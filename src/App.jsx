@@ -12,6 +12,7 @@ const pageStyle = {
   fontFamily: 'Arial, sans-serif',
   backgroundColor: '#f0f8ff', // <--- CAMBIO
   borderRadius: 10
+  };
   
 function OrderForm({ onAddOrder }) {
   const [cliente, setCliente] = useState('');
