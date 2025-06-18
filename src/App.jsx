@@ -63,6 +63,7 @@ function KitchenView({ orders }) {
   };
 
   const handleSelectCocinero = (firebaseKey, valor) => {
+    if (!valor) return;
     const now = new Date().toLocaleTimeString();
     const updates = {
       cocinero: valor,
@@ -87,8 +88,11 @@ function KitchenView({ orders }) {
   const handleClickEstado = (order) => {
     if (editingId === order.firebaseKey || order.estado === 'Cancelado') return;
     const now = new Date().toLocaleTimeString();
-    if (order.estado === 'Pendiente') update(ref(database, `orders/${order.firebaseKey}`), { estado: 'En preparación', timestampPreparacion: now });
-    else if (order.estado === 'En preparación') update(ref(database, `orders/${order.firebaseKey}`), { estado: 'Preparado', timestampPreparado: now });
+    if (order.estado === 'Pendiente') {
+      update(ref(database, `orders/${order.firebaseKey}`), { estado: 'En preparación', timestampPreparacion: now });
+    } else if (order.estado === 'En preparación') {
+      update(ref(database, `orders/${order.firebaseKey}`), { estado: 'Preparado', timestampPreparado: now });
+    }
   };
 
   const handleDoubleClickEstado = (order) => {
@@ -97,7 +101,9 @@ function KitchenView({ orders }) {
 
   const handleCancelar = (e, order) => {
     e.stopPropagation();
-    updateCampo(order.firebaseKey, 'estado', 'Cancelado');
+    if (window.confirm("¿Estás seguro de cancelar este pedido?")) {
+      updateCampo(order.firebaseKey, 'estado', 'Cancelado');
+    }
   };
 
   const handleDeshacer = (e, order) => {
@@ -111,6 +117,8 @@ function KitchenView({ orders }) {
       const now = new Date().toISOString().slice(0, 10);
       if (latestOrder.fecha === now && latestOrder.justAdded) {
         audioRef.current.play();
+        const orderRef = ref(database, `orders/${latestOrder.firebaseKey}`);
+        update(orderRef, { justAdded: false });
       }
     }
   }, [orders]);
@@ -128,7 +136,7 @@ function KitchenView({ orders }) {
         <p>No hay pedidos para hoy</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {orders.map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey, cocinero }) => {
+          {orders.map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey, cocinero, timestampIngreso, timestampPreparacion, timestampPreparado }) => {
             const { background, border } = getColors(estado);
             const isEditing = editingId === firebaseKey;
             const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
@@ -136,13 +144,25 @@ function KitchenView({ orders }) {
             return (
               <li
                 key={firebaseKey}
-                style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8, cursor: isEditing ? 'default' : estado === 'Cancelado' ? 'not-allowed' : 'pointer', userSelect: isEditing ? 'text' : 'none', display: 'flex', flexDirection: 'column', position: 'relative' }}
+                style={{
+                  backgroundColor: background,
+                  border: `2px solid ${border}`,
+                  marginBottom: 10,
+                  padding: 15,
+                  borderRadius: 8,
+                  cursor: isEditing ? 'default' : estado === 'Cancelado' ? 'not-allowed' : 'pointer',
+                  userSelect: isEditing ? 'text' : 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative'
+                }}
                 onClick={() => handleClickEstado({ firebaseKey, estado })}
                 onDoubleClick={() => handleDoubleClickEstado({ firebaseKey, estado })}
               >
                 <div>
                   <strong style={textStyle}>#{id} - Cliente:</strong> <span style={textStyle}>{cliente}</span>
                 </div>
+
                 <div style={{ marginTop: 5 }}>
                   <strong style={textStyle}>Pedido:</strong>{' '}
                   {isEditing ? (
@@ -163,10 +183,15 @@ function KitchenView({ orders }) {
                     >✏️ Editar</button>
                   )}
                 </div>
-                {estado === 'Pendiente' && (
+
+                {estado !== 'Preparado' && estado !== 'Cancelado' && (
                   <div style={{ marginTop: 8 }}>
                     <label><strong>Seleccionar cocinero:</strong></label>
-                    <select onChange={(e) => handleSelectCocinero(firebaseKey, e.target.value)} defaultValue="">
+                    <select
+                      onChange={(e) => handleSelectCocinero(firebaseKey, e.target.value)}
+                      value={cocinero || ''}
+                      style={{ marginTop: 4, fontSize: 16, padding: 4 }}
+                    >
                       <option value="" disabled>Seleccionar...</option>
                       {cocineros.map((c) => (
                         <option key={c} value={c}>{c}</option>
@@ -174,6 +199,14 @@ function KitchenView({ orders }) {
                     </select>
                   </div>
                 )}
+
+                {cocinero && (
+                  <div style={{ marginTop: 5 }}>
+                    <strong>Cocinero:</strong>{' '}
+                    <span style={{ backgroundColor: '#eee', padding: '2px 6px', borderRadius: 4 }}>{cocinero}</span>
+                  </div>
+                )}
+
                 <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 15, userSelect: 'none' }}>
                   <strong>Estado:</strong>
                   <span>{estado}</span>
@@ -184,6 +217,13 @@ function KitchenView({ orders }) {
                     <button onClick={(e) => handleDeshacer(e, { firebaseKey, estado })} style={{ marginLeft: 'auto', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Deshacer</button>
                   )}
                 </div>
+
+                <div style={{ marginTop: 5, fontSize: 12, color: '#555' }}>
+                  {timestampIngreso && <span>Ingreso: {timestampIngreso} </span>}
+                  {timestampPreparacion && <span> / Preparación: {timestampPreparacion}</span>}
+                  {timestampPreparado && <span> / Listo: {timestampPreparado}</span>}
+                </div>
+
                 <small style={{ marginTop: 5, color: '#666', fontSize: 12 }}>(clic para cambiar, doble clic para volver de "Preparado")</small>
               </li>
             );
@@ -193,6 +233,7 @@ function KitchenView({ orders }) {
     </div>
   );
 }
+
 
 function App() {
   const [orders, setOrders] = useState([]);
