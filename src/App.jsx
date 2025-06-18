@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+// App.js
+import React, { useState, useEffect, useRef } from 'react';
 import { database } from './firebase';
 import { ref, push, onValue, update } from 'firebase/database';
 import logo from './logo.svg';
+import pedidoSound from './pedido.mp3';
 
-const preparadores = [
-  'Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Jose Orozco', 'Otro'
-];
+function OrderForm({ onAddOrder }) {
+  const [cliente, setCliente] = useState('');
+  const [pedido, setPedido] = useState('');
 
-const handleSubmit = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!cliente.trim() || !pedido.trim()) return;
     const fecha = new Date().toISOString().slice(0, 10);
@@ -35,7 +37,7 @@ const handleSubmit = (e) => {
         style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10, resize: 'vertical' }}
         required
       />
-      <button type="submit" style={{ padding: '10px 20px', fontSize: 16 }}>
+      <button type="submit" style={{ padding: '10px 20px', fontSize: 16, backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: 6 }}>
         Agregar Pedido
       </button>
     </form>
@@ -130,7 +132,7 @@ function KitchenView({ orders }) {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Pedidos en Cocina</h2>
+      <h2 style={{ fontSize: 24, marginBottom: 20 }}>Pedidos en Cocina</h2>
       <audio ref={audioRef} src={pedidoSound} preload="auto" />
       {orders.length === 0 ? (
         <p>No hay pedidos para hoy</p>
@@ -149,12 +151,13 @@ function KitchenView({ orders }) {
                   border: `2px solid ${border}`,
                   marginBottom: 10,
                   padding: 15,
-                  borderRadius: 8,
+                  borderRadius: 12,
                   cursor: isEditing ? 'default' : estado === 'Cancelado' ? 'not-allowed' : 'pointer',
                   userSelect: isEditing ? 'text' : 'none',
                   display: 'flex',
                   flexDirection: 'column',
-                  position: 'relative'
+                  position: 'relative',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                 }}
                 onClick={() => handleClickEstado({ firebaseKey, estado })}
                 onDoubleClick={() => handleDoubleClickEstado({ firebaseKey, estado })}
@@ -167,14 +170,14 @@ function KitchenView({ orders }) {
                   <strong style={textStyle}>Pedido:</strong>{' '}
                   {isEditing ? (
                     <>
-                      <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%', resize: 'vertical', fontSize: '20px' }} />
+                      <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%', resize: 'vertical', fontSize: '18px' }} />
                       <div style={{ marginTop: 6 }}>
                         <button onClick={() => saveEdit(firebaseKey)}>Guardar</button>
                         <button onClick={() => setEditingId(null)} style={{ marginLeft: 8 }}>Cancelar</button>
                       </div>
                     </>
                   ) : (
-                    <pre style={{ whiteSpace: 'pre-wrap', margin: '5px 0', display: 'inline-block', fontSize: '20px', ...textStyle }}>{pedido}</pre>
+                    <pre style={{ whiteSpace: 'pre-wrap', margin: '5px 0', display: 'inline-block', fontSize: '18px', ...textStyle }}>{pedido}</pre>
                   )}
                   {!isEditing && (
                     <button
@@ -233,7 +236,6 @@ function KitchenView({ orders }) {
     </div>
   );
 }
-
 
 function App() {
   const [orders, setOrders] = useState([]);
