@@ -1,19 +1,8 @@
-// App.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { database } from './firebase';
 import { ref, push, onValue, update } from 'firebase/database';
 import logo from './logo.svg';
-import pedidoSound from './pedido.mp3';
 
-const pageStyle = {
-  maxWidth: 900,
-  margin: '20px auto',
-  padding: 20,
-  fontFamily: 'Arial, sans-serif',
-  backgroundColor: '#f0f8ff', // <--- CAMBIO
-  borderRadius: 10
-  };
-  
 function OrderForm({ onAddOrder }) {
   const [cliente, setCliente] = useState('');
   const [pedido, setPedido] = useState('');
@@ -22,8 +11,7 @@ function OrderForm({ onAddOrder }) {
     e.preventDefault();
     if (!cliente.trim() || !pedido.trim()) return;
     const fecha = new Date().toISOString().slice(0, 10);
-    const hora = new Date().toLocaleTimeString();
-    onAddOrder({ cliente, pedido, fecha, hora });
+    onAddOrder({ cliente, pedido, fecha });
     setCliente('');
     setPedido('');
   };
@@ -46,7 +34,7 @@ function OrderForm({ onAddOrder }) {
         style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10, resize: 'vertical' }}
         required
       />
-      <button type="submit" style={{ padding: '10px 20px', fontSize: 16, backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: 6 }}>
+      <button type="submit" style={{ padding: '10px 20px', fontSize: 16 }}>
         Agregar Pedido
       </button>
     </form>
@@ -66,23 +54,10 @@ function getColors(estado) {
 function KitchenView({ orders }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
-  const audioRef = useRef(null);
 
   const updateCampo = (firebaseKey, campo, valor) => {
     const orderRef = ref(database, `orders/${firebaseKey}`);
     update(orderRef, { [campo]: valor });
-  };
-
-  const handleSelectCocinero = (firebaseKey, valor) => {
-    if (!valor) return;
-    const now = new Date().toLocaleTimeString();
-    const updates = {
-      cocinero: valor,
-      estado: 'En preparación',
-      timestampPreparacion: now
-    };
-    const orderRef = ref(database, `orders/${firebaseKey}`);
-    update(orderRef, updates);
   };
 
   const startEdit = (firebaseKey, currentText) => {
@@ -98,12 +73,8 @@ function KitchenView({ orders }) {
 
   const handleClickEstado = (order) => {
     if (editingId === order.firebaseKey || order.estado === 'Cancelado') return;
-    const now = new Date().toLocaleTimeString();
-    if (order.estado === 'Pendiente') {
-      update(ref(database, `orders/${order.firebaseKey}`), { estado: 'En preparación', timestampPreparacion: now });
-    } else if (order.estado === 'En preparación') {
-      update(ref(database, `orders/${order.firebaseKey}`), { estado: 'Preparado', timestampPreparado: now });
-    }
+    if (order.estado === 'Pendiente') updateCampo(order.firebaseKey, 'estado', 'En preparación');
+    else if (order.estado === 'En preparación') updateCampo(order.firebaseKey, 'estado', 'Preparado');
   };
 
   const handleDoubleClickEstado = (order) => {
@@ -112,9 +83,7 @@ function KitchenView({ orders }) {
 
   const handleCancelar = (e, order) => {
     e.stopPropagation();
-    if (window.confirm("¿Estás seguro de cancelar este pedido?")) {
-      updateCampo(order.firebaseKey, 'estado', 'Cancelado');
-    }
+    updateCampo(order.firebaseKey, 'estado', 'Cancelado');
   };
 
   const handleDeshacer = (e, order) => {
@@ -122,32 +91,14 @@ function KitchenView({ orders }) {
     updateCampo(order.firebaseKey, 'estado', 'Pendiente');
   };
 
-  useEffect(() => {
-    if (audioRef.current && orders.length > 0) {
-      const latestOrder = orders[0];
-      const now = new Date().toISOString().slice(0, 10);
-      if (latestOrder.fecha === now && latestOrder.justAdded) {
-        audioRef.current.play();
-        const orderRef = ref(database, `orders/${latestOrder.firebaseKey}`);
-        update(orderRef, { justAdded: false });
-      }
-    }
-  }, [orders]);
-
-  const cocineros = [
-    'Noel Hernandez', 'Julio Amador', 'Roberto Centeno',
-    'Maria Gomez', 'Daniel Cruz', 'Jose Orozco', 'Otro'
-  ];
-
   return (
     <div style={{ padding: 20 }}>
-      <h2 style={{ fontSize: 24, marginBottom: 20 }}>Pedidos en Cocina</h2>
-      <audio ref={audioRef} src={pedidoSound} preload="auto" />
+      <h2>Pedidos en Cocina</h2>
       {orders.length === 0 ? (
         <p>No hay pedidos para hoy</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {orders.map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey, cocinero, timestampIngreso, timestampPreparacion, timestampPreparado }) => {
+          {orders.map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey }) => {
             const { background, border } = getColors(estado);
             const isEditing = editingId === firebaseKey;
             const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
@@ -155,38 +106,25 @@ function KitchenView({ orders }) {
             return (
               <li
                 key={firebaseKey}
-                style={{
-                  backgroundColor: background,
-                  border: `2px solid ${border}`,
-                  marginBottom: 10,
-                  padding: 15,
-                  borderRadius: 12,
-                  cursor: isEditing ? 'default' : estado === 'Cancelado' ? 'not-allowed' : 'pointer',
-                  userSelect: isEditing ? 'text' : 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  position: 'relative',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                }}
+                style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8, cursor: isEditing ? 'default' : estado === 'Cancelado' ? 'not-allowed' : 'pointer', userSelect: isEditing ? 'text' : 'none', display: 'flex', flexDirection: 'column', position: 'relative' }}
                 onClick={() => handleClickEstado({ firebaseKey, estado })}
                 onDoubleClick={() => handleDoubleClickEstado({ firebaseKey, estado })}
               >
                 <div>
                   <strong style={textStyle}>#{id} - Cliente:</strong> <span style={textStyle}>{cliente}</span>
                 </div>
-
                 <div style={{ marginTop: 5 }}>
                   <strong style={textStyle}>Pedido:</strong>{' '}
                   {isEditing ? (
                     <>
-                      <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%', resize: 'vertical', fontSize: '18px' }} />
+                      <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%', resize: 'vertical', fontSize: '20px' }} />
                       <div style={{ marginTop: 6 }}>
                         <button onClick={() => saveEdit(firebaseKey)}>Guardar</button>
                         <button onClick={() => setEditingId(null)} style={{ marginLeft: 8 }}>Cancelar</button>
                       </div>
                     </>
                   ) : (
-                    <pre style={{ whiteSpace: 'pre-wrap', margin: '5px 0', display: 'inline-block', fontSize: '18px', ...textStyle }}>{pedido}</pre>
+                    <pre style={{ whiteSpace: 'pre-wrap', margin: '5px 0', display: 'inline-block', fontSize: '20px', ...textStyle }}>{pedido}</pre>
                   )}
                   {!isEditing && (
                     <button
@@ -195,29 +133,6 @@ function KitchenView({ orders }) {
                     >✏️ Editar</button>
                   )}
                 </div>
-
-                {estado !== 'Preparado' && estado !== 'Cancelado' && (
-                  <div style={{ marginTop: 8 }}>
-                    <label><strong>Seleccionar cocinero:</strong></label>
-                    <select
-                      onChange={(e) => handleSelectCocinero(firebaseKey, e.target.value)}
-                      value={cocinero || ''}
-                      style={{ marginTop: 4, fontSize: 16, padding: 4 }}
-                    >
-                      <option value="" disabled>Seleccionar...</option>
-                      {cocineros.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {cocinero && (
-                  <div style={{ marginTop: 5 }}>
-                    <strong>Cocinero:</strong>{' '}
-                    <span style={{ backgroundColor: '#eee', padding: '2px 6px', borderRadius: 4 }}>{cocinero}</span>
-                  </div>
-                )}
 
                 <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 15, userSelect: 'none' }}>
                   <strong>Estado:</strong>
@@ -229,13 +144,6 @@ function KitchenView({ orders }) {
                     <button onClick={(e) => handleDeshacer(e, { firebaseKey, estado })} style={{ marginLeft: 'auto', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Deshacer</button>
                   )}
                 </div>
-
-                <div style={{ marginTop: 5, fontSize: 12, color: '#555' }}>
-                  {timestampIngreso && <span>Ingreso: {timestampIngreso} </span>}
-                  {timestampPreparacion && <span> / Preparación: {timestampPreparacion}</span>}
-                  {timestampPreparado && <span> / Listo: {timestampPreparado}</span>}
-                </div>
-
                 <small style={{ marginTop: 5, color: '#666', fontSize: 12 }}>(clic para cambiar, doble clic para volver de "Preparado")</small>
               </li>
             );
@@ -246,9 +154,45 @@ function KitchenView({ orders }) {
   );
 }
 
+function ListView({ orders }) {
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Lista de pedidos de hoy</h2>
+      {orders.length === 0 ? (
+        <p>No hay pedidos aún</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th>#</th><th>Cliente</th><th>Pedido</th><th>Estado</th><th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map(({ id, cliente, pedido, estado, fecha }) => {
+              const { background, border } = getColors(estado);
+              const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
+              return (
+                <tr key={`${fecha}-${id}`} style={{ backgroundColor: background, border: `2px solid ${border}` }}>
+                  <td style={{ padding: '8px', ...textStyle }}>{id}</td>
+                  <td style={{ padding: '8px', ...textStyle }}>{cliente}</td>
+                  <td style={{ padding: '8px', whiteSpace: 'pre-wrap', ...textStyle }}>{pedido}</td>
+                  <td style={{ padding: '8px', ...textStyle }}>{estado}</td>
+                  <td style={{ padding: '8px', ...textStyle }}>{fecha}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [orders, setOrders] = useState([]);
   const [view, setView] = useState('ingreso');
+  const [todayOrders, setTodayOrders] = useState([]);
+  const [previousOrders, setPreviousOrders] = useState([]);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -256,35 +200,35 @@ function App() {
     onValue(ordersRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const grouped = Object.entries(data).reduce((acc, [key, val]) => {
-          const fecha = val.fecha;
-          if (!acc[fecha]) acc[fecha] = [];
-          acc[fecha].push({ firebaseKey: key, ...val });
-          return acc;
-        }, {});
+        const groupedByDate = {};
+        Object.entries(data).forEach(([key, val]) => {
+          const fecha = val.fecha || 'sin-fecha';
+          if (!groupedByDate[fecha]) groupedByDate[fecha] = [];
+          groupedByDate[fecha].push({ firebaseKey: key, ...val });
+        });
 
-        const pedidosHoy = (grouped[today] || []).sort((a, b) => b.timestampIngreso?.localeCompare(a.timestampIngreso));
-        pedidosHoy.forEach((pedido, idx) => pedido.id = pedidosHoy.length - idx);
-        const anteriores = Object.entries(grouped)
-          .filter(([fecha]) => fecha !== today)
-          .flatMap(([fecha, arr]) => arr.map((p, idx) => ({ ...p, fecha, id: idx + 1 })));
+        const fechasOrdenadas = Object.keys(groupedByDate).sort();
+        let parsed = [];
+        fechasOrdenadas.forEach((fecha) => {
+          const pedidos = groupedByDate[fecha].sort((a, b) => a.firebaseKey.localeCompare(b.firebaseKey));
+          pedidos.forEach((pedido, index) => {
+            parsed.push({ id: index + 1, ...pedido, fecha });
+          });
+        });
 
-        setOrders({ hoy: pedidosHoy, anteriores });
+        setOrders(parsed);
+        setTodayOrders(parsed.filter((p) => p.fecha === today));
+        setPreviousOrders(parsed.filter((p) => p.fecha !== today));
       } else {
-        setOrders({ hoy: [], anteriores: [] });
+        setOrders([]);
+        setTodayOrders([]);
+        setPreviousOrders([]);
       }
     });
   }, []);
 
-  const addOrder = ({ cliente, pedido, fecha, hora }) => {
-    push(ref(database, 'orders'), {
-      cliente,
-      pedido,
-      estado: 'Pendiente',
-      fecha,
-      timestampIngreso: new Date().toLocaleTimeString(),
-      justAdded: true
-    });
+  const addOrder = ({ cliente, pedido, fecha }) => {
+    push(ref(database, 'orders'), { cliente, pedido, estado: 'Pendiente', fecha });
   };
 
   return (
@@ -297,13 +241,15 @@ function App() {
         <div>
           <button onClick={() => setView('ingreso')} disabled={view === 'ingreso'} style={{ marginRight: 8 }}>Ingresar</button>
           <button onClick={() => setView('cocina')} disabled={view === 'cocina'} style={{ marginRight: 8 }}>Cocina</button>
+          <button onClick={() => setView('lista')} disabled={view === 'lista'} style={{ marginRight: 8 }}>Lista</button>
           <button onClick={() => setView('anteriores')} disabled={view === 'anteriores'}>Anteriores</button>
         </div>
       </header>
 
       {view === 'ingreso' && <OrderForm onAddOrder={addOrder} />}
-      {view === 'cocina' && <KitchenView orders={orders.hoy || []} />}
-      {view === 'anteriores' && <KitchenView orders={orders.anteriores || []} />}
+      {view === 'cocina' && <KitchenView orders={todayOrders} />}
+      {view === 'lista' && <ListView orders={todayOrders} />}
+      {view === 'anteriores' && <ListView orders={previousOrders} />}
     </div>
   );
 }
