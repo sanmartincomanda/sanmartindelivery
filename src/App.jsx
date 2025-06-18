@@ -5,6 +5,14 @@ import { ref, push, onValue, update } from 'firebase/database';
 import logo from './logo.svg';
 import pedidoSound from './pedido.mp3';
 
+const pageStyle = {
+  maxWidth: 900,
+  margin: '20px auto',
+  padding: 20,
+  fontFamily: 'Arial, sans-serif',
+  backgroundColor: '#f0f8ff', // <--- CAMBIO
+  borderRadius: 10
+  
 function OrderForm({ onAddOrder }) {
   const [cliente, setCliente] = useState('');
   const [pedido, setPedido] = useState('');
