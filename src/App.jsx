@@ -57,10 +57,16 @@ function getColors(estado) {
 }
 
 function ListaPedidos({ pedidos }) {
-  const repartidores = ['Carlos Mora', 'Noel Hernadez', 'Noel Bendaña', 'Jose Orozco', 'Daniel Cruz', 'Otros'];
+  const repartidores = [
+    'Carlos Mora',
+    'Noel Hernadez',
+    'Noel Bendaña',
+    'Jose Orozco',
+    'Daniel Cruz',
+    'Otros'
+  ];
 
-    const handleEnviar = (firebaseKey, repartidor) => {
-    if (!repartidor) return;
+  const handleEnviar = (firebaseKey, repartidor) => {
     update(ref(database, `orders/${firebaseKey}`), {
       estado: 'Enviado',
       repartidor
@@ -74,36 +80,34 @@ function ListaPedidos({ pedidos }) {
         {pedidos.map(({ id, cliente, estado, cocinero, repartidor, firebaseKey }) => {
           const { background, border } = getColors(estado);
           const parpadeo = estado === 'Preparado' ? 'parpadeo' : '';
+          const estiloItem = {
+            padding: 10,
+            borderBottom: '1px solid #ccc',
+            backgroundColor: background,
+            border: `2px solid ${border}`,
+            borderRadius: 6,
+            marginBottom: 8
+          };
 
           return (
-            <li
-              key={id}
-              className={parpadeo}
-              style={{
-                padding: 10,
-                borderBottom: '1px solid #ccc',
-                backgroundColor: background,
-                border: `2px solid ${border}`,
-                borderRadius: 6,
-                marginBottom: 8
-              }}
-            >
+            <li key={firebaseKey} className={parpadeo} style={estiloItem}>
               <strong>#{id}</strong> - {cliente} - <em>{estado}</em>
               {estado === 'En preparación' && cocinero && (
                 <> (Cocinero: <strong>{cocinero}</strong>)</>
               )}
+              {estado === 'Enviado' && repartidor && (
+                <> (Repartidor: <strong>{repartidor}</strong>)</>
+              )}
+
               {estado === 'Preparado' && (
                 <div style={{ marginTop: 6 }}>
                   <label>Enviar pedido con: </label>
                   <select defaultValue="" onChange={(e) => handleEnviar(firebaseKey, e.target.value)}>
                     <option value="" disabled>Seleccionar...</option>
-                    {repartidores.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {repartidores.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
                   </select>
-                </div>
-              )}
-              {estado === 'Enviado' && repartidor && (
-                <div style={{ marginTop: 6 }}>
-                  <strong>Repartidor: {repartidor}</strong>
                 </div>
               )}
             </li>
