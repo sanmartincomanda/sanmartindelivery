@@ -59,7 +59,8 @@ function getColors(estado) {
 function ListaPedidos({ pedidos }) {
   const repartidores = ['Carlos Mora', 'Noel Hernadez', 'Noel Bendaña', 'Jose Orozco', 'Daniel Cruz', 'Otros'];
 
-  const handleEnviar = (firebaseKey, repartidor) => {
+    const handleEnviar = (firebaseKey, repartidor) => {
+    if (!repartidor) return;
     update(ref(database, `orders/${firebaseKey}`), {
       estado: 'Enviado',
       repartidor
@@ -70,7 +71,7 @@ function ListaPedidos({ pedidos }) {
     <div style={{ padding: 20 }}>
       <h2>Lista de Pedidos de Hoy</h2>
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {pedidos.map(({ id, cliente, estado, cocinero, firebaseKey }) => {
+        {pedidos.map(({ id, cliente, estado, cocinero, repartidor, firebaseKey }) => {
           const { background, border } = getColors(estado);
           const parpadeo = estado === 'Preparado' ? 'parpadeo' : '';
 
@@ -100,6 +101,11 @@ function ListaPedidos({ pedidos }) {
                   </select>
                 </div>
               )}
+              {estado === 'Enviado' && repartidor && (
+                <div style={{ marginTop: 6 }}>
+                  <strong>Repartidor: {repartidor}</strong>
+                </div>
+              )}
             </li>
           );
         })}
@@ -107,6 +113,7 @@ function ListaPedidos({ pedidos }) {
     </div>
   );
 }
+
 function KitchenView({ orders }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
