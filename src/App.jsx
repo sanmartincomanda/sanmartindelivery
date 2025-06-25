@@ -6,22 +6,33 @@ import logo from './logo.svg';
 import pedidoSound from './pedido.mp3';
 import './App.css'; // Asegúrate de que este archivo exista para animaciones
 
-function OrderForm({ onAddOrder }) {
+function OrderForm({ onAddOrder, nextOrderId }) {
   const [cliente, setCliente] = useState('');
   const [pedido, setPedido] = useState('');
+  const [customId, setCustomId] = useState(nextOrderId);
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!cliente.trim() || !pedido.trim()) return;
     const fecha = new Date().toISOString().slice(0, 10);
     const hora = new Date().toLocaleTimeString();
-    onAddOrder({ cliente, pedido, fecha, hora });
+    onAddOrder({ cliente, pedido, fecha, hora, id: customId });
     setCliente('');
     setPedido('');
-  };
+    setCustomId((prev) => Math.min(prev + 1, 100));
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
+      <label>Número de pedido:</label>
+      <input
+        type="number"
+        value={customId}
+        onChange={(e) => setCustomId(parseInt(e.target.value))}
+        min={1}
+        max={100}
+        style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10 }}
+      />
       <input
         type="text"
         placeholder="Nombre del cliente"
@@ -45,6 +56,7 @@ function OrderForm({ onAddOrder }) {
   );
 }
 
+
 function getColors(estado) {
   switch (estado) {
     case 'Pendiente': return { background: '#d1ecf1', border: '#0c5460' };
@@ -60,9 +72,11 @@ function ListaPedidos({ pedidos }) {
   const repartidores = ['Carlos Mora', 'Noel Hernadez', 'Noel Bendaña', 'Jose Orozco', 'Daniel Cruz', 'Otros'];
 
   const handleEnviar = (firebaseKey, repartidor) => {
+    const now = new Date().toLocaleTimeString();
     update(ref(database, `orders/${firebaseKey}`), {
       estado: 'Enviado',
-      repartidor
+      repartidor,
+      timestampEnviado: now
     });
   };
 
@@ -100,11 +114,15 @@ function ListaPedidos({ pedidos }) {
                   </select>
                 </div>
               )}
-              {estado === 'Enviado' && repartidor && (
+              {estado === 'Enviado' && (
                 <div style={{ marginTop: 6 }}>
-                  <strong>Repartidor:</strong> {repartidor}
+                  <small>Preparado por: <strong>{cocinero}</strong></small><br />
+                  <small>Repartidor: <strong>{repartidor}</strong></small><br />
+                  <small>Enviado a las: {timestampEnviado}</small>
                 </div>
               )}
+              {timestampPreparacion && <div><small>Inicio: {timestampPreparacion}</small></div>}
+              {timestampPreparado && <div><small>Preparado: {timestampPreparado}</small></div>}
             </li>
           );
         })}
@@ -186,76 +204,80 @@ function KitchenView({ orders }) {
         <p>No hay pedidos para hoy</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {[...orders].reverse().map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey, cocinero }) => {
-            const isEditing = editingId === firebaseKey;
-            const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
-            const { background, border } = getColors(estado);
+          {[...orders]
+            .filter(order => order.estado !== 'Enviado')
+            .sort((a, b) => a.id - b.id)
+            .map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey, cocinero }) => {
+              const isEditing = editingId === firebaseKey;
+              const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
+              const { background, border } = getColors(estado);
 
-            return (
-              <li
-                key={firebaseKey}
-                style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8 }}
-              >
-                <div>
-                  <strong style={textStyle}>#{id} - Cliente:</strong> <span style={textStyle}>{cliente}</span>
-                </div>
-                <div style={{ marginTop: 5 }}>
-                  <strong style={textStyle}>Pedido:</strong>{' '}
-                  {isEditing ? (
-                    <>
-                      <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%', resize: 'vertical', fontSize: '20px' }} />
-                      <div style={{ marginTop: 6 }}>
-                        <button onClick={() => saveEdit(firebaseKey)}>Guardar</button>
-                        <button onClick={() => setEditingId(null)} style={{ marginLeft: 8 }}>Cancelar</button>
-                      </div>
-                    </>
-                  ) : (
-                    <pre style={{ whiteSpace: 'pre-wrap', margin: '5px 0', fontSize: '20px', ...textStyle }}>{pedido}</pre>
-                  )}
-                  {!isEditing && (
-                    <button
-                      onClick={() => startEdit(firebaseKey, pedido)}
-                      style={{ marginLeft: 8, padding: '2px 6px' }}
-                    >✏️ Editar</button>
-                  )}
-                </div>
-                {estado === 'Pendiente' && (
-                  <div style={{ marginTop: 8 }}>
-                    <label><strong>Seleccionar cocinero:</strong></label>
-                    <select onChange={(e) => handleSelectCocinero(firebaseKey, e.target.value)} defaultValue="">
-                      <option value="" disabled>Seleccionar...</option>
-                      {cocineros.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+              return (
+                <li
+                  key={firebaseKey}
+                  style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8 }}
+                >
+                  <div>
+                    <strong style={textStyle}>#{id} - Cliente:</strong> <span style={textStyle}>{cliente}</span>
                   </div>
-                )}
-                {estado === 'En preparación' && (
-                  <div style={{ marginTop: 10 }}>
-                    <strong>Cocinero: {cocinero}</strong>
-                    <button onClick={() => marcarPreparado(firebaseKey)} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 5, marginLeft: 10 }}>
-                      ✅ Marcar como Preparado
-                    </button>
+                  <div style={{ marginTop: 5 }}>
+                    <strong style={textStyle}>Pedido:</strong>{' '}
+                    {isEditing ? (
+                      <>
+                        <textarea rows={3} value={editText} onChange={(e) => setEditText(e.target.value)} style={{ width: '100%', resize: 'vertical', fontSize: '20px' }} />
+                        <div style={{ marginTop: 6 }}>
+                          <button onClick={() => saveEdit(firebaseKey)}>Guardar</button>
+                          <button onClick={() => setEditingId(null)} style={{ marginLeft: 8 }}>Cancelar</button>
+                        </div>
+                      </>
+                    ) : (
+                      <pre style={{ whiteSpace: 'pre-wrap', margin: '5px 0', fontSize: '20px', ...textStyle }}>{pedido}</pre>
+                    )}
+                    {!isEditing && (
+                      <button
+                        onClick={() => startEdit(firebaseKey, pedido)}
+                        style={{ marginLeft: 8, padding: '2px 6px' }}
+                      >✏️ Editar</button>
+                    )}
                   </div>
-                )}
-                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 15 }}>
-                  <strong>Estado:</strong>
-                  <span>{estado}</span>
-                  {estado !== 'Cancelado' && (
-                    <button onClick={(e) => handleCancelar(e, { firebaseKey, estado })} style={{ marginLeft: 'auto', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancelar</button>
+                  {estado === 'Pendiente' && (
+                    <div style={{ marginTop: 8 }}>
+                      <label><strong>Seleccionar cocinero:</strong></label>
+                      <select onChange={(e) => handleSelectCocinero(firebaseKey, e.target.value)} defaultValue="">
+                        <option value="" disabled>Seleccionar...</option>
+                        {cocineros.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
                   )}
-                  {estado === 'Cancelado' && (
-                    <button onClick={(e) => handleDeshacer(e, { firebaseKey, estado })} style={{ marginLeft: 'auto', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Deshacer</button>
+                  {estado === 'En preparación' && (
+                    <div style={{ marginTop: 10 }}>
+                      <strong>Cocinero: {cocinero}</strong>
+                      <button onClick={() => marcarPreparado(firebaseKey)} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '6px 12px', borderRadius: 5, marginLeft: 10 }}>
+                        ✅ Marcar como Preparado
+                      </button>
+                    </div>
                   )}
-                </div>
-              </li>
-            );
-          })}
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 15 }}>
+                    <strong>Estado:</strong>
+                    <span>{estado}</span>
+                    {estado !== 'Cancelado' && (
+                      <button onClick={(e) => handleCancelar(e, { firebaseKey, estado })} style={{ marginLeft: 'auto', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Cancelar</button>
+                    )}
+                    {estado === 'Cancelado' && (
+                      <button onClick={(e) => handleDeshacer(e, { firebaseKey, estado })} style={{ marginLeft: 'auto', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer' }}>Deshacer</button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
         </ul>
       )}
     </div>
   );
 }
+
 
 function App() {
   const [orders, setOrders] = useState([]);
