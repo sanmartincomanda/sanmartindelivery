@@ -1,0 +1,1 @@
+.parpadeo{animation:blink 1s infinite}@keyframes blink{0%,to{opacity:1}50%{opacity:.4}}body{font-family:Arial,sans-serif}input,textarea{width:100%;margin-bottom:10px}button{margin-top:5px}
