@@ -109,6 +109,7 @@ function ListaPedidos({ pedidos, onEnviarPedido }) {
 }
 
 function KitchenView({ orders }) {
+  
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const audioRef = useRef(null);
@@ -151,7 +152,7 @@ function KitchenView({ orders }) {
   const pedidosFiltrados = orders.filter(o => o.estado !== 'Enviado');
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, fontSize: '20px' }}>
       <h2>Pedidos en Cocina</h2>
       <audio ref={audioRef} src={pedidoSound} preload="auto" />
       {pedidosFiltrados.length === 0 ? (
@@ -167,7 +168,9 @@ function KitchenView({ orders }) {
               <li key={firebaseKey} style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8 }}>
                 <div><strong>#{id} - Cliente:</strong> {cliente}</div>
                 <div style={{ marginTop: 5 }}>
-                  <strong>Pedido:</strong> {pedido}
+                  <strong>Pedido:</strong>
+                  <pre style={{ whiteSpace: 'pre-wrap', marginTop: 5 }}>{pedido}</pre>
+
                 </div>
                 {estado === 'Pendiente' && (
                   <div style={{ marginTop: 8 }}>
