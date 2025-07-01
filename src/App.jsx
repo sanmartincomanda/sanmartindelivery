@@ -169,9 +169,26 @@ function KitchenView({ orders }) {
                 <div><strong>#{id} - Cliente:</strong> {cliente}</div>
                 <div style={{ marginTop: 5 }}>
                   <strong>Pedido:</strong>
-                  <pre style={{ whiteSpace: 'pre-wrap', marginTop: 5 }}>{pedido}</pre>
-
-                </div>
+                                    {isEditing ? (
+                    <>
+                      <textarea
+                        rows={3}
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        style={{ width: '100%', fontSize: '16px', resize: 'vertical', marginTop: 5 }}
+                      />
+                      <div style={{ marginTop: 5 }}>
+                        <button onClick={() => { updateCampo(firebaseKey, 'pedido', editText); setEditingId(null); }}>Guardar</button>
+                        <button onClick={() => setEditingId(null)} style={{ marginLeft: 10 }}>Cancelar</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <pre style={{ whiteSpace: 'pre-wrap', marginTop: 5 }}>{pedido}</pre>
+                      <button onClick={() => { setEditingId(firebaseKey); setEditText(pedido); }} style={{ marginTop: 5 }}>✏️ Editar</button>
+                    </>
+                  )}
+                </div>                  
                 {estado === 'Pendiente' && (
                   <div style={{ marginTop: 8 }}>
                     <label>Seleccionar cocinero:</label>
