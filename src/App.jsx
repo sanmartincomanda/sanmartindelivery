@@ -214,91 +214,67 @@ function KitchenView({ orders }) {
     </div>
   );
 }
-function exportarAExcel(pedidos) {
-  const rows = pedidos
-    .filter(p => p.estado !== 'Cancelado')
-    .map(p => ({
-      ID: p.id,
-      Cliente: p.cliente,
-      Pedido: p.pedido.replace(/\n/g, ' '),
-      Estado: p.estado,
-      Ingreso: p.timestampIngreso || '-',
-      Preparación: p.timestampPreparacion || '-',
-      Preparado: p.timestampPreparado || '-',
-      Enviado: p.timestampEnviado || '-',
-      Cocinero: p.cocinero || '-',
-      Repartidor: p.repartidor || '-'
-    }));
-
-  const csvContent =
-    'data:text/csv;charset=utf-8,' +
-    [
-      Object.keys(rows[0]).join(','),
-      ...rows.map(r => Object.values(r).join(','))
-    ].join('\n');
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', 'historial_pedidos.csv');
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
 function Anteriores({ pedidos }) {
-  const pedidosPorFecha = pedidos.filter(p => p.estado !== 'Cancelado').reduce((acc, p) => {
-    if (!acc[p.fecha]) acc[p.fecha] = [];
-    acc[p.fecha].push(p);
-    return acc;
-  }, {});
+  const [filtroFecha, setFiltroFecha] = useState('');
+
+  const pedidosFiltrados = pedidos
+    .filter(p => p.estado !== 'Cancelado')
+    .filter(p => (filtroFecha ? p.fecha.includes(filtroFecha) : true));
 
   return (
     <div style={{ padding: 20 }}>
       <h2>Pedidos Anteriores</h2>
-      <button
-        onClick={() => exportarAExcel(pedidos)}
-        style={{ marginBottom: '10px', padding: '8px 14px', fontSize: '14px' }}
-      >
-        Descargar como Excel
-      </button>
-      {Object.entries(pedidosPorFecha).map(([fecha, items]) => (
-        <div key={fecha} style={{ marginBottom: 20 }}>
-          <h3>{fecha}</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }} border="1">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Cliente</th>
-                <th>Pedido</th>
-                <th>Estado</th>
-                <th>Ingreso</th>
-                <th>Preparación</th>
-                <th>Preparado</th>
-                <th>Enviado</th>
-                <th>Cocinero</th>
-                <th>Repartidor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(({ id, cliente, pedido, estado, cocinero, repartidor, timestampIngreso, timestampPreparacion, timestampPreparado, timestampEnviado }) => (
-                <tr key={id}>
-                  <td>{id}</td>
-                  <td>{cliente}</td>
-                  <td style={{ whiteSpace: 'pre-wrap' }}>{pedido}</td>
-                  <td>{estado}</td>
-                  <td>{timestampIngreso || '-'}</td>
-                  <td>{timestampPreparacion || '-'}</td>
-                  <td>{timestampPreparado || '-'}</td>
-                  <td>{timestampEnviado || '-'}</td>
-                  <td>{cocinero || '-'}</td>
-                  <td>{repartidor || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+
+      <div style={{ marginBottom: 10 }}>
+        <label>Filtrar por fecha:</label>
+        <input
+          type="date"
+          value={filtroFecha}
+          onChange={(e) => setFiltroFecha(e.target.value)}
+          style={{ marginLeft: 10, padding: 5 }}
+        />
+        <button
+          onClick={() => exportarAExcel(pedidosFiltrados)}
+          style={{ marginLeft: 20, padding: '6px 12px', fontSize: '14px' }}
+        >
+          Descargar como Excel
+        </button>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }} border="1">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>#</th>
+            <th>Cliente</th>
+            <th>Pedido</th>
+            <th>Estado</th>
+            <th>Ingreso</th>
+            <th>Preparación</th>
+            <th>Preparado</th>
+            <th>Enviado</th>
+            <th>Cocinero</th>
+            <th>Repartidor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pedidosFiltrados.map(({ id, cliente, pedido, estado, cocinero, repartidor, timestampIngreso, timestampPreparacion, timestampPreparado, timestampEnviado, fecha }) => (
+            <tr key={`${fecha}-${id}`}>
+              <td>{fecha}</td>
+              <td>{id}</td>
+              <td>{cliente}</td>
+              <td style={{ whiteSpace: 'pre-wrap' }}>{pedido}</td>
+              <td>{estado}</td>
+              <td>{timestampIngreso || '-'}</td>
+              <td>{timestampPreparacion || '-'}</td>
+              <td>{timestampPreparado || '-'}</td>
+              <td>{timestampEnviado || '-'}</td>
+              <td>{cocinero || '-'}</td>
+              <td>{repartidor || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
