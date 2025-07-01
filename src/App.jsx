@@ -187,6 +187,25 @@ function KitchenView({ orders }) {
                     <button onClick={() => marcarPreparado(firebaseKey)} style={{ marginLeft: 10 }}>✅ Marcar como Preparado</button>
                   </div>
                 )}
+                <div style={{ marginTop: 10 }}>
+  {estado !== 'Cancelado' && (
+    <button
+      onClick={() => updateCampo(firebaseKey, 'estado', 'Cancelado')}
+      style={{ backgroundColor: '#dc3545', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
+    >
+      ❌ Cancelar
+    </button>
+  )}
+  {estado === 'Cancelado' && (
+    <button
+      onClick={() => updateCampo(firebaseKey, 'estado', 'Pendiente')}
+      style={{ backgroundColor: '#007bff', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
+    >
+      ↩️ Deshacer cancelación
+    </button>
+  )}
+</div>
+
               </li>
             );
           })}
