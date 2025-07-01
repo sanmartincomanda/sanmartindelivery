@@ -217,32 +217,42 @@ function KitchenView({ orders }) {
 function exportarAExcel(pedidos) {
   const rows = pedidos
     .filter(p => p.estado !== 'Cancelado')
-    .map(p => ({
-      Fecha: p.fecha,
-      ID: p.id,
-      Cliente: p.cliente,
-      Pedido: p.pedido.replace(/\n/g, ' '),
-      Estado: p.estado,
-      Ingreso: p.timestampIngreso || '-',
-      Preparación: p.timestampPreparacion || '-',
-      Preparado: p.timestampPreparado || '-',
-      Enviado: p.timestampEnviado || '-',
-      Cocinero: p.cocinero || '-',
-      Repartidor: p.repartidor || '-'
-    }));
+    .map(p => [
+      p.fecha,
+      p.id,
+      p.cliente,
+      p.pedido.replace(/\n/g, ' '),
+      p.estado,
+      p.timestampIngreso || '-',
+      p.timestampPreparacion || '-',
+      p.timestampPreparado || '-',
+      p.timestampEnviado || '-',
+      p.cocinero || '-',
+      p.repartidor || '-'
+    ]);
 
-  const header = Object.keys(rows[0]).join(',');
-  const data = rows.map(r => Object.values(r).join(',')).join('\n');
-  const csvContent = `data:text/csv;charset=utf-8,${header}\n${data}`;
+  const header = [
+    'Fecha', '#', 'Cliente', 'Pedido', 'Estado',
+    'Ingreso', 'Preparación', 'Preparado', 'Enviado',
+    'Cocinero', 'Repartidor'
+  ];
 
-  const encodedUri = encodeURI(csvContent);
+  let htmlContent = '<table border="1"><tr>' + header.map(col => `<th>${col}</th>`).join('') + '</tr>';
+
+  rows.forEach(r => {
+    htmlContent += '<tr>' + r.map(val => `<td>${val}</td>`).join('') + '</tr>';
+  });
+  htmlContent += '</table>';
+
+  const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
   const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', 'historial_pedidos.csv');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'historial_pedidos.xls';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
+
 
 function Anteriores({ pedidos }) {
   const [fechaInicio, setFechaInicio] = useState('');
