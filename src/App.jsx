@@ -215,11 +215,16 @@ function KitchenView({ orders }) {
   );
 }
 function Anteriores({ pedidos }) {
-  const [filtroFecha, setFiltroFecha] = useState('');
+const [fechaInicio, setFechaInicio] = useState('');
+const [fechaFin, setFechaFin] = useState('');
+...
+.filter(p => {
+  const fechaPedido = new Date(p.fecha);
+  const inicio = fechaInicio ? new Date(fechaInicio) : null;
+  const fin = fechaFin ? new Date(fechaFin) : null;
+  return (!inicio || fechaPedido >= inicio) && (!fin || fechaPedido <= fin);
+});
 
-  const pedidosFiltrados = pedidos
-    .filter(p => p.estado !== 'Cancelado')
-    .filter(p => (filtroFecha ? p.fecha.includes(filtroFecha) : true));
 
   return (
     <div style={{ padding: 20 }}>
