@@ -841,6 +841,7 @@ function App() {
           <button onClick={() => setView('lista')} disabled={view === 'lista'}>Lista de pedidos</button>
           <button onClick={() => setView('anteriores')} disabled={view === 'anteriores'}>Anteriores</button>
           <button onClick={() => setView('clientes')} disabled={view === 'clientes'}>Clientes</button>
+          <button onClick={debugWrite}>⚙️ Debug Firebase</button>
         </div>
       </header>
 
