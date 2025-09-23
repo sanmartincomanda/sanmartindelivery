@@ -525,6 +525,82 @@ function ClientesManager({ clientes }) {
   const [editBuffer, setEditBuffer] = useState({}); // {firebaseKey: {nombre, codigo, direccion}}
   const [uploading, setUploading] = useState(false);
 const [csvFile, setCsvFile] = useState(null);
+const stripBOM = (s = '') => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+const normalize = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+const splitLine = (line, delim) => {
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === delim && !inQuotes) { out.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+};
+
+const cargarCSV = async () => {
+  if (!csvFile) { alert('Primero seleccioná un archivo CSV.'); return; }
+  setUploading(true);
+  try {
+    const textRaw = await csvFile.text();
+    const text = stripBOM(textRaw);
+    const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+    if (!lines.length) { alert('El archivo está vacío.'); return; }
+
+    // Detectar delimitador en la primera línea
+    const first = lines[0];
+    const delim = ((first.match(/;/g) || []).length > (first.match(/,/g) || []).length) ? ';' : ',';
+
+    // Mapear encabezados
+    const header = splitLine(first, delim).map(h => normalize(h));
+    const idxNombre = header.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
+    const idxCodigo = header.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
+    const idxDireccion = header.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr'].some(k => h.includes(k)));
+
+    let start = 1;
+    let map = { nombre: 0, codigo: 1, direccion: 2 };
+    const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
+    if (hasHeader) {
+      if (idxNombre !== -1) map.nombre = idxNombre;
+      if (idxCodigo !== -1) map.codigo = idxCodigo;
+      if (idxDireccion !== -1) map.direccion = idxDireccion;
+    } else {
+      start = 0; // sin encabezado → primeras 3 columnas
+    }
+
+    let ok = 0;
+    for (let i = start; i < lines.length; i++) {
+      const parts = splitLine(lines[i], delim).map(s => s.replace(/^"|"$/g, ''));
+      const nombre = (parts[map.nombre] || '').trim();
+      const codigo = (parts[map.codigo] || '').trim();
+      const direccion = (parts[map.direccion] || '').trim();
+      if (!nombre || !codigo || !direccion) continue;
+
+      try {
+        const nuevoRef = push(ref(database, 'clients'));
+        await set(nuevoRef, { nombre, codigo, direccion });
+        ok++;
+      } catch (innerErr) {
+        console.error('Error en fila', i + 1, innerErr);
+      }
+    }
+
+    alert(`Carga masiva completada: ${ok} clientes agregados.`);
+    setCsvFile(null);
+  } catch (err) {
+    console.error('Error leyendo CSV:', err);
+    alert('Error leyendo CSV: ' + (err?.message || err));
+  } finally {
+    setUploading(false);
+  }
+};
+
 
 
   const onFile = async (file) => {
