@@ -58,21 +58,44 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
     setCustomId((prev) => Math.min(prev + 1, 100));
   };
 
-  const guardarNuevoCliente = async () => {
-    const { nombre, codigo, direccion } = nuevoCliente;
-    if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
-      alert('Completá nombre, código y dirección para crear el cliente.');
-      return;
-    }
+const guardarNuevoCliente = async () => {
+  const { nombre, codigo, direccion } = nuevoCliente;
+  const nombreOk = (nombre || "").trim();
+  const codigoOk = (codigo || "").trim();
+  const direccionOk = (direccion || "").trim();
+
+  if (!nombreOk || !codigoOk || !direccionOk) {
+    alert('Completá nombre, código y dirección para crear el cliente.');
+    return;
+  }
+
+  // (Opcional) Evitar duplicados por código usando la lista que ya tenés en props
+  const codigoLower = codigoOk.toLowerCase();
+  const yaExiste = (clientes || []).some(c => (c.codigo || '').toLowerCase() === codigoLower);
+  if (yaExiste) {
+    alert(`El código ${codigoOk} ya existe en tu base de clientes.`);
+    return;
+  }
+
+  try {
     const nuevoRef = push(ref(database, 'clients'));
-    const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
+    const data = { nombre: nombreOk, codigo: codigoOk, direccion: direccionOk };
     await set(nuevoRef, data);
+
+    // UI: cerrar modal y limpiar
     setShowNewClient(false);
     setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
+
     // Autoseleccionar recién creado
     setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
     setClienteInput(data.nombre);
-  };
+  } catch (err) {
+    console.error('Error guardando cliente en Firebase:', err);
+    // Esto te muestra el motivo exacto (muy útil si son reglas)
+    alert('No se pudo guardar el cliente. Detalle: ' + (err?.message || err));
+  }
+};
+
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
@@ -686,3 +709,4 @@ function App() {
 }
 
 export default App;
+git 
