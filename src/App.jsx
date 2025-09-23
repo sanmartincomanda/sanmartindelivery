@@ -1,25 +1,77 @@
-// App.js
 import React, { useState, useEffect, useRef } from 'react';
 import { database } from './firebase';
-import { ref, push, onValue, update } from 'firebase/database';
+import { ref, push, onValue, update, set } from 'firebase/database';
 import logo from './logo.svg';
 import pedidoSound from './pedido.mp3';
 import './App.css';
 
-function OrderForm({ onAddOrder, nextOrderId }) {
-  const [cliente, setCliente] = useState('');
+/******************** UTIL ********************/
+const normalizar = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+/******************** ORDER FORM ********************/
+function OrderForm({ onAddOrder, nextOrderId, clientes }) {
+  const [clienteInput, setClienteInput] = useState('');
   const [pedido, setPedido] = useState('');
   const [customId, setCustomId] = useState(nextOrderId);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '' });
+
+  useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
+
+  const sugerencias = clientes
+    .filter(c => normalizar(c.nombre).includes(normalizar(clienteInput)))
+    .slice(0, 8);
+
+  const handleSelectCliente = (c) => {
+    setSelectedClient(c);
+    setClienteInput(c.nombre);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!cliente.trim() || !pedido.trim()) return;
+    if (!pedido.trim()) return;
+
+    // Si hay un cliente seleccionado, usamos sus datos. Si no, impedimos continuar.
+    if (!selectedClient) {
+      alert('Seleccioná un cliente de la lista (o agregá uno nuevo).');
+      return;
+    }
+
     const fecha = new Date().toISOString().slice(0, 10);
     const hora = new Date().toLocaleTimeString();
-    onAddOrder({ cliente, pedido, fecha, hora, id: customId });
-    setCliente('');
+
+    onAddOrder({
+      cliente: selectedClient.nombre,
+      clienteCodigo: selectedClient.codigo || '-',
+      direccion: selectedClient.direccion || '-',
+      pedido,
+      fecha,
+      hora,
+      id: customId
+    });
+
+    // reset
+    setClienteInput('');
+    setSelectedClient(null);
     setPedido('');
     setCustomId((prev) => Math.min(prev + 1, 100));
+  };
+
+  const guardarNuevoCliente = async () => {
+    const { nombre, codigo, direccion } = nuevoCliente;
+    if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
+      alert('Completá nombre, código y dirección para crear el cliente.');
+      return;
+    }
+    const nuevoRef = push(ref(database, 'clients'));
+    const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
+    await set(nuevoRef, data);
+    setShowNewClient(false);
+    setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
+    // Autoseleccionar recién creado
+    setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
+    setClienteInput(data.nombre);
   };
 
   return (
@@ -28,19 +80,96 @@ function OrderForm({ onAddOrder, nextOrderId }) {
       <input
         type="number"
         value={customId}
-        onChange={(e) => setCustomId(parseInt(e.target.value))}
+        onChange={(e) => setCustomId(parseInt(e.target.value || '1', 10))}
         min={1}
         max={100}
         style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10 }}
       />
-      <input
-        type="text"
-        placeholder="Nombre del cliente"
-        value={cliente}
-        onChange={(e) => setCliente(e.target.value)}
-        style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10 }}
-        required
-      />
+
+      <label>Cliente:</label>
+      <div style={{ position: 'relative', marginBottom: 10 }}>
+        <input
+          type="text"
+          placeholder="Escribí y elegí de la lista"
+          value={clienteInput}
+          onChange={(e) => {
+            setClienteInput(e.target.value);
+            setSelectedClient(null);
+          }}
+          style={{ width: '100%', padding: 8, fontSize: 16 }}
+          required
+          autoComplete="off"
+        />
+        {/* Dropdown de sugerencias */}
+        {clienteInput && !selectedClient && sugerencias.length > 0 && (
+          <ul style={{
+            position: 'absolute', top: '100%', left: 0, right: 0,
+            background: 'white', border: '1px solid #ddd', borderRadius: 6,
+            listStyle: 'none', margin: 0, padding: 0, zIndex: 10, maxHeight: 220, overflowY: 'auto'
+          }}>
+            {sugerencias.map((c) => (
+              <li
+                key={c.firebaseKey}
+                onClick={() => handleSelectCliente(c)}
+                style={{ padding: '8px 10px', cursor: 'pointer' }}
+              >
+                <div style={{ fontWeight: 600 }}>{c.nombre}</div>
+                <small>Código: {c.codigo} · Dirección: {c.direccion}</small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {selectedClient && (
+        <div style={{
+          background: '#f6f9ff', border: '1px solid #cfe2ff', padding: 10,
+          borderRadius: 8, marginBottom: 10
+        }}>
+          <div><strong>Cliente seleccionado:</strong> {selectedClient.nombre}</div>
+          <div><strong>Código:</strong> {selectedClient.codigo}</div>
+          <div><strong>Dirección:</strong> {selectedClient.direccion}</div>
+          <button type="button" onClick={() => { setSelectedClient(null); setClienteInput(''); }}>Cambiar</button>
+        </div>
+      )}
+
+      {!selectedClient && (
+        <div style={{ marginBottom: 12 }}>
+          <button type="button" onClick={() => setShowNewClient(v => !v)}>
+            {showNewClient ? 'Cancelar nuevo cliente' : '➕ Agregar cliente nuevo'}
+          </button>
+        </div>
+      )}
+
+      {showNewClient && (
+        <div style={{ background: '#fffaf0', border: '1px solid #ffe8a1', padding: 10, borderRadius: 8, marginBottom: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 8 }}>
+            <input
+              placeholder="Nombre"
+              value={nuevoCliente.nombre}
+              onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
+              style={{ padding: 8, fontSize: 14 }}
+            />
+            <input
+              placeholder="Código"
+              value={nuevoCliente.codigo}
+              onChange={(e) => setNuevoCliente({ ...nuevoCliente, codigo: e.target.value })}
+              style={{ padding: 8, fontSize: 14 }}
+            />
+          </div>
+          <input
+            placeholder="Dirección"
+            value={nuevoCliente.direccion}
+            onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
+            style={{ marginTop: 8, padding: 8, width: '100%', fontSize: 14 }}
+          />
+          <div style={{ marginTop: 8 }}>
+            <button type="button" onClick={guardarNuevoCliente}>Guardar cliente</button>
+          </div>
+        </div>
+      )}
+
+      <label>Pedido:</label>
       <textarea
         rows={5}
         placeholder="Escribí el pedido aquí"
@@ -56,6 +185,7 @@ function OrderForm({ onAddOrder, nextOrderId }) {
   );
 }
 
+/******************** COLORES POR ESTADO ********************/
 function getColors(estado) {
   switch (estado) {
     case 'Pendiente': return { background: '#d1ecf1', border: '#0c5460' };
@@ -67,23 +197,32 @@ function getColors(estado) {
   }
 }
 
+/******************** LISTA (ENVÍO) ********************/
 function ListaPedidos({ pedidos, onEnviarPedido }) {
   return (
     <div style={{ padding: 20 }}>
       <h2>Lista de Pedidos de Hoy</h2>
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {pedidos.map(({ id, cliente, estado, cocinero, repartidor }) => {
+        {pedidos.map(({ id, cliente, clienteCodigo, direccion, estado, cocinero, repartidor }) => {
           const { background, border } = getColors(estado);
           const parpadeo = estado === 'Preparado' ? 'parpadeo' : '';
           return (
             <li key={id} className={parpadeo} style={{ padding: 10, borderBottom: '1px solid #ccc', backgroundColor: background, border: `2px solid ${border}`, borderRadius: 6, marginBottom: 8 }}>
-              <strong>#{id}</strong> - {cliente} - <em>{estado}</em>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div>
+                  <strong>#{id}</strong> — <strong>{cliente}</strong> (Código: {clienteCodigo || '-'})
+                  <div style={{ fontSize: 13 }}><em>Dirección:</em> {direccion || '-'}</div>
+                </div>
+                <em>{estado}</em>
+              </div>
+
               {estado === 'En preparación' && cocinero && (
                 <> (Cocinero: <strong>{cocinero}</strong>)</>
               )}
+
               {estado === 'Preparado' && (
                 <div style={{ marginTop: 8 }}>
-                  <label>Enviar pedido con:</label>
+                  <label>Enviar pedido con: </label>
                   <select onChange={(e) => onEnviarPedido(id, e.target.value)} defaultValue="">
                     <option value="" disabled>Seleccionar...</option>
                     <option>Carlos Mora</option>
@@ -108,8 +247,8 @@ function ListaPedidos({ pedidos, onEnviarPedido }) {
   );
 }
 
+/******************** COCINA ********************/
 function KitchenView({ orders }) {
-  
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const audioRef = useRef(null);
@@ -148,7 +287,6 @@ function KitchenView({ orders }) {
   }, [orders]);
 
   const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Jose Orozco', 'Otro'];
-
   const pedidosFiltrados = orders.filter(o => o.estado !== 'Enviado');
 
   return (
@@ -159,17 +297,19 @@ function KitchenView({ orders }) {
         <p>No hay pedidos para hoy</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {[...pedidosFiltrados].sort((a, b) => a.id - b.id).map(({ id, cliente, pedido, estado = 'Pendiente', firebaseKey, cocinero }) => {
+          {[...pedidosFiltrados].sort((a, b) => a.id - b.id).map(({ id, cliente, clienteCodigo, pedido, estado = 'Pendiente', firebaseKey, cocinero }) => {
             const isEditing = editingId === firebaseKey;
             const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
             const { background, border } = getColors(estado);
 
             return (
               <li key={firebaseKey} style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8 }}>
-                <div><strong>#{id} - Cliente:</strong> {cliente}</div>
+                <div style={{ marginBottom: 6 }}>
+                  <strong>#{id} - Cliente:</strong> {cliente} — <strong>Código:</strong> {clienteCodigo || '-'}
+                </div>
                 <div style={{ marginTop: 5 }}>
                   <strong>Pedido:</strong>
-                                    {isEditing ? (
+                  {isEditing ? (
                     <>
                       <textarea
                         rows={3}
@@ -184,11 +324,12 @@ function KitchenView({ orders }) {
                     </>
                   ) : (
                     <>
-                      <pre style={{ whiteSpace: 'pre-wrap', marginTop: 5 }}>{pedido}</pre>
+                      <pre style={{ whiteSpace: 'pre-wrap', marginTop: 5, ...textStyle }}>{pedido}</pre>
                       <button onClick={() => { setEditingId(firebaseKey); setEditText(pedido); }} style={{ marginTop: 5 }}>✏️ Editar</button>
                     </>
                   )}
-                </div>                  
+                </div>
+
                 {estado === 'Pendiente' && (
                   <div style={{ marginTop: 8 }}>
                     <label>Seleccionar cocinero:</label>
@@ -205,23 +346,23 @@ function KitchenView({ orders }) {
                   </div>
                 )}
                 <div style={{ marginTop: 10 }}>
-  {estado !== 'Cancelado' && (
-    <button
-      onClick={() => updateCampo(firebaseKey, 'estado', 'Cancelado')}
-      style={{ backgroundColor: '#dc3545', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
-    >
-      ❌ Cancelar
-    </button>
-  )}
-  {estado === 'Cancelado' && (
-    <button
-      onClick={() => updateCampo(firebaseKey, 'estado', 'Pendiente')}
-      style={{ backgroundColor: '#007bff', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
-    >
-      ↩️ Deshacer cancelación
-    </button>
-  )}
-</div>
+                  {estado !== 'Cancelado' && (
+                    <button
+                      onClick={() => updateCampo(firebaseKey, 'estado', 'Cancelado')}
+                      style={{ backgroundColor: '#dc3545', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
+                    >
+                      ❌ Cancelar
+                    </button>
+                  )}
+                  {estado === 'Cancelado' && (
+                    <button
+                      onClick={() => updateCampo(firebaseKey, 'estado', 'Pendiente')}
+                      style={{ backgroundColor: '#007bff', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
+                    >
+                      ↩️ Deshacer cancelación
+                    </button>
+                  )}
+                </div>
 
               </li>
             );
@@ -231,6 +372,8 @@ function KitchenView({ orders }) {
     </div>
   );
 }
+
+/******************** EXPORTAR A EXCEL ********************/
 function exportarAExcel(pedidos) {
   const rows = pedidos
     .filter(p => p.estado !== 'Cancelado')
@@ -238,6 +381,8 @@ function exportarAExcel(pedidos) {
       p.fecha,
       p.id,
       p.cliente,
+      p.clienteCodigo || '-',
+      p.direccion || '-',
       p.pedido.replace(/\n/g, ' '),
       p.estado,
       p.timestampIngreso || '-',
@@ -249,7 +394,7 @@ function exportarAExcel(pedidos) {
     ]);
 
   const header = [
-    'Fecha', '#', 'Cliente', 'Pedido', 'Estado',
+    'Fecha', '#', 'Cliente', 'Código Cliente', 'Dirección', 'Pedido', 'Estado',
     'Ingreso', 'Preparación', 'Preparado', 'Enviado',
     'Cocinero', 'Repartidor'
   ];
@@ -270,7 +415,7 @@ function exportarAExcel(pedidos) {
   document.body.removeChild(link);
 }
 
-
+/******************** ANTERIORES ********************/
 function Anteriores({ pedidos }) {
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -318,6 +463,8 @@ function Anteriores({ pedidos }) {
             <th>Fecha</th>
             <th>#</th>
             <th>Cliente</th>
+            <th>Código</th>
+            <th>Dirección</th>
             <th>Pedido</th>
             <th>Estado</th>
             <th>Ingreso</th>
@@ -329,11 +476,13 @@ function Anteriores({ pedidos }) {
           </tr>
         </thead>
         <tbody>
-          {pedidosFiltrados.map(({ id, cliente, pedido, estado, cocinero, repartidor, timestampIngreso, timestampPreparacion, timestampPreparado, timestampEnviado, fecha }) => (
+          {pedidosFiltrados.map(({ id, cliente, clienteCodigo, direccion, pedido, estado, cocinero, repartidor, timestampIngreso, timestampPreparacion, timestampPreparado, timestampEnviado, fecha }) => (
             <tr key={`${fecha}-${id}`}>
               <td>{fecha}</td>
               <td>{id}</td>
               <td>{cliente}</td>
+              <td>{clienteCodigo || '-'}</td>
+              <td>{direccion || '-'}</td>
               <td style={{ whiteSpace: 'pre-wrap' }}>{pedido}</td>
               <td>{estado}</td>
               <td>{timestampIngreso || '-'}</td>
@@ -349,10 +498,96 @@ function Anteriores({ pedidos }) {
     </div>
   );
 }
+
+/******************** CLIENTES: CARGA MASIVA + EDICIÓN ********************/
+function ClientesManager({ clientes }) {
+  const [editBuffer, setEditBuffer] = useState({}); // {firebaseKey: {nombre, codigo, direccion}}
+
+  const onFile = async (file) => {
+    const text = await file.text();
+    // CSV esperado (con o sin encabezado): nombre,codigo,direccion
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // Detectar encabezado
+    const startIdx = lines[0].toLowerCase().includes('codigo') ? 1 : 0;
+    for (let i = startIdx; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      const [nombre = '', codigo = '', direccion = ''] = parts.map(p => p.trim());
+      if (!nombre || !codigo || !direccion) continue;
+      const nuevoRef = push(ref(database, 'clients'));
+      await set(nuevoRef, { nombre, codigo, direccion });
+    }
+    alert('Carga masiva completada');
+  };
+
+  const handleChange = (key, field, value) => {
+    setEditBuffer(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  };
+
+  const handleSave = async (c) => {
+    const payload = editBuffer[c.firebaseKey] || { nombre: c.nombre, codigo: c.codigo, direccion: c.direccion };
+    await update(ref(database, `clients/${c.firebaseKey}`), payload);
+    setEditBuffer(prev => { const cp = { ...prev }; delete cp[c.firebaseKey]; return cp; });
+  };
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Clientes</h2>
+      <p>Subí un CSV (nombre,codigo,direccion) para cargar clientes masivamente. También podés editar en línea.</p>
+      <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginTop: 12 }} border="1">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Código</th>
+            <th>Dirección</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {clientes.map(c => {
+            const buf = editBuffer[c.firebaseKey] || {};
+            return (
+              <tr key={c.firebaseKey}>
+                <td>
+                  <input
+                    defaultValue={c.nombre}
+                    onChange={(e) => handleChange(c.firebaseKey, 'nombre', e.target.value)}
+                  />
+                </td>
+                <td>
+                  <input
+                    defaultValue={c.codigo}
+                    onChange={(e) => handleChange(c.firebaseKey, 'codigo', e.target.value)}
+                  />
+                </td>
+                <td>
+                  <input
+                    defaultValue={c.direccion}
+                    onChange={(e) => handleChange(c.firebaseKey, 'direccion', e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                </td>
+                <td>
+                  <button onClick={() => handleSave(c)}>Guardar</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/******************** APP ********************/
 function App() {
   const [orders, setOrders] = useState([]);
+  const [anteriores, setAnteriores] = useState([]);
+  const [clientes, setClientes] = useState([]);
   const [view, setView] = useState('ingreso');
 
+  // Cargar pedidos
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const ordersRef = ref(database, 'orders');
@@ -367,26 +602,43 @@ function App() {
         }, {});
 
         const pedidosHoy = (grouped[today] || []).sort((a, b) => a.id - b.id);
-        const anteriores = Object.entries(grouped)
+        const prev = Object.entries(grouped)
           .filter(([fecha]) => fecha !== today)
           .flatMap(([fecha, arr]) => arr.map((p, idx) => ({ ...p, fecha, id: p.id || idx + 1 })));
 
-        setOrders({ hoy: pedidosHoy, anteriores });
+        setOrders(pedidosHoy);
+        setAnteriores(prev);
       } else {
-        setOrders({ hoy: [], anteriores: [] });
+        setOrders([]);
+        setAnteriores([]);
       }
     });
   }, []);
 
+  // Cargar clientes
+  useEffect(() => {
+    const clientsRef = ref(database, 'clients');
+    onValue(clientsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) { setClientes([]); return; }
+      const arr = Object.entries(data).map(([key, val]) => ({ firebaseKey: key, ...val }));
+      // ordenar por nombre
+      arr.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      setClientes(arr);
+    });
+  }, []);
+
   const getNextOrderId = () => {
-    const maxId = orders.hoy?.reduce((max, o) => Math.max(max, o.id || 0), 0) || 0;
+    const maxId = orders.reduce((max, o) => Math.max(max, o.id || 0), 0) || 0;
     return maxId + 1;
   };
 
-  const addOrder = ({ cliente, pedido, fecha, hora, id }) => {
+  const addOrder = ({ cliente, clienteCodigo, direccion, pedido, fecha, hora, id }) => {
     const timestamp = new Date().toLocaleTimeString();
     push(ref(database, 'orders'), {
       cliente,
+      clienteCodigo,
+      direccion,
       pedido,
       estado: 'Pendiente',
       fecha,
@@ -397,7 +649,7 @@ function App() {
   };
 
   const handleEnviarPedido = (orderId, repartidor) => {
-    const order = orders.hoy.find(o => o.id === orderId);
+    const order = orders.find(o => o.id === orderId);
     if (order) {
       update(ref(database, `orders/${order.firebaseKey}`), {
         estado: 'Enviado',
@@ -408,24 +660,26 @@ function App() {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: '20px auto', padding: 20, fontFamily: 'Arial, sans-serif', backgroundColor: '#f0f8ff', borderRadius: 10 }}>
+    <div style={{ maxWidth: 1000, margin: '20px auto', padding: 20, fontFamily: 'Arial, sans-serif', backgroundColor: '#f0f8ff', borderRadius: 10 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <img src={logo} alt="Logo" style={{ width: 50, height: 50 }} />
           <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Servicio Delivery</h1>
         </div>
-        <div>
-          <button onClick={() => setView('ingreso')} disabled={view === 'ingreso'} style={{ marginRight: 8 }}>Ingresar</button>
-          <button onClick={() => setView('cocina')} disabled={view === 'cocina'} style={{ marginRight: 8 }}>Cocina</button>
-          <button onClick={() => setView('lista')} disabled={view === 'lista'} style={{ marginRight: 8 }}>Lista de pedidos</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => setView('ingreso')} disabled={view === 'ingreso'}>Ingresar</button>
+          <button onClick={() => setView('cocina')} disabled={view === 'cocina'}>Cocina</button>
+          <button onClick={() => setView('lista')} disabled={view === 'lista'}>Lista de pedidos</button>
           <button onClick={() => setView('anteriores')} disabled={view === 'anteriores'}>Anteriores</button>
+          <button onClick={() => setView('clientes')} disabled={view === 'clientes'}>Clientes</button>
         </div>
       </header>
 
-      {view === 'ingreso' && <OrderForm onAddOrder={addOrder} nextOrderId={getNextOrderId()} />}
-      {view === 'cocina' && <KitchenView orders={orders.hoy || []} />}
-      {view === 'lista' && <ListaPedidos pedidos={orders.hoy || []} onEnviarPedido={handleEnviarPedido} />}
-      {view === 'anteriores' && <Anteriores pedidos={orders.anteriores || []} />}
+      {view === 'ingreso' && <OrderForm onAddOrder={addOrder} nextOrderId={getNextOrderId()} clientes={clientes} />}
+      {view === 'cocina' && <KitchenView orders={orders} />}
+      {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
+      {view === 'anteriores' && <Anteriores pedidos={anteriores} />}
+      {view === 'clientes' && <ClientesManager clientes={clientes} />}
 
     </div>
   );
