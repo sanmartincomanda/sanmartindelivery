@@ -4,7 +4,6 @@ import { ref, push, onValue, update, set } from 'firebase/database';
 import logo from './logo.svg';
 import pedidoSound from './pedido.mp3';
 import './App.css';
-import { getApp } from 'firebase/app';
 
 
 /******************** UTIL ********************/
@@ -22,15 +21,6 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
 
 
   useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
-useEffect(() => {
-  try {
-    console.log('Firebase projectId:', getApp().options.projectId);
-    console.log('Realtime DB root:', ref(database).toString());
-    // Ejemplo de salida: https://TU-PROYECTO-default-rtdb.us-central1.firebasedatabase.app/
-  } catch (e) {
-    console.error('No pude leer config de Firebase:', e);
-  }
-}, []);
 
   const sugerencias = clientes
     .filter(c => normalizar(c.nombre).includes(normalizar(clienteInput)))
@@ -807,16 +797,6 @@ function App() {
     });
   };
 
-  const debugWrite = async () => {
-  try {
-    await set(ref(database, '__debug__/ping'), { ts: Date.now() });
-    alert('✅ Escritura de prueba OK (ruta __debug__/ping).');
-  } catch (err) {
-    console.error('Debug write error:', err);
-    alert('❌ Error en escritura de prueba: ' + (err?.code || err?.message || String(err)));
-  }
-};
-
   const handleEnviarPedido = (orderId, repartidor) => {
     const order = orders.find(o => o.id === orderId);
     if (order) {
@@ -841,7 +821,6 @@ function App() {
           <button onClick={() => setView('lista')} disabled={view === 'lista'}>Lista de pedidos</button>
           <button onClick={() => setView('anteriores')} disabled={view === 'anteriores'}>Anteriores</button>
           <button onClick={() => setView('clientes')} disabled={view === 'clientes'}>Clientes</button>
-          <button onClick={debugWrite}>⚙️ Debug Firebase</button>
         </div>
       </header>
 
