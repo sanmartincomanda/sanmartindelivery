@@ -556,8 +556,16 @@ const [csvFile, setCsvFile] = useState(null);
   return (
     <div style={{ padding: 20 }}>
       <h2>Clientes</h2>
-      <p>Subí un CSV (nombre,codigo,direccion) para cargar clientes masivamente. También podés editar en línea.</p>
-      <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+      <p>Subí un CSV (nombre,codigo,direccion). Elegí archivo y luego hacé clic en “Cargar CSV”.</p>
+<input
+  type="file"
+  accept=".csv,text/csv,.txt"
+  onChange={(e) => setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+/>
+<button type="button" onClick={cargarCSV} disabled={uploading || !csvFile} style={{ marginLeft: 8 }}>
+  {uploading ? 'Cargando…' : 'Cargar CSV'}
+</button>
+
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginTop: 12 }} border="1">
         <thead>
