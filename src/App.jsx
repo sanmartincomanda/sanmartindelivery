@@ -16,6 +16,8 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showNewClient, setShowNewClient] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '' });
+  const [savingClient, setSavingClient] = useState(false);
+
 
   useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
 
@@ -58,21 +60,37 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
     setCustomId((prev) => Math.min(prev + 1, 100));
   };
 
-  const guardarNuevoCliente = async () => {
-    const { nombre, codigo, direccion } = nuevoCliente;
-    if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
-      alert('Completá nombre, código y dirección para crear el cliente.');
-      return;
-    }
+const guardarNuevoCliente = async () => {
+  const { nombre, codigo, direccion } = nuevoCliente;
+  const nombreOk = (nombre || '').trim();
+  const codigoOk = (codigo || '').trim();
+  const direccionOk = (direccion || '').trim();
+
+  if (!nombreOk || !codigoOk || !direccionOk) {
+    alert('Completá nombre, código y dirección para crear el cliente.');
+    return;
+  }
+
+  try {
+    setSavingClient(true);
     const nuevoRef = push(ref(database, 'clients'));
-    const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
+    const data = { nombre: nombreOk, codigo: codigoOk, direccion: direccionOk };
     await set(nuevoRef, data);
+    alert('Cliente agregado: ' + nombreOk);
+
+    // Reset + autoselección
     setShowNewClient(false);
     setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
-    // Autoseleccionar recién creado
     setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
     setClienteInput(data.nombre);
-  };
+  } catch (err) {
+    console.error('Error guardando cliente en Firebase:', err);
+    alert('No se pudo guardar el cliente. Detalle: ' + (err?.message || err));
+  } finally {
+    setSavingClient(false);
+  }
+};
+
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
@@ -164,7 +182,10 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
             style={{ marginTop: 8, padding: 8, width: '100%', fontSize: 14 }}
           />
           <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={guardarNuevoCliente}>Guardar cliente</button>
+          <button type="button" onClick={guardarNuevoCliente} disabled={savingClient}>
+  {savingClient ? 'Guardando…' : 'Guardar cliente'}
+</button>
+
           </div>
         </div>
       )}
@@ -502,6 +523,9 @@ function Anteriores({ pedidos }) {
 /******************** CLIENTES: CARGA MASIVA + EDICIÓN ********************/
 function ClientesManager({ clientes }) {
   const [editBuffer, setEditBuffer] = useState({}); // {firebaseKey: {nombre, codigo, direccion}}
+  const [uploading, setUploading] = useState(false);
+const [csvFile, setCsvFile] = useState(null);
+
 
   const onFile = async (file) => {
     const text = await file.text();
