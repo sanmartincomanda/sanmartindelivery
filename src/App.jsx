@@ -605,7 +605,8 @@ const cargarCSV = async () => {
   const onFile = async (file) => {
     const text = await file.text();
     // CSV esperado (con o sin encabezado): nombre,codigo,direccion
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+   const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+
     // Detectar encabezado
     const startIdx = lines[0].toLowerCase().includes('codigo') ? 1 : 0;
     for (let i = startIdx; i < lines.length; i++) {
