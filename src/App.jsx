@@ -32,7 +32,7 @@ useEffect(() => {
 }, []);
 
   const sugerencias = clientes
-    .filter(c => normalizar(c.nombre).includes(normalizar(clienteInput)))
+    .filter(c => normalizar(c.nombre || '').includes(normalizar(clienteInput)))
     .slice(0, 8);
 
   const handleSelectCliente = (c) => {
@@ -77,13 +77,14 @@ const guardarNuevoCliente = async () => {
     return;
   }
   try {
+    setSavingClient(true); // usa el estado que ya tienes
     const nuevoRef = push(ref(database, 'clients'));
     const data = {
       nombre: nombre.trim(),
       codigo: codigo.trim(),
-      direccion: direccion.trim()
+      direccion: direccion.trim(),
     };
-    await set(nuevoRef, data);                // <- ESTA LÍNEA FALTABA
+    await set(nuevoRef, data);
     setShowNewClient(false);
     setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
     setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
@@ -91,8 +92,11 @@ const guardarNuevoCliente = async () => {
   } catch (err) {
     console.error('Error guardando cliente:', err);
     alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
+  } finally {
+    setSavingClient(false);
   }
 };
+
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
@@ -576,13 +580,13 @@ const cargarCSV = async () => {
       start = 0; // sin encabezado → primeras 3 columnas
     }
 
-    let ok = 0;
+    let ok = 0, omitidos = 0;
     for (let i = start; i < lines.length; i++) {
       const parts = splitLine(lines[i], delim).map(s => s.replace(/^"|"$/g, ''));
       const nombre = (parts[map.nombre] || '').trim();
       const codigo = (parts[map.codigo] || '').trim();
       const direccion = (parts[map.direccion] || '').trim();
-      if (!nombre || !codigo || !direccion) continue;
+      if (!nombre || !codigo || !direccion) { omitidos++; continue; }
 
       try {
         const nuevoRef = push(ref(database, 'clients'));
@@ -590,10 +594,11 @@ const cargarCSV = async () => {
         ok++;
       } catch (innerErr) {
         console.error('Error en fila', i + 1, innerErr);
+        omitidos++;
       }
     }
 
-    alert(`Carga masiva completada: ${ok} clientes agregados.`);
+    alert(`Carga masiva: ${ok} agregados, ${omitidos} omitidos.`);
     setCsvFile(null);
   } catch (err) {
     console.error('Error leyendo CSV:', err);
@@ -612,7 +617,7 @@ const cargarCSV = async () => {
     // Detectar encabezado
     const startIdx = lines[0].toLowerCase().includes('codigo') ? 1 : 0;
     for (let i = startIdx; i < lines.length; i++) {
-      const parts = lines[i].split(',');
+      const parts = splitLine(lines[i], ','); // o detecta delim igual que en cargarCSV
       const [nombre = '', codigo = '', direccion = ''] = parts.map(p => p.trim());
       if (!nombre || !codigo || !direccion) continue;
       const nuevoRef = push(ref(database, 'clients'));
