@@ -76,7 +76,9 @@ const guardarNuevoCliente = async () => {
     alert('Completá nombre, código y dirección para crear el cliente.');
     return;
   }
+  
   try {
+setSavingClient(true);
     const nuevoRef = push(ref(database, 'clients'));
     const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
     await set(nuevoRef, data);
@@ -87,8 +89,11 @@ const guardarNuevoCliente = async () => {
   } catch (err) {
     console.error('Error guardando cliente:', err);
     alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
+  } finally {
++   setSavingClient(false);
   }
 };
+
 
 
   return (
@@ -575,7 +580,7 @@ const cargarCSV = async () => {
 
     let ok = 0;
     for (let i = start; i < lines.length; i++) {
-      const parts = splitLine(lines[i]).map(s => s.replace(/^"|"$/g, ''));
+      const parts = splitLine(lines[i], delim).map(s => s.replace(/^"|"$/g, ''));
       const nombre = (parts[map.nombre] || '').trim();
       const codigo = (parts[map.codigo] || '').trim();
       const direccion = (parts[map.direccion] || '').trim();
