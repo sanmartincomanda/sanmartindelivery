@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getApp } from 'firebase/app';
-import { ref } from 'firebase/database';
-import { database } from './firebase';
 import { ref, push, onValue, update, set } from 'firebase/database';
+import { database } from './firebase';
 import logo from './logo.svg';
 import pedidoSound from './pedido.mp3';
 import './App.css';
@@ -587,7 +586,7 @@ const cargarCSV = async () => {
 
     let ok = 0;
     for (let i = start; i < lines.length; i++) {
-      const parts = splitLine(lines[i], delim).map(s => s.replace(/^"|"$/g, ''));
+      const parts = splitLine(lines[i]).map(s => s.replace(/^"|"$/g, ''));
       const nombre = (parts[map.nombre] || '').trim();
       const codigo = (parts[map.codigo] || '').trim();
       const direccion = (parts[map.direccion] || '').trim();
