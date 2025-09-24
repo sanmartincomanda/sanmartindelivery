@@ -1,6 +1,7 @@
 // firebase.js
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro",
@@ -13,4 +14,17 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// HABILITA MODO DEBUG (dev / netlify preview). Debe ir antes de initializeAppCheck.
+if (typeof window !== 'undefined') {
+  // true => genera/usa token de debug automáticamente
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
+initializeAppCheck(app, {
+  // Con DEBUG activado, se usa el token de debug y no vas a ver el challenge
+  provider: new ReCaptchaV3Provider('debug-only'),
+  isTokenAutoRefreshEnabled: true,
+});
+
 export const database = getDatabase(app);
