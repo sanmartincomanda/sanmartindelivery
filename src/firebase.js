@@ -6,7 +6,7 @@ import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 const firebaseConfig = {
   apiKey: "AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro",
   authDomain: "comanda-digital-ac1ec.firebaseapp.com",
-  databaseURL: "https://comanda-digital-ac1ec-default-rtdb.firebaseio.com",
+  databaseURL: "https://comanda-digital-ac1ec-default-rtdb.firebaseio.com/",
   projectId: "comanda-digital-ac1ec",
   storageBucket: "comanda-digital-ac1ec.firebasestorage.app",
   messagingSenderId: "41323183250",
