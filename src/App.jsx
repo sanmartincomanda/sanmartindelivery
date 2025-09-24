@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getApp } from 'firebase/app';
+import { ref } from 'firebase/database';
 import { database } from './firebase';
 import { ref, push, onValue, update, set } from 'firebase/database';
 import logo from './logo.svg';
@@ -20,6 +22,15 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
 
 
   useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
+useEffect(() => {
+  try {
+    console.log('Firebase projectId:', getApp().options.projectId);
+    console.log('Realtime DB root:', ref(database).toString());
+    // Debe verse algo como: https://TU-PROYECTO-default-rtdb.<region>.firebasedatabase.app/
+  } catch (e) {
+    console.error('No pude leer config de Firebase:', e);
+  }
+}, []);
 
   const sugerencias = clientes
     .filter(c => normalizar(c.nombre).includes(normalizar(clienteInput)))
