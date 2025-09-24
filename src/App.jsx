@@ -76,12 +76,14 @@ const guardarNuevoCliente = async () => {
     alert('Completá nombre, código y dirección para crear el cliente.');
     return;
   }
-  
   try {
-setSavingClient(true);
     const nuevoRef = push(ref(database, 'clients'));
-    const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
-    await set(nuevoRef, data);
+    const data = {
+      nombre: nombre.trim(),
+      codigo: codigo.trim(),
+      direccion: direccion.trim()
+    };
+    await set(nuevoRef, data);                // <- ESTA LÍNEA FALTABA
     setShowNewClient(false);
     setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
     setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
@@ -89,12 +91,8 @@ setSavingClient(true);
   } catch (err) {
     console.error('Error guardando cliente:', err);
     alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
-  } finally {
-+   setSavingClient(false);
   }
 };
-
-
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
@@ -611,7 +609,6 @@ const cargarCSV = async () => {
     const text = await file.text();
     // CSV esperado (con o sin encabezado): nombre,codigo,direccion
    const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
-
     // Detectar encabezado
     const startIdx = lines[0].toLowerCase().includes('codigo') ? 1 : 0;
     for (let i = startIdx; i < lines.length; i++) {
