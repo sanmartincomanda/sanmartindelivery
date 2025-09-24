@@ -72,34 +72,24 @@ useEffect(() => {
 
 const guardarNuevoCliente = async () => {
   const { nombre, codigo, direccion } = nuevoCliente;
-  const nombreOk = (nombre || '').trim();
-  const codigoOk = (codigo || '').trim();
-  const direccionOk = (direccion || '').trim();
-
-  if (!nombreOk || !codigoOk || !direccionOk) {
+  if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
     alert('Completá nombre, código y dirección para crear el cliente.');
     return;
   }
-
   try {
-    setSavingClient(true);
     const nuevoRef = push(ref(database, 'clients'));
-    const data = { nombre: nombreOk, codigo: codigoOk, direccion: direccionOk };
+    const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
     await set(nuevoRef, data);
-    alert('Cliente agregado: ' + nombreOk);
-
-    // Reset + autoselección
     setShowNewClient(false);
     setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
     setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
     setClienteInput(data.nombre);
   } catch (err) {
-    console.error('Error guardando cliente en Firebase:', err);
-    alert('No se pudo guardar el cliente. Detalle: ' + (err?.message || err));
-  } finally {
-    setSavingClient(false);
+    console.error('Error guardando cliente:', err);
+    alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
   }
 };
+
 
 
   return (
