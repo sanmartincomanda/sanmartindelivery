@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { database } from './firebase';
+import { getApp } from 'firebase/app';
 import { ref, push, onValue, update, set } from 'firebase/database';
+import { database } from './firebase';
 import logo from './logo.svg';
 import pedidoSound from './pedido.mp3';
 import './App.css';
@@ -16,8 +17,19 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showNewClient, setShowNewClient] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '' });
+  const [savingClient, setSavingClient] = useState(false);
+
 
   useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
+useEffect(() => {
+  try {
+    console.log('Firebase projectId:', getApp().options.projectId);
+    console.log('Realtime DB root:', ref(database).toString());
+    // Debe verse algo como: https://TU-PROYECTO-default-rtdb.<region>.firebasedatabase.app/
+  } catch (e) {
+    console.error('No pude leer config de Firebase:', e);
+  }
+}, []);
 
   const sugerencias = clientes
     .filter(c => normalizar(c.nombre).includes(normalizar(clienteInput)))
@@ -58,32 +70,26 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
     setCustomId((prev) => Math.min(prev + 1, 100));
   };
 
-  const guardarNuevoCliente = async () => {
-    const { nombre, codigo, direccion } = nuevoCliente;
-    if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
-      alert('Completá nombre, código y dirección para crear el cliente.');
-      return;
-    }
-    try {
-      const nuevoRef = push(ref(database, 'clients'));
-      const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
-      await set(nuevoRef, data);
-      setShowNewClient(false);
-      setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
-      setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
-      setClienteInput(data.nombre);
-    } catch (err) {
-      console.error('Error guardando cliente:', err);
-      alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
-    }
-  };
+const guardarNuevoCliente = async () => {
+  const { nombre, codigo, direccion } = nuevoCliente;
+  if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
+    alert('Completá nombre, código y dirección para crear el cliente.');
+    return;
+  }
+  try {
+    const nuevoRef = push(ref(database, 'clients'));
+    const data = { nombre: nombre.trim(), codigo: codigo.trim(), direccion: direccion.trim() };
     await set(nuevoRef, data);
     setShowNewClient(false);
     setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
-    // Autoseleccionar recién creado
     setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
     setClienteInput(data.nombre);
-  };
+  } catch (err) {
+    console.error('Error guardando cliente:', err);
+    alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
+  }
+};
+
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
@@ -175,7 +181,10 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
             style={{ marginTop: 8, padding: 8, width: '100%', fontSize: 14 }}
           />
           <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={guardarNuevoCliente}>Guardar cliente</button>
+          <button type="button" onClick={guardarNuevoCliente} disabled={savingClient}>
+  {savingClient ? 'Guardando…' : 'Guardar cliente'}
+</button>
+
           </div>
         </div>
       )}
@@ -513,173 +522,100 @@ function Anteriores({ pedidos }) {
 /******************** CLIENTES: CARGA MASIVA + EDICIÓN ********************/
 function ClientesManager({ clientes }) {
   const [editBuffer, setEditBuffer] = useState({}); // {firebaseKey: {nombre, codigo, direccion}}
+  const [uploading, setUploading] = useState(false);
+const [csvFile, setCsvFile] = useState(null);
+const stripBOM = (s = '') => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+const normalize = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
+const splitLine = (line, delim) => {
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === delim && !inQuotes) { out.push(cur); cur = ''; }
+    else { cur += ch; }
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+};
+
+const cargarCSV = async () => {
+  if (!csvFile) { alert('Primero seleccioná un archivo CSV.'); return; }
+  setUploading(true);
+  try {
+    const textRaw = await csvFile.text();
+    const text = stripBOM(textRaw);
+    const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+    if (!lines.length) { alert('El archivo está vacío.'); return; }
+
+    // Detectar delimitador en la primera línea
+    const first = lines[0];
+    const delim = ((first.match(/;/g) || []).length > (first.match(/,/g) || []).length) ? ';' : ',';
+
+    // Mapear encabezados
+    const header = splitLine(first, delim).map(h => normalize(h));
+    const idxNombre = header.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
+    const idxCodigo = header.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
+    const idxDireccion = header.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr'].some(k => h.includes(k)));
+
+    let start = 1;
+    let map = { nombre: 0, codigo: 1, direccion: 2 };
+    const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
+    if (hasHeader) {
+      if (idxNombre !== -1) map.nombre = idxNombre;
+      if (idxCodigo !== -1) map.codigo = idxCodigo;
+      if (idxDireccion !== -1) map.direccion = idxDireccion;
+    } else {
+      start = 0; // sin encabezado → primeras 3 columnas
+    }
+
+    let ok = 0;
+    for (let i = start; i < lines.length; i++) {
+      const parts = splitLine(lines[i]).map(s => s.replace(/^"|"$/g, ''));
+      const nombre = (parts[map.nombre] || '').trim();
+      const codigo = (parts[map.codigo] || '').trim();
+      const direccion = (parts[map.direccion] || '').trim();
+      if (!nombre || !codigo || !direccion) continue;
+
+      try {
+        const nuevoRef = push(ref(database, 'clients'));
+        await set(nuevoRef, { nombre, codigo, direccion });
+        ok++;
+      } catch (innerErr) {
+        console.error('Error en fila', i + 1, innerErr);
+      }
+    }
+
+    alert(`Carga masiva completada: ${ok} clientes agregados.`);
+    setCsvFile(null);
+  } catch (err) {
+    console.error('Error leyendo CSV:', err);
+    alert('Error leyendo CSV: ' + (err?.message || err));
+  } finally {
+    setUploading(false);
+  }
+};
+
+
 
   const onFile = async (file) => {
-    try {
-      // Helpers
-      const stripBOM = (s = '') => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
-      const normalize = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-      const textRaw = await file.text();
-      const text =ter(l => l.trim().length > 0);
-      if (!lines.length) { alert('El archivo está vacío.'); return; }
-
-      // Detectar delimitador en la primera línea
-      const first = lines[0];
-      const comma = (first.match(/,/g) || []).length;
-      const semi  = (first.match(/;/g) || []).length;
-      const delim = semi > comma ? ';' : ',';
-
-      // Split que respeta comillas usando el delimitador detectado
-      const splitLine = (line) => {
-        const out = [];
-        let cur = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (ch === '"') {
-            if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
-            else { inQuotes = !inQuotes; }
-          } else if (ch === delim && !inQuotes) {
-            out.push(cur); cur = '';
-          } else {
-            cur += ch;
-          }
-        }
-        out.push(cur);
-        return out.map(s => s.trim());
-      };
-
-      const headerRaw = splitLine(first);
-      const headerNorm = headerRaw.map(h => normalize(h));
-
-      // Detectar encabezados esperados (con y sin acentos)
-      const idxNombre = headerNorm.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
-      const idxCodigo = headerNorm.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
-      const idxDireccion = headerNorm.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr','direccion completa'].some(k => h.includes(k)));
-
-      let start = 1;
-      let map = { nombre: 0, codigo: 1, direccion: 2 };
-      const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
-      if (hasHeader) {
-        if (idxNombre !== -1)    map.nombre    = idxNombre;
-        if (idxCodigo !== -1)    map.codigo    = idxCodigo;
-        if (idxDireccion !== -1) map.direccion = idxDireccion;
-      } else {
-        start = 0; // sin encabezado: usar 3 primeras columnas
-      }
-
-      let ok = 0, skipped = 0, firstErr = null;
-      for (let i = start; i < lines.length; i++) {
-        const parts = splitLine(lines[i]).map(s => s.replace(/^\"|\"$/g, ""));
-        const nomb.codigo] || '').trim();
-        const direccion = (parts[map.direccion] || '').trim();
-        if (!nombre || !codigo || !direccion) { skipped++; continue; }
-        try {
-          const nuevoRef = push(ref(database, 'clients'));
-          await set(nuevoRef, { nombre, codigo, direccion });
-          ok++;
-        } catch (innerErr) {
-          if (!firstErr) firstErr = innerErr;
-          console.error('Error en fila', i + 1, innerErr);
-          skipped++;
-        }
-      }
-
-      alert('Carga masiva: ' + ok + ' agregados, ' + skipped + ' omitidos' + (firstErr ? (' — Ejemplo de error: ' + (firstErr.code || firstErr.message)) : ''));
-    } catch (err) {
-      console.error('Error leyendo CSV:', err);
-      alert('Error leyendo CSV: ' + (err?.message || err));
+    const text = await file.text();
+    // CSV esperado (con o sin encabezado): nombre,codigo,direccion
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // Detectar encabezado
+    const startIdx = lines[0].toLowerCase().includes('codigo') ? 1 : 0;
+    for (let i = startIdx; i < lines.length; i++) {
+      const parts = lines[i].split(',');
+      const [nombre = '', codigo = '', direccion = ''] = parts.map(p => p.trim());
+      if (!nombre || !codigo || !direccion) continue;
+      const nuevoRef = push(ref(database, 'clients'));
+      await set(nuevoRef, { nombre, codigo, direccion });
     }
-  };out.push(cur);
-        return out.map(s => s.trim());
-      };
-
-      const headerRaw = splitLine(first);
-      const headerNorm = headerRaw.map(h => normalize(h));
-
-      // Detectar encabezados esperados (con y sin acentos)
-      const idxNombre = headerNorm.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
-      const idxCodigo = headerNorm.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
-      const idxDireccion = headerNorm.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr','direccion completa'].some(k => h.includes(k)));
-
-      let start = 1;
-      let map = { nombre: 0, codigo: 1, direccion: 2 };
-      const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
-      if (hasHeader) {
-        if (idxNombre !== -1)    map.nombre    = idxNombre;
-        if (idxCodigo !== -1)    map.codigo    = idxCodigo;
-        if (idxDireccion !== -1) map.direccion = idxDireccion;
-      } else {
-        start = 0; // sin encabezado: usar 3 primeras columnas
-      }
-
-      let ok = 0, skipped = 0, firstErr = null;
-      for (let i = start; i < lines.length; i++) {
-        const parts = splitLine(lines[i]).map(s => s.replace(/^"|"$/g, ''));
-        const nombre = (parts[map.nombre] || '').trim();
-        const codigo = (parts[map.codigo] || '').trim();
-        const direccion = (parts[map.direccion] || '').trim();
-        if (!nombre || !codigo || !direccion) { skipped++; continue; }
-        try {
-          const nuevoRef = push(ref(database, 'clients'));
-          await set(nuevoRef, { nombre, codigo, direccion });
-          ok++;
-        } catch (innerErr) {
-          if (!firstErr) firstErr = innerErr;
-          console.error('Error en fila', i + 1, innerErr);
-          skipped++;
-        }
-      }
-
-      alert(`Carga masiva: ${ok} agregados, ${skipped} omitidos` + (firstErr ? ` — Ejemplo de error: ${firstErr.code || firstErr.message}` : ''));
-    } catch (err) {
-      console.error('Error leyendo CSV:', err);
-      alert('Error leyendo CSV: ' + (err?.message || err));
-    }
-  };
-
-      const normalize = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-
-      const headerRaw = splitLine(first);
-      const headerNorm = headerRaw.map(h => normalize(h));
-
-      // Detectar encabezados esperados (con y sin acentos)
-      const idxNombre = headerNorm.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
-      const idxCodigo = headerNorm.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
-      const idxDireccion = headerNorm.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr','direccion completa'].some(k => h.includes(k)));
-
-      let start = 1;
-      let map = { nombre: 0, codigo: 1, direccion: 2 };
-      const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
-      if (hasHeader) {
-        if (idxNombre !== -1)    map.nombre    = idxNombre;
-        if (idxCodigo !== -1)    map.codigo    = idxCodigo;
-        if (idxDireccion !== -1) map.direccion = idxDireccion;
-      } else {
-        start = 0; // sin encabezado: usar 3 primeras columnas
-      }
-
-      let ok = 0;
-      for (let i = start; i < lines.length; i++) {
-        const parts = splitLine(lines[i]).map(s => s.replace(/^\\"|\\"$/g, ''));
-        const nombre = (parts[map.nombre] || '').trim();
-        const codigo = (parts[map.codigo] || '').trim();
-        const direccion = (parts[map.direccion] || '').trim();
-        if (!nombre || !codigo || !direccion) continue;
-        try {
-          const nuevoRef = push(ref(database, 'clients'));
-          await set(nuevoRef, { nombre, codigo, direccion });
-          ok++;
-        } catch (innerErr) {
-          console.error('Error en fila', i + 1, innerErr);
-        }
-      }
-
-      alert(`Carga masiva completada: ${ok} clientes agregados.`);
-    } catch (err) {
-      console.error('Error leyendo CSV:', err);
-      alert('Error leyendo CSV: ' + (err?.message || err));
-    }
+    alert('Carga masiva completada');
   };
 
   const handleChange = (key, field, value) => {
@@ -695,8 +631,16 @@ function ClientesManager({ clientes }) {
   return (
     <div style={{ padding: 20 }}>
       <h2>Clientes</h2>
-      <p>Subí un CSV (nombre,codigo,direccion) para cargar clientes masivamente. También podés editar en línea.</p>
-      <input type="file" accept=".csv,text/csv" onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} />
+      <p>Subí un CSV (nombre,codigo,direccion). Elegí archivo y luego hacé clic en “Cargar CSV”.</p>
+<input
+  type="file"
+  accept=".csv,text/csv,.txt"
+  onChange={(e) => setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+/>
+<button type="button" onClick={cargarCSV} disabled={uploading || !csvFile} style={{ marginLeft: 8 }}>
+  {uploading ? 'Cargando…' : 'Cargar CSV'}
+</button>
+
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginTop: 12 }} border="1">
         <thead>
