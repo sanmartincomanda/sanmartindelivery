@@ -313,7 +313,7 @@ function KitchenView({ orders }) {
     }
   }, [orders]);
 
-  const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Jose Orozco', 'Otro'];
+  const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Noel Bendaña', 'Otro'];
   const pedidosFiltrados = orders.filter(o => o.estado !== 'Enviado');
 
   return (
