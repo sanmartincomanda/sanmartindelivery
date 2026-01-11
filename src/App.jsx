@@ -223,56 +223,262 @@ function getColors(estado) {
 }
 
 /******************** LISTA (ENVÍO) ********************/
-function ListaPedidos({ pedidos, onEnviarPedido }) {
+// REEMPLAZÁ COMPLETO: function ListaPedidos({ pedidos, onEnviarPedido }) { ... }
+// - Estilo futurista tipo Cocina (cards con halo por estado)
+// - Pedido grande (lo más importante)
+// - Contadores arriba: Por enviar / Enviados / Cancelados
+// - Muestra: cocinero (quién lo hizo), repartidor (enviado con), dirección, tiempos
+function ListaPedidos({ pedidos = [], onEnviarPedido }) {
+  const stateTone = (estado = 'Pendiente') => {
+    if (estado === 'En preparación') return 'warn';
+    if (estado === 'Preparado') return 'ok';        // listo para enviar
+    if (estado === 'Cancelado') return 'danger';
+    if (estado === 'Enviado') return 'sent';
+    return 'info';
+  };
+
+  const ui = {
+    page: { padding: 18, color: '#0b1220' },
+    headerRow: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      flexWrap: 'wrap',
+      marginBottom: 14,
+    },
+    title: { margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 0.2 },
+    pills: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' },
+    pill: (tone) => ({
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '8px 12px',
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 900,
+      background: 'rgba(255,255,255,0.85)',
+      border: '1px solid rgba(15,23,42,0.10)',
+      boxShadow: '0 8px 18px rgba(15,23,42,0.05)',
+    }),
+    dot: (tone) => ({
+      width: 8,
+      height: 8,
+      borderRadius: 999,
+      background:
+        tone === 'ok' ? 'rgba(34,197,94,0.95)' :
+        tone === 'sent' ? 'rgba(99,102,241,0.95)' :
+        tone === 'danger' ? 'rgba(244,63,94,0.95)' :
+        'rgba(34,211,238,0.95)',
+    }),
+
+    list: { listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 10 },
+
+    card: (tone) => ({
+      borderRadius: 18,
+      border: '1px solid rgba(15,23,42,0.10)',
+      background: 'rgba(255,255,255,0.92)',
+      padding: 12,
+      position: 'relative',
+      overflow: 'hidden',
+      boxShadow:
+        tone === 'ok' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(34,197,94,0.22)' :
+        tone === 'sent' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(99,102,241,0.22)' :
+        tone === 'danger' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(244,63,94,0.22)' :
+        '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(34,211,238,0.22)',
+    }),
+
+    glow: (tone) => ({
+      position: 'absolute',
+      inset: -80,
+      background:
+        tone === 'ok' ? 'radial-gradient(circle at 20% 10%, rgba(34,197,94,0.20), transparent 55%)' :
+        tone === 'sent' ? 'radial-gradient(circle at 20% 10%, rgba(99,102,241,0.20), transparent 55%)' :
+        tone === 'danger' ? 'radial-gradient(circle at 20% 10%, rgba(244,63,94,0.18), transparent 55%)' :
+        'radial-gradient(circle at 20% 10%, rgba(34,211,238,0.22), transparent 55%)',
+      pointerEvents: 'none',
+      filter: 'blur(2px)',
+    }),
+
+    topRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      gap: 10,
+      flexWrap: 'wrap',
+      alignItems: 'baseline',
+      position: 'relative',
+      marginBottom: 6,
+    },
+    id: { fontSize: 13, fontWeight: 900, opacity: 0.85 },
+    estado: { fontSize: 12, fontWeight: 900, opacity: 0.8 },
+
+    cliente: { margin: 0, fontSize: 15, fontWeight: 900 },
+    sub: { fontSize: 12, opacity: 0.86, marginTop: 4, fontWeight: 700 },
+
+    metaGrid: {
+      marginTop: 8,
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))',
+      gap: 8,
+    },
+    metaItem: {
+      background: 'rgba(15,23,42,0.04)',
+      border: '1px solid rgba(15,23,42,0.08)',
+      borderRadius: 12,
+      padding: 10,
+      fontSize: 13,
+      fontWeight: 700,
+    },
+
+    pedidoBox: {
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 14,
+      border: '1px solid rgba(15,23,42,0.10)',
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(34,211,238,0.08))',
+      boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.10)',
+    },
+    pedidoLabel: {
+      fontSize: 12,
+      fontWeight: 900,
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+      opacity: 0.8,
+      marginBottom: 6,
+    },
+    pedidoText: (cancelado) => ({
+      whiteSpace: 'pre-wrap',
+      margin: 0,
+      fontSize: 19,
+      lineHeight: 1.35,
+      fontWeight: 900,
+      letterSpacing: 0.2,
+      ...(cancelado ? { textDecoration: 'line-through', opacity: 0.65 } : {}),
+    }),
+
+    enviarWrap: { marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' },
+    select: {
+      padding: '8px 10px',
+      borderRadius: 12,
+      border: '1px solid rgba(15,23,42,0.14)',
+      background: 'rgba(255,255,255,0.95)',
+      fontWeight: 900,
+      fontSize: 12,
+    },
+  };
+
+  // Contadores
+  const porEnviar = pedidos.filter(p => p.estado !== 'Enviado' && p.estado !== 'Cancelado').length;
+  const enviados = pedidos.filter(p => p.estado === 'Enviado').length;
+  const cancelados = pedidos.filter(p => p.estado === 'Cancelado').length;
+
+  const Pill = ({ label, value, tone }) => (
+    <span style={ui.pill(tone)}>
+      <span style={ui.dot(tone)} />
+      {label}: <span style={{ fontWeight: 900 }}>{value}</span>
+    </span>
+  );
+
+  // Mostrar todos (incluye enviados), pero el contador aclara
+  const pedidosOrdenados = [...pedidos].sort((a, b) => (a.id || 0) - (b.id || 0));
+
   return (
-    <div style={{ padding: 20 }}>
-      <h2>Lista de Pedidos de Hoy</h2>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {pedidos.map(({ id, cliente, clienteCodigo, direccion, estado, cocinero, repartidor }) => {
-          const { background, border } = getColors(estado);
-          const parpadeo = estado === 'Preparado' ? 'parpadeo' : '';
-          return (
-            <li key={id} className={parpadeo} style={{ padding: 10, borderBottom: '1px solid #ccc', backgroundColor: background, border: `2px solid ${border}`, borderRadius: 6, marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <div>
-                  <strong>#{id}</strong> — <strong>{cliente}</strong> (Código: {clienteCodigo || '-'})
-                  <div style={{ fontSize: 13 }}><em>Dirección:</em> {direccion || '-'}</div>
-                </div>
-                <em>{estado}</em>
-              </div>
+    <div style={ui.page}>
+      <div style={ui.headerRow}>
+        <h2 style={ui.title}>Lista de Pedidos de Hoy</h2>
+        <div style={ui.pills}>
+          <Pill label="Por enviar" value={porEnviar} tone="ok" />
+          <Pill label="Enviados" value={enviados} tone="sent" />
+          <Pill label="Cancelados" value={cancelados} tone="danger" />
+        </div>
+      </div>
 
-              {estado === 'En preparación' && cocinero && (
-                <> (Cocinero: <strong>{cocinero}</strong>)</>
-              )}
+      {pedidosOrdenados.length === 0 ? (
+        <p>No hay pedidos para hoy</p>
+      ) : (
+        <ul style={ui.list}>
+          {pedidosOrdenados.map((p) => {
+            const tone = stateTone(p.estado || 'Pendiente');
+            const cancelado = p.estado === 'Cancelado';
 
-              {estado === 'Preparado' && (
-                <div style={{ marginTop: 8 }}>
-                  <label>Enviar pedido con: </label>
-                  <select onChange={(e) => onEnviarPedido(id, e.target.value)} defaultValue="">
-                    <option value="" disabled>Seleccionar...</option>
-                    <option>Carlos Mora</option>
-                    <option>Noel Hernadez</option>
-                    <option>Noel Bendaña</option>
-                    <option>Jose Orozco</option>
-                    <option>Daniel Cruz</option>
-                    <option>Otros</option>
-                  </select>
+            return (
+              <li key={p.firebaseKey || `${p.fecha || 'hoy'}-${p.id}`} style={ui.card(tone)}>
+                <div style={ui.glow(tone)} />
+
+                <div style={{ position: 'relative' }}>
+                  <div style={ui.topRow}>
+                    <div style={ui.id}>#{p.id}</div>
+                    <div style={ui.estado}>{p.estado || 'Pendiente'}</div>
+                  </div>
+
+                  <p style={ui.cliente}>
+                    {p.cliente} <span style={{ fontSize: 12, opacity: 0.7 }}>({p.clienteCodigo || '-'})</span>
+                  </p>
+
+                  {p.direccion && (
+                    <div style={ui.sub}><strong>Dir:</strong> {p.direccion}</div>
+                  )}
+
+                  <div style={ui.metaGrid}>
+                    <div style={ui.metaItem}>
+                      <strong>Quién lo hizo (Cocinero):</strong><br />
+                      {p.cocinero || '-'}
+                    </div>
+
+                    <div style={ui.metaItem}>
+                      <strong>Enviado con (Repartidor):</strong><br />
+                      {p.repartidor || '-'}
+                    </div>
+
+                    <div style={ui.metaItem}>
+                      <strong>Tiempos:</strong><br />
+                      Ingreso: {p.timestampIngreso || '-'} · Prep: {p.timestampPreparacion || '-'}
+                    </div>
+
+                    <div style={ui.metaItem}>
+                      <strong>Tiempos:</strong><br />
+                      Listo: {p.timestampPreparado || '-'} · Enviado: {p.timestampEnviado || '-'}
+                    </div>
+                  </div>
+
+                  <div style={ui.pedidoBox}>
+                    <div style={ui.pedidoLabel}>Pedido</div>
+                    <pre style={ui.pedidoText(cancelado)}>{p.pedido || ''}</pre>
+                  </div>
+
+                  {p.estado === 'Preparado' && (
+                    <div style={ui.enviarWrap}>
+                      <label style={{ fontWeight: 900 }}>Enviar pedido con:</label>
+                      <select style={ui.select} onChange={(e) => onEnviarPedido(p.id, e.target.value)} defaultValue="">
+                        <option value="" disabled>Seleccionar...</option>
+                        <option>Carlos Mora</option>
+                        <option>Noel Hernadez</option>
+                        <option>Noel Bendaña</option>
+                        <option>Jose Orozco</option>
+                        <option>Daniel Cruz</option>
+                        <option>Otros</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
-              )}
-              {estado === 'Enviado' && repartidor && (
-                <div style={{ marginTop: 5 }}>
-                  <small>Enviado con: <strong>{repartidor}</strong></small>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
 
+
 /******************** COCINA ********************/
+/******************** COCINA (UI FUTURISTA) ********************/
+// REEMPLAZÁ SOLO KitchenView por esta versión:
+// - Misma idea de "lista única" (no columnas por estado)
+// - Estilo futurista
+// - El PEDIDO es lo que más resalta (grande)
+// - Color/halo cambia según estado (como antes, pero moderno)
+// - Mantiene: seleccionar cocinero, listo, cancelar, deshacer, editar
 function KitchenView({ orders }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
@@ -289,20 +495,14 @@ function KitchenView({ orders }) {
       rutaRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (!data) {
-          setRutaOrders([]);
-          return;
-        }
+        if (!data) { setRutaOrders([]); return; }
         const arr = Object.entries(data)
           .map(([key, val]) => ({ firebaseKey: key, ...val }))
           .filter((p) => p.fecha === today)
           .sort((a, b) => (a.id || 0) - (b.id || 0));
-
         setRutaOrders(arr);
       },
-      (error) => {
-        console.error('Error leyendo rutaOrders (cocina):', error);
-      }
+      (error) => console.error('Error leyendo rutaOrders (cocina):', error)
     );
   }, []);
 
@@ -310,8 +510,7 @@ function KitchenView({ orders }) {
 
   const updateCampo = (firebaseKey, campo, valor, tab = kitchenTab) => {
     const basePath = getBasePath(tab);
-    const orderRef = ref(database, `${basePath}/${firebaseKey}`);
-    update(orderRef, { [campo]: valor });
+    update(ref(database, `${basePath}/${firebaseKey}`), { [campo]: valor });
   };
 
   const handleSelectCocinero = (firebaseKey, valor, tab = kitchenTab) => {
@@ -336,6 +535,7 @@ function KitchenView({ orders }) {
     });
   };
 
+  // Sonido SOLO delivery
   useEffect(() => {
     if (kitchenTab !== 'delivery') return;
 
@@ -351,15 +551,212 @@ function KitchenView({ orders }) {
   const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Noel Bendaña', 'Otro'];
 
   const currentOrdersRaw = kitchenTab === 'ruta' ? rutaOrders : orders;
-  const pedidosFiltrados = currentOrdersRaw.filter(o => o.estado !== 'Enviado');
+
+  // Misma regla: excluir enviados, y mantener orden por id
+  const pedidosFiltrados = [...currentOrdersRaw]
+    .filter(o => o.estado !== 'Enviado')
+    .sort((a, b) => (a.id || 0) - (b.id || 0));
+
+  // ====== estilos futuristas (lista) ======
+  const stateTone = (estado = 'Pendiente') => {
+    if (estado === 'En preparación') return 'warn';
+    if (estado === 'Preparado') return 'ok';
+    if (estado === 'Cancelado') return 'danger';
+    return 'info';
+  };
+
+  const ui = {
+    page: { padding: 18, color: '#0b1220' },
+    headerRow: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      flexWrap: 'wrap',
+      marginBottom: 14,
+    },
+    title: { margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 0.2 },
+    tabWrap: {
+      display: 'flex',
+      background: 'rgba(255,255,255,0.85)',
+      border: '1px solid rgba(15,23,42,0.12)',
+      borderRadius: 14,
+      padding: 4,
+      boxShadow: '0 8px 24px rgba(15,23,42,0.06)',
+      backdropFilter: 'blur(8px)',
+    },
+    tabBtn: (active) => ({
+      padding: '10px 14px',
+      borderRadius: 12,
+      border: 'none',
+      cursor: active ? 'default' : 'pointer',
+      background: active ? 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(34,211,238,0.18))' : 'transparent',
+      fontWeight: 900,
+    }),
+    pills: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+    },
+    pill: (tone) => ({
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '8px 12px',
+      borderRadius: 999,
+      fontSize: 13,
+      fontWeight: 900,
+      background: 'rgba(255,255,255,0.85)',
+      border: '1px solid rgba(15,23,42,0.10)',
+      boxShadow: '0 8px 18px rgba(15,23,42,0.05)',
+    }),
+    dot: (tone) => ({
+      width: 8, height: 8, borderRadius: 999,
+      background:
+        tone === 'info' ? 'rgba(34,211,238,0.9)' :
+        tone === 'warn' ? 'rgba(245,158,11,0.95)' :
+        tone === 'ok' ? 'rgba(34,197,94,0.9)' :
+        'rgba(244,63,94,0.9)'
+    }),
+    list: {
+      listStyle: 'none',
+      padding: 0,
+      margin: 0,
+      display: 'grid',
+      gap: 10,
+    },
+    card: (tone) => ({
+      borderRadius: 18,
+      border: '1px solid rgba(15,23,42,0.10)',
+      background: 'rgba(255,255,255,0.9)',
+      boxShadow: '0 10px 22px rgba(15,23,42,0.08)',
+      padding: 12,
+      position: 'relative',
+      overflow: 'hidden',
+
+      // borde/halo por estado (equivale a "cambiar color", pero moderno)
+      boxShadow:
+        tone === 'info' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(34,211,238,0.22)' :
+        tone === 'warn' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(245,158,11,0.22)' :
+        tone === 'ok' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(34,197,94,0.22)' :
+        '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(244,63,94,0.22)',
+    }),
+    glow: (tone) => ({
+      position: 'absolute',
+      inset: -80,
+      background:
+        tone === 'info' ? 'radial-gradient(circle at 20% 10%, rgba(34,211,238,0.22), transparent 55%)' :
+        tone === 'warn' ? 'radial-gradient(circle at 20% 10%, rgba(245,158,11,0.24), transparent 55%)' :
+        tone === 'ok' ? 'radial-gradient(circle at 20% 10%, rgba(34,197,94,0.20), transparent 55%)' :
+        'radial-gradient(circle at 20% 10%, rgba(244,63,94,0.18), transparent 55%)',
+      pointerEvents: 'none',
+      filter: 'blur(2px)'
+    }),
+    topRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      gap: 10,
+      flexWrap: 'wrap',
+      alignItems: 'baseline',
+      position: 'relative',
+      marginBottom: 6,
+    },
+    id: { fontSize: 13, fontWeight: 900, opacity: 0.85 },
+    meta: { fontSize: 12, fontWeight: 900, opacity: 0.75 },
+    name: { fontSize: 15, fontWeight: 900, margin: 0 },
+    sub: { fontSize: 12, opacity: 0.86, marginTop: 4, fontWeight: 700 },
+
+    // ✅ PEDIDO DOMINANTE
+    pedidoBox: {
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 14,
+      border: '1px solid rgba(15,23,42,0.10)',
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(34,211,238,0.08))',
+      boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.10)',
+    },
+    pedidoLabel: {
+      fontSize: 12,
+      fontWeight: 900,
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+      opacity: 0.8,
+      marginBottom: 6
+    },
+    pedidoText: (isCancelado) => ({
+      whiteSpace: 'pre-wrap',
+      margin: 0,
+      fontSize: 19,
+      lineHeight: 1.35,
+      fontWeight: 900,
+      letterSpacing: 0.2,
+      ...(isCancelado ? { textDecoration: 'line-through', opacity: 0.65 } : {}),
+    }),
+    textarea: {
+      width: '100%',
+      borderRadius: 12,
+      border: '1px solid rgba(15,23,42,0.14)',
+      padding: 10,
+      fontSize: 15,
+      fontWeight: 800,
+      resize: 'vertical',
+      background: 'rgba(255,255,255,0.98)',
+    },
+    actions: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' },
+    btn: (variant) => ({
+      border: '1px solid rgba(15,23,42,0.12)',
+      background:
+        variant === 'primary' ? 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(34,211,238,0.20))' :
+        variant === 'danger' ? 'linear-gradient(135deg, rgba(244,63,94,0.20), rgba(251,113,133,0.14))' :
+        'rgba(255,255,255,0.92)',
+      padding: '8px 10px',
+      borderRadius: 12,
+      cursor: 'pointer',
+      fontWeight: 900,
+      fontSize: 12,
+      boxShadow: '0 8px 18px rgba(15,23,42,0.06)',
+    }),
+    select: {
+      padding: '8px 10px',
+      borderRadius: 12,
+      border: '1px solid rgba(15,23,42,0.14)',
+      background: 'rgba(255,255,255,0.95)',
+      fontWeight: 900,
+      fontSize: 12,
+    },
+  };
+
+  const Pill = ({ label, value, tone }) => (
+    <span style={ui.pill(tone)}>
+      <span style={ui.dot(tone)} />
+      {label}: <span style={{ fontWeight: 900 }}>{value}</span>
+    </span>
+  );
+
+  const pendientesCount = pedidosFiltrados.filter(p => (p.estado || 'Pendiente') === 'Pendiente').length;
+  const preparandoCount = pedidosFiltrados.filter(p => p.estado === 'En preparación').length;
+  const preparadosCount = pedidosFiltrados.filter(p => p.estado === 'Preparado').length;
+  const canceladosCount = pedidosFiltrados.filter(p => p.estado === 'Cancelado').length;
 
   return (
-    <div style={{ padding: 20, fontSize: '20px' }}>
-      <h2>Pedidos en Cocina</h2>
+    <div style={ui.page}>
+      <div style={ui.headerRow}>
+        <h2 style={ui.title}>Cocina</h2>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        <button onClick={() => setKitchenTab('delivery')} disabled={kitchenTab === 'delivery'}>Delivery</button>
-        <button onClick={() => setKitchenTab('ruta')} disabled={kitchenTab === 'ruta'}>Ruta</button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={ui.tabWrap}>
+            <button style={ui.tabBtn(kitchenTab === 'delivery')} onClick={() => setKitchenTab('delivery')}>Delivery</button>
+            <button style={ui.tabBtn(kitchenTab === 'ruta')} onClick={() => setKitchenTab('ruta')}>Ruta</button>
+          </div>
+
+          <div style={ui.pills}>
+            <Pill label="Pendientes" value={pendientesCount} tone="info" />
+            <Pill label="En preparación" value={preparandoCount} tone="warn" />
+            <Pill label="Preparados" value={preparadosCount} tone="ok" />
+            <Pill label="Cancelados" value={canceladosCount} tone="danger" />
+          </div>
+        </div>
       </div>
 
       <audio ref={audioRef} src={pedidoSound} preload="auto" />
@@ -367,80 +764,110 @@ function KitchenView({ orders }) {
       {pedidosFiltrados.length === 0 ? (
         <p>No hay pedidos para hoy</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {[...pedidosFiltrados].sort((a, b) => (a.id || 0) - (b.id || 0)).map(({ id, cliente, clienteCodigo, pedido, estado = 'Pendiente', firebaseKey, cocinero, ruta }) => {
-            const isEditing = editingId === firebaseKey;
-            const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
-            const { background, border } = getColors(estado);
+        <ul style={ui.list}>
+          {pedidosFiltrados.map((p) => {
+            const tone = stateTone(p.estado || 'Pendiente');
+            const isEditing = editingId === p.firebaseKey;
 
             return (
-              <li key={firebaseKey} style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8 }}>
-                <div style={{ marginBottom: 6 }}>
-                  <strong>#{id} - Cliente:</strong> {cliente} — <strong>Código:</strong> {clienteCodigo || '-'}
-                  {kitchenTab === 'ruta' && (
-                    <span style={{ marginLeft: 10 }}>— <strong>Ruta:</strong> {ruta || 'Sin ruta'}</span>
-                  )}
-                </div>
-
-                <div style={{ marginTop: 5 }}>
-                  <strong>Pedido:</strong>
-                  {isEditing ? (
-                    <>
-                      <textarea
-                        rows={3}
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        style={{ width: '100%', fontSize: '16px', resize: 'vertical', marginTop: 5 }}
-                      />
-                      <div style={{ marginTop: 5 }}>
-                        <button onClick={() => { updateCampo(firebaseKey, 'pedido', editText); setEditingId(null); }}>Guardar</button>
-                        <button onClick={() => setEditingId(null)} style={{ marginLeft: 10 }}>Cancelar</button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <pre style={{ whiteSpace: 'pre-wrap', marginTop: 5, ...textStyle }}>{pedido}</pre>
-                      <button onClick={() => { setEditingId(firebaseKey); setEditText(pedido); }} style={{ marginTop: 5 }}>✏️ Editar</button>
-                    </>
-                  )}
-                </div>
-
-                {estado === 'Pendiente' && (
-                  <div style={{ marginTop: 8 }}>
-                    <label>Seleccionar cocinero:</label>
-                    <select onChange={(e) => handleSelectCocinero(firebaseKey, e.target.value)} defaultValue="">
-                      <option value="" disabled>Seleccionar...</option>
-                      {cocineros.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+              <li key={p.firebaseKey} style={ui.card(tone)}>
+                <div style={ui.glow(tone)} />
+                <div style={{ position: 'relative' }}>
+                  <div style={ui.topRow}>
+                    <div style={ui.id}>#{p.id}</div>
+                    <div style={ui.meta}>
+                      {kitchenTab === 'ruta' ? `Ruta: ${p.ruta || 'Sin ruta'}` : 'Delivery'} · {p.estado || 'Pendiente'}
+                      {p.cocinero ? ` · ${p.cocinero}` : ''}
+                    </div>
                   </div>
-                )}
 
-                {estado === 'En preparación' && (
-                  <div style={{ marginTop: 10 }}>
-                    <strong>Cocinero: {cocinero}</strong>
-                    <button onClick={() => marcarPreparado(firebaseKey)} style={{ marginLeft: 10 }}>✅ Marcar como Preparado</button>
+                  <p style={ui.name}>
+                    {p.cliente} <span style={{ fontSize: 12, opacity: 0.7 }}>({p.clienteCodigo || '-'})</span>
+                  </p>
+
+                  {p.direccion && (
+                    <div style={ui.sub}><strong>Dir:</strong> {p.direccion}</div>
+                  )}
+
+                  {/* PEDIDO GRANDE */}
+                  <div style={ui.pedidoBox}>
+                    <div style={ui.pedidoLabel}>Pedido</div>
+
+                    {isEditing ? (
+                      <>
+                        <textarea
+                          rows={4}
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          style={ui.textarea}
+                        />
+                        <div style={ui.actions}>
+                          <button
+                            style={ui.btn('primary')}
+                            onClick={() => { updateCampo(p.firebaseKey, 'pedido', editText); setEditingId(null); }}
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            style={ui.btn()}
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <pre style={ui.pedidoText((p.estado || '') === 'Cancelado')}>{p.pedido}</pre>
+                        <div style={ui.actions}>
+                          <button style={ui.btn()} onClick={() => { setEditingId(p.firebaseKey); setEditText(p.pedido || ''); }}>
+                            ✏️ Editar
+                          </button>
+
+                          {(p.estado || 'Pendiente') === 'Pendiente' && (
+                            <>
+                              <select style={ui.select} onChange={(e) => handleSelectCocinero(p.firebaseKey, e.target.value)} defaultValue="">
+                                <option value="" disabled>Seleccionar cocinero...</option>
+                                {cocineros.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                              <button style={ui.btn('danger')} onClick={() => updateCampo(p.firebaseKey, 'estado', 'Cancelado')}>
+                                ❌ Cancelar
+                              </button>
+                            </>
+                          )}
+
+                          {p.estado === 'En preparación' && (
+                            <>
+                              <button style={ui.btn('primary')} onClick={() => marcarPreparado(p.firebaseKey)}>
+                                ✅ Listo
+                              </button>
+                              <button style={ui.btn('danger')} onClick={() => updateCampo(p.firebaseKey, 'estado', 'Cancelado')}>
+                                ❌ Cancelar
+                              </button>
+                            </>
+                          )}
+
+                          {p.estado === 'Preparado' && (
+                            <>
+                              <button style={ui.btn()} onClick={() => updateCampo(p.firebaseKey, 'estado', 'Pendiente')}>
+                                ↩️ Deshacer
+                              </button>
+                              <button style={ui.btn('danger')} onClick={() => updateCampo(p.firebaseKey, 'estado', 'Cancelado')}>
+                                ❌ Cancelar
+                              </button>
+                            </>
+                          )}
+
+                          {p.estado === 'Cancelado' && (
+                            <button style={ui.btn('primary')} onClick={() => updateCampo(p.firebaseKey, 'estado', 'Pendiente')}>
+                              ↩️ Deshacer cancelación
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
-
-                <div style={{ marginTop: 10 }}>
-                  {estado !== 'Cancelado' && (
-                    <button
-                      onClick={() => updateCampo(firebaseKey, 'estado', 'Cancelado')}
-                      style={{ backgroundColor: '#dc3545', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
-                    >
-                      ❌ Cancelar
-                    </button>
-                  )}
-                  {estado === 'Cancelado' && (
-                    <button
-                      onClick={() => updateCampo(firebaseKey, 'estado', 'Pendiente')}
-                      style={{ backgroundColor: '#007bff', color: 'white', padding: '4px 10px', borderRadius: 4, border: 'none' }}
-                    >
-                      ↩️ Deshacer cancelación
-                    </button>
-                  )}
                 </div>
-
               </li>
             );
           })}
@@ -449,6 +876,7 @@ function KitchenView({ orders }) {
     </div>
   );
 }
+
 
 /******************** EXPORTAR A EXCEL ********************/
 function exportarAExcel(pedidos) {
