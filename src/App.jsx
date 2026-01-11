@@ -13,25 +13,23 @@ const normalizar = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '')
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
 /******************** ORDER FORM ********************/
+/******************** ORDER FORM ********************/
+// REEMPLAZÁ COMPLETO tu function OrderForm por este.
+// Mantiene toda tu lógica (clientes, nuevo cliente, método de pago, etc.)
+// Solo mejora el UI estilo “kiosk / McD”: header con logo grande, cards, botones grandes, colores.
 function OrderForm({ onAddOrder, nextOrderId, clientes }) {
   const [clienteInput, setClienteInput] = useState('');
   const [pedido, setPedido] = useState('');
   const [customId, setCustomId] = useState(nextOrderId);
   const [selectedClient, setSelectedClient] = useState(null);
+
   const [showNewClient, setShowNewClient] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '' });
   const [savingClient, setSavingClient] = useState(false);
 
-  useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
+  const [metodoPago, setMetodoPago] = useState('Efectivo');
 
-  useEffect(() => {
-    try {
-      console.log('Firebase projectId:', getApp().options.projectId);
-      console.log('Realtime DB root:', ref(database).toString());
-    } catch (e) {
-      console.error('No pude leer config de Firebase:', e);
-    }
-  }, []);
+  useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
 
   const sugerencias = clientes
     .filter(c => normalizar(c.nombre || '').includes(normalizar(clienteInput)))
@@ -51,7 +49,7 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
       return;
     }
 
-    const fecha = hoyISO();
+    const fecha = new Date().toISOString().slice(0, 10);
     const hora = new Date().toLocaleTimeString();
 
     onAddOrder({
@@ -61,12 +59,14 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
       pedido,
       fecha,
       hora,
-      id: customId
+      id: customId,
+      metodoPago
     });
 
     setClienteInput('');
     setSelectedClient(null);
     setPedido('');
+    setMetodoPago('Efectivo');
     setCustomId((prev) => Math.min(prev + 1, 100));
   };
 
@@ -85,6 +85,7 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
         direccion: direccion.trim(),
       };
       await set(nuevoRef, data);
+
       setShowNewClient(false);
       setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
       setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
@@ -97,118 +98,334 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
     }
   };
 
+  // ====== UI estilo “kiosk” ======
+  const ui = {
+    page: {
+      borderRadius: 18,
+      overflow: 'hidden',
+      border: '1px solid rgba(15,23,42,0.10)',
+      background: 'linear-gradient(180deg, rgba(255,226,0,0.22), rgba(255,255,255,0.92) 40%, rgba(255,255,255,0.92))',
+      boxShadow: '0 18px 50px rgba(15,23,42,0.10)',
+    },
+    hero: {
+      padding: 18,
+      background: 'linear-gradient(135deg, rgba(220,38,38,0.95), rgba(245,158,11,0.85))',
+      color: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      flexWrap: 'wrap',
+    },
+    brand: { display: 'flex', alignItems: 'center', gap: 14 },
+    logoWrap: {
+      width: 84,
+      height: 84,
+      borderRadius: 20,
+      background: 'rgba(255,255,255,0.16)',
+      border: '1px solid rgba(255,255,255,0.30)',
+      display: 'grid',
+      placeItems: 'center',
+      boxShadow: '0 10px 24px rgba(0,0,0,0.18)',
+    },
+    logo: { width: 64, height: 64, objectFit: 'contain', filter: 'drop-shadow(0 8px 18px rgba(0,0,0,0.25))' },
+    h1: { margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 0.2 },
+    subtitle: { margin: '4px 0 0 0', opacity: 0.92, fontWeight: 700, fontSize: 13 },
+
+    body: { padding: 18 },
+
+    grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 },
+    card: {
+      borderRadius: 16,
+      border: '1px solid rgba(15,23,42,0.10)',
+      background: 'rgba(255,255,255,0.92)',
+      boxShadow: '0 10px 22px rgba(15,23,42,0.06)',
+      padding: 14,
+    },
+    cardTitle: { margin: '0 0 10px 0', fontSize: 13, fontWeight: 900, letterSpacing: 0.6, textTransform: 'uppercase', opacity: 0.75 },
+
+    label: { display: 'block', fontWeight: 900, fontSize: 12, letterSpacing: 0.4, opacity: 0.85, marginBottom: 6 },
+    input: {
+      width: '100%',
+      padding: '12px 12px',
+      borderRadius: 14,
+      border: '1px solid rgba(15,23,42,0.14)',
+      background: 'rgba(255,255,255,0.98)',
+      fontSize: 16,
+      fontWeight: 800,
+      outline: 'none',
+    },
+    textarea: {
+      width: '100%',
+      padding: 12,
+      borderRadius: 14,
+      border: '1px solid rgba(15,23,42,0.14)',
+      background: 'rgba(255,255,255,0.98)',
+      fontSize: 16,
+      fontWeight: 800,
+      resize: 'vertical',
+      outline: 'none',
+    },
+    select: {
+      width: '100%',
+      padding: '12px 12px',
+      borderRadius: 14,
+      border: '1px solid rgba(15,23,42,0.14)',
+      background: 'rgba(255,255,255,0.98)',
+      fontSize: 16,
+      fontWeight: 900,
+      outline: 'none',
+    },
+
+    hint: { fontSize: 12, opacity: 0.7, marginTop: 6, fontWeight: 700 },
+
+    bigBtn: {
+      width: '100%',
+      padding: '14px 14px',
+      borderRadius: 16,
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: 16,
+      fontWeight: 900,
+      letterSpacing: 0.2,
+      background: 'linear-gradient(135deg, rgba(220,38,38,1), rgba(245,158,11,0.95))',
+      color: 'white',
+      boxShadow: '0 16px 32px rgba(220,38,38,0.22)',
+    },
+    smallBtn: (variant) => ({
+      padding: '10px 12px',
+      borderRadius: 14,
+      border: '1px solid rgba(15,23,42,0.14)',
+      background:
+        variant === 'danger' ? 'linear-gradient(135deg, rgba(244,63,94,0.18), rgba(251,113,133,0.12))' :
+        variant === 'primary' ? 'linear-gradient(135deg, rgba(34,197,94,0.18), rgba(34,197,94,0.10))' :
+        'rgba(255,255,255,0.95)',
+      cursor: 'pointer',
+      fontWeight: 900,
+      fontSize: 13,
+    }),
+
+    dropdown: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      background: 'white',
+      border: '1px solid rgba(15,23,42,0.12)',
+      borderRadius: 14,
+      listStyle: 'none',
+      margin: 0,
+      padding: 6,
+      zIndex: 50,
+      maxHeight: 260,
+      overflowY: 'auto',
+      boxShadow: '0 18px 40px rgba(15,23,42,0.10)',
+    },
+    dropdownItem: {
+      padding: '10px 10px',
+      borderRadius: 12,
+      cursor: 'pointer',
+      border: '1px solid transparent',
+    },
+    dropdownItemHover: {
+      background: 'rgba(245,158,11,0.12)',
+      border: '1px solid rgba(245,158,11,0.25)',
+    },
+
+    selectedBox: {
+      borderRadius: 16,
+      border: '1px solid rgba(34,197,94,0.22)',
+      background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(255,255,255,0.92))',
+      padding: 12,
+      marginTop: 10,
+    },
+    selectedTitle: { fontWeight: 900, marginBottom: 6 },
+    kv: { fontSize: 13, fontWeight: 800, opacity: 0.9, lineHeight: 1.35 },
+
+    full: { gridColumn: '1 / -1' }
+  };
+
+  const [hoverIdx, setHoverIdx] = useState(-1);
+
   return (
-    <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
-      <label>Número de pedido:</label>
-      <input
-        type="number"
-        value={customId}
-        onChange={(e) => setCustomId(parseInt(e.target.value || '1', 10))}
-        min={1}
-        max={100}
-        style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10 }}
-      />
+    <div style={ui.page}>
+      {/* HERO */}
+      <div style={ui.hero}>
+        <div style={ui.brand}>
+          <div style={ui.logoWrap}>
+            {/* usa el logo global que ya importás en App.jsx */}
+            <img src={logo} alt="Logo" style={ui.logo} />
+          </div>
+          <div>
+            <h2 style={ui.h1}>Ingreso de Pedidos</h2>
+            <div style={ui.subtitle}>Delivery · Rápido · Claro · Sin errores</div>
+          </div>
+        </div>
 
-      <label>Cliente:</label>
-      <div style={{ position: 'relative', marginBottom: 10 }}>
-        <input
-          type="text"
-          placeholder="Escribí y elegí de la lista"
-          value={clienteInput}
-          onChange={(e) => {
-            setClienteInput(e.target.value);
-            setSelectedClient(null);
-          }}
-          style={{ width: '100%', padding: 8, fontSize: 16 }}
-          required
-          autoComplete="off"
-        />
-
-        {clienteInput && !selectedClient && sugerencias.length > 0 && (
-          <ul style={{
-            position: 'absolute', top: '100%', left: 0, right: 0,
-            background: 'white', border: '1px solid #ddd', borderRadius: 6,
-            listStyle: 'none', margin: 0, padding: 0, zIndex: 10, maxHeight: 220, overflowY: 'auto'
-          }}>
-            {sugerencias.map((c) => (
-              <li
-                key={c.firebaseKey}
-                onClick={() => handleSelectCliente(c)}
-                style={{ padding: '8px 10px', cursor: 'pointer' }}
-              >
-                <div style={{ fontWeight: 600 }}>{c.nombre}</div>
-                <small>Código: {c.codigo} · Dirección: {c.direccion}</small>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div style={{ fontWeight: 900, opacity: 0.95 }}>
+          Pedido #{customId}
+        </div>
       </div>
 
-      {selectedClient && (
-        <div style={{
-          background: '#f6f9ff', border: '1px solid #cfe2ff', padding: 10,
-          borderRadius: 8, marginBottom: 10
-        }}>
-          <div><strong>Cliente seleccionado:</strong> {selectedClient.nombre}</div>
-          <div><strong>Código:</strong> {selectedClient.codigo}</div>
-          <div><strong>Dirección:</strong> {selectedClient.direccion}</div>
-          <button type="button" onClick={() => { setSelectedClient(null); setClienteInput(''); }}>Cambiar</button>
-        </div>
-      )}
+      {/* BODY */}
+      <form onSubmit={handleSubmit} style={ui.body}>
+        <div style={ui.grid}>
+          {/* Card: Identificación */}
+          <div style={ui.card}>
+            <div style={ui.cardTitle}>Pedido</div>
 
-      {!selectedClient && (
-        <div style={{ marginBottom: 12 }}>
-          <button type="button" onClick={() => setShowNewClient(v => !v)}>
-            {showNewClient ? 'Cancelar nuevo cliente' : '➕ Agregar cliente nuevo'}
-          </button>
-        </div>
-      )}
-
-      {showNewClient && (
-        <div style={{ background: '#fffaf0', border: '1px solid #ffe8a1', padding: 10, borderRadius: 8, marginBottom: 10 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 8 }}>
+            <label style={ui.label}>Número de pedido</label>
             <input
-              placeholder="Nombre"
-              value={nuevoCliente.nombre}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
-              style={{ padding: 8, fontSize: 14 }}
+              type="number"
+              value={customId}
+              onChange={(e) => setCustomId(parseInt(e.target.value || '1', 10))}
+              min={1}
+              max={100}
+              style={ui.input}
             />
-            <input
-              placeholder="Código"
-              value={nuevoCliente.codigo}
-              onChange={(e) => setNuevoCliente({ ...nuevoCliente, codigo: e.target.value })}
-              style={{ padding: 8, fontSize: 14 }}
-            />
+            <div style={ui.hint}>Recomendado: automático (siguiente número del día).</div>
+
+            <div style={{ marginTop: 12 }}>
+              <label style={ui.label}>Método de pago</label>
+              <select value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)} style={ui.select}>
+                <option>Efectivo</option>
+                <option>POS BAC</option>
+                <option>POS BANPRO</option>
+                <option>POS LAFISE</option>
+                <option>LINK DE PAGO</option>
+                <option>TRANSFERENCIA</option>
+                <option>CREDITO</option>
+              </select>
+            </div>
           </div>
-          <input
-            placeholder="Dirección"
-            value={nuevoCliente.direccion}
-            onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
-            style={{ marginTop: 8, padding: 8, width: '100%', fontSize: 14 }}
-          />
-          <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={guardarNuevoCliente} disabled={savingClient}>
-              {savingClient ? 'Guardando…' : 'Guardar cliente'}
-            </button>
+
+          {/* Card: Cliente */}
+          <div style={ui.card}>
+            <div style={ui.cardTitle}>Cliente</div>
+
+            <label style={ui.label}>Buscar cliente</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Escribí y elegí de la lista"
+                value={clienteInput}
+                onChange={(e) => {
+                  setClienteInput(e.target.value);
+                  setSelectedClient(null);
+                }}
+                style={ui.input}
+                required
+                autoComplete="off"
+              />
+
+              {clienteInput && !selectedClient && sugerencias.length > 0 && (
+                <ul style={ui.dropdown}>
+                  {sugerencias.map((c, idx) => (
+                    <li
+                      key={c.firebaseKey}
+                      onMouseEnter={() => setHoverIdx(idx)}
+                      onMouseLeave={() => setHoverIdx(-1)}
+                      onClick={() => handleSelectCliente(c)}
+                      style={{
+                        ...ui.dropdownItem,
+                        ...(hoverIdx === idx ? ui.dropdownItemHover : {})
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>{c.nombre}</div>
+                      <div style={{ fontSize: 12, opacity: 0.8, fontWeight: 700 }}>
+                        Código: {c.codigo} · Dirección: {c.direccion}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {selectedClient ? (
+              <div style={ui.selectedBox}>
+                <div style={ui.selectedTitle}>Cliente seleccionado</div>
+                <div style={ui.kv}>Nombre: {selectedClient.nombre}</div>
+                <div style={ui.kv}>Código: {selectedClient.codigo}</div>
+                <div style={ui.kv}>Dirección: {selectedClient.direccion}</div>
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedClient(null); setClienteInput(''); }}
+                    style={ui.smallBtn('danger')}
+                  >
+                    Cambiar cliente
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowNewClient(v => !v)}
+                  style={ui.smallBtn(showNewClient ? 'danger' : 'primary')}
+                >
+                  {showNewClient ? 'Cancelar nuevo cliente' : '➕ Agregar cliente nuevo'}
+                </button>
+
+                {showNewClient && (
+                  <div style={{ marginTop: 10, display: 'grid', gap: 10 }}>
+                    <input
+                      placeholder="Nombre"
+                      value={nuevoCliente.nombre}
+                      onChange={(e) => setNuevoCliente({ ...nuevoCliente, nombre: e.target.value })}
+                      style={ui.input}
+                    />
+                    <input
+                      placeholder="Código"
+                      value={nuevoCliente.codigo}
+                      onChange={(e) => setNuevoCliente({ ...nuevoCliente, codigo: e.target.value })}
+                      style={ui.input}
+                    />
+                    <input
+                      placeholder="Dirección"
+                      value={nuevoCliente.direccion}
+                      onChange={(e) => setNuevoCliente({ ...nuevoCliente, direccion: e.target.value })}
+                      style={ui.input}
+                    />
+                    <button type="button" onClick={guardarNuevoCliente} disabled={savingClient} style={ui.smallBtn('primary')}>
+                      {savingClient ? 'Guardando…' : 'Guardar cliente'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Card: Pedido (FULL) */}
+          <div style={{ ...ui.card, ...ui.full }}>
+            <div style={ui.cardTitle}>Detalle del pedido</div>
+
+            <label style={ui.label}>Pedido</label>
+            <textarea
+              rows={6}
+              placeholder="Escribí el pedido aquí"
+              value={pedido}
+              onChange={(e) => setPedido(e.target.value)}
+              style={ui.textarea}
+              required
+            />
+
+            <div style={{ marginTop: 12 }}>
+              <button type="submit" style={ui.bigBtn}>
+                ✅ Agregar Pedido
+              </button>
+            </div>
+
+            <div style={ui.hint}>
+              Tip: Escribí el pedido por líneas (ej: “2 lb lomo”, “1 lb molida”, “1 bolsa hielo”).
+            </div>
           </div>
         </div>
-      )}
-
-      <label>Pedido:</label>
-      <textarea
-        rows={5}
-        placeholder="Escribí el pedido aquí"
-        value={pedido}
-        onChange={(e) => setPedido(e.target.value)}
-        style={{ width: '100%', padding: 8, fontSize: 16, marginBottom: 10, resize: 'vertical' }}
-        required
-      />
-      <button type="submit" style={{ padding: '10px 20px', fontSize: 16 }}>
-        Agregar Pedido
-      </button>
-    </form>
+      </form>
+    </div>
   );
 }
+
 
 /******************** COLORES POR ESTADO ********************/
 function getColors(estado) {
@@ -226,12 +443,11 @@ function getColors(estado) {
 // REEMPLAZÁ COMPLETO: function ListaPedidos({ pedidos, onEnviarPedido }) { ... }
 // - Estilo futurista tipo Cocina (cards con halo por estado)
 // - Pedido grande (lo más importante)
-// - Contadores arriba: Por enviar / Enviados / Cancelados
-// - Muestra: cocinero (quién lo hizo), repartidor (enviado con), dirección, tiempos
+// 3) REEMPLAZÁ ListaPedidos por esta versión (muestra Método de pago siempre, incluso Enviado/Cancelado)
 function ListaPedidos({ pedidos = [], onEnviarPedido }) {
   const stateTone = (estado = 'Pendiente') => {
     if (estado === 'En preparación') return 'warn';
-    if (estado === 'Preparado') return 'ok';        // listo para enviar
+    if (estado === 'Preparado') return 'ok';
     if (estado === 'Cancelado') return 'danger';
     if (estado === 'Enviado') return 'sent';
     return 'info';
@@ -240,40 +456,27 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
   const ui = {
     page: { padding: 18, color: '#0b1220' },
     headerRow: {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      flexWrap: 'wrap',
-      marginBottom: 14,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: 12, flexWrap: 'wrap', marginBottom: 14
     },
     title: { margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 0.2 },
     pills: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' },
     pill: (tone) => ({
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 8,
-      padding: '8px 12px',
-      borderRadius: 999,
-      fontSize: 13,
-      fontWeight: 900,
+      display: 'inline-flex', alignItems: 'center', gap: 8,
+      padding: '8px 12px', borderRadius: 999, fontSize: 13, fontWeight: 900,
       background: 'rgba(255,255,255,0.85)',
       border: '1px solid rgba(15,23,42,0.10)',
       boxShadow: '0 8px 18px rgba(15,23,42,0.05)',
     }),
     dot: (tone) => ({
-      width: 8,
-      height: 8,
-      borderRadius: 999,
+      width: 8, height: 8, borderRadius: 999,
       background:
         tone === 'ok' ? 'rgba(34,197,94,0.95)' :
         tone === 'sent' ? 'rgba(99,102,241,0.95)' :
         tone === 'danger' ? 'rgba(244,63,94,0.95)' :
         'rgba(34,211,238,0.95)',
     }),
-
     list: { listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 10 },
-
     card: (tone) => ({
       borderRadius: 18,
       border: '1px solid rgba(15,23,42,0.10)',
@@ -287,7 +490,6 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
         tone === 'danger' ? '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(244,63,94,0.22)' :
         '0 10px 22px rgba(15,23,42,0.08), 0 0 0 1px rgba(34,211,238,0.22)',
     }),
-
     glow: (tone) => ({
       position: 'absolute',
       inset: -80,
@@ -299,15 +501,9 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
       pointerEvents: 'none',
       filter: 'blur(2px)',
     }),
-
     topRow: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      gap: 10,
-      flexWrap: 'wrap',
-      alignItems: 'baseline',
-      position: 'relative',
-      marginBottom: 6,
+      display: 'flex', justifyContent: 'space-between', gap: 10,
+      flexWrap: 'wrap', alignItems: 'baseline', position: 'relative', marginBottom: 6
     },
     id: { fontSize: 13, fontWeight: 900, opacity: 0.85 },
     estado: { fontSize: 12, fontWeight: 900, opacity: 0.8 },
@@ -367,7 +563,6 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
     },
   };
 
-  // Contadores
   const porEnviar = pedidos.filter(p => p.estado !== 'Enviado' && p.estado !== 'Cancelado').length;
   const enviados = pedidos.filter(p => p.estado === 'Enviado').length;
   const cancelados = pedidos.filter(p => p.estado === 'Cancelado').length;
@@ -379,7 +574,6 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
     </span>
   );
 
-  // Mostrar todos (incluye enviados), pero el contador aclara
   const pedidosOrdenados = [...pedidos].sort((a, b) => (a.id || 0) - (b.id || 0));
 
   return (
@@ -404,7 +598,6 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
             return (
               <li key={p.firebaseKey || `${p.fecha || 'hoy'}-${p.id}`} style={ui.card(tone)}>
                 <div style={ui.glow(tone)} />
-
                 <div style={{ position: 'relative' }}>
                   <div style={ui.topRow}>
                     <div style={ui.id}>#{p.id}</div>
@@ -420,6 +613,12 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
                   )}
 
                   <div style={ui.metaGrid}>
+                    {/* ✅ NUEVO: Método de pago */}
+                    <div style={ui.metaItem}>
+                      <strong>Método de pago:</strong><br />
+                      {p.metodoPago || '-'}
+                    </div>
+
                     <div style={ui.metaItem}>
                       <strong>Quién lo hizo (Cocinero):</strong><br />
                       {p.cocinero || '-'}
@@ -432,11 +631,7 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
 
                     <div style={ui.metaItem}>
                       <strong>Tiempos:</strong><br />
-                      Ingreso: {p.timestampIngreso || '-'} · Prep: {p.timestampPreparacion || '-'}
-                    </div>
-
-                    <div style={ui.metaItem}>
-                      <strong>Tiempos:</strong><br />
+                      Ingreso: {p.timestampIngreso || '-'} · Prep: {p.timestampPreparacion || '-'}<br />
                       Listo: {p.timestampPreparado || '-'} · Enviado: {p.timestampEnviado || '-'}
                     </div>
                   </div>
@@ -454,8 +649,8 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
                         <option>Carlos Mora</option>
                         <option>Noel Hernadez</option>
                         <option>Noel Bendaña</option>
-                        <option>Jose Orozco</option>
-                        <option>Daniel Cruz</option>
+                        <option>JORDIN</option>
+                        <option>Harvey Mora</option>
                         <option>Otros</option>
                       </select>
                     </div>
@@ -469,6 +664,7 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
     </div>
   );
 }
+
 
 
 /******************** COCINA ********************/
@@ -1327,7 +1523,7 @@ function App() {
     return maxId + 1;
   };
 
-  const addOrder = ({ cliente, clienteCodigo, direccion, pedido, fecha, hora, id }) => {
+  const addOrder = ({ cliente, clienteCodigo, direccion, pedido, fecha, hora, id, metodoPago }) => {
     const timestamp = new Date().toLocaleTimeString();
     push(ref(database, 'orders'), {
       cliente,
@@ -1335,6 +1531,7 @@ function App() {
       direccion,
       pedido,
       estado: 'Pendiente',
+      metodoPago: metodoPago || 'Efectivo', // ✅ OBLIGATORIO
       fecha,
       id,
       timestampIngreso: timestamp,
