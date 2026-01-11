@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+// src/App.jsx
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { getApp } from 'firebase/app';
-import { ref, push, onValue, update, set } from 'firebase/database';
+import { ref, push, onValue, update, set, remove } from 'firebase/database';
 import { database } from './firebase';
 import logo from './logo.svg';
+import PedidosRuta from "./PedidosRuta";
 import pedidoSound from './pedido.mp3';
 import './App.css';
 
 /******************** UTIL ********************/
 const normalizar = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const hoyISO = () => new Date().toISOString().slice(0, 10);
 
 /******************** ORDER FORM ********************/
 function OrderForm({ onAddOrder, nextOrderId, clientes }) {
@@ -19,17 +22,16 @@ function OrderForm({ onAddOrder, nextOrderId, clientes }) {
   const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '' });
   const [savingClient, setSavingClient] = useState(false);
 
-
   useEffect(() => setCustomId(nextOrderId), [nextOrderId]);
-useEffect(() => {
-  try {
-    console.log('Firebase projectId:', getApp().options.projectId);
-    console.log('Realtime DB root:', ref(database).toString());
-    // Debe verse algo como: https://TU-PROYECTO-default-rtdb.<region>.firebasedatabase.app/
-  } catch (e) {
-    console.error('No pude leer config de Firebase:', e);
-  }
-}, []);
+
+  useEffect(() => {
+    try {
+      console.log('Firebase projectId:', getApp().options.projectId);
+      console.log('Realtime DB root:', ref(database).toString());
+    } catch (e) {
+      console.error('No pude leer config de Firebase:', e);
+    }
+  }, []);
 
   const sugerencias = clientes
     .filter(c => normalizar(c.nombre || '').includes(normalizar(clienteInput)))
@@ -44,13 +46,12 @@ useEffect(() => {
     e.preventDefault();
     if (!pedido.trim()) return;
 
-    // Si hay un cliente seleccionado, usamos sus datos. Si no, impedimos continuar.
     if (!selectedClient) {
       alert('Seleccioná un cliente de la lista (o agregá uno nuevo).');
       return;
     }
 
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = hoyISO();
     const hora = new Date().toLocaleTimeString();
 
     onAddOrder({
@@ -63,40 +64,38 @@ useEffect(() => {
       id: customId
     });
 
-    // reset
     setClienteInput('');
     setSelectedClient(null);
     setPedido('');
     setCustomId((prev) => Math.min(prev + 1, 100));
   };
 
-const guardarNuevoCliente = async () => {
-  const { nombre, codigo, direccion } = nuevoCliente;
-  if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
-    alert('Completá nombre, código y dirección para crear el cliente.');
-    return;
-  }
-  try {
-    setSavingClient(true); // usa el estado que ya tienes
-    const nuevoRef = push(ref(database, 'clients'));
-    const data = {
-      nombre: nombre.trim(),
-      codigo: codigo.trim(),
-      direccion: direccion.trim(),
-    };
-    await set(nuevoRef, data);
-    setShowNewClient(false);
-    setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
-    setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
-    setClienteInput(data.nombre);
-  } catch (err) {
-    console.error('Error guardando cliente:', err);
-    alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
-  } finally {
-    setSavingClient(false);
-  }
-};
-
+  const guardarNuevoCliente = async () => {
+    const { nombre, codigo, direccion } = nuevoCliente;
+    if (!nombre.trim() || !codigo.trim() || !direccion.trim()) {
+      alert('Completá nombre, código y dirección para crear el cliente.');
+      return;
+    }
+    try {
+      setSavingClient(true);
+      const nuevoRef = push(ref(database, 'clients'));
+      const data = {
+        nombre: nombre.trim(),
+        codigo: codigo.trim(),
+        direccion: direccion.trim(),
+      };
+      await set(nuevoRef, data);
+      setShowNewClient(false);
+      setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
+      setSelectedClient({ firebaseKey: nuevoRef.key, ...data });
+      setClienteInput(data.nombre);
+    } catch (err) {
+      console.error('Error guardando cliente:', err);
+      alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
+    } finally {
+      setSavingClient(false);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit} style={{ marginBottom: 20 }}>
@@ -124,7 +123,7 @@ const guardarNuevoCliente = async () => {
           required
           autoComplete="off"
         />
-        {/* Dropdown de sugerencias */}
+
         {clienteInput && !selectedClient && sugerencias.length > 0 && (
           <ul style={{
             position: 'absolute', top: '100%', left: 0, right: 0,
@@ -188,10 +187,9 @@ const guardarNuevoCliente = async () => {
             style={{ marginTop: 8, padding: 8, width: '100%', fontSize: 14 }}
           />
           <div style={{ marginTop: 8 }}>
-          <button type="button" onClick={guardarNuevoCliente} disabled={savingClient}>
-  {savingClient ? 'Guardando…' : 'Guardar cliente'}
-</button>
-
+            <button type="button" onClick={guardarNuevoCliente} disabled={savingClient}>
+              {savingClient ? 'Guardando…' : 'Guardar cliente'}
+            </button>
           </div>
         </div>
       )}
@@ -280,51 +278,97 @@ function KitchenView({ orders }) {
   const [editText, setEditText] = useState('');
   const audioRef = useRef(null);
 
-  const updateCampo = (firebaseKey, campo, valor) => {
-    const orderRef = ref(database, `orders/${firebaseKey}`);
+  const [kitchenTab, setKitchenTab] = useState('delivery'); // 'delivery' | 'ruta'
+  const [rutaOrders, setRutaOrders] = useState([]);
+
+  useEffect(() => {
+    const today = hoyISO();
+    const rutaRef = ref(database, 'rutaOrders');
+
+    return onValue(
+      rutaRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+          setRutaOrders([]);
+          return;
+        }
+        const arr = Object.entries(data)
+          .map(([key, val]) => ({ firebaseKey: key, ...val }))
+          .filter((p) => p.fecha === today)
+          .sort((a, b) => (a.id || 0) - (b.id || 0));
+
+        setRutaOrders(arr);
+      },
+      (error) => {
+        console.error('Error leyendo rutaOrders (cocina):', error);
+      }
+    );
+  }, []);
+
+  const getBasePath = (tab) => (tab === 'ruta' ? 'rutaOrders' : 'orders');
+
+  const updateCampo = (firebaseKey, campo, valor, tab = kitchenTab) => {
+    const basePath = getBasePath(tab);
+    const orderRef = ref(database, `${basePath}/${firebaseKey}`);
     update(orderRef, { [campo]: valor });
   };
 
-  const handleSelectCocinero = (firebaseKey, valor) => {
+  const handleSelectCocinero = (firebaseKey, valor, tab = kitchenTab) => {
     if (!valor) return;
     const now = new Date().toLocaleTimeString();
-    update(ref(database, `orders/${firebaseKey}`), {
+    const basePath = getBasePath(tab);
+
+    update(ref(database, `${basePath}/${firebaseKey}`), {
       cocinero: valor,
       estado: 'En preparación',
       timestampPreparacion: now
     });
   };
 
-  const marcarPreparado = (firebaseKey) => {
+  const marcarPreparado = (firebaseKey, tab = kitchenTab) => {
     const now = new Date().toLocaleTimeString();
-    update(ref(database, `orders/${firebaseKey}`), {
+    const basePath = getBasePath(tab);
+
+    update(ref(database, `${basePath}/${firebaseKey}`), {
       estado: 'Preparado',
       timestampPreparado: now
     });
   };
 
   useEffect(() => {
+    if (kitchenTab !== 'delivery') return;
+
     if (audioRef.current && orders.length > 0) {
       const latestOrder = orders[orders.length - 1];
-      const now = new Date().toISOString().slice(0, 10);
+      const now = hoyISO();
       if (latestOrder.fecha === now && latestOrder.justAdded) {
         audioRef.current.play();
       }
     }
-  }, [orders]);
+  }, [orders, kitchenTab]);
 
   const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Noel Bendaña', 'Otro'];
-  const pedidosFiltrados = orders.filter(o => o.estado !== 'Enviado');
+
+  const currentOrdersRaw = kitchenTab === 'ruta' ? rutaOrders : orders;
+  const pedidosFiltrados = currentOrdersRaw.filter(o => o.estado !== 'Enviado');
 
   return (
     <div style={{ padding: 20, fontSize: '20px' }}>
       <h2>Pedidos en Cocina</h2>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <button onClick={() => setKitchenTab('delivery')} disabled={kitchenTab === 'delivery'}>Delivery</button>
+        <button onClick={() => setKitchenTab('ruta')} disabled={kitchenTab === 'ruta'}>Ruta</button>
+      </div>
+
       <audio ref={audioRef} src={pedidoSound} preload="auto" />
+
       {pedidosFiltrados.length === 0 ? (
         <p>No hay pedidos para hoy</p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {[...pedidosFiltrados].sort((a, b) => a.id - b.id).map(({ id, cliente, clienteCodigo, pedido, estado = 'Pendiente', firebaseKey, cocinero }) => {
+          {[...pedidosFiltrados].sort((a, b) => (a.id || 0) - (b.id || 0)).map(({ id, cliente, clienteCodigo, pedido, estado = 'Pendiente', firebaseKey, cocinero, ruta }) => {
             const isEditing = editingId === firebaseKey;
             const textStyle = estado === 'Cancelado' ? { textDecoration: 'line-through' } : {};
             const { background, border } = getColors(estado);
@@ -333,7 +377,11 @@ function KitchenView({ orders }) {
               <li key={firebaseKey} style={{ backgroundColor: background, border: `2px solid ${border}`, marginBottom: 10, padding: 15, borderRadius: 8 }}>
                 <div style={{ marginBottom: 6 }}>
                   <strong>#{id} - Cliente:</strong> {cliente} — <strong>Código:</strong> {clienteCodigo || '-'}
+                  {kitchenTab === 'ruta' && (
+                    <span style={{ marginLeft: 10 }}>— <strong>Ruta:</strong> {ruta || 'Sin ruta'}</span>
+                  )}
                 </div>
+
                 <div style={{ marginTop: 5 }}>
                   <strong>Pedido:</strong>
                   {isEditing ? (
@@ -366,12 +414,14 @@ function KitchenView({ orders }) {
                     </select>
                   </div>
                 )}
+
                 {estado === 'En preparación' && (
                   <div style={{ marginTop: 10 }}>
                     <strong>Cocinero: {cocinero}</strong>
                     <button onClick={() => marcarPreparado(firebaseKey)} style={{ marginLeft: 10 }}>✅ Marcar como Preparado</button>
                   </div>
                 )}
+
                 <div style={{ marginTop: 10 }}>
                   {estado !== 'Cancelado' && (
                     <button
@@ -410,7 +460,7 @@ function exportarAExcel(pedidos) {
       p.cliente,
       p.clienteCodigo || '-',
       p.direccion || '-',
-      p.pedido.replace(/\n/g, ' '),
+      (p.pedido || '').replace(/\n/g, ' '),
       p.estado,
       p.timestampIngreso || '-',
       p.timestampPreparacion || '-',
@@ -463,23 +513,10 @@ function Anteriores({ pedidos }) {
 
       <div style={{ marginBottom: 10 }}>
         <label>Desde:</label>
-        <input
-          type="date"
-          value={fechaInicio}
-          onChange={(e) => setFechaInicio(e.target.value)}
-          style={{ margin: '0 10px', padding: 5 }}
-        />
+        <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} style={{ margin: '0 10px', padding: 5 }} />
         <label>Hasta:</label>
-        <input
-          type="date"
-          value={fechaFin}
-          onChange={(e) => setFechaFin(e.target.value)}
-          style={{ margin: '0 10px', padding: 5 }}
-        />
-        <button
-          onClick={() => exportarAExcel(pedidosFiltrados)}
-          style={{ marginLeft: 20, padding: '6px 12px', fontSize: '14px' }}
-        >
+        <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} style={{ margin: '0 10px', padding: 5 }} />
+        <button onClick={() => exportarAExcel(pedidosFiltrados)} style={{ marginLeft: 20, padding: '6px 12px', fontSize: '14px' }}>
           Descargar como Excel
         </button>
       </div>
@@ -487,19 +524,8 @@ function Anteriores({ pedidos }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }} border="1">
         <thead>
           <tr>
-            <th>Fecha</th>
-            <th>#</th>
-            <th>Cliente</th>
-            <th>Código</th>
-            <th>Dirección</th>
-            <th>Pedido</th>
-            <th>Estado</th>
-            <th>Ingreso</th>
-            <th>Preparación</th>
-            <th>Preparado</th>
-            <th>Enviado</th>
-            <th>Cocinero</th>
-            <th>Repartidor</th>
+            <th>Fecha</th><th>#</th><th>Cliente</th><th>Código</th><th>Dirección</th><th>Pedido</th><th>Estado</th>
+            <th>Ingreso</th><th>Preparación</th><th>Preparado</th><th>Enviado</th><th>Cocinero</th><th>Repartidor</th>
           </tr>
         </thead>
         <tbody>
@@ -528,102 +554,83 @@ function Anteriores({ pedidos }) {
 
 /******************** CLIENTES: CARGA MASIVA + EDICIÓN ********************/
 function ClientesManager({ clientes }) {
-  const [editBuffer, setEditBuffer] = useState({}); // {firebaseKey: {nombre, codigo, direccion}}
+  const [editBuffer, setEditBuffer] = useState({});
   const [uploading, setUploading] = useState(false);
-const [csvFile, setCsvFile] = useState(null);
-const stripBOM = (s = '') => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
-const normalize = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+  const [csvFile, setCsvFile] = useState(null);
 
-const splitLine = (line, delim) => {
-  const out = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
-      else { inQuotes = !inQuotes; }
-    } else if (ch === delim && !inQuotes) { out.push(cur); cur = ''; }
-    else { cur += ch; }
-  }
-  out.push(cur);
-  return out.map(s => s.trim());
-};
+  const stripBOM = (s = '') => (s.charCodeAt(0) === 0xfeff ? s.slice(1) : s);
+  const normalize = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
 
-const cargarCSV = async () => {
-  if (!csvFile) { alert('Primero seleccioná un archivo CSV.'); return; }
-  setUploading(true);
-  try {
-    const textRaw = await csvFile.text();
-    const text = stripBOM(textRaw);
-    const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
-    if (!lines.length) { alert('El archivo está vacío.'); return; }
-
-    // Detectar delimitador en la primera línea
-    const first = lines[0];
-    const delim = ((first.match(/;/g) || []).length > (first.match(/,/g) || []).length) ? ';' : ',';
-
-    // Mapear encabezados
-    const header = splitLine(first, delim).map(h => normalize(h));
-    const idxNombre = header.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
-    const idxCodigo = header.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
-    const idxDireccion = header.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr'].some(k => h.includes(k)));
-
-    let start = 1;
-    let map = { nombre: 0, codigo: 1, direccion: 2 };
-    const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
-    if (hasHeader) {
-      if (idxNombre !== -1) map.nombre = idxNombre;
-      if (idxCodigo !== -1) map.codigo = idxCodigo;
-      if (idxDireccion !== -1) map.direccion = idxDireccion;
-    } else {
-      start = 0; // sin encabezado → primeras 3 columnas
+  const splitLine = (line, delim) => {
+    const out = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === delim && !inQuotes) { out.push(cur); cur = ''; }
+      else { cur += ch; }
     }
+    out.push(cur);
+    return out.map(s => s.trim());
+  };
 
-    let ok = 0, omitidos = 0;
-    for (let i = start; i < lines.length; i++) {
-      const parts = splitLine(lines[i], delim).map(s => s.replace(/^"|"$/g, ''));
-      const nombre = (parts[map.nombre] || '').trim();
-      const codigo = (parts[map.codigo] || '').trim();
-      const direccion = (parts[map.direccion] || '').trim();
-      if (!nombre || !codigo || !direccion) { omitidos++; continue; }
+  const cargarCSV = async () => {
+    if (!csvFile) { alert('Primero seleccioná un archivo CSV.'); return; }
+    setUploading(true);
+    try {
+      const textRaw = await csvFile.text();
+      const text = stripBOM(textRaw);
+      const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+      if (!lines.length) { alert('El archivo está vacío.'); return; }
 
-      try {
-        const nuevoRef = push(ref(database, 'clients'));
-        await set(nuevoRef, { nombre, codigo, direccion });
-        ok++;
-      } catch (innerErr) {
-        console.error('Error en fila', i + 1, innerErr);
-        omitidos++;
+      const first = lines[0];
+      const delim = ((first.match(/;/g) || []).length > (first.match(/,/g) || []).length) ? ';' : ',';
+
+      const header = splitLine(first, delim).map(h => normalize(h));
+      const idxNombre = header.findIndex(h => ['nombre','cliente','cliente nombre','nombre cliente','razon social','razon','name'].some(k => h.includes(k)));
+      const idxCodigo = header.findIndex(h => ['codigo','código','cod','id','codigo cliente','código cliente','client code'].some(k => h.includes(k)));
+      const idxDireccion = header.findIndex(h => ['direccion','dirección','domicilio','direccion cliente','address','addr'].some(k => h.includes(k)));
+
+      let start = 1;
+      let map = { nombre: 0, codigo: 1, direccion: 2 };
+      const hasHeader = idxNombre !== -1 || idxCodigo !== -1 || idxDireccion !== -1;
+      if (hasHeader) {
+        if (idxNombre !== -1) map.nombre = idxNombre;
+        if (idxCodigo !== -1) map.codigo = idxCodigo;
+        if (idxDireccion !== -1) map.direccion = idxDireccion;
+      } else {
+        start = 0;
       }
+
+      let ok = 0, omitidos = 0;
+      for (let i = start; i < lines.length; i++) {
+        const parts = splitLine(lines[i], delim).map(s => s.replace(/^"|"$/g, ''));
+        const nombre = (parts[map.nombre] || '').trim();
+        const codigo = (parts[map.codigo] || '').trim();
+        const direccion = (parts[map.direccion] || '').trim();
+        if (!nombre || !codigo || !direccion) { omitidos++; continue; }
+
+        try {
+          const nuevoRef = push(ref(database, 'clients'));
+          await set(nuevoRef, { nombre, codigo, direccion });
+          ok++;
+        } catch (innerErr) {
+          console.error('Error en fila', i + 1, innerErr);
+          omitidos++;
+        }
+      }
+
+      alert(`Carga masiva: ${ok} agregados, ${omitidos} omitidos.`);
+      setCsvFile(null);
+    } catch (err) {
+      console.error('Error leyendo CSV:', err);
+      alert('Error leyendo CSV: ' + (err?.message || err));
+    } finally {
+      setUploading(false);
     }
-
-    alert(`Carga masiva: ${ok} agregados, ${omitidos} omitidos.`);
-    setCsvFile(null);
-  } catch (err) {
-    console.error('Error leyendo CSV:', err);
-    alert('Error leyendo CSV: ' + (err?.message || err));
-  } finally {
-    setUploading(false);
-  }
-};
-
-
-
-  const onFile = async (file) => {
-    const text = await file.text();
-    // CSV esperado (con o sin encabezado): nombre,codigo,direccion
-   const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
-    // Detectar encabezado
-    const startIdx = lines[0].toLowerCase().includes('codigo') ? 1 : 0;
-    for (let i = startIdx; i < lines.length; i++) {
-      const parts = splitLine(lines[i], ','); // o detecta delim igual que en cargarCSV
-      const [nombre = '', codigo = '', direccion = ''] = parts.map(p => p.trim());
-      if (!nombre || !codigo || !direccion) continue;
-      const nuevoRef = push(ref(database, 'clients'));
-      await set(nuevoRef, { nombre, codigo, direccion });
-    }
-    alert('Carga masiva completada');
   };
 
   const handleChange = (key, field, value) => {
@@ -640,15 +647,14 @@ const cargarCSV = async () => {
     <div style={{ padding: 20 }}>
       <h2>Clientes</h2>
       <p>Subí un CSV (nombre,codigo,direccion). Elegí archivo y luego hacé clic en “Cargar CSV”.</p>
-<input
-  type="file"
-  accept=".csv,text/csv,.txt"
-  onChange={(e) => setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
-/>
-<button type="button" onClick={cargarCSV} disabled={uploading || !csvFile} style={{ marginLeft: 8 }}>
-  {uploading ? 'Cargando…' : 'Cargar CSV'}
-</button>
-
+      <input
+        type="file"
+        accept=".csv,text/csv,.txt"
+        onChange={(e) => setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+      />
+      <button type="button" onClick={cargarCSV} disabled={uploading || !csvFile} style={{ marginLeft: 8 }}>
+        {uploading ? 'Cargando…' : 'Cargar CSV'}
+      </button>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, marginTop: 12 }} border="1">
         <thead>
@@ -661,7 +667,6 @@ const cargarCSV = async () => {
         </thead>
         <tbody>
           {clientes.map(c => {
-            const buf = editBuffer[c.firebaseKey] || {};
             return (
               <tr key={c.firebaseKey}>
                 <td>
@@ -695,6 +700,155 @@ const cargarCSV = async () => {
   );
 }
 
+/******************** BASE DE DATOS: Pedidos Ruta (Admin) ********************/
+function PedidosRutaDBAdmin() {
+  const [fecha, setFecha] = useState(hoyISO());
+  const [data, setData] = useState([]);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editText, setEditText] = useState('');
+
+  useEffect(() => {
+    const rutaRef = ref(database, 'rutaOrders');
+
+    return onValue(
+      rutaRef,
+      (snapshot) => {
+        const raw = snapshot.val();
+        if (!raw) { setData([]); return; }
+
+        const arr = Object.entries(raw)
+          .map(([key, val]) => ({ firebaseKey: key, ...val }))
+          .filter((p) => p.fecha === fecha)
+          .sort((a, b) => (a.id || 0) - (b.id || 0));
+
+        setData(arr);
+      },
+      (err) => console.error('Error leyendo rutaOrders admin:', err)
+    );
+  }, [fecha]);
+
+  const guardarPedido = async (firebaseKey) => {
+    await update(ref(database, `rutaOrders/${firebaseKey}`), { pedido: editText });
+    setEditingKey(null);
+    setEditText('');
+  };
+
+  const eliminarPedido = async (p) => {
+    const ok = window.confirm(`¿Eliminar pedido Ruta #${p.id}?`);
+    if (!ok) return;
+    await remove(ref(database, `rutaOrders/${p.firebaseKey}`));
+  };
+
+  const borrarOrden = async (p) => {
+    await update(ref(database, `rutaOrders/${p.firebaseKey}`), { ordenRuta: 0 });
+  };
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h2>Pedidos Ruta (Base de datos)</h2>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+        <label>Fecha:</label>
+        <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        <span style={{ fontSize: 12, color: '#666' }}>Total: <strong>{data.length}</strong></span>
+      </div>
+
+      {data.length === 0 ? (
+        <p>No hay pedidos Ruta en esa fecha.</p>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {data.map((p) => {
+            const isEditing = editingKey === p.firebaseKey;
+            return (
+              <li key={p.firebaseKey} style={{ background: 'white', border: '1px solid #ddd', borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>
+                      #{p.id} — {p.cliente} — {p.clienteCodigo || '-'}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      <strong>Ruta:</strong> {p.ruta || 'Sin ruta'} · <strong>Orden:</strong> {p.ordenRuta || 0} · <strong>Estado:</strong> {p.estado || 'Pendiente'}
+                    </div>
+                    <div style={{ fontSize: 13 }}>
+                      <strong>Dirección:</strong> {p.direccion || '-'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => borrarOrden(p)}>Borrar orden</button>
+                    <button
+                      type="button"
+                      onClick={() => eliminarPedido(p)}
+                      style={{ backgroundColor: '#ffe5e5', border: '1px solid #ffb3b3' }}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 10 }}>
+                  <strong>Pedido:</strong>
+                  {isEditing ? (
+                    <>
+                      <textarea
+                        rows={3}
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        style={{ width: '100%', marginTop: 6 }}
+                      />
+                      <div style={{ marginTop: 6 }}>
+                        <button type="button" onClick={() => guardarPedido(p.firebaseKey)}>Guardar</button>
+                        <button type="button" onClick={() => { setEditingKey(null); setEditText(''); }} style={{ marginLeft: 8 }}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <pre style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{p.pedido}</pre>
+                      <button type="button" onClick={() => { setEditingKey(p.firebaseKey); setEditText(p.pedido || ''); }}>
+                        ✏️ Editar
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/******************** BASE DE DATOS VIEW ********************/
+function BaseDatosView({ clientes, anteriores }) {
+  const [section, setSection] = useState('clientes'); // clientes | anteriores | ruta
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 12, padding: 0 }}>
+      <div style={{ border: '1px solid #ddd', borderRadius: 10, padding: 12, background: 'white', height: 'calc(100vh - 210px)', overflow: 'auto' }}>
+        <h3 style={{ marginTop: 0 }}>Base de datos</h3>
+        <button style={{ width: '100%', marginBottom: 8 }} onClick={() => setSection('clientes')} disabled={section === 'clientes'}>
+          Clientes
+        </button>
+        <button style={{ width: '100%', marginBottom: 8 }} onClick={() => setSection('anteriores')} disabled={section === 'anteriores'}>
+          Anteriores
+        </button>
+        <button style={{ width: '100%', marginBottom: 8 }} onClick={() => setSection('ruta')} disabled={section === 'ruta'}>
+          Pedidos Ruta
+        </button>
+      </div>
+
+      <div style={{ border: '1px solid #ddd', borderRadius: 10, background: 'white', height: 'calc(100vh - 210px)', overflow: 'auto' }}>
+        {section === 'clientes' && <ClientesManager clientes={clientes} />}
+        {section === 'anteriores' && <Anteriores pedidos={anteriores} />}
+        {section === 'ruta' && <PedidosRutaDBAdmin />}
+      </div>
+    </div>
+  );
+}
+
 /******************** APP ********************/
 function App() {
   const [orders, setOrders] = useState([]);
@@ -702,9 +856,8 @@ function App() {
   const [clientes, setClientes] = useState([]);
   const [view, setView] = useState('ingreso');
 
-  // Cargar pedidos
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = hoyISO();
     const ordersRef = ref(database, 'orders');
     onValue(ordersRef, (snapshot) => {
       const data = snapshot.val();
@@ -716,7 +869,7 @@ function App() {
           return acc;
         }, {});
 
-        const pedidosHoy = (grouped[today] || []).sort((a, b) => a.id - b.id);
+        const pedidosHoy = (grouped[today] || []).sort((a, b) => (a.id || 0) - (b.id || 0));
         const prev = Object.entries(grouped)
           .filter(([fecha]) => fecha !== today)
           .flatMap(([fecha, arr]) => arr.map((p, idx) => ({ ...p, fecha, id: p.id || idx + 1 })));
@@ -730,15 +883,13 @@ function App() {
     });
   }, []);
 
-  // Cargar clientes
   useEffect(() => {
     const clientsRef = ref(database, 'clients');
     onValue(clientsRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) { setClientes([]); return; }
       const arr = Object.entries(data).map(([key, val]) => ({ firebaseKey: key, ...val }));
-      // ordenar por nombre
-      arr.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      arr.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
       setClientes(arr);
     });
   }, []);
@@ -781,21 +932,27 @@ function App() {
           <img src={logo} alt="Logo" style={{ width: 50, height: 50 }} />
           <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Servicio Delivery</h1>
         </div>
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={() => setView('ingreso')} disabled={view === 'ingreso'}>Ingresar</button>
           <button onClick={() => setView('cocina')} disabled={view === 'cocina'}>Cocina</button>
           <button onClick={() => setView('lista')} disabled={view === 'lista'}>Lista de pedidos</button>
-          <button onClick={() => setView('anteriores')} disabled={view === 'anteriores'}>Anteriores</button>
-          <button onClick={() => setView('clientes')} disabled={view === 'clientes'}>Clientes</button>
+
+          {/* Nuevo: Base de datos contiene Clientes + Anteriores + Ruta */}
+          <button onClick={() => setView('basedatos')} disabled={view === 'basedatos'}>Base de datos</button>
+
+          {/* Opcional: mantener acceso directo a Pedidos Ruta (módulo operativo) */}
+          <button onClick={() => setView('ruta')} disabled={view === 'ruta'}>Pedidos Ruta</button>
         </div>
       </header>
 
       {view === 'ingreso' && <OrderForm onAddOrder={addOrder} nextOrderId={getNextOrderId()} clientes={clientes} />}
       {view === 'cocina' && <KitchenView orders={orders} />}
       {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
-      {view === 'anteriores' && <Anteriores pedidos={anteriores} />}
-      {view === 'clientes' && <ClientesManager clientes={clientes} />}
 
+      {view === 'basedatos' && <BaseDatosView clientes={clientes} anteriores={anteriores} />}
+
+      {view === 'ruta' && <PedidosRuta clientes={clientes} />}
     </div>
   );
 }
