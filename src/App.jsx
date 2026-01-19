@@ -445,6 +445,23 @@ function getColors(estado) {
 // - Pedido grande (lo más importante)
 // 3) REEMPLAZÁ ListaPedidos por esta versión (muestra Método de pago siempre, incluso Enviado/Cancelado)
 function ListaPedidos({ pedidos = [], onEnviarPedido }) {
+  const [filtro, setFiltro] = React.useState('por_enviar'); // 'por_enviar' | 'enviados' | 'cancelados' | 'todos'
+
+  const isPorEnviar = (p) => p.estado !== 'Enviado' && p.estado !== 'Cancelado';
+  const isEnviado = (p) => p.estado === 'Enviado';
+  const isCancelado = (p) => p.estado === 'Cancelado';
+
+  const porEnviarCount = pedidos.filter(isPorEnviar).length;
+  const enviadosCount = pedidos.filter(isEnviado).length;
+  const canceladosCount = pedidos.filter(isCancelado).length;
+
+  const filtrar = (arr) => {
+    if (filtro === 'enviados') return arr.filter(isEnviado);
+    if (filtro === 'cancelados') return arr.filter(isCancelado);
+    if (filtro === 'por_enviar') return arr.filter(isPorEnviar);
+    return arr; // todos
+  };
+
   const stateTone = (estado = 'Pendiente') => {
     if (estado === 'En preparación') return 'warn';
     if (estado === 'Preparado') return 'ok';
@@ -461,21 +478,26 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
     },
     title: { margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 0.2 },
     pills: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' },
-    pill: (tone) => ({
+
+    pill: (tone, active) => ({
       display: 'inline-flex', alignItems: 'center', gap: 8,
-      padding: '8px 12px', borderRadius: 999, fontSize: 13, fontWeight: 900,
-      background: 'rgba(255,255,255,0.85)',
-      border: '1px solid rgba(15,23,42,0.10)',
-      boxShadow: '0 8px 18px rgba(15,23,42,0.05)',
+      padding: '9px 12px', borderRadius: 999, fontSize: 13, fontWeight: 900,
+      cursor: 'pointer',
+      background: active ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.85)',
+      color: active ? 'white' : '#0b1220',
+      border: active ? '1px solid rgba(15,23,42,0.92)' : '1px solid rgba(15,23,42,0.10)',
+      boxShadow: active ? '0 14px 26px rgba(15,23,42,0.18)' : '0 8px 18px rgba(15,23,42,0.05)',
+      userSelect: 'none',
     }),
-    dot: (tone) => ({
+    dot: (tone, active) => ({
       width: 8, height: 8, borderRadius: 999,
       background:
-        tone === 'ok' ? 'rgba(34,197,94,0.95)' :
-        tone === 'sent' ? 'rgba(99,102,241,0.95)' :
-        tone === 'danger' ? 'rgba(244,63,94,0.95)' :
+        tone === 'ok' ? (active ? 'rgba(34,197,94,1)' : 'rgba(34,197,94,0.95)') :
+        tone === 'sent' ? (active ? 'rgba(99,102,241,1)' : 'rgba(99,102,241,0.95)') :
+        tone === 'danger' ? (active ? 'rgba(244,63,94,1)' : 'rgba(244,63,94,0.95)') :
         'rgba(34,211,238,0.95)',
     }),
+
     list: { listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 10 },
     card: (tone) => ({
       borderRadius: 18,
@@ -561,34 +583,66 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
       fontWeight: 900,
       fontSize: 12,
     },
+
+    empty: {
+      padding: 18,
+      borderRadius: 16,
+      background: 'rgba(15,23,42,0.04)',
+      border: '1px dashed rgba(15,23,42,0.18)',
+      fontWeight: 800
+    }
   };
 
-  const porEnviar = pedidos.filter(p => p.estado !== 'Enviado' && p.estado !== 'Cancelado').length;
-  const enviados = pedidos.filter(p => p.estado === 'Enviado').length;
-  const cancelados = pedidos.filter(p => p.estado === 'Cancelado').length;
-
-  const Pill = ({ label, value, tone }) => (
-    <span style={ui.pill(tone)}>
-      <span style={ui.dot(tone)} />
+  const Pill = ({ label, value, tone, active, onClick }) => (
+    <span style={ui.pill(tone, active)} onClick={onClick}>
+      <span style={ui.dot(tone, active)} />
       {label}: <span style={{ fontWeight: 900 }}>{value}</span>
     </span>
   );
 
-  const pedidosOrdenados = [...pedidos].sort((a, b) => (a.id || 0) - (b.id || 0));
+  const pedidosOrdenados = [...filtrar(pedidos)].sort((a, b) => (a.id || 0) - (b.id || 0));
 
   return (
     <div style={ui.page}>
       <div style={ui.headerRow}>
         <h2 style={ui.title}>Lista de Pedidos de Hoy</h2>
+
         <div style={ui.pills}>
-          <Pill label="Por enviar" value={porEnviar} tone="ok" />
-          <Pill label="Enviados" value={enviados} tone="sent" />
-          <Pill label="Cancelados" value={cancelados} tone="danger" />
+          <Pill
+            label="Por enviar"
+            value={porEnviarCount}
+            tone="ok"
+            active={filtro === 'por_enviar'}
+            onClick={() => setFiltro('por_enviar')}
+          />
+          <Pill
+            label="Enviados"
+            value={enviadosCount}
+            tone="sent"
+            active={filtro === 'enviados'}
+            onClick={() => setFiltro('enviados')}
+          />
+          <Pill
+            label="Cancelados"
+            value={canceladosCount}
+            tone="danger"
+            active={filtro === 'cancelados'}
+            onClick={() => setFiltro('cancelados')}
+          />
+          <Pill
+            label="Todos"
+            value={pedidos.length}
+            tone="info"
+            active={filtro === 'todos'}
+            onClick={() => setFiltro('todos')}
+          />
         </div>
       </div>
 
       {pedidosOrdenados.length === 0 ? (
-        <p>No hay pedidos para hoy</p>
+        <div style={ui.empty}>
+          No hay pedidos en este filtro.
+        </div>
       ) : (
         <ul style={ui.list}>
           {pedidosOrdenados.map((p) => {
@@ -609,11 +663,10 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
                   </p>
 
                   {p.direccion && (
-                    <div style={ui.sub}><strong>Dir:</strong> {p.direccion}</div>
+                    <div style={ui.sub}><strong>Dir:</strong> {p.direccion || '-'}</div>
                   )}
 
                   <div style={ui.metaGrid}>
-                    {/* ✅ NUEVO: Método de pago */}
                     <div style={ui.metaItem}>
                       <strong>Método de pago:</strong><br />
                       {p.metodoPago || '-'}
@@ -644,13 +697,17 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
                   {p.estado === 'Preparado' && (
                     <div style={ui.enviarWrap}>
                       <label style={{ fontWeight: 900 }}>Enviar pedido con:</label>
-                      <select style={ui.select} onChange={(e) => onEnviarPedido(p.id, e.target.value)} defaultValue="">
+                      <select
+                        style={ui.select}
+                        onChange={(e) => onEnviarPedido(p.id, e.target.value)}
+                        defaultValue=""
+                      >
                         <option value="" disabled>Seleccionar...</option>
                         <option>Carlos Mora</option>
                         <option>Noel Hernadez</option>
                         <option>Noel Bendaña</option>
-                        <option>JORDIN</option>
-                        <option>Harvey Mora</option>
+                        <option>Jose Orozco</option>
+                        <option>Daniel Cruz</option>
                         <option>Otros</option>
                       </select>
                     </div>
