@@ -706,7 +706,8 @@ function ListaPedidos({ pedidos = [], onEnviarPedido }) {
                         <option>Carlos Mora</option>
                         <option>Noel Hernadez</option>
                         <option>Noel Bendaña</option>
-                        <option>Jose Orozco</option>
+                        <option>Jordin Gomez</option>
+                        <option>Harvey Mora</option>
                         <option>Daniel Cruz</option>
                         <option>Otros</option>
                       </select>
@@ -801,7 +802,7 @@ function KitchenView({ orders }) {
     }
   }, [orders, kitchenTab]);
 
-  const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 'Maria Gomez', 'Daniel Cruz', 'Noel Bendaña', 'Otro'];
+  const cocineros = ['Noel Hernandez', 'Julio Amador', 'Roberto Centeno','Michael Perez', 'Maria Gomez', 'Daniel Cruz', 'Noel Bendaña', 'Otro'];
 
   const currentOrdersRaw = kitchenTab === 'ruta' ? rutaOrders : orders;
 
