@@ -92,7 +92,6 @@ export default function KitchenView({ orders }) {
     const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const basePath = getBasePath(tab);
     
-    // Animación de transición
     setAnimatingCards(prev => new Set([...prev, firebaseKey]));
     setTimeout(() => setAnimatingCards(prev => {
       const next = new Set(prev);
@@ -189,6 +188,10 @@ export default function KitchenView({ orders }) {
           25% { transform: rotate(-5deg); }
           75% { transform: rotate(5deg); }
         }
+        @keyframes highlight {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
         .card-enter {
           animation: slideIn 0.4s ease-out forwards;
         }
@@ -210,6 +213,16 @@ export default function KitchenView({ orders }) {
         }
         .card-transition:hover {
           transform: translateY(-4px);
+        }
+        .pedido-text {
+          font-size: 22px !important;
+          line-height: 1.6 !important;
+          font-weight: 700 !important;
+        }
+        @media (min-width: 1400px) {
+          .pedido-text {
+            font-size: 26px !important;
+          }
         }
       `}</style>
 
@@ -353,8 +366,8 @@ export default function KitchenView({ orders }) {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
-          gap: '20px'
+          gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))',
+          gap: '24px'
         }}>
           {pedidosFiltrados.map((pedido, index) => {
             const status = pedido.estado || 'Pendiente';
@@ -368,8 +381,8 @@ export default function KitchenView({ orders }) {
                 className={`card-enter card-transition ${isAnimating ? 'card-transition' : ''}`}
                 style={{
                   background: config.bg,
-                  borderRadius: '24px',
-                  border: `3px solid ${config.border}`,
+                  borderRadius: '28px',
+                  border: `4px solid ${config.border}`,
                   overflow: 'hidden',
                   position: 'relative',
                   boxShadow: config.shadow,
@@ -392,27 +405,29 @@ export default function KitchenView({ orders }) {
                   />
                 )}
 
-                <div style={{ padding: '24px', position: 'relative' }}>
-                  {/* Header */}
+                <div style={{ padding: '28px', position: 'relative' }}>
+                  {/* Header Compacto */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: '16px'
+                    alignItems: 'center',
+                    marginBottom: '20px',
+                    paddingBottom: '16px',
+                    borderBottom: `2px solid ${config.border}40`
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div 
                         className={config.pulse ? 'shake-icon' : ''}
                         style={{
-                          width: '44px',
-                          height: '44px',
-                          borderRadius: '12px',
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '14px',
                           background: 'white',
                           color: config.color,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                         }}
                       >
                         {config.icon}
@@ -426,122 +441,112 @@ export default function KitchenView({ orders }) {
                           borderRadius: '20px',
                           background: 'white',
                           color: config.color,
-                          fontSize: '12px',
+                          fontSize: '13px',
                           fontWeight: 800,
                           textTransform: 'uppercase',
                           letterSpacing: '0.5px',
-                          marginBottom: '4px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
                         }}>
                           {config.label}
                         </div>
-                        <div style={{ fontSize: '13px', opacity: 0.6, fontWeight: 600 }}>
+                        <div style={{ fontSize: '14px', opacity: 0.7, fontWeight: 600, marginTop: '4px' }}>
                           #{pedido.id} · {getTimeElapsed(pedido.timestamp)}
+                          {pedido.cocinero && ` · 👨‍🍳 ${pedido.cocinero}`}
                         </div>
                       </div>
                     </div>
-                    
-                    {pedido.cocinero && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '8px 14px',
-                        background: 'rgba(255,255,255,0.9)',
-                        borderRadius: '20px',
-                        fontSize: '13px',
-                        fontWeight: 700,
-                        color: '#475569',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                      }}>
-                        {Icons.user}
-                        {pedido.cocinero}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Client Info */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <h3 style={{ 
-                      margin: '0 0 4px 0', 
-                      fontSize: '22px', 
+                  {/* Cliente Info Minimalista */}
+                  <div style={{ 
+                    marginBottom: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexWrap: 'wrap'
+                  }}>
+                    <span style={{ 
+                      fontSize: '18px', 
                       fontWeight: 800,
                       color: '#1e293b'
                     }}>
                       {pedido.cliente}
-                    </h3>
-                    <div style={{ 
+                    </span>
+                    <span style={{ 
                       fontSize: '13px', 
                       color: '#64748b',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      background: 'rgba(255,255,255,0.6)',
+                      padding: '4px 10px',
+                      borderRadius: '8px'
                     }}>
-                      Código: {pedido.clienteCodigo || '-'}
-                    </div>
+                      {pedido.clienteCodigo || 'Sin código'}
+                    </span>
+                    {pedido.direccion && (
+                      <span style={{ 
+                        fontSize: '13px', 
+                        color: '#475569',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        {Icons.mapPin}
+                        {pedido.direccion}
+                      </span>
+                    )}
                   </div>
 
-                  {pedido.direccion && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      padding: '12px',
-                      background: 'rgba(255,255,255,0.7)',
-                      borderRadius: '12px',
-                      marginBottom: '16px',
-                      fontSize: '13px',
-                      color: '#475569',
-                      fontWeight: 600,
-                      border: '1px solid rgba(255,255,255,0.5)'
-                    }}>
-                      <div style={{ width: '16px', height: '16px', flexShrink: 0, marginTop: '2px', color: '#3b82f6' }}>
-                        {Icons.mapPin}
-                      </div>
-                      {pedido.direccion}
-                    </div>
-                  )}
-
-                  {/* Order Content */}
+                  {/* PEDIDO - LO MÁS IMPORTANTE - GRANDE Y VISIBLE */}
                   <div style={{
                     background: 'white',
-                    borderRadius: '16px',
-                    padding: '16px',
-                    marginBottom: '16px',
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                    border: '1px solid rgba(0,0,0,0.04)'
+                    borderRadius: '20px',
+                    padding: '24px',
+                    marginBottom: '20px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                    border: `3px solid ${config.border}60`,
+                    position: 'relative'
                   }}>
                     <div style={{
-                      fontSize: '11px',
+                      position: 'absolute',
+                      top: '-12px',
+                      left: '20px',
+                      background: config.color,
+                      color: 'white',
+                      padding: '6px 16px',
+                      borderRadius: '20px',
+                      fontSize: '12px',
                       fontWeight: 800,
                       textTransform: 'uppercase',
                       letterSpacing: '1px',
-                      color: '#94a3b8',
-                      marginBottom: '10px'
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
                     }}>
-                      Pedido
+                      📝 Pedido
                     </div>
                     
                     {isEditing ? (
-                      <div>
+                      <div style={{ marginTop: '10px' }}>
                         <textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           style={{
                             width: '100%',
-                            minHeight: '100px',
-                            border: '2px solid #e2e8f0',
+                            minHeight: '150px',
+                            border: '3px solid #e2e8f0',
                             borderRadius: '12px',
-                            padding: '12px',
-                            fontSize: '14px',
+                            padding: '16px',
+                            fontSize: '18px',
                             fontFamily: 'inherit',
                             resize: 'vertical',
-                            marginBottom: '12px',
+                            marginBottom: '16px',
                             outline: 'none',
-                            transition: 'border-color 0.2s'
+                            fontWeight: '600',
+                            lineHeight: '1.6'
                           }}
-                          onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                          onFocus={(e) => e.target.style.borderColor = config.color}
                           onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                         />
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
                           <button
                             onClick={() => {
                               updateCampo(pedido.firebaseKey, 'pedido', editText);
@@ -550,28 +555,30 @@ export default function KitchenView({ orders }) {
                             className="btn-hover btn-active"
                             style={{
                               flex: 1,
-                              padding: '12px',
-                              borderRadius: '10px',
+                              padding: '14px',
+                              borderRadius: '12px',
                               border: 'none',
-                              background: '#3b82f6',
+                              background: config.color,
                               color: 'white',
-                              fontWeight: 700,
+                              fontWeight: 800,
+                              fontSize: '16px',
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
                           >
-                            Guardar
+                            ✅ Guardar Cambios
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
                             className="btn-hover btn-active"
                             style={{
-                              padding: '12px 20px',
-                              borderRadius: '10px',
+                              padding: '14px 24px',
+                              borderRadius: '12px',
                               border: 'none',
                               background: '#e2e8f0',
                               color: '#475569',
                               fontWeight: 700,
+                              fontSize: '16px',
                               cursor: 'pointer',
                               transition: 'all 0.2s'
                             }}
@@ -581,17 +588,18 @@ export default function KitchenView({ orders }) {
                         </div>
                       </div>
                     ) : (
-                      <div>
-                        <pre style={{
-                          margin: 0,
-                          fontFamily: 'inherit',
-                          fontSize: '15px',
-                          lineHeight: 1.6,
-                          color: '#1e293b',
-                          fontWeight: 600,
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word'
-                        }}>
+                      <div style={{ marginTop: '10px' }}>
+                        <pre 
+                          className="pedido-text"
+                          style={{
+                            margin: 0,
+                            fontFamily: "'Segoe UI', system-ui, sans-serif",
+                            color: '#0f172a',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            letterSpacing: '-0.2px'
+                          }}
+                        >
                           {pedido.pedido}
                         </pre>
                         <button
@@ -601,57 +609,58 @@ export default function KitchenView({ orders }) {
                           }}
                           className="btn-hover btn-active"
                           style={{
-                            marginTop: '12px',
-                            padding: '8px 14px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: '#f1f5f9',
+                            marginTop: '16px',
+                            padding: '10px 18px',
+                            borderRadius: '10px',
+                            border: '2px solid #e2e8f0',
+                            background: 'white',
                             color: '#64748b',
-                            fontSize: '12px',
+                            fontSize: '14px',
                             fontWeight: 700,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px',
+                            gap: '8px',
                             transition: 'all 0.2s'
                           }}
                         >
                           {Icons.edit}
-                          Editar
+                          Editar Pedido
                         </button>
                       </div>
                     )}
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     {status === 'Pendiente' && (
                       <>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
+                        <div style={{ flex: 1, minWidth: '220px' }}>
                           <select
                             onChange={(e) => handleSelectCocinero(pedido.firebaseKey, e.target.value)}
                             style={{
                               width: '100%',
-                              padding: '14px 16px',
-                              borderRadius: '12px',
-                              border: '2px solid rgba(255,255,255,0.8)',
+                              padding: '16px 18px',
+                              borderRadius: '14px',
+                              border: '3px solid rgba(255,255,255,0.9)',
                               background: 'white',
-                              fontSize: '14px',
+                              fontSize: '15px',
                               fontWeight: 700,
                               color: '#475569',
                               cursor: 'pointer',
                               appearance: 'none',
                               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
                               backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 12px center',
-                              backgroundSize: '16px',
+                              backgroundPosition: 'right 14px center',
+                              backgroundSize: '20px',
                               outline: 'none',
-                              transition: 'all 0.2s'
+                              transition: 'all 0.2s',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
                             }}
                             onFocus={(e) => e.target.style.borderColor = '#f59e0b'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.8)'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.9)'}
                           >
-                            <option value="">👨‍🍳 Asignar cocinero...</option>
+                            <option value="">👨‍🍳 Seleccionar cocinero...</option>
                             {cocineros.map(c => (
                               <option key={c} value={c}>{c}</option>
                             ))}
@@ -661,8 +670,8 @@ export default function KitchenView({ orders }) {
                           onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
                           className="btn-hover btn-active"
                           style={{
-                            padding: '14px 18px',
-                            borderRadius: '12px',
+                            padding: '16px 20px',
+                            borderRadius: '14px',
                             border: 'none',
                             background: '#fee2e2',
                             color: '#dc2626',
@@ -671,10 +680,12 @@ export default function KitchenView({ orders }) {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            fontSize: '15px'
                           }}
                         >
                           {Icons.cancel}
+                          Cancelar
                         </button>
                       </>
                     )}
@@ -686,37 +697,38 @@ export default function KitchenView({ orders }) {
                           className="btn-hover btn-active"
                           style={{
                             flex: 1,
-                            padding: '16px',
-                            borderRadius: '12px',
+                            padding: '18px',
+                            borderRadius: '14px',
                             border: 'none',
                             background: '#10b981',
                             color: 'white',
                             fontWeight: 800,
-                            fontSize: '15px',
+                            fontSize: '17px',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '8px',
-                            boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+                            gap: '10px',
+                            boxShadow: '0 6px 20px rgba(16, 185, 129, 0.4)',
                             transition: 'all 0.2s'
                           }}
                         >
                           {Icons.check}
-                          Marcar Listo
+                          Pedido Listo
                         </button>
                         <button
                           onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
                           className="btn-hover btn-active"
                           style={{
-                            padding: '14px 18px',
-                            borderRadius: '12px',
+                            padding: '16px 20px',
+                            borderRadius: '14px',
                             border: 'none',
                             background: '#fee2e2',
                             color: '#dc2626',
                             fontWeight: 700,
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            fontSize: '15px'
                           }}
                         >
                           {Icons.cancel}
@@ -731,9 +743,9 @@ export default function KitchenView({ orders }) {
                           className="btn-hover btn-active"
                           style={{
                             flex: 1,
-                            padding: '14px',
-                            borderRadius: '12px',
-                            border: '2px solid #e2e8f0',
+                            padding: '16px',
+                            borderRadius: '14px',
+                            border: '3px solid #e2e8f0',
                             background: 'white',
                             color: '#475569',
                             fontWeight: 700,
@@ -741,25 +753,27 @@ export default function KitchenView({ orders }) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '6px',
-                            transition: 'all 0.2s'
+                            gap: '8px',
+                            transition: 'all 0.2s',
+                            fontSize: '15px'
                           }}
                         >
                           {Icons.undo}
-                          Volver a Pendiente
+                          Volver a Preparar
                         </button>
                         <button
                           onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
                           className="btn-hover btn-active"
                           style={{
-                            padding: '14px 18px',
-                            borderRadius: '12px',
+                            padding: '16px 20px',
+                            borderRadius: '14px',
                             border: 'none',
                             background: '#fee2e2',
                             color: '#dc2626',
                             fontWeight: 700,
                             cursor: 'pointer',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            fontSize: '15px'
                           }}
                         >
                           {Icons.cancel}
@@ -773,8 +787,8 @@ export default function KitchenView({ orders }) {
                         className="btn-hover btn-active"
                         style={{
                           width: '100%',
-                          padding: '14px',
-                          borderRadius: '12px',
+                          padding: '16px',
+                          borderRadius: '14px',
                           border: 'none',
                           background: '#3b82f6',
                           color: 'white',
@@ -783,8 +797,9 @@ export default function KitchenView({ orders }) {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s'
+                          gap: '8px',
+                          transition: 'all 0.2s',
+                          fontSize: '16px'
                         }}
                       >
                         {Icons.undo}
@@ -796,20 +811,26 @@ export default function KitchenView({ orders }) {
                   {/* Timestamps */}
                   {(pedido.timestampPreparacion || pedido.timestampPreparado) && (
                     <div style={{
-                      marginTop: '16px',
+                      marginTop: '20px',
                       paddingTop: '16px',
-                      borderTop: '1px dashed rgba(0,0,0,0.15)',
+                      borderTop: `2px dashed ${config.border}50`,
                       display: 'flex',
-                      gap: '16px',
-                      fontSize: '12px',
+                      gap: '20px',
+                      fontSize: '13px',
                       color: '#64748b',
                       fontWeight: 600
                     }}>
                       {pedido.timestampPreparacion && (
-                        <div>🕐 Inicio: {pedido.timestampPreparacion}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '16px' }}>🕐</span>
+                          Inicio: {pedido.timestampPreparacion}
+                        </div>
                       )}
                       {pedido.timestampPreparado && (
-                        <div>✅ Terminado: {pedido.timestampPreparado}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '16px' }}>✅</span>
+                          Terminado: {pedido.timestampPreparado}
+                        </div>
                       )}
                     </div>
                   )}
