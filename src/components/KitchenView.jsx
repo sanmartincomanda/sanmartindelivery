@@ -4,19 +4,20 @@ import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
 
-// Iconos SVG inline
+// Iconos SVG
 const Icons = {
   chef: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4h12M6 4v16a2 2 0 002 2h8a2 2 0 002-2V4M6 4L4 2m16 2l2-2M12 14v6m-4-4l4 4 4-4"/></svg>,
   clock: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
   check: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>,
   fire: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/></svg>,
-  user: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-  mapPin: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>,
-  edit: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  mapPin: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  edit: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   cancel: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6m0-6l6 6"/></svg>,
-  undo: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>,
+  undo: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>,
   delivery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>,
-  route: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+  route: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>,
+  hash: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
 };
 
 const STATUS_CONFIG = {
@@ -58,6 +59,12 @@ const STATUS_CONFIG = {
   }
 };
 
+const COCINEROS = [
+  'Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 
+  'Michael Perez', 'Maria Gomez', 'Daniel Cruz', 
+  'Noel Bendaña', 'Harvey Mora', 'Encargado Logistica', 'Otro'
+];
+
 export default function KitchenView({ orders }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
@@ -65,6 +72,7 @@ export default function KitchenView({ orders }) {
   const [kitchenTab, setKitchenTab] = useState('delivery');
   const [rutaOrders, setRutaOrders] = useState([]);
   const [animatingCards, setAnimatingCards] = useState(new Set());
+  const [selectedCocineroTemp, setSelectedCocineroTemp] = useState({});
 
   useEffect(() => {
     const today = hoyISO();
@@ -105,6 +113,9 @@ export default function KitchenView({ orders }) {
       timestampPreparacion: now,
       timestamp: Date.now()
     });
+    
+    // Limpiar selección temporal
+    setSelectedCocineroTemp(prev => ({ ...prev, [firebaseKey]: null }));
   };
 
   const marcarPreparado = (firebaseKey, tab = kitchenTab) => {
@@ -135,12 +146,6 @@ export default function KitchenView({ orders }) {
       }
     }
   }, [orders, kitchenTab]);
-
-  const cocineros = [
-    'Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 
-    'Michael Perez', 'Maria Gomez', 'Daniel Cruz', 
-    'Noel Bendaña', 'Harvey Mora', 'Encargado Logistica', 'Otro'
-  ];
 
   const currentOrdersRaw = kitchenTab === 'ruta' ? rutaOrders : orders;
   const pedidosFiltrados = [...currentOrdersRaw]
@@ -188,41 +193,21 @@ export default function KitchenView({ orders }) {
           25% { transform: rotate(-5deg); }
           75% { transform: rotate(5deg); }
         }
-        @keyframes highlight {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .card-enter {
-          animation: slideIn 0.4s ease-out forwards;
-        }
-        .pulse-bg {
-          animation: pulse-ring 2s ease-in-out infinite;
-        }
-        .shake-icon {
-          animation: shake 0.5s ease-in-out infinite;
-        }
-        .btn-hover:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
-        .btn-active:active {
-          transform: translateY(0);
-        }
-        .card-transition {
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .card-transition:hover {
-          transform: translateY(-4px);
-        }
-        .pedido-text {
-          font-size: 22px !important;
-          line-height: 1.6 !important;
-          font-weight: 700 !important;
-        }
-        @media (min-width: 1400px) {
-          .pedido-text {
-            font-size: 26px !important;
-          }
+        .card-enter { animation: slideIn 0.4s ease-out forwards; }
+        .pulse-bg { animation: pulse-ring 2s ease-in-out infinite; }
+        .shake-icon { animation: shake 0.5s ease-in-out infinite; }
+        .btn-hover { transition: all 0.2s ease; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+        .btn-active:active { transform: translateY(0); }
+        .card-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card-transition:hover { transform: translateY(-4px); }
+        .cocinero-card { transition: all 0.2s ease; cursor: pointer; }
+        .cocinero-card:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .cocinero-card.selected { 
+          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; 
+          color: white !important;
+          border-color: #f59e0b !important;
+          transform: scale(1.05);
         }
       `}</style>
 
@@ -366,7 +351,7 @@ export default function KitchenView({ orders }) {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))',
           gap: '24px'
         }}>
           {pedidosFiltrados.map((pedido, index) => {
@@ -374,6 +359,7 @@ export default function KitchenView({ orders }) {
             const config = STATUS_CONFIG[status];
             const isEditing = editingId === pedido.firebaseKey;
             const isAnimating = animatingCards.has(pedido.firebaseKey);
+            const selectedTemp = selectedCocineroTemp[pedido.firebaseKey];
             
             return (
               <div
@@ -405,435 +391,567 @@ export default function KitchenView({ orders }) {
                   />
                 )}
 
-                <div style={{ padding: '28px', position: 'relative' }}>
-                  {/* Header Compacto */}
+                <div style={{ padding: '0', position: 'relative' }}>
+                  
+                  {/* 🔥 NUEVO: Header Grande con Info Principal */}
                   <div style={{
+                    background: 'rgba(255,255,255,0.95)',
+                    padding: '24px 28px',
+                    borderBottom: `3px solid ${config.border}`,
                     display: 'flex',
-                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '20px',
-                    paddingBottom: '16px',
-                    borderBottom: `2px solid ${config.border}40`
+                    justifyContent: 'space-between',
+                    gap: '20px',
+                    flexWrap: 'wrap'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Izquierda: Número y Estado */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div 
                         className={config.pulse ? 'shake-icon' : ''}
                         style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '14px',
-                          background: 'white',
-                          color: config.color,
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '16px',
+                          background: config.color,
+                          color: 'white',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                          boxShadow: `0 8px 20px ${config.color}50`,
+                          fontSize: '28px',
+                          fontWeight: 900
                         }}
                       >
-                        {config.icon}
+                        #{pedido.id}
                       </div>
                       <div>
                         <div style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 14px',
+                          gap: '8px',
+                          padding: '8px 16px',
                           borderRadius: '20px',
-                          background: 'white',
-                          color: config.color,
+                          background: config.color,
+                          color: 'white',
                           fontSize: '13px',
                           fontWeight: 800,
                           textTransform: 'uppercase',
                           letterSpacing: '0.5px',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                          marginBottom: '6px'
                         }}>
+                          {config.icon}
                           {config.label}
                         </div>
-                        <div style={{ fontSize: '14px', opacity: 0.7, fontWeight: 600, marginTop: '4px' }}>
-                          #{pedido.id} · {getTimeElapsed(pedido.timestamp)}
-                          {pedido.cocinero && ` · 👨‍🍳 ${pedido.cocinero}`}
+                        <div style={{ 
+                          fontSize: '15px', 
+                          color: '#475569', 
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span style={{ fontSize: '18px' }}>⏱️</span>
+                          {getTimeElapsed(pedido.timestamp)} en cola
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Cliente Info Minimalista */}
-                  <div style={{ 
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    flexWrap: 'wrap'
-                  }}>
-                    <span style={{ 
-                      fontSize: '18px', 
-                      fontWeight: 800,
-                      color: '#1e293b'
-                    }}>
-                      {pedido.cliente}
-                    </span>
-                    <span style={{ 
-                      fontSize: '13px', 
-                      color: '#64748b',
-                      fontWeight: 600,
-                      background: 'rgba(255,255,255,0.6)',
-                      padding: '4px 10px',
-                      borderRadius: '8px'
-                    }}>
-                      {pedido.clienteCodigo || 'Sin código'}
-                    </span>
-                    {pedido.direccion && (
-                      <span style={{ 
-                        fontSize: '13px', 
-                        color: '#475569',
-                        fontWeight: 600,
+                    {/* Derecha: Cocinero asignado */}
+                    {pedido.cocinero && (
+                      <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '12px',
+                        padding: '14px 20px',
+                        background: 'white',
+                        borderRadius: '16px',
+                        border: `2px solid ${config.color}30`,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
                       }}>
-                        {Icons.mapPin}
-                        {pedido.direccion}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* PEDIDO - LO MÁS IMPORTANTE - GRANDE Y VISIBLE */}
-                  <div style={{
-                    background: 'white',
-                    borderRadius: '20px',
-                    padding: '24px',
-                    marginBottom: '20px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                    border: `3px solid ${config.border}60`,
-                    position: 'relative'
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-12px',
-                      left: '20px',
-                      background: config.color,
-                      color: 'white',
-                      padding: '6px 16px',
-                      borderRadius: '20px',
-                      fontSize: '12px',
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
-                      letterSpacing: '1px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                    }}>
-                      📝 Pedido
-                    </div>
-                    
-                    {isEditing ? (
-                      <div style={{ marginTop: '10px' }}>
-                        <textarea
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          style={{
-                            width: '100%',
-                            minHeight: '150px',
-                            border: '3px solid #e2e8f0',
-                            borderRadius: '12px',
-                            padding: '16px',
-                            fontSize: '18px',
-                            fontFamily: 'inherit',
-                            resize: 'vertical',
-                            marginBottom: '16px',
-                            outline: 'none',
-                            fontWeight: '600',
-                            lineHeight: '1.6'
-                          }}
-                          onFocus={(e) => e.target.style.borderColor = config.color}
-                          onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                        />
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <button
-                            onClick={() => {
-                              updateCampo(pedido.firebaseKey, 'pedido', editText);
-                              setEditingId(null);
-                            }}
-                            className="btn-hover btn-active"
-                            style={{
-                              flex: 1,
-                              padding: '14px',
-                              borderRadius: '12px',
-                              border: 'none',
-                              background: config.color,
-                              color: 'white',
-                              fontWeight: 800,
-                              fontSize: '16px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            ✅ Guardar Cambios
-                          </button>
-                          <button
-                            onClick={() => setEditingId(null)}
-                            className="btn-hover btn-active"
-                            style={{
-                              padding: '14px 24px',
-                              borderRadius: '12px',
-                              border: 'none',
-                              background: '#e2e8f0',
-                              color: '#475569',
-                              fontWeight: 700,
-                              fontSize: '16px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ marginTop: '10px' }}>
-                        <pre 
-                          className="pedido-text"
-                          style={{
-                            margin: 0,
-                            fontFamily: "'Segoe UI', system-ui, sans-serif",
-                            color: '#0f172a',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            letterSpacing: '-0.2px'
-                          }}
-                        >
-                          {pedido.pedido}
-                        </pre>
-                        <button
-                          onClick={() => {
-                            setEditingId(pedido.firebaseKey);
-                            setEditText(pedido.pedido || '');
-                          }}
-                          className="btn-hover btn-active"
-                          style={{
-                            marginTop: '16px',
-                            padding: '10px 18px',
-                            borderRadius: '10px',
-                            border: '2px solid #e2e8f0',
-                            background: 'white',
-                            color: '#64748b',
-                            fontSize: '14px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {Icons.edit}
-                          Editar Pedido
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {status === 'Pendiente' && (
-                      <>
-                        <div style={{ flex: 1, minWidth: '220px' }}>
-                          <select
-                            onChange={(e) => handleSelectCocinero(pedido.firebaseKey, e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '16px 18px',
-                              borderRadius: '14px',
-                              border: '3px solid rgba(255,255,255,0.9)',
-                              background: 'white',
-                              fontSize: '15px',
-                              fontWeight: 700,
-                              color: '#475569',
-                              cursor: 'pointer',
-                              appearance: 'none',
-                              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-                              backgroundRepeat: 'no-repeat',
-                              backgroundPosition: 'right 14px center',
-                              backgroundSize: '20px',
-                              outline: 'none',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                            }}
-                            onFocus={(e) => e.target.style.borderColor = '#f59e0b'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.9)'}
-                          >
-                            <option value="">👨‍🍳 Seleccionar cocinero...</option>
-                            {cocineros.map(c => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <button
-                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
-                          className="btn-hover btn-active"
-                          style={{
-                            padding: '16px 20px',
-                            borderRadius: '14px',
-                            border: 'none',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'all 0.2s',
-                            fontSize: '15px'
-                          }}
-                        >
-                          {Icons.cancel}
-                          Cancelar
-                        </button>
-                      </>
-                    )}
-
-                    {status === 'En preparación' && (
-                      <>
-                        <button
-                          onClick={() => marcarPreparado(pedido.firebaseKey)}
-                          className="btn-hover btn-active"
-                          style={{
-                            flex: 1,
-                            padding: '18px',
-                            borderRadius: '14px',
-                            border: 'none',
-                            background: '#10b981',
-                            color: 'white',
-                            fontWeight: 800,
-                            fontSize: '17px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '10px',
-                            boxShadow: '0 6px 20px rgba(16, 185, 129, 0.4)',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {Icons.check}
-                          Pedido Listo
-                        </button>
-                        <button
-                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
-                          className="btn-hover btn-active"
-                          style={{
-                            padding: '16px 20px',
-                            borderRadius: '14px',
-                            border: 'none',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            fontSize: '15px'
-                          }}
-                        >
-                          {Icons.cancel}
-                        </button>
-                      </>
-                    )}
-
-                    {status === 'Preparado' && (
-                      <>
-                        <button
-                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Pendiente')}
-                          className="btn-hover btn-active"
-                          style={{
-                            flex: 1,
-                            padding: '16px',
-                            borderRadius: '14px',
-                            border: '3px solid #e2e8f0',
-                            background: 'white',
-                            color: '#475569',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            transition: 'all 0.2s',
-                            fontSize: '15px'
-                          }}
-                        >
-                          {Icons.undo}
-                          Volver a Preparar
-                        </button>
-                        <button
-                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
-                          className="btn-hover btn-active"
-                          style={{
-                            padding: '16px 20px',
-                            borderRadius: '14px',
-                            border: 'none',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            fontSize: '15px'
-                          }}
-                        >
-                          {Icons.cancel}
-                        </button>
-                      </>
-                    )}
-
-                    {status === 'Cancelado' && (
-                      <button
-                        onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Pendiente')}
-                        className="btn-hover btn-active"
-                        style={{
-                          width: '100%',
-                          padding: '16px',
-                          borderRadius: '14px',
-                          border: 'none',
-                          background: '#3b82f6',
-                          color: 'white',
-                          fontWeight: 700,
-                          cursor: 'pointer',
+                        <div style={{
+                          width: '44px',
+                          height: '44px',
+                          borderRadius: '50%',
+                          background: `linear-gradient(135deg, ${config.color}20, ${config.color}40)`,
+                          color: config.color,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '8px',
-                          transition: 'all 0.2s',
-                          fontSize: '16px'
-                        }}
-                      >
-                        {Icons.undo}
-                        Reactivar Pedido
-                      </button>
+                          fontSize: '20px'
+                        }}>
+                          👨‍🍳
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                            Preparando
+                          </div>
+                          <div style={{ fontSize: '17px', fontWeight: 800, color: '#1e293b' }}>
+                            {pedido.cocinero}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  {/* Timestamps */}
-                  {(pedido.timestampPreparacion || pedido.timestampPreparado) && (
-                    <div style={{
-                      marginTop: '20px',
-                      paddingTop: '16px',
-                      borderTop: `2px dashed ${config.border}50`,
+                  {/* Contenido del Pedido */}
+                  <div style={{ padding: '28px' }}>
+                    {/* Info Cliente */}
+                    <div style={{ 
+                      marginBottom: '24px',
                       display: 'flex',
-                      gap: '20px',
-                      fontSize: '13px',
-                      color: '#64748b',
-                      fontWeight: 600
+                      alignItems: 'center',
+                      gap: '16px',
+                      flexWrap: 'wrap'
                     }}>
-                      {pedido.timestampPreparacion && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '16px' }}>🕐</span>
-                          Inicio: {pedido.timestampPreparacion}
-                        </div>
-                      )}
-                      {pedido.timestampPreparado && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontSize: '16px' }}>✅</span>
-                          Terminado: {pedido.timestampPreparado}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '12px 18px',
+                        background: 'rgba(255,255,255,0.8)',
+                        borderRadius: '12px',
+                        fontSize: '17px',
+                        fontWeight: 800,
+                        color: '#1e293b'
+                      }}>
+                        <span style={{ fontSize: '20px' }}>👤</span>
+                        {pedido.cliente}
+                      </div>
+                      <div style={{
+                        padding: '10px 16px',
+                        background: 'rgba(255,255,255,0.6)',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: '#64748b',
+                        fontFamily: 'monospace'
+                      }}>
+                        {pedido.clienteCodigo || 'Sin código'}
+                      </div>
+                      {pedido.direccion && pedido.direccion !== '-' && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          color: '#3b82f6'
+                        }}>
+                          {Icons.mapPin}
+                          {pedido.direccion}
                         </div>
                       )}
                     </div>
-                  )}
+
+                    {/* Pedido - Destacado */}
+                    <div style={{
+                      background: 'white',
+                      borderRadius: '20px',
+                      padding: '28px',
+                      marginBottom: '24px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                      border: `3px solid ${config.border}60`
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginBottom: '16px',
+                        fontSize: '12px',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        color: config.color
+                      }}>
+                        <span style={{ fontSize: '16px' }}>📝</span>
+                        Detalle del Pedido
+                      </div>
+                      
+                      {isEditing ? (
+                        <div>
+                          <textarea
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            style={{
+                              width: '100%',
+                              minHeight: '150px',
+                              border: '3px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              fontSize: '18px',
+                              fontFamily: 'inherit',
+                              resize: 'vertical',
+                              marginBottom: '16px',
+                              outline: 'none',
+                              fontWeight: '600',
+                              lineHeight: '1.6'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = config.color}
+                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                          />
+                          <div style={{ display: 'flex', gap: '12px' }}>
+                            <button
+                              onClick={() => {
+                                updateCampo(pedido.firebaseKey, 'pedido', editText);
+                                setEditingId(null);
+                              }}
+                              className="btn-hover"
+                              style={{
+                                flex: 1,
+                                padding: '14px',
+                                borderRadius: '12px',
+                                border: 'none',
+                                background: config.color,
+                                color: 'white',
+                                fontWeight: 800,
+                                fontSize: '15px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ✅ Guardar Cambios
+                            </button>
+                            <button
+                              onClick={() => setEditingId(null)}
+                              className="btn-hover"
+                              style={{
+                                padding: '14px 24px',
+                                borderRadius: '12px',
+                                border: 'none',
+                                background: '#e2e8f0',
+                                color: '#475569',
+                                fontWeight: 700,
+                                fontSize: '15px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <pre style={{
+                            margin: 0,
+                            fontFamily: "'Segoe UI', system-ui, sans-serif",
+                            fontSize: '22px',
+                            lineHeight: '1.7',
+                            color: '#0f172a',
+                            fontWeight: 700,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                          }}>
+                            {pedido.pedido}
+                          </pre>
+                          <button
+                            onClick={() => {
+                              setEditingId(pedido.firebaseKey);
+                              setEditText(pedido.pedido || '');
+                            }}
+                            className="btn-hover"
+                            style={{
+                              marginTop: '20px',
+                              padding: '12px 20px',
+                              borderRadius: '10px',
+                              border: '2px solid #e2e8f0',
+                              background: 'white',
+                              color: '#64748b',
+                              fontSize: '14px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px'
+                            }}
+                          >
+                            {Icons.edit}
+                            Editar Pedido
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 🔥 NUEVO: Selector de Cocineros tipo Grid */}
+                    {status === 'Pendiente' && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 800,
+                          color: '#475569',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span style={{ fontSize: '18px' }}>👨‍🍳</span>
+                          Seleccionar Cocinero
+                        </div>
+                        
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                          gap: '12px'
+                        }}>
+                          {COCINEROS.map((cocinero) => (
+                            <button
+                              key={cocinero}
+                              type="button"
+                              onClick={() => setSelectedCocineroTemp(prev => ({
+                                ...prev,
+                                [pedido.firebaseKey]: cocinero
+                              }))}
+                              className={`cocinero-card ${selectedTemp === cocinero ? 'selected' : ''}`}
+                              style={{
+                                padding: '16px 12px',
+                                borderRadius: '14px',
+                                border: '2px solid',
+                                borderColor: selectedTemp === cocinero ? '#f59e0b' : '#e2e8f0',
+                                background: selectedTemp === cocinero 
+                                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                                  : 'white',
+                                color: selectedTemp === cocinero ? 'white' : '#475569',
+                                fontWeight: selectedTemp === cocinero ? 800 : 700,
+                                fontSize: '13px',
+                                cursor: 'pointer',
+                                textAlign: 'center',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '8px',
+                                minHeight: '80px',
+                                justifyContent: 'center'
+                              }}
+                            >
+                              <span style={{ fontSize: '28px' }}>
+                                {cocinero.includes('Noel') ? '👨‍🍳' : 
+                                 cocinero.includes('Maria') ? '👩‍🍳' : 
+                                 cocinero.includes('Logistica') ? '📦' : '👨‍🍳'}
+                              </span>
+                              <span style={{ lineHeight: '1.3' }}>{cocinero.split(' ')[0]}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {selectedTemp && (
+                          <div className="animate-slideIn" style={{ marginTop: '16px' }}>
+                            <button
+                              onClick={() => handleSelectCocinero(pedido.firebaseKey, selectedTemp)}
+                              className="btn-hover"
+                              style={{
+                                width: '100%',
+                                padding: '18px',
+                                borderRadius: '14px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                color: 'white',
+                                fontWeight: 800,
+                                fontSize: '16px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '10px',
+                                boxShadow: '0 8px 25px rgba(245, 158, 11, 0.4)'
+                              }}
+                            >
+                              <span>✓</span>
+                              Confirmar: {selectedTemp}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Botones de Acción */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {status === 'En preparación' && (
+                        <>
+                          <button
+                            onClick={() => marcarPreparado(pedido.firebaseKey)}
+                            className="btn-hover"
+                            style={{
+                              flex: 1,
+                              padding: '18px 24px',
+                              borderRadius: '14px',
+                              border: 'none',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: 'white',
+                              fontWeight: 800,
+                              fontSize: '17px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '10px',
+                              boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
+                            }}
+                          >
+                            {Icons.check}
+                            Pedido Listo
+                          </button>
+                          <button
+                            onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
+                            className="btn-hover"
+                            style={{
+                              padding: '18px',
+                              borderRadius: '14px',
+                              border: 'none',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            {Icons.cancel}
+                          </button>
+                        </>
+                      )}
+
+                      {status === 'Preparado' && (
+                        <>
+                          <button
+                            onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Pendiente')}
+                            className="btn-hover"
+                            style={{
+                              flex: 1,
+                              padding: '16px',
+                              borderRadius: '14px',
+                              border: '2px solid #e2e8f0',
+                              background: 'white',
+                              color: '#475569',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              fontSize: '15px'
+                            }}
+                          >
+                            {Icons.undo}
+                            Volver a Preparar
+                          </button>
+                          <button
+                            onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
+                            className="btn-hover"
+                            style={{
+                              padding: '16px 20px',
+                              borderRadius: '14px',
+                              border: 'none',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {Icons.cancel}
+                          </button>
+                        </>
+                      )}
+
+                      {status === 'Cancelado' && (
+                        <button
+                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Pendiente')}
+                          className="btn-hover"
+                          style={{
+                            width: '100%',
+                            padding: '16px',
+                            borderRadius: '14px',
+                            border: 'none',
+                            background: '#3b82f6',
+                            color: 'white',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            fontSize: '16px'
+                          }}
+                        >
+                          {Icons.undo}
+                          Reactivar Pedido
+                        </button>
+                      )}
+
+                      {status === 'Pendiente' && !selectedTemp && (
+                        <button
+                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
+                          className="btn-hover"
+                          style={{
+                            width: '100%',
+                            padding: '16px',
+                            borderRadius: '14px',
+                            border: '2px solid #fee2e2',
+                            background: 'transparent',
+                            color: '#ef4444',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontSize: '15px'
+                          }}
+                        >
+                          Cancelar Pedido
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Timestamps */}
+                    {(pedido.timestampPreparacion || pedido.timestampPreparado) && (
+                      <div style={{
+                        marginTop: '24px',
+                        paddingTop: '20px',
+                        borderTop: `2px dashed ${config.border}50`,
+                        display: 'flex',
+                        gap: '24px',
+                        fontSize: '14px',
+                        color: '#64748b',
+                        fontWeight: 600,
+                        flexWrap: 'wrap'
+                      }}>
+                        {pedido.timestampPreparacion && (
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            padding: '10px 16px',
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            borderRadius: '10px',
+                            color: '#d97706'
+                          }}>
+                            <span style={{ fontSize: '18px' }}>🕐</span>
+                            <div>
+                              <div style={{ fontSize: '11px', opacity: 0.8 }}>Inicio</div>
+                              <div style={{ fontWeight: 800 }}>{pedido.timestampPreparacion}</div>
+                            </div>
+                          </div>
+                        )}
+                        {pedido.timestampPreparado && (
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            padding: '10px 16px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            borderRadius: '10px',
+                            color: '#059669'
+                          }}>
+                            <span style={{ fontSize: '18px' }}>✅</span>
+                            <div>
+                              <div style={{ fontSize: '11px', opacity: 0.8 }}>Terminado</div>
+                              <div style={{ fontWeight: 800 }}>{pedido.timestampPreparado}</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
