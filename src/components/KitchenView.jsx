@@ -17,7 +17,7 @@ const Icons = {
   undo: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>,
   delivery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>,
   route: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>,
-  hash: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+  close: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 };
 
 const STATUS_CONFIG = {
@@ -59,10 +59,18 @@ const STATUS_CONFIG = {
   }
 };
 
+// ✅ ALIAS para cocineros - Noel Hernandez se muestra como CHIMI
 const COCINEROS = [
-  'Noel Hernandez', 'Julio Amador', 'Roberto Centeno', 
-  'Michael Perez', 'Maria Gomez', 'Daniel Cruz', 
-  'Noel Bendaña', 'Harvey Mora', 'Encargado Logistica', 'Otro'
+  { nombre: 'Noel Hernandez', alias: 'CHIMI', icono: '👨‍🍳' },
+  { nombre: 'Julio Amador', alias: 'Julio', icono: '👨‍🍳' },
+  { nombre: 'Roberto Centeno', alias: 'Roberto', icono: '👨‍🍳' },
+  { nombre: 'Michael Perez', alias: 'Michael', icono: '👨‍🍳' },
+  { nombre: 'Maria Gomez', alias: 'Maria', icono: '👩‍🍳' },
+  { nombre: 'Daniel Cruz', alias: 'Daniel', icono: '👨‍🍳' },
+  { nombre: 'Noel Bendaña', alias: 'Noel B.', icono: '👨‍🍳' },
+  { nombre: 'Harvey Mora', alias: 'Harvey', icono: '👨‍🍳' },
+  { nombre: 'Encargado Logistica', alias: 'Logística', icono: '📦' },
+  { nombre: 'Otro', alias: 'Otro', icono: '👤' }
 ];
 
 export default function KitchenView({ orders }) {
@@ -72,7 +80,8 @@ export default function KitchenView({ orders }) {
   const [kitchenTab, setKitchenTab] = useState('delivery');
   const [rutaOrders, setRutaOrders] = useState([]);
   const [animatingCards, setAnimatingCards] = useState(new Set());
-  const [selectedCocineroTemp, setSelectedCocineroTemp] = useState({});
+  const [modalCocinero, setModalCocinero] = useState(null); // firebaseKey del pedido abierto
+  const [cocineroSeleccionado, setCocineroSeleccionado] = useState(null);
 
   useEffect(() => {
     const today = hoyISO();
@@ -95,8 +104,8 @@ export default function KitchenView({ orders }) {
     update(ref(database, `${basePath}/${firebaseKey}`), { [campo]: valor });
   };
 
-  const handleSelectCocinero = (firebaseKey, valor, tab = kitchenTab) => {
-    if (!valor) return;
+  const handleSelectCocinero = (firebaseKey, nombreReal, tab = kitchenTab) => {
+    if (!nombreReal) return;
     const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const basePath = getBasePath(tab);
     
@@ -108,14 +117,14 @@ export default function KitchenView({ orders }) {
     }), 300);
 
     update(ref(database, `${basePath}/${firebaseKey}`), {
-      cocinero: valor,
+      cocinero: nombreReal, // Guardamos el nombre real en la base de datos
       estado: 'En preparación',
       timestampPreparacion: now,
       timestamp: Date.now()
     });
     
-    // Limpiar selección temporal
-    setSelectedCocineroTemp(prev => ({ ...prev, [firebaseKey]: null }));
+    setModalCocinero(null);
+    setCocineroSeleccionado(null);
   };
 
   const marcarPreparado = (firebaseKey, tab = kitchenTab) => {
@@ -170,6 +179,12 @@ export default function KitchenView({ orders }) {
     return `${Math.floor(diff / 60)}h ${diff % 60}m`;
   };
 
+  // Función para mostrar el nombre del cocinero (con alias si aplica)
+  const mostrarNombreCocinero = (nombre) => {
+    const cocinero = COCINEROS.find(c => c.nombre === nombre);
+    return cocinero ? cocinero.alias : nombre;
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -188,6 +203,10 @@ export default function KitchenView({ orders }) {
           from { opacity: 0; transform: translateY(20px) scale(0.95); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        @keyframes modalIn {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
         @keyframes shake {
           0%, 100% { transform: rotate(0deg); }
           25% { transform: rotate(-5deg); }
@@ -198,21 +217,204 @@ export default function KitchenView({ orders }) {
         .shake-icon { animation: shake 0.5s ease-in-out infinite; }
         .btn-hover { transition: all 0.2s ease; }
         .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
-        .btn-active:active { transform: translateY(0); }
         .card-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .card-transition:hover { transform: translateY(-4px); }
-        .cocinero-card { transition: all 0.2s ease; cursor: pointer; }
-        .cocinero-card:hover { transform: scale(1.05); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .cocinero-card { 
+          transition: all 0.2s ease; 
+          cursor: pointer;
+        }
+        .cocinero-card:hover { 
+          transform: scale(1.05); 
+          box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
+        }
         .cocinero-card.selected { 
           background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; 
           color: white !important;
           border-color: #f59e0b !important;
-          transform: scale(1.05);
+        }
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.7);
+          backdrop-filter: blur(4px);
+          display: flex;
+          alignItems: center;
+          justifyContent: center;
+          z-index: 1000;
+          animation: fadeIn 0.2s ease;
+        }
+        .modal-content {
+          animation: modalIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
 
       <audio ref={audioRef} src={pedidoSound} preload="auto" />
       
+      {/* 🔥 MODAL PARA SELECCIONAR COCINERO */}
+      {modalCocinero && (
+        <div 
+          className="modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setModalCocinero(null);
+              setCocineroSeleccionado(null);
+            }
+          }}
+        >
+          <div className="modal-content" style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: '32px',
+            width: '90%',
+            maxWidth: '600px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.3)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <div>
+                <h2 style={{ 
+                  margin: '0 0 4px 0', 
+                  fontSize: '24px', 
+                  fontWeight: 800, 
+                  color: '#1e293b' 
+                }}>
+                  Seleccionar Cocinero
+                </h2>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+                  Pedido #{pedidosFiltrados.find(p => p.firebaseKey === modalCocinero)?.id}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setModalCocinero(null);
+                  setCocineroSeleccionado(null);
+                }}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  background: '#f1f5f9',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#e2e8f0';
+                  e.target.style.color = '#1e293b';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#f1f5f9';
+                  e.target.style.color = '#64748b';
+                }}
+              >
+                {Icons.close}
+              </button>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: '12px',
+              marginBottom: '24px'
+            }}>
+              {COCINEROS.map((cocinero) => (
+                <button
+                  key={cocinero.nombre}
+                  type="button"
+                  onClick={() => setCocineroSeleccionado(cocinero.nombre)}
+                  className={`cocinero-card ${cocineroSeleccionado === cocinero.nombre ? 'selected' : ''}`}
+                  style={{
+                    padding: '20px 12px',
+                    borderRadius: '16px',
+                    border: '2px solid',
+                    borderColor: cocineroSeleccionado === cocinero.nombre ? '#f59e0b' : '#e2e8f0',
+                    background: cocineroSeleccionado === cocinero.nombre 
+                      ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                      : '#f8fafc',
+                    color: cocineroSeleccionado === cocinero.nombre ? 'white' : '#475569',
+                    fontWeight: cocineroSeleccionado === cocinero.nombre ? 800 : 700,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    minHeight: '100px',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <span style={{ fontSize: '32px' }}>{cocinero.icono}</span>
+                  <span style={{ lineHeight: '1.3' }}>{cocinero.alias}</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => {
+                  setModalCocinero(null);
+                  setCocineroSeleccionado(null);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '2px solid #e2e8f0',
+                  background: 'white',
+                  color: '#64748b',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (cocineroSeleccionado) {
+                    handleSelectCocinero(modalCocinero, cocineroSeleccionado);
+                  }
+                }}
+                disabled={!cocineroSeleccionado}
+                style={{
+                  flex: 2,
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: cocineroSeleccionado 
+                    ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                    : '#cbd5e1',
+                  color: 'white',
+                  fontWeight: 800,
+                  fontSize: '16px',
+                  cursor: cocineroSeleccionado ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s',
+                  boxShadow: cocineroSeleccionado ? '0 8px 25px rgba(245, 158, 11, 0.4)' : 'none'
+                }}
+              >
+                {cocineroSeleccionado ? `Asignar a ${COCINEROS.find(c => c.nombre === cocineroSeleccionado)?.alias}` : 'Selecciona un cocinero'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -260,7 +462,7 @@ export default function KitchenView({ orders }) {
             <button
               key={tab}
               onClick={() => setKitchenTab(tab)}
-              className="btn-hover btn-active"
+              className="btn-hover"
               style={{
                 padding: '12px 24px',
                 borderRadius: '12px',
@@ -359,7 +561,6 @@ export default function KitchenView({ orders }) {
             const config = STATUS_CONFIG[status];
             const isEditing = editingId === pedido.firebaseKey;
             const isAnimating = animatingCards.has(pedido.firebaseKey);
-            const selectedTemp = selectedCocineroTemp[pedido.firebaseKey];
             
             return (
               <div
@@ -393,7 +594,7 @@ export default function KitchenView({ orders }) {
 
                 <div style={{ padding: '0', position: 'relative' }}>
                   
-                  {/* 🔥 NUEVO: Header Grande con Info Principal */}
+                  {/* Header Grande con Info Principal */}
                   <div style={{
                     background: 'rgba(255,255,255,0.95)',
                     padding: '24px 28px',
@@ -456,7 +657,7 @@ export default function KitchenView({ orders }) {
                       </div>
                     </div>
 
-                    {/* Derecha: Cocinero asignado */}
+                    {/* Derecha: Cocinero asignado - Muestra ALIAS */}
                     {pedido.cocinero && (
                       <div style={{
                         display: 'flex',
@@ -479,14 +680,15 @@ export default function KitchenView({ orders }) {
                           justifyContent: 'center',
                           fontSize: '20px'
                         }}>
-                          👨‍🍳
+                          {COCINEROS.find(c => c.nombre === pedido.cocinero)?.icono || '👨‍🍳'}
                         </div>
                         <div>
                           <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
                             Preparando
                           </div>
-                          <div style={{ fontSize: '17px', fontWeight: 800, color: '#1e293b' }}>
-                            {pedido.cocinero}
+                          <div style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>
+                            {/* ✅ AQUÍ SE MUESTRA EL ALIAS - CHIMI en vez de Noel Hernandez */}
+                            {mostrarNombreCocinero(pedido.cocinero)}
                           </div>
                         </div>
                       </div>
@@ -673,96 +875,43 @@ export default function KitchenView({ orders }) {
                       )}
                     </div>
 
-                    {/* 🔥 NUEVO: Selector de Cocineros tipo Grid */}
+                    {/* 🔥 BOTÓN PARA ABRIR MODAL DE COCINERO (ahora ocupa poco espacio) */}
                     {status === 'Pendiente' && (
                       <div style={{ marginBottom: '20px' }}>
-                        <div style={{
-                          fontSize: '13px',
-                          fontWeight: 800,
-                          color: '#475569',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.5px',
-                          marginBottom: '16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <span style={{ fontSize: '18px' }}>👨‍🍳</span>
+                        <button
+                          onClick={() => {
+                            setModalCocinero(pedido.firebaseKey);
+                            setCocineroSeleccionado(null);
+                          }}
+                          className="btn-hover"
+                          style={{
+                            width: '100%',
+                            padding: '18px 24px',
+                            borderRadius: '14px',
+                            border: '2px dashed #f59e0b',
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            color: '#d97706',
+                            fontWeight: 800,
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '12px',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.target.style.background = 'rgba(245, 158, 11, 0.2)';
+                            e.target.style.borderStyle = 'solid';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.background = 'rgba(245, 158, 11, 0.1)';
+                            e.target.style.borderStyle = 'dashed';
+                          }}
+                        >
+                          <span style={{ fontSize: '24px' }}>👨‍🍳</span>
                           Seleccionar Cocinero
-                        </div>
-                        
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                          gap: '12px'
-                        }}>
-                          {COCINEROS.map((cocinero) => (
-                            <button
-                              key={cocinero}
-                              type="button"
-                              onClick={() => setSelectedCocineroTemp(prev => ({
-                                ...prev,
-                                [pedido.firebaseKey]: cocinero
-                              }))}
-                              className={`cocinero-card ${selectedTemp === cocinero ? 'selected' : ''}`}
-                              style={{
-                                padding: '16px 12px',
-                                borderRadius: '14px',
-                                border: '2px solid',
-                                borderColor: selectedTemp === cocinero ? '#f59e0b' : '#e2e8f0',
-                                background: selectedTemp === cocinero 
-                                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
-                                  : 'white',
-                                color: selectedTemp === cocinero ? 'white' : '#475569',
-                                fontWeight: selectedTemp === cocinero ? 800 : 700,
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                textAlign: 'center',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '8px',
-                                minHeight: '80px',
-                                justifyContent: 'center'
-                              }}
-                            >
-                              <span style={{ fontSize: '28px' }}>
-                                {cocinero.includes('Noel') ? '👨‍🍳' : 
-                                 cocinero.includes('Maria') ? '👩‍🍳' : 
-                                 cocinero.includes('Logistica') ? '📦' : '👨‍🍳'}
-                              </span>
-                              <span style={{ lineHeight: '1.3' }}>{cocinero.split(' ')[0]}</span>
-                            </button>
-                          ))}
-                        </div>
-
-                        {selectedTemp && (
-                          <div className="animate-slideIn" style={{ marginTop: '16px' }}>
-                            <button
-                              onClick={() => handleSelectCocinero(pedido.firebaseKey, selectedTemp)}
-                              className="btn-hover"
-                              style={{
-                                width: '100%',
-                                padding: '18px',
-                                borderRadius: '14px',
-                                border: 'none',
-                                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                                color: 'white',
-                                fontWeight: 800,
-                                fontSize: '16px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '10px',
-                                boxShadow: '0 8px 25px rgba(245, 158, 11, 0.4)'
-                              }}
-                            >
-                              <span>✓</span>
-                              Confirmar: {selectedTemp}
-                            </button>
-                          </div>
-                        )}
+                        </button>
                       </div>
                     )}
 
@@ -881,7 +1030,7 @@ export default function KitchenView({ orders }) {
                         </button>
                       )}
 
-                      {status === 'Pendiente' && !selectedTemp && (
+                      {status === 'Pendiente' && (
                         <button
                           onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
                           className="btn-hover"
