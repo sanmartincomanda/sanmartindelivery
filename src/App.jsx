@@ -18,6 +18,23 @@ const Icons = {
 };
 
 function App() {
+  // --- INICIO BLOQUE NUEVO DE LOGIN ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [inputUser, setInputUser] = useState('');
+  const [inputPass, setInputPass] = useState('');
+  const [loginError, setLoginError] = useState(false);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (inputUser === 'delivery' && inputPass === 'delivery2026') {
+      setIsAuthenticated(true);
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+    }
+  };
+  // --- FIN BLOQUE NUEVO DE LOGIN ---
+
   const [orders, setOrders] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [view, setView] = useState('ingreso');
@@ -141,6 +158,42 @@ function App() {
     const item = navItems.find(n => n.id === view);
     return item ? item.label : 'Dashboard';
   };
+
+  // --- PANTALLA DE LOGIN (Se muestra si no está autenticado) ---
+  if (!isAuthenticated) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', fontFamily: "'Inter', sans-serif" }}>
+        <form onSubmit={handleLogin} style={{ background: 'white', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '380px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+            <img src={logo} alt="Logo" style={{ width: '40px', filter: 'brightness(0) invert(1)' }} />
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#1e293b', margin: '0 0 8px 0' }}>San Martín</h2>
+          <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '14px', marginTop: 0 }}>Acceso a Delivery</p>
+          
+          <input 
+            type="text" 
+            placeholder="Usuario" 
+            value={inputUser} 
+            onChange={(e) => setInputUser(e.target.value)} 
+            style={{ width: '100%', boxSizing: 'border-box', padding: '14px', borderRadius: '12px', border: '2px solid #e2e8f0', marginBottom: '16px', outline: 'none', fontSize: '14px' }} 
+          />
+          <input 
+            type="password" 
+            placeholder="Contraseña" 
+            value={inputPass} 
+            onChange={(e) => setInputPass(e.target.value)} 
+            style={{ width: '100%', boxSizing: 'border-box', padding: '14px', borderRadius: '12px', border: '2px solid #e2e8f0', marginBottom: '16px', outline: 'none', fontSize: '14px' }} 
+          />
+          
+          {loginError && <p style={{ color: '#dc2626', fontSize: '12px', fontWeight: 700, margin: '0 0 16px 0' }}>Credenciales incorrectas</p>}
+          
+          <button type="submit" style={{ width: '100%', padding: '16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', fontSize: '14px' }}>
+            ENTRAR
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   // Loading screen mientras carga la primera vez
   if (loading) {
