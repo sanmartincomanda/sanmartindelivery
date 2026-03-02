@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ref, onValue, push, update } from 'firebase/database';
 import { database } from './firebase';
 import logo from './logo.svg';
@@ -110,9 +110,8 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  const getNextOrderId = useMemo(() => {
-    return () => (orders.reduce((max, o) => Math.max(max, o.id || 0), 0) || 0) + 1;
-  }, [orders]);
+  // 🔥 ELIMINADO: getNextOrderId ya no se necesita porque OrderForm calcula automáticamente
+  // const getNextOrderId = useMemo(() => { ... }, [orders]);
 
   const addOrder = async ({ cliente, clienteCodigo, direccion, pedido, fecha, id, metodoPago }) => {
     try {
@@ -437,7 +436,7 @@ function App() {
           {view === 'ingreso' && (
             <OrderForm 
               onAddOrder={addOrder} 
-              nextOrderId={getNextOrderId()} 
+              pedidosExistentes={orders}  // 🔥 AGREGADO: Pasa los pedidos para calcular ID 1-125
               clientes={clientes} 
             />
           )}
