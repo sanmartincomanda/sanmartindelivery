@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ref, push, set } from 'firebase/database';
 import { database } from '../firebase';
 import logo from '../logo.svg';
-import { normalizar } from './Utils';
+import { normalizar, hoyISO } from './Utils';
 
 export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes }) {
   const [clienteInput, setClienteInput] = useState('');
@@ -16,45 +16,26 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // 🔥 NUEVA LÓGICA: Calcular siguiente número disponible (1-125)
+  // 🔥 LÓGICA SIMPLE: Máximo número usado hoy + 1
   const calcularSiguienteOrden = () => {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyISO();
     
-    // Filtrar pedidos de hoy con ID numérico válido (1-125)
-    const pedidosHoy = (pedidosExistentes || []).filter(p => {
-      const esHoy = p.fecha === hoy;
-      const idNum = parseInt(p.id);
-      const idValido = !isNaN(idNum) && idNum >= 1 && idNum <= 125;
-      return esHoy && idValido;
-    });
+    // Obtener todos los IDs numéricos de pedidos de hoy
+    const idsHoy = (pedidosExistentes || [])
+      .filter(p => p.fecha === hoy)
+      .map(p => parseInt(p.id))
+      .filter(id => !isNaN(id) && id >= 1 && id <= 125);
     
-    // Obtener IDs usados hoy
-    const idsUsados = new Set(pedidosHoy.map(p => parseInt(p.id)));
+    // Si no hay pedidos hoy, empezar en 1
+    if (idsHoy.length === 0) return 1;
     
-    // Buscar primer número disponible del 1 al 125
-    for (let i = 1; i <= 125; i++) {
-      if (!idsUsados.has(i)) {
-        return i;
-      }
-    }
-    
-    // Si todos los números (1-125) están ocupados
-    return null;
+    // Siguiente = máximo + 1
+    const maxId = Math.max(...idsHoy);
+    return maxId + 1;
   };
 
-  const [orderId, setOrderId] = useState(1);
-
-  // Recalcular cuando cambien los pedidos existentes
-  useEffect(() => {
-    const siguiente = calcularSiguienteOrden();
-    if (siguiente) {
-      setOrderId(siguiente);
-    } else {
-      // Si no hay números disponibles, mostrar advertencia
-      alert('⚠️ Todos los números de orden (1-125) están ocupados. Contacta al administrador.');
-      setOrderId(125); // Mantener en 125 pero bloquear envío
-    }
-  }, [pedidosExistentes]);
+  const siguienteNumero = calcularSiguienteOrden();
+  const hayDisponibles = siguienteNumero <= 125;
 
   const sugerencias = clientes
     .filter(c => normalizar(c.nombre || '').includes(normalizar(clienteInput)))
@@ -69,7 +50,6 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validaciones
     if (!pedido.trim()) {
       alert('El pedido no puede estar vacío');
       return;
@@ -78,10 +58,8 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
       alert('Seleccioná un cliente de la lista (o agregá uno nuevo).');
       return;
     }
-    
-    // 🔥 Validar que hay número disponible
-    if (orderId === null || orderId < 1 || orderId > 125) {
-      alert('❌ No hay números de orden disponibles (1-125). Espere a que se liberen o contacte soporte.');
+    if (!hayDisponibles) {
+      alert('❌ Se alcanzó el límite de 125 pedidos para hoy.');
       return;
     }
 
@@ -97,7 +75,7 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
       pedido,
       fecha,
       hora,
-      id: orderId, // 🔥 Usar el número calculado automáticamente
+      id: siguienteNumero, // 🔥 Usar el número calculado (máximo + 1)
       metodoPago
     });
 
@@ -110,9 +88,6 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
     setPedido('');
     setMetodoPago('Efectivo');
     setIsSubmitting(false);
-    
-    // 🔥 El siguiente número se calculará automáticamente en el useEffect 
-    // cuando se actualice pedidosExistentes desde el padre
   };
 
   const guardarNuevoCliente = async () => {
@@ -137,14 +112,11 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
       setClienteInput(data.nombre);
     } catch (err) {
       console.error('Error guardando cliente:', err);
-      alert('No se pudo guardar el cliente. Detalle: ' + (err?.code || err?.message || String(err)));
+      alert('No se pudo guardar el cliente.');
     } finally {
       setSavingClient(false);
     }
   };
-
-  // Verificar si hay números disponibles
-  const hayNumerosDisponibles = orderId !== null && orderId >= 1 && orderId <= 125;
 
   return (
     <div style={{
@@ -155,36 +127,16 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
       color: '#f8fafc'
     }}>
       <style>{`
-        @keyframes slideIn {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        @keyframes successPop {
-          0% { transform: scale(0.8); opacity: 0; }
-          50% { transform: scale(1.1); }
-          100% { transform: scale(1); opacity: 1; }
-        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes successPop { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
         .animate-slideIn { animation: slideIn 0.5s ease-out; }
         .animate-slideUp { animation: slideUp 0.5s ease-out; }
         .animate-pulse { animation: pulse 2s infinite; }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
         .animate-success { animation: successPop 0.4s ease-out; }
         .btn-hover { transition: all 0.2s ease; }
         .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .btn-hover:active { transform: translateY(0); }
         .input-focus { transition: all 0.2s ease; }
         .input-focus:focus { transform: scale(1.01); }
         .card-hover { transition: all 0.3s ease; }
@@ -214,60 +166,43 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
             overflow: 'hidden'
           }}>
             <img src={logo} alt="Logo" style={{ width: '44px', height: '44px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.2) 50%, transparent 70%)',
-              animation: 'slideIn 2s infinite'
-            }} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 800, letterSpacing: '-0.5px' }}>
-              Nuevo Pedido
-            </h1>
+            <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 800 }}>Nuevo Pedido</h1>
             <p style={{ margin: '4px 0 0 0', opacity: 0.6, fontSize: '15px', fontWeight: 500 }}>
               Sistema de gestión de delivery
             </p>
           </div>
         </div>
 
-        {/* 🔥 NÚMERO DE ORDEN - Solo visualización, no editable */}
+        {/* Número de Orden Actual */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
           padding: '16px 24px',
-          background: hayNumerosDisponibles ? 'rgba(255,255,255,0.05)' : 'rgba(239, 68, 68, 0.2)',
+          background: hayDisponibles ? 'rgba(255,255,255,0.05)' : 'rgba(239, 68, 68, 0.2)',
           borderRadius: '16px',
-          border: `2px solid ${hayNumerosDisponibles ? 'rgba(255,255,255,0.1)' : '#ef4444'}`,
-          transition: 'all 0.3s ease'
+          border: `2px solid ${hayDisponibles ? 'rgba(255,255,255,0.1)' : '#ef4444'}`,
         }}>
           <div>
-            <span style={{ fontSize: '14px', opacity: 0.6, fontWeight: 600, display: 'block' }}>Pedido #</span>
+            <span style={{ fontSize: '14px', opacity: 0.6, fontWeight: 600, display: 'block' }}>Siguiente Pedido #</span>
             <span style={{ 
-              fontSize: hayNumerosDisponibles ? '36px' : '24px', 
+              fontSize: '36px', 
               fontWeight: 900, 
-              color: hayNumerosDisponibles ? '#f59e0b' : '#ef4444',
+              color: hayDisponibles ? '#f59e0b' : '#ef4444',
               fontFamily: 'monospace',
               lineHeight: 1
             }}>
-              {hayNumerosDisponibles ? String(orderId).padStart(2, '0') : 'FULL'}
+              {hayDisponibles ? String(siguienteNumero).padStart(2, '0') : 'MAX'}
             </span>
           </div>
-          {hayNumerosDisponibles && (
-            <div style={{
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              background: '#10b981',
-              animation: 'pulse 2s infinite'
-            }} />
-          )}
+          {hayDisponibles && <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }} />}
         </div>
       </div>
 
-      {/* Mensaje de error si no hay números */}
-      {!hayNumerosDisponibles && (
+      {/* Mensaje de límite alcanzado */}
+      {!hayDisponibles && (
         <div style={{
           background: 'rgba(239, 68, 68, 0.2)',
           border: '2px solid #ef4444',
@@ -281,9 +216,9 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
         }}>
           <span style={{ fontSize: '24px' }}>⚠️</span>
           <div>
-            <div style={{ fontWeight: 800, marginBottom: '4px' }}>Números de orden agotados</div>
+            <div style={{ fontWeight: 800 }}>Límite alcanzado</div>
             <div style={{ fontSize: '14px', opacity: 0.9 }}>
-              Todos los números del 1 al 125 están ocupados. Espere a que se liberen o contacte al administrador.
+              Ya se usaron los 125 números disponibles para hoy.
             </div>
           </div>
         </div>
@@ -307,20 +242,20 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
           <div style={{ fontSize: '64px', marginBottom: '16px' }}>✅</div>
           <div style={{ fontSize: '24px', fontWeight: 800 }}>¡Pedido Enviado!</div>
           <div style={{ fontSize: '16px', opacity: 0.9, marginTop: '8px' }}>
-            Orden #{String(orderId).padStart(2, '0')} enviada a cocina
+            Orden #{String(siguienteNumero).padStart(2, '0')} enviada a cocina
           </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
         
-        {/* Top Row - Order Info & Client */}
+        {/* Info del Pedido y Cliente */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
           gap: '20px'
         }}>
-          {/* Order Info Card - Simplificado sin input de número */}
+          {/* Order Info Card */}
           <div className="animate-slideUp card-hover" style={{
             background: 'rgba(255,255,255,0.05)',
             borderRadius: '24px',
@@ -343,13 +278,14 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
               Información del Pedido
             </div>
 
-            {/* 🔥 MOSTRAR NÚMERO CALCULADO - No editable */}
+            {/* Display del número calculado */}
             <div style={{ 
               marginBottom: '20px',
               padding: '20px',
               background: 'rgba(0,0,0,0.2)',
               borderRadius: '16px',
-              border: '2px solid rgba(245, 158, 11, 0.3)'
+              border: '2px solid rgba(245, 158, 11, 0.3)',
+              textAlign: 'center'
             }}>
               <div style={{
                 fontSize: '12px',
@@ -362,18 +298,16 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
                 Número de Orden Asignado
               </div>
               <div style={{
-                fontSize: '48px',
+                fontSize: '56px',
                 fontWeight: 900,
                 color: '#f59e0b',
                 fontFamily: 'monospace',
                 lineHeight: 1
               }}>
-                {hayNumerosDisponibles ? String(orderId).padStart(3, '0') : '---'}
+                {hayDisponibles ? String(siguienteNumero).padStart(3, '0') : '---'}
               </div>
-              <div style={{ fontSize: '12px', opacity: 0.5, marginTop: '8px', fontWeight: 500 }}>
-                {hayNumerosDisponibles 
-                  ? `Siguiente disponible: ${orderId} de 125` 
-                  : 'Rango completo (1-125)'}
+              <div style={{ fontSize: '12px', opacity: 0.5, marginTop: '8px' }}>
+                {hayDisponibles ? `Último usado: ${siguienteNumero - 1} de 125` : 'Límite alcanzado'}
               </div>
             </div>
 
@@ -421,7 +355,7 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
             </div>
           </div>
 
-          {/* Client Card - Sin cambios */}
+          {/* Client Card (igual que antes) */}
           <div className="animate-slideUp card-hover" style={{
             background: 'rgba(255,255,255,0.05)',
             borderRadius: '24px',
@@ -690,7 +624,7 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
           </div>
         </div>
 
-        {/* Order Details - Full Width */}
+        {/* Detalle del Pedido */}
         <div className="animate-slideUp card-hover" style={{
           background: 'rgba(255,255,255,0.05)',
           borderRadius: '24px',
@@ -757,13 +691,13 @@ Ejemplo:
             
             <button
               type="submit"
-              disabled={isSubmitting || !selectedClient || !pedido.trim() || !hayNumerosDisponibles}
+              disabled={isSubmitting || !selectedClient || !pedido.trim() || !hayDisponibles}
               className="btn-hover"
               style={{
                 padding: '20px 48px',
                 borderRadius: '16px',
                 border: 'none',
-                background: !hayNumerosDisponibles 
+                background: !hayDisponibles 
                   ? '#ef4444' 
                   : isSubmitting 
                     ? 'rgba(255,255,255,0.1)' 
@@ -771,12 +705,12 @@ Ejemplo:
                 color: 'white',
                 fontWeight: 900,
                 fontSize: '18px',
-                cursor: (isSubmitting || !selectedClient || !pedido.trim() || !hayNumerosDisponibles) ? 'not-allowed' : 'pointer',
+                cursor: (isSubmitting || !selectedClient || !pedido.trim() || !hayDisponibles) ? 'not-allowed' : 'pointer',
                 opacity: (isSubmitting || !selectedClient || !pedido.trim()) ? 0.5 : 1,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                boxShadow: (isSubmitting || !hayNumerosDisponibles) ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)'
+                boxShadow: (isSubmitting || !hayDisponibles) ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)'
               }}
             >
               {isSubmitting ? (
@@ -784,15 +718,15 @@ Ejemplo:
                   <span className="animate-pulse">⏳</span>
                   Enviando...
                 </>
-              ) : !hayNumerosDisponibles ? (
+              ) : !hayDisponibles ? (
                 <>
                   <span>🚫</span>
-                  Sin números disponibles
+                  Límite 125 alcanzado
                 </>
               ) : (
                 <>
                   <span>🚀</span>
-                  Enviar a Cocina #{String(orderId).padStart(2, '0')}
+                  Enviar Orden #{String(siguienteNumero).padStart(2, '0')}
                 </>
               )}
             </button>
