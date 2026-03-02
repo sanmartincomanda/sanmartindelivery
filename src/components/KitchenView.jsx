@@ -169,7 +169,7 @@ export default function KitchenView({ orders }) {
       
       // Si son del mismo estado, ordenar por número de orden (id)
       if (estadoDiff === 0) {
-        return (parseInt(a.id) || 0) - (parseInt(b.id) || 0);
+        return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
       }
       
       return estadoDiff;
