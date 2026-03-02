@@ -80,7 +80,7 @@ export default function KitchenView({ orders }) {
   const [kitchenTab, setKitchenTab] = useState('delivery');
   const [rutaOrders, setRutaOrders] = useState([]);
   const [animatingCards, setAnimatingCards] = useState(new Set());
-  const [modalCocinero, setModalCocinero] = useState(null); // firebaseKey del pedido abierto
+  const [modalCocinero, setModalCocinero] = useState(null);
   const [cocineroSeleccionado, setCocineroSeleccionado] = useState(null);
 
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function KitchenView({ orders }) {
     }), 300);
 
     update(ref(database, `${basePath}/${firebaseKey}`), {
-      cocinero: nombreReal, // Guardamos el nombre real en la base de datos
+      cocinero: nombreReal,
       estado: 'En preparación',
       timestampPreparacion: now,
       timestamp: Date.now()
@@ -157,11 +157,22 @@ export default function KitchenView({ orders }) {
   }, [orders, kitchenTab]);
 
   const currentOrdersRaw = kitchenTab === 'ruta' ? rutaOrders : orders;
+  
+  // 🔥 NUEVA LÓGICA DE ORDENAMIENTO:
+  // 1. Primero por estado: Pendiente -> En preparación -> Preparado -> Cancelado
+  // 2. Dentro del mismo estado, ordenar por número de orden (id) ascendente
   const pedidosFiltrados = [...currentOrdersRaw]
     .filter(o => o.estado !== 'Enviado')
     .sort((a, b) => {
       const order = { 'Pendiente': 0, 'En preparación': 1, 'Preparado': 2, 'Cancelado': 3 };
-      return (order[a.estado] || 0) - (order[b.estado] || 0) || (b.timestamp || 0) - (a.timestamp || 0);
+      const estadoDiff = (order[a.estado] || 0) - (order[b.estado] || 0);
+      
+      // Si son del mismo estado, ordenar por número de orden (id)
+      if (estadoDiff === 0) {
+        return (parseInt(a.id) || 0) - (parseInt(b.id) || 0);
+      }
+      
+      return estadoDiff;
     });
 
   const stats = {
@@ -179,7 +190,6 @@ export default function KitchenView({ orders }) {
     return `${Math.floor(diff / 60)}h ${diff % 60}m`;
   };
 
-  // Función para mostrar el nombre del cocinero (con alias si aplica)
   const mostrarNombreCocinero = (nombre) => {
     const cocinero = COCINEROS.find(c => c.nombre === nombre);
     return cocinero ? cocinero.alias : nombre;
@@ -657,7 +667,7 @@ export default function KitchenView({ orders }) {
                       </div>
                     </div>
 
-                    {/* Derecha: Cocinero asignado - Muestra ALIAS */}
+                    {/* Derecha: Cocinero asignado */}
                     {pedido.cocinero && (
                       <div style={{
                         display: 'flex',
@@ -687,7 +697,6 @@ export default function KitchenView({ orders }) {
                             Preparando
                           </div>
                           <div style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>
-                            {/* ✅ AQUÍ SE MUESTRA EL ALIAS - CHIMI en vez de Noel Hernandez */}
                             {mostrarNombreCocinero(pedido.cocinero)}
                           </div>
                         </div>
@@ -791,8 +800,6 @@ export default function KitchenView({ orders }) {
                               fontWeight: '600',
                               lineHeight: '1.6'
                             }}
-                            onFocus={(e) => e.target.style.borderColor = config.color}
-                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                           />
                           <div style={{ display: 'flex', gap: '12px' }}>
                             <button
@@ -875,7 +882,7 @@ export default function KitchenView({ orders }) {
                       )}
                     </div>
 
-                    {/* 🔥 BOTÓN PARA ABRIR MODAL DE COCINERO (ahora ocupa poco espacio) */}
+                    {/* Botón para seleccionar cocinero */}
                     {status === 'Pendiente' && (
                       <div style={{ marginBottom: '20px' }}>
                         <button
@@ -897,16 +904,7 @@ export default function KitchenView({ orders }) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '12px',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.background = 'rgba(245, 158, 11, 0.2)';
-                            e.target.style.borderStyle = 'solid';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.background = 'rgba(245, 158, 11, 0.1)';
-                            e.target.style.borderStyle = 'dashed';
+                            gap: '12px'
                           }}
                         >
                           <span style={{ fontSize: '24px' }}>👨‍🍳</span>
@@ -952,10 +950,7 @@ export default function KitchenView({ orders }) {
                               background: '#fee2e2',
                               color: '#dc2626',
                               fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px'
+                              cursor: 'pointer'
                             }}
                           >
                             {Icons.cancel}
@@ -977,10 +972,6 @@ export default function KitchenView({ orders }) {
                               color: '#475569',
                               fontWeight: 700,
                               cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px',
                               fontSize: '15px'
                             }}
                           >
@@ -1017,12 +1008,7 @@ export default function KitchenView({ orders }) {
                             background: '#3b82f6',
                             color: 'white',
                             fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            fontSize: '16px'
+                            cursor: 'pointer'
                           }}
                         >
                           {Icons.undo}
@@ -1042,8 +1028,7 @@ export default function KitchenView({ orders }) {
                             background: 'transparent',
                             color: '#ef4444',
                             fontWeight: 700,
-                            cursor: 'pointer',
-                            fontSize: '15px'
+                            cursor: 'pointer'
                           }}
                         >
                           Cancelar Pedido

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ref, update } from 'firebase/database';
 import { database } from '../firebase';
-import { hoyISO } from './Utils';
 
 // Iconos SVG (mismos que en KitchenView)
 const Icons = {
@@ -17,10 +16,11 @@ const Icons = {
   delivery: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>,
   route: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0112 2a8 8 0 018 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>,
   close: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  truck: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+  truck: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
+  creditCard: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
 };
 
-// Configuración de estados (misma que KitchenView pero agregando 'Enviado')
+// Configuración de estados
 const STATUS_CONFIG = {
   'Pendiente': {
     color: '#3b82f6',
@@ -81,7 +81,7 @@ const REPARTIDORES = [
   { nombre: 'Otros', icono: '📦' }
 ];
 
-// Alias para cocineros (misma lógica que KitchenView)
+// Alias para cocineros
 const COCINEROS_ALIAS = {
   'Noel Hernandez': 'CHIMI',
   'Julio Amador': 'Julio',
@@ -96,7 +96,7 @@ const COCINEROS_ALIAS = {
 
 export default function ListaPedidos({ pedidos = [] }) {
   const [filtro, setFiltro] = useState('por_enviar');
-  const [modalRepartidor, setModalRepartidor] = useState(null); // firebaseKey del pedido abierto
+  const [modalRepartidor, setModalRepartidor] = useState(null);
   const [repartidorSeleccionado, setRepartidorSeleccionado] = useState(null);
   const [animatingCards, setAnimatingCards] = useState(new Set());
 
@@ -115,7 +115,7 @@ export default function ListaPedidos({ pedidos = [] }) {
     return arr;
   };
 
-  const getBasePath = () => 'orders'; // Ajusta si usas rutaOrders también
+  const getBasePath = () => 'orders';
 
   const updateCampo = (firebaseKey, campo, valor) => {
     update(ref(database, `${getBasePath()}/${firebaseKey}`), { [campo]: valor });
@@ -144,7 +144,6 @@ export default function ListaPedidos({ pedidos = [] }) {
   };
 
   const handleCancelarEnvio = (firebaseKey) => {
-    // Vuelve a "Preparado" para poder reenviar con otro repartidor
     setAnimatingCards(prev => new Set([...prev, firebaseKey]));
     setTimeout(() => setAnimatingCards(prev => {
       const next = new Set(prev);
@@ -172,9 +171,9 @@ export default function ListaPedidos({ pedidos = [] }) {
     return `${Math.floor(diff / 60)}h ${diff % 60}m`;
   };
 
+  // Ordenar puramente por número de orden (ID) descendente (mayor a menor)
   const pedidosOrdenados = [...filtrar(pedidos)].sort((a, b) => {
-    const order = { 'Pendiente': 0, 'En preparación': 1, 'Preparado': 2, 'Enviado': 3, 'Cancelado': 4 };
-    return (order[a.estado] || 0) - (order[b.estado] || 0) || (b.timestamp || 0) - (a.timestamp || 0);
+    return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
   });
 
   const stats = {
@@ -183,6 +182,20 @@ export default function ListaPedidos({ pedidos = [] }) {
     preparados: pedidos.filter(p => p.estado === 'Preparado').length,
     enviados: enviadosCount,
     cancelados: canceladosCount
+  };
+
+  // Función para obtener color según método de pago
+  const getMetodoPagoColor = (metodo) => {
+    const colores = {
+      'Efectivo': '#10b981', // Verde
+      'POS BAC': '#3b82f6',  // Azul
+      'POS BANPRO': '#3b82f6',
+      'POS LAFISE': '#3b82f6',
+      'LINK DE PAGO': '#8b5cf6', // Púrpura
+      'TRANSFERENCIA': '#f59e0b', // Naranja
+      'CREDITO': '#ec4899'  // Rosa
+    };
+    return colores[metodo] || '#64748b'; // Gris por defecto
   };
 
   return (
@@ -325,7 +338,6 @@ export default function ListaPedidos({ pedidos = [] }) {
               </button>
             </div>
 
-            {/* Info del repartidor actual si ya está enviado */}
             {pedidos.find(p => p.firebaseKey === modalRepartidor)?.repartidor && (
               <div style={{
                 background: '#f1f5f9',
@@ -602,6 +614,7 @@ export default function ListaPedidos({ pedidos = [] }) {
             const status = pedido.estado || 'Pendiente';
             const config = STATUS_CONFIG[status];
             const isAnimating = animatingCards.has(pedido.firebaseKey);
+            const metodoPagoColor = getMetodoPagoColor(pedido.metodoPago);
             
             return (
               <div
@@ -619,7 +632,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                   animationDelay: `${index * 0.05}s`
                 }}
               >
-                {/* Pulse animation for new orders */}
                 {config.pulse && (
                   <div
                     className="pulse-bg"
@@ -635,7 +647,7 @@ export default function ListaPedidos({ pedidos = [] }) {
 
                 <div style={{ padding: '0', position: 'relative' }}>
                   
-                  {/* Header Grande con Info Principal */}
+                  {/* Header */}
                   <div style={{
                     background: 'rgba(255,255,255,0.95)',
                     padding: '24px 28px',
@@ -646,7 +658,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                     gap: '20px',
                     flexWrap: 'wrap'
                   }}>
-                    {/* Izquierda: Número y Estado */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div 
                         className={config.pulse ? 'shake-icon' : ''}
@@ -698,7 +709,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     </div>
 
-                    {/* Derecha: Repartidor asignado (si está enviado) */}
                     {pedido.repartidor && (
                       <div style={{
                         display: 'flex',
@@ -735,9 +745,9 @@ export default function ListaPedidos({ pedidos = [] }) {
                     )}
                   </div>
 
-                  {/* Contenido del Pedido */}
+                  {/* Contenido */}
                   <div style={{ padding: '28px' }}>
-                    {/* Info Cliente */}
+                    {/* Info Cliente + Método de Pago */}
                     <div style={{ 
                       marginBottom: '24px',
                       display: 'flex',
@@ -759,6 +769,25 @@ export default function ListaPedidos({ pedidos = [] }) {
                         <span style={{ fontSize: '20px' }}>👤</span>
                         {pedido.cliente}
                       </div>
+                      
+                      {/* 🔥 MÉTODO DE PAGO AGREGADO */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '10px 16px',
+                        background: `${metodoPagoColor}15`,
+                        borderRadius: '10px',
+                        border: `2px solid ${metodoPagoColor}30`,
+                        color: metodoPagoColor,
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        fontFamily: 'monospace'
+                      }}>
+                        <span style={{ fontSize: '16px' }}>{Icons.creditCard}</span>
+                        {pedido.metodoPago || 'Efectivo'}
+                      </div>
+
                       <div style={{
                         padding: '10px 16px',
                         background: 'rgba(255,255,255,0.6)',
@@ -788,7 +817,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                       )}
                     </div>
 
-                    {/* Info Cocinero */}
                     {pedido.cocinero && (
                       <div style={{
                         display: 'flex',
@@ -812,7 +840,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     )}
 
-                    {/* Pedido - Destacado */}
                     <div style={{
                       background: 'white',
                       borderRadius: '20px',
@@ -851,7 +878,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </pre>
                     </div>
 
-                    {/* 🔥 BOTÓN PARA ENVIAR O CAMBIAR REPARTIDOR */}
                     {status === 'Preparado' && (
                       <div style={{ marginBottom: '20px' }}>
                         <button
@@ -873,16 +899,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '12px',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.background = 'rgba(99, 102, 241, 0.2)';
-                            e.target.style.borderStyle = 'solid';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.background = 'rgba(99, 102, 241, 0.1)';
-                            e.target.style.borderStyle = 'dashed';
+                            gap: '12px'
                           }}
                         >
                           <span style={{ fontSize: '24px' }}>🛵</span>
@@ -891,7 +908,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     )}
 
-                    {/* 🔥 BOTÓN PARA CANCELAR ENVÍO Y REASIGNAR */}
                     {status === 'Enviado' && (
                       <div style={{ marginBottom: '20px' }}>
                         <button
@@ -913,17 +929,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            gap: '12px',
-                            transition: 'all 0.2s',
-                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.background = '#6366f1';
-                            e.target.style.color = 'white';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.background = 'white';
-                            e.target.style.color = '#4f46e5';
+                            gap: '12px'
                           }}
                         >
                           <span style={{ fontSize: '24px' }}>🔄</span>
@@ -950,7 +956,6 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     )}
 
-                    {/* Timestamps */}
                     <div style={{
                       marginTop: '24px',
                       paddingTop: '20px',
