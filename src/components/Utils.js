@@ -1,5 +1,12 @@
 export const normalizar = (s = '') => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-export const hoyISO = () => new Date().toISOString().slice(0, 10);
+
+export const fechaISO = (date = new Date()) => {
+  const localDate = new Date(date);
+  localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset());
+  return localDate.toISOString().slice(0, 10);
+};
+
+export const hoyISO = () => fechaISO(new Date());
 
 export const exportarAExcel = (pedidos) => {
   const rows = pedidos.filter(p => p.estado !== 'Cancelado').map(p => [

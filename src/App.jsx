@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { ref, onValue, push, update } from 'firebase/database';
 import { database } from './firebase';
 import logo from './logo.svg';
@@ -8,7 +8,8 @@ import { hoyISO } from './components/Utils';
 import OrderForm from './components/OrderForm';
 import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
-import BaseDatosView from './components/BaseDatosView';
+
+const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
 
 const Icons = {
   plus: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>,
@@ -448,7 +449,25 @@ function App() {
             />
           )}
           {view === 'basedatos' && (
-            <BaseDatosView clientes={clientes} />
+            <Suspense
+              fallback={
+                <div
+                  style={{
+                    minHeight: '60vh',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                    fontSize: '18px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Cargando base de datos...
+                </div>
+              }
+            >
+              <BaseDatosView clientes={clientes} />
+            </Suspense>
           )}
         </div>
       </main>

@@ -65,8 +65,7 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
 
     setIsSubmitting(true);
 
-    const fecha = new Date().toISOString().slice(0, 10);
-    const hora = new Date().toLocaleTimeString();
+    const fecha = hoyISO();
 
     await onAddOrder({
       cliente: selectedClient.nombre,
@@ -74,7 +73,6 @@ export default function OrderForm({ onAddOrder, pedidosExistentes = [], clientes
       direccion: selectedClient.direccion || '-',
       pedido,
       fecha,
-      hora,
       id: siguienteNumero, // 🔥 Usar el número calculado (máximo + 1)
       metodoPago
     });
