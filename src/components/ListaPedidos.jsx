@@ -60,6 +60,15 @@ const STATUS_CONFIG = {
     pulse: false,
     shadow: '0 20px 40px -10px rgba(99, 102, 241, 0.3)'
   },
+  'Entregado': {
+    color: '#16a34a',
+    bg: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+    border: '#22c55e',
+    icon: Icons.check,
+    label: 'Entregado',
+    pulse: false,
+    shadow: '0 20px 40px -10px rgba(22, 163, 74, 0.3)'
+  },
   'Cancelado': {
     color: '#ef4444',
     bg: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
@@ -111,16 +120,19 @@ export default function ListaPedidos({ pedidos = [] }) {
     return () => unsubscribe();
   }, []);
 
-  const isPorEnviar = (p) => p.estado !== 'Enviado' && p.estado !== 'Cancelado';
+  const isPorEnviar = (p) => p.estado !== 'Enviado' && p.estado !== 'Entregado' && p.estado !== 'Cancelado';
   const isEnviado = (p) => p.estado === 'Enviado';
+  const isEntregado = (p) => p.estado === 'Entregado';
   const isCancelado = (p) => p.estado === 'Cancelado';
 
   const porEnviarCount = pedidos.filter(isPorEnviar).length;
   const enviadosCount = pedidos.filter(isEnviado).length;
+  const entregadosCount = pedidos.filter(isEntregado).length;
   const canceladosCount = pedidos.filter(isCancelado).length;
 
   const filtrar = (arr) => {
     if (filtro === 'enviados') return arr.filter(isEnviado);
+    if (filtro === 'entregados') return arr.filter(isEntregado);
     if (filtro === 'cancelados') return arr.filter(isCancelado);
     if (filtro === 'por_enviar') return arr.filter(isPorEnviar);
     return arr;
@@ -196,6 +208,7 @@ export default function ListaPedidos({ pedidos = [] }) {
     preparando: pedidos.filter(p => p.estado === 'En preparación').length,
     preparados: pedidos.filter(p => p.estado === 'Preparado').length,
     enviados: enviadosCount,
+    entregados: entregadosCount,
     cancelados: canceladosCount
   };
 
@@ -516,6 +529,7 @@ export default function ListaPedidos({ pedidos = [] }) {
           {[
             { key: 'por_enviar', label: 'Por Enviar', count: porEnviarCount, color: '#10b981' },
             { key: 'enviados', label: 'Enviados', count: enviadosCount, color: '#6366f1' },
+            { key: 'entregados', label: 'Entregados', count: entregadosCount, color: '#16a34a' },
             { key: 'cancelados', label: 'Cancelados', count: canceladosCount, color: '#ef4444' },
             { key: 'todos', label: 'Todos', count: pedidos.length, color: '#3b82f6' }
           ].map((tab) => (
@@ -569,6 +583,7 @@ export default function ListaPedidos({ pedidos = [] }) {
           { label: 'En Prep', value: stats.preparando, color: '#f59e0b', icon: Icons.fire },
           { label: 'Listos', value: stats.preparados, color: '#10b981', icon: Icons.check },
           { label: 'Enviados', value: stats.enviados, color: '#6366f1', icon: Icons.truck },
+          { label: 'Entregados', value: stats.entregados, color: '#16a34a', icon: Icons.check },
           { label: 'Cancelados', value: stats.cancelados, color: '#ef4444', icon: Icons.cancel }
         ].map((stat, idx) => (
           <div
@@ -720,7 +735,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                           gap: '8px'
                         }}>
                           <span style={{ fontSize: '18px' }}>⏱️</span>
-                          {getTimeElapsed(pedido.timestamp)} {status === 'Enviado' ? 'enviado' : 'en cola'}
+                          {getTimeElapsed(pedido.timestamp)} {status === 'Entregado' ? 'entregado' : status === 'Enviado' ? 'enviado' : 'en cola'}
                         </div>
                       </div>
                     </div>
@@ -1090,6 +1105,20 @@ export default function ListaPedidos({ pedidos = [] }) {
                         }}>
                           <span>🚚</span>
                           <span>Envío: {pedido.timestampEnviado}</span>
+                        </div>
+                      )}
+                      {pedido.timestampEntregado && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '8px 12px',
+                          background: 'rgba(22, 163, 74, 0.1)',
+                          borderRadius: '8px',
+                          color: '#16a34a'
+                        }}>
+                          <span>OK</span>
+                          <span>Entregado: {pedido.timestampEntregado}</span>
                         </div>
                       )}
                     </div>

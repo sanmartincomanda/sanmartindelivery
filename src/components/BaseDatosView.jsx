@@ -148,6 +148,7 @@ const STATUS_META = {
   'En preparacion': { color: '#f59e0b', soft: 'rgba(245, 158, 11, 0.16)', label: 'En preparacion' },
   Preparado: { color: '#10b981', soft: 'rgba(16, 185, 129, 0.16)', label: 'Preparado' },
   Enviado: { color: '#6366f1', soft: 'rgba(99, 102, 241, 0.16)', label: 'Enviado' },
+  Entregado: { color: '#16a34a', soft: 'rgba(22, 163, 74, 0.16)', label: 'Entregado' },
   Cancelado: { color: '#ef4444', soft: 'rgba(239, 68, 68, 0.16)', label: 'Cancelado' },
 };
 
@@ -225,6 +226,10 @@ const normalizeStatus = (status = 'Pendiente') => {
     return 'Enviado';
   }
 
+  if (cleanStatus === 'entregado') {
+    return 'Entregado';
+  }
+
   if (cleanStatus === 'cancelado') {
     return 'Cancelado';
   }
@@ -289,6 +294,7 @@ const orderMatchesSearch = (order, normalizedTerm) => {
     order.timestampPreparacion,
     order.timestampPreparado,
     order.timestampEnviado,
+    order.timestampEntregado,
   ]
     .filter(Boolean)
     .some((value) => normalizar(String(value)).includes(normalizedTerm));
@@ -320,7 +326,9 @@ const buildHistoryExportRows = (orders) =>
     'Hora inicio cocina': order.timestampPreparacion || '-',
     'Hora preparado': order.timestampPreparado || '-',
     Repartidor: order.repartidor || '-',
-    'Hora entrega': order.timestampEnviado || '-',
+    'Hora envio': order.timestampEnviado || '-',
+    'Hora entrega': order.timestampEntregado || '-',
+    'Entregado por': order.entregadoPor || '-',
     PedidoDetalle: (order.pedido || '').replace(/\n/g, ' '),
   }));
 
@@ -1392,6 +1400,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
       'En preparacion': filteredOrders.filter((order) => normalizeStatus(order.estado) === 'En preparacion').length,
       Preparado: filteredOrders.filter((order) => normalizeStatus(order.estado) === 'Preparado').length,
       Enviado: filteredOrders.filter((order) => normalizeStatus(order.estado) === 'Enviado').length,
+      Entregado: filteredOrders.filter((order) => normalizeStatus(order.estado) === 'Entregado').length,
     }),
     [filteredOrders],
   );
@@ -1503,7 +1512,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
         </div>
       </div>
 
-      <div className="bd-history-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '14px', marginBottom: '18px' }}>
+      <div className="bd-history-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '14px', marginBottom: '18px' }}>
         <HistoryStatCard
           active={statusFilter === 'todos'}
           label="Todos"
@@ -1538,6 +1547,13 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
           value={stats.Enviado}
           color="#818cf8"
           onClick={() => setStatusFilter('Enviado')}
+        />
+        <HistoryStatCard
+          active={statusFilter === 'Entregado'}
+          label="Entregados"
+          value={stats.Entregado}
+          color="#22c55e"
+          onClick={() => setStatusFilter('Entregado')}
         />
       </div>
 
@@ -1608,6 +1624,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
               <option value="En preparacion">En preparacion</option>
               <option value="Preparado">Preparado</option>
               <option value="Enviado">Enviado</option>
+              <option value="Entregado">Entregado</option>
               <option value="Cancelado">Cancelado</option>
             </select>
           </FilterField>
@@ -1635,6 +1652,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
             <QuickFilterButton label="Ultimos 7 dias" onClick={() => { setDateFrom(shiftIsoDate(hoyISO(), -7)); setDateTo(hoyISO()); }} />
             <QuickFilterButton label="Preparados" onClick={() => setStatusFilter('Preparado')} />
             <QuickFilterButton label="Enviados" onClick={() => setStatusFilter('Enviado')} />
+            <QuickFilterButton label="Entregados" onClick={() => setStatusFilter('Entregado')} />
           </div>
 
           <button
@@ -1944,7 +1962,8 @@ function HistoryDetailModal({ order, onClose }) {
               <TimelineItem label="Hora de ingreso" value={order.timestampIngreso || 'Sin registro'} accent="#38bdf8" />
               <TimelineItem label="Inicio en cocina" value={order.timestampPreparacion || 'Sin registro'} accent="#fbbf24" />
               <TimelineItem label="Pedido preparado" value={order.timestampPreparado || 'Sin registro'} accent="#34d399" />
-              <TimelineItem label="Pedido entregado" value={order.timestampEnviado || 'Sin registro'} accent="#818cf8" />
+              <TimelineItem label="Pedido enviado" value={order.timestampEnviado || 'Sin registro'} accent="#818cf8" />
+              <TimelineItem label="Pedido entregado" value={order.timestampEntregado || 'Sin registro'} accent="#22c55e" />
               <TimelineItem label="Ultima actualizacion" value={formatDateTimeLabel(order.timestamp)} accent="#c084fc" />
             </DetailPanel>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { onValue, ref } from 'firebase/database';
+import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import logo from '../logo.svg';
 import {
@@ -24,10 +24,18 @@ const normalizeName = (value) =>
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
+const formatTimeLabel = () =>
+  new Date().toLocaleTimeString('es-NI', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
 const getWrittenAddress = (order) => {
   const address = String(order?.direccion || order?.address || '').trim();
   return address && address !== '-' ? address : '';
 };
+
+const isDeliveredOrder = (order) => order?.estado === 'Entregado';
 
 export default function DriverView({ orders = [] }) {
   const [drivers, setDrivers] = useState(() => mergeDrivers());
@@ -46,6 +54,7 @@ export default function DriverView({ orders = [] }) {
   const [loginError, setLoginError] = useState('');
   const [routeOrders, setRouteOrders] = useState([]);
   const [optimizing, setOptimizing] = useState(false);
+  const [deliveringOrderKey, setDeliveringOrderKey] = useState('');
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
@@ -69,7 +78,14 @@ export default function DriverView({ orders = [] }) {
 
         return order.repartidorCodigo === driver.code || normalizeName(order.repartidor) === driverName;
       })
-      .sort((left, right) => Number(left.timestamp || 0) - Number(right.timestamp || 0));
+      .sort((left, right) => {
+        const deliveredDiff = Number(isDeliveredOrder(left)) - Number(isDeliveredOrder(right));
+        if (deliveredDiff !== 0) {
+          return deliveredDiff;
+        }
+
+        return Number(left.timestamp || 0) - Number(right.timestamp || 0);
+      });
   }, [driver, orders]);
 
   useEffect(() => {
@@ -97,7 +113,8 @@ export default function DriverView({ orders = [] }) {
   };
 
   const optimizeRoute = async () => {
-    const locatedOrders = assignedOrders.filter((order) => hasLocation(order.ubicacion));
+    const activeAssignedOrders = assignedOrders.filter((order) => !isDeliveredOrder(order));
+    const locatedOrders = activeAssignedOrders.filter((order) => hasLocation(order.ubicacion));
     if (locatedOrders.length === 0) {
       alert('No hay pedidos con ubicacion para optimizar.');
       return;
@@ -112,14 +129,45 @@ export default function DriverView({ orders = [] }) {
         origin = null;
       }
 
-      const optimized = optimizeStopsByNearest(assignedOrders, origin);
-      setRouteOrders(optimized);
+      const optimized = optimizeStopsByNearest(activeAssignedOrders, origin);
+      const deliveredOrders = assignedOrders.filter((order) => isDeliveredOrder(order));
+      setRouteOrders([...optimized, ...deliveredOrders]);
       const routeUrl = buildGoogleMapsRouteUrl(optimized, origin);
       if (routeUrl) {
         window.open(routeUrl, '_blank', 'noopener,noreferrer');
       }
     } finally {
       setOptimizing(false);
+    }
+  };
+
+  const markOrderDelivered = async (order) => {
+    if (!order?.firebaseKey) {
+      alert('No se pudo identificar este pedido.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Marcar pedido #${formatOrderNumber(order.id)} como ENTREGADO?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const now = formatTimeLabel();
+    setDeliveringOrderKey(order.firebaseKey);
+
+    try {
+      await update(ref(database, `orders/${order.firebaseKey}`), {
+        estado: 'Entregado',
+        timestampEntregado: now,
+        entregadoPor: driver.name,
+        entregadoPorCodigo: driver.code,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error('Error marcando pedido entregado:', error);
+      alert('No se pudo marcar el pedido como entregado. Intenta de nuevo.');
+    } finally {
+      setDeliveringOrderKey('');
     }
   };
 
@@ -151,7 +199,9 @@ export default function DriverView({ orders = [] }) {
     );
   }
 
-  const ordersWithLocation = routeOrders.filter((order) => hasLocation(order.ubicacion));
+  const activeRouteOrders = routeOrders.filter((order) => !isDeliveredOrder(order));
+  const ordersWithLocation = activeRouteOrders.filter((order) => hasLocation(order.ubicacion));
+  const deliveredCount = assignedOrders.filter((order) => isDeliveredOrder(order)).length;
 
   return (
     <div className="driver-shell">
@@ -174,8 +224,8 @@ export default function DriverView({ orders = [] }) {
 
       <section className="driver-summary">
         <div>
-          <strong>{assignedOrders.length}</strong>
-          <span>Asignados</span>
+          <strong>{activeRouteOrders.length}</strong>
+          <span>Pendientes ruta</span>
         </div>
         <div>
           <strong>{ordersWithLocation.length}</strong>
@@ -184,6 +234,10 @@ export default function DriverView({ orders = [] }) {
         <div>
           <strong>{assignedOrders.filter((order) => order.estado === 'Enviado').length}</strong>
           <span>En camino</span>
+        </div>
+        <div>
+          <strong>{deliveredCount}</strong>
+          <span>Entregados</span>
         </div>
       </section>
 
@@ -199,9 +253,10 @@ export default function DriverView({ orders = [] }) {
             const mapUrl = buildGoogleMapsPlaceUrl(order.ubicacion);
             const writtenAddress = getWrittenAddress(order);
             const addressUrl = buildGoogleMapsAddressUrl(writtenAddress);
+            const delivered = isDeliveredOrder(order);
 
             return (
-              <article key={order.firebaseKey || order.id} className="driver-order">
+              <article key={order.firebaseKey || order.id} className={`driver-order ${delivered ? 'delivered' : ''}`}>
                 <div className="driver-order-number">#{formatOrderNumber(order.id)}</div>
                 <div className="driver-order-body">
                   <div className="driver-order-top">
@@ -233,6 +288,20 @@ export default function DriverView({ orders = [] }) {
                       </a>
                     ) : (
                       <button type="button" disabled>Sin ubicacion ni direccion</button>
+                    )}
+                    {delivered ? (
+                      <span className="driver-delivered-badge">
+                        Entregado {order.timestampEntregado ? `- ${order.timestampEntregado}` : ''}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="deliver-button"
+                        onClick={() => markOrderDelivered(order)}
+                        disabled={deliveringOrderKey === order.firebaseKey}
+                      >
+                        {deliveringOrderKey === order.firebaseKey ? 'Guardando...' : 'ENTREGADO'}
+                      </button>
                     )}
                     {order.pedido && (
                       <details>
@@ -375,7 +444,7 @@ const driverStyles = `
   }
   .driver-summary {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     margin: 16px 0;
   }
@@ -417,6 +486,18 @@ const driverStyles = `
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
     overflow: hidden;
+  }
+  .driver-order.delivered {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+  }
+  .driver-order.delivered .driver-order-number {
+    background: #dcfce7;
+    color: #15803d;
+  }
+  .driver-order.delivered .driver-status {
+    background: #dcfce7;
+    color: #15803d;
   }
   .driver-order-number {
     display: flex;
@@ -503,6 +584,20 @@ const driverStyles = `
   }
   .driver-actions a.address-search {
     background: #f97316;
+  }
+  .driver-actions button.deliver-button {
+    background: #16a34a;
+  }
+  .driver-delivered-badge {
+    min-height: 44px;
+    border-radius: 999px;
+    padding: 0 18px;
+    background: #dcfce7;
+    color: #15803d;
+    font-weight: 950;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .driver-actions summary {
     cursor: pointer;

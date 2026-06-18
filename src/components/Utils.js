@@ -13,9 +13,9 @@ export const exportarAExcel = (pedidos) => {
     p.fecha, p.id, p.cliente, p.clienteCodigo || '-', p.direccion || '-', 
     (p.pedido || '').replace(/\n/g, ' '), p.estado, p.timestampIngreso || '-', 
     p.timestampPreparacion || '-', p.timestampPreparado || '-', p.timestampEnviado || '-', 
-    p.cocinero || '-', p.repartidor || '-'
+    p.timestampEntregado || '-', p.cocinero || '-', p.repartidor || '-', p.entregadoPor || '-'
   ]);
-  const header = ['Fecha', '#', 'Cliente', 'Código Cliente', 'Dirección', 'Pedido', 'Estado', 'Ingreso', 'Preparación', 'Preparado', 'Enviado', 'Cocinero', 'Repartidor'];
+  const header = ['Fecha', '#', 'Cliente', 'Código Cliente', 'Dirección', 'Pedido', 'Estado', 'Ingreso', 'Preparación', 'Preparado', 'Enviado', 'Entregado', 'Cocinero', 'Repartidor', 'Entregado por'];
   let htmlContent = '<table border="1"><tr>' + header.map(col => `<th>${col}</th>`).join('') + '</tr>';
   rows.forEach(r => { htmlContent += '<tr>' + r.map(val => `<td>${val}</td>`).join('') + '</tr>'; });
   htmlContent += '</table>';

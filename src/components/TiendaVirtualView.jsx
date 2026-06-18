@@ -34,7 +34,7 @@ import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orde
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
-const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino'];
+const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -84,6 +84,10 @@ const normalizeCustomerOrderStatus = (status) => {
 
   if (normalizedStatus.includes('enviado')) {
     return 'enviado';
+  }
+
+  if (normalizedStatus.includes('entregado')) {
+    return 'entregado';
   }
 
   if (normalizedStatus.includes('preparado')) {
@@ -144,6 +148,14 @@ const getCustomerStatusMeta = (order = {}) => {
       label: 'En camino',
       message: `${riderName} lleva tu pedido en camino.`,
       progress: 4,
+    },
+    entregado: {
+      accent: '#16a34a',
+      soft: '#f0fdf4',
+      emoji: 'OK',
+      label: 'Pedido entregado',
+      message: 'Tu pedido fue entregado. Gracias por comprar en Carnes San Martin Granada.',
+      progress: 5,
     },
     cancelado: {
       accent: '#64748b',
@@ -2896,7 +2908,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
   const whatsappLink = buildOrderWhatsAppLink(order, currentUser);
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const canCancelOrder =
-    typeof onCancelOrder === 'function' && !['cancelado', 'enviado'].includes(statusKey);
+    typeof onCancelOrder === 'function' && !['cancelado', 'enviado', 'entregado'].includes(statusKey);
 
   return (
     <div
@@ -2966,7 +2978,11 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           <span>Entrega</span>
           <strong>
             {riderName}
-            {order.timestampEnviado ? ` - ${order.timestampEnviado}` : ''}
+            {order.timestampEntregado
+              ? ` - Entregado ${order.timestampEntregado}`
+              : order.timestampEnviado
+                ? ` - ${order.timestampEnviado}`
+                : ''}
           </strong>
         </div>
       </div>

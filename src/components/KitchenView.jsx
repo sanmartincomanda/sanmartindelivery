@@ -197,7 +197,7 @@ export default function KitchenView({ orders }) {
   // 1. Primero por estado: Pendiente -> En preparación -> Preparado -> Cancelado
   // 2. Dentro del mismo estado, ordenar por número de orden (id) ascendente
   const pedidosFiltrados = [...currentOrdersRaw]
-    .filter(o => o.estado !== 'Enviado')
+    .filter(o => o.estado !== 'Enviado' && o.estado !== 'Entregado')
     .sort((a, b) => {
       const order = { 'Pendiente': 0, 'En preparación': 1, 'Preparado': 2, 'Cancelado': 3 };
       const estadoDiff = (order[a.estado] || 0) - (order[b.estado] || 0);
