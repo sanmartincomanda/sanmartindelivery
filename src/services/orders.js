@@ -1,4 +1,4 @@
-import { ref, runTransaction, set } from 'firebase/database';
+import { get, ref, runTransaction, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { hoyISO } from '../components/Utils';
 import { normalizeLocation } from './geo';
@@ -6,10 +6,73 @@ import { normalizeLocation } from './geo';
 export const ORDER_LIMIT_PER_DAY = 125;
 export const MANUAL_CHANNEL = 'manual';
 export const STORE_CHANNEL = 'tienda_virtual';
+export const STORE_ORDER_RETENTION_DAYS = 3;
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 const roundToHalf = (value) => Math.round(Number(value || 0) * 2) / 2;
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
+
+const removeTextAccents = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const normalizeOrderStatus = (status) => removeTextAccents(status || 'Pendiente');
+
+const isFinalStoreStatus = (status) => {
+  const normalizedStatus = normalizeOrderStatus(status);
+  return (
+    normalizedStatus.includes('entregado') ||
+    normalizedStatus.includes('cancel') ||
+    normalizedStatus.includes('anulad')
+  );
+};
+
+const getFinishedOrderTimestamp = (order = {}) =>
+  Number(
+    order.timestampFinalizado ||
+      order.timestampEntregadoMs ||
+      order.timestampCanceladoMs ||
+      order.timestampAnuladoMs ||
+      order.timestamp ||
+      0
+  );
+
+export const isExpiredFinalStoreOrder = (order = {}, now = Date.now(), retentionDays = STORE_ORDER_RETENTION_DAYS) => {
+  if (order.canal !== STORE_CHANNEL || !isFinalStoreStatus(order.estado)) {
+    return false;
+  }
+
+  const finishedAt = getFinishedOrderTimestamp(order);
+  if (!finishedAt) {
+    return false;
+  }
+
+  return now - finishedAt >= retentionDays * DAY_IN_MS;
+};
+
+export async function cleanupExpiredStoreOrders(retentionDays = STORE_ORDER_RETENTION_DAYS) {
+  const snapshot = await get(ref(database, 'orders'));
+  const data = snapshot.val() || {};
+  const now = Date.now();
+  const updates = {};
+
+  Object.entries(data).forEach(([key, order]) => {
+    if (isExpiredFinalStoreOrder(order, now, retentionDays)) {
+      updates[`orders/${key}`] = null;
+    }
+  });
+
+  if (Object.keys(updates).length === 0) {
+    return 0;
+  }
+
+  await update(ref(database), updates);
+  return Object.keys(updates).length;
+}
 
 const buildTimeLabel = () =>
   new Date().toLocaleTimeString('es-NI', {

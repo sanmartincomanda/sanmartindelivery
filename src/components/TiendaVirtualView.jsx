@@ -30,7 +30,12 @@ import {
   registerStoreUser,
   updateStoreUserProfile,
 } from '../services/storeUsers';
-import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orders';
+import {
+  cleanupExpiredStoreOrders,
+  formatOrderNumber,
+  formatWeight,
+  STORE_CHANNEL,
+} from '../services/orders';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
@@ -132,6 +137,10 @@ const normalizeCustomerOrderStatus = (status) => {
     return 'cancelado';
   }
 
+  if (normalizedStatus.includes('anulad')) {
+    return 'cancelado';
+  }
+
   if (normalizedStatus.includes('enviado')) {
     return 'enviado';
   }
@@ -150,6 +159,9 @@ const normalizeCustomerOrderStatus = (status) => {
 
   return 'pendiente';
 };
+
+const isFinalCustomerOrder = (order = {}) =>
+  ['cancelado', 'entregado'].includes(normalizeCustomerOrderStatus(order.estado));
 
 const getShortPersonName = (name, fallback) => {
   const cleanName = String(name || '').trim();
@@ -342,6 +354,12 @@ export default function TiendaVirtualView({
     });
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    cleanupExpiredStoreOrders().catch((error) => {
+      console.error('No se pudieron limpiar pedidos antiguos de tienda:', error);
+    });
   }, []);
 
   useEffect(
@@ -682,12 +700,15 @@ export default function TiendaVirtualView({
       return;
     }
 
+    const nowMs = Date.now();
     const now = new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' });
     const cancelPayload = {
       estado: 'Cancelado',
       canceladoPor: 'Cliente tienda virtual',
       timestampCancelado: now,
-      timestamp: Date.now(),
+      timestampCanceladoMs: nowMs,
+      timestampFinalizado: nowMs,
+      timestamp: nowMs,
     };
 
     try {
@@ -3181,7 +3202,11 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
   const liveCreatedOrder = createdOrder
     ? listedOrders.find((order) => isSameCustomerOrder(order, createdOrder))
     : null;
-  const activeOrder = liveCreatedOrder || createdOrder || listedOrders[0] || null;
+  const liveOrCreatedOrder = liveCreatedOrder || createdOrder;
+  const activeOrder =
+    liveOrCreatedOrder && !isFinalCustomerOrder(liveOrCreatedOrder)
+      ? liveOrCreatedOrder
+      : listedOrders.find((order) => !isFinalCustomerOrder(order)) || null;
   const previousOrders = activeOrder
     ? listedOrders.filter((order) => !isSameCustomerOrder(order, activeOrder))
     : listedOrders;

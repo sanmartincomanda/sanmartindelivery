@@ -382,15 +382,18 @@ export default function DriverView({ orders = [] }) {
     }
 
     const now = formatTimeLabel();
+    const nowMs = Date.now();
     setDeliveringOrderKey(order.firebaseKey);
 
     try {
       await update(ref(database, `orders/${order.firebaseKey}`), {
         estado: 'Entregado',
         timestampEntregado: now,
+        timestampEntregadoMs: nowMs,
+        timestampFinalizado: nowMs,
         entregadoPor: driver.name,
         entregadoPorCodigo: driver.code,
-        timestamp: Date.now(),
+        timestamp: nowMs,
       });
       setConfirmDeliveryOrder(null);
       setSelectedOrder(null);

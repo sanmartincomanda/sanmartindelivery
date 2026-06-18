@@ -136,7 +136,26 @@ export default function KitchenView({ orders }) {
   
   const updateCampo = (firebaseKey, campo, valor, tab = kitchenTab) => {
     const basePath = getBasePath(tab);
-    update(ref(database, `${basePath}/${firebaseKey}`), { [campo]: valor });
+    const payload = { [campo]: valor };
+
+    if (campo === 'estado') {
+      const nowMs = Date.now();
+      payload.timestamp = nowMs;
+
+      if (valor === 'Cancelado') {
+        payload.timestampCancelado = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        payload.timestampCanceladoMs = nowMs;
+        payload.timestampFinalizado = nowMs;
+      }
+
+      if (valor === 'Pendiente') {
+        payload.timestampCancelado = null;
+        payload.timestampCanceladoMs = null;
+        payload.timestampFinalizado = null;
+      }
+    }
+
+    update(ref(database, `${basePath}/${firebaseKey}`), payload);
   };
 
   const handleSelectCocinero = (firebaseKey, nombreReal, tab = kitchenTab) => {
