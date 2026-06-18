@@ -750,8 +750,10 @@ export default function TiendaVirtualView({
           margin-left: auto;
           display: flex;
           gap: 8px;
+          align-items: center;
         }
         .store-icon-button,
+        .store-order-status-button,
         .store-button,
         .store-chip,
         .store-back,
@@ -762,6 +764,7 @@ export default function TiendaVirtualView({
           transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
         }
         .store-icon-button:hover,
+        .store-order-status-button:hover,
         .store-button:hover,
         .store-chip:hover,
         .store-back:hover,
@@ -777,6 +780,18 @@ export default function TiendaVirtualView({
           color: #111827;
           font-size: 18px;
           font-weight: 900;
+        }
+        .store-order-status-button {
+          min-height: 42px;
+          border-radius: 999px;
+          padding: 0 16px;
+          background: linear-gradient(135deg, #7b1022, #d94a3f);
+          color: #fffaf5;
+          box-shadow: 0 14px 28px rgba(123, 16, 34, 0.2);
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.04em;
+          white-space: nowrap;
         }
         .store-search-wrap {
           display: flex;
@@ -1266,6 +1281,45 @@ export default function TiendaVirtualView({
           font-size: 12px;
           font-weight: 900;
         }
+        .store-section-label {
+          margin: 14px 0 8px;
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+        .store-history-toggle {
+          width: 100%;
+          min-height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 14px;
+          border: 1px solid #ead8da;
+          border-radius: 16px;
+          padding: 0 14px;
+          background: #fff8f6;
+          color: #7b1022;
+          cursor: pointer;
+          font: inherit;
+          font-weight: 950;
+        }
+        .store-history-toggle span {
+          display: inline-flex;
+          min-width: 28px;
+          height: 28px;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: #7b1022;
+          color: #fffaf5;
+          font-size: 12px;
+        }
+        .store-history-list {
+          margin-top: 8px;
+        }
         .store-status-items {
           position: relative;
           z-index: 1;
@@ -1311,6 +1365,18 @@ export default function TiendaVirtualView({
           }
           .store-cart-bar {
             left: 50%;
+          }
+          .store-brand-row {
+            align-items: flex-start;
+          }
+          .store-actions {
+            flex-direction: column;
+            align-items: flex-end;
+          }
+          .store-order-status-button {
+            min-height: 38px;
+            padding: 0 12px;
+            font-size: 11px;
           }
           .store-auth-hero {
             min-height: 420px;
@@ -1394,11 +1460,11 @@ export default function TiendaVirtualView({
             <div className="store-actions">
               <button
                 type="button"
-                className="store-icon-button"
-                title="Mis pedidos"
+                className="store-order-status-button"
+                title="Estado de mi pedido"
                 onClick={() => setOrdersOpen(true)}
               >
-                #
+                ESTADO DE MI PEDIDO
               </button>
               <button
                 type="button"
@@ -1970,15 +2036,26 @@ function CheckoutSheet({
 }
 
 function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
+  const [showPreviousOrders, setShowPreviousOrders] = useState(false);
   const listedOrders = Array.isArray(orders) ? orders : [];
-  const createdOrderAlreadyListed =
-    createdOrder &&
-    listedOrders.some((order) =>
-      createdOrder.firebaseKey
-        ? order.firebaseKey === createdOrder.firebaseKey
-        : String(order.id) === String(createdOrder.id)
-    );
-  const featuredOrder = createdOrderAlreadyListed ? null : createdOrder;
+  const isSameCustomerOrder = (left, right) => {
+    if (!left || !right) {
+      return false;
+    }
+
+    if (left.firebaseKey && right.firebaseKey && left.firebaseKey === right.firebaseKey) {
+      return true;
+    }
+
+    return left.id !== undefined && right.id !== undefined && String(left.id) === String(right.id);
+  };
+  const liveCreatedOrder = createdOrder
+    ? listedOrders.find((order) => isSameCustomerOrder(order, createdOrder))
+    : null;
+  const activeOrder = liveCreatedOrder || createdOrder || listedOrders[0] || null;
+  const previousOrders = activeOrder
+    ? listedOrders.filter((order) => !isSameCustomerOrder(order, activeOrder))
+    : listedOrders;
 
   return (
     <div className="store-sheet-overlay">
@@ -1987,7 +2064,7 @@ function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
           <button type="button" className="store-back" onClick={onClose}>
             &lt;
           </button>
-          <strong>Estado de pedido</strong>
+          <strong>ESTADO DE MI PEDIDO</strong>
         </div>
 
         <div className="store-status-card" style={{ marginTop: 0 }}>
@@ -1996,22 +2073,40 @@ function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
           <div style={{ color: '#6b7280' }}>{currentUser.telefono}</div>
         </div>
 
-        {featuredOrder && (
-          <OrderStatusCard order={featuredOrder} currentUser={currentUser} highlight />
-        )}
-
-        {!featuredOrder && listedOrders.length === 0 ? (
+        {activeOrder ? (
+          <>
+            <div className="store-section-label">Pedido actual</div>
+            <OrderStatusCard order={activeOrder} currentUser={currentUser} highlight />
+          </>
+        ) : (
           <div className="store-empty" style={{ marginTop: 12 }}>
             Todavia no tienes pedidos en esta cuenta.
           </div>
-        ) : (
-          listedOrders.map((order) => (
-            <OrderStatusCard
-              key={order.firebaseKey || order.id}
-              order={order}
-              currentUser={currentUser}
-            />
-          ))
+        )}
+
+        {previousOrders.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="store-history-toggle"
+              onClick={() => setShowPreviousOrders((value) => !value)}
+            >
+              {showPreviousOrders ? 'Ocultar pedidos anteriores' : 'Ver pedidos anteriores'}
+              <span>{previousOrders.length}</span>
+            </button>
+
+            {showPreviousOrders && (
+              <div className="store-history-list">
+                {previousOrders.map((order) => (
+                  <OrderStatusCard
+                    key={order.firebaseKey || order.id}
+                    order={order}
+                    currentUser={currentUser}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
