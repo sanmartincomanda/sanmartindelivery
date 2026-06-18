@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase';
 import {
@@ -39,6 +39,18 @@ const clampQuantity = (value, product) => {
   }
 
   return Number(rounded.toFixed(step === 1 ? 0 : 1));
+};
+
+const isValidQuantityStep = (value, product) => {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    return true;
+  }
+
+  const step = getQuantityStep(product);
+  const steps = numberValue / step;
+  return Math.abs(steps - Math.round(steps)) < 0.00001;
 };
 
 const formatStoreQuantity = (quantity, unit) =>
@@ -181,6 +193,7 @@ export default function TiendaVirtualView({
   const [catalog, setCatalog] = useState(() => mergeCatalogProducts());
   const [categories, setCategories] = useState(() => mergeStoreCategories());
   const [cart, setCart] = useState({});
+  const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('todos');
   const [activeSubcategory, setActiveSubcategory] = useState('todas');
@@ -223,6 +236,7 @@ export default function TiendaVirtualView({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
+  const quantityNoticeTimeoutRef = useRef(null);
 
   const deferredQuery = useDeferredValue(query);
   const isDashboard = mode === 'dashboard';
@@ -242,6 +256,15 @@ export default function TiendaVirtualView({
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(
+    () => () => {
+      if (quantityNoticeTimeoutRef.current) {
+        window.clearTimeout(quantityNoticeTimeoutRef.current);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (!currentUser) {
@@ -381,11 +404,39 @@ export default function TiendaVirtualView({
 
   const cartCount = cartItems.length;
 
+  const showQuantityNotice = (message) => {
+    setQuantityNotice(message);
+
+    if (quantityNoticeTimeoutRef.current) {
+      window.clearTimeout(quantityNoticeTimeoutRef.current);
+    }
+
+    quantityNoticeTimeoutRef.current = window.setTimeout(() => {
+      setQuantityNotice('');
+      quantityNoticeTimeoutRef.current = null;
+    }, 2000);
+  };
+
   const updateQuantity = (code, nextValue) => {
     const product = activeProducts.find((item) => item.code === code) || catalog.find((item) => item.code === code);
+    const numericValue = Number(nextValue);
+
+    if (!Number.isFinite(numericValue)) {
+      showQuantityNotice('Ingresa una cantidad valida.');
+      return;
+    }
+
+    if (!isValidQuantityStep(numericValue, product)) {
+      showQuantityNotice(
+        isUnitProduct(product)
+          ? 'Solo permite unidades cerradas.'
+          : 'Solo permite pesos de media libra o libra cerrada.'
+      );
+    }
+
     setCart((current) => ({
       ...current,
-      [code]: clampQuantity(nextValue, product),
+      [code]: clampQuantity(numericValue, product),
     }));
   };
 
@@ -580,19 +631,43 @@ export default function TiendaVirtualView({
       <style>{`
         .store-shell {
           min-height: ${isDashboard ? 'calc(100vh - 64px)' : '100vh'};
-          background: #f7f7f8;
+          position: relative;
+          isolation: isolate;
+          overflow-x: hidden;
+          background:
+            radial-gradient(circle at 12% 12%, rgba(123, 16, 34, 0.08), transparent 28%),
+            radial-gradient(circle at 88% 28%, rgba(217, 74, 63, 0.08), transparent 30%),
+            linear-gradient(180deg, #fffafa 0%, #f8f4f4 48%, #f7f7f8 100%);
           color: #111827;
           font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        }
+        .store-shell::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          z-index: -1;
+          pointer-events: none;
+          opacity: 0.24;
+          background-image: url("data:image/svg+xml,%3Csvg width='420' height='420' viewBox='0 0 420 420' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%237b1022' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' opacity='.24'%3E%3Cpath d='M40 85 C82 42 128 42 170 85 S258 128 300 85'/%3E%3Cpath d='M54 138 C96 96 142 96 184 138 S272 180 314 138'/%3E%3Ccircle cx='330' cy='72' r='34' stroke-width='18'/%3E%3Cpath d='M80 302 C96 252 160 246 188 288 C204 314 184 348 142 354 C96 360 66 334 80 302Z'/%3E%3Cpath d='M250 300 C264 260 326 256 340 300Z'/%3E%3Cpath d='M252 308 H342 M270 334 C286 350 316 350 334 334'/%3E%3C/g%3E%3C/svg%3E");
+          background-size: 420px 420px;
+          background-position: 3% 8%;
         }
         .store-shell * {
           box-sizing: border-box;
         }
         .store-page {
+          position: relative;
+          z-index: 1;
           max-width: 1180px;
           margin: 0 auto;
           padding: ${isDashboard ? '18px' : '12px'} 18px 108px;
         }
+        .store-page.with-floating-cart {
+          max-width: 1500px;
+        }
         .store-auth-page {
+          position: relative;
+          z-index: 1;
           min-height: ${isDashboard ? 'calc(100vh - 64px)' : '100vh'};
           display: grid;
           grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.75fr);
@@ -724,7 +799,7 @@ export default function TiendaVirtualView({
           position: sticky;
           top: ${isDashboard ? '64px' : '0'};
           z-index: 80;
-          background: rgba(247, 247, 248, 0.96);
+          background: rgba(255, 250, 250, 0.9);
           backdrop-filter: blur(12px);
           padding: 10px 0 14px;
         }
@@ -1010,22 +1085,142 @@ export default function TiendaVirtualView({
           color: #6b7280;
           text-align: center;
         }
-        .store-cart-bar {
+        .store-floating-cart {
           position: fixed;
-          left: ${isDashboard ? 'calc(50% + 130px)' : '50%'};
-          bottom: 18px;
+          top: ${isDashboard ? '148px' : '132px'};
+          right: max(18px, calc((100vw - 1500px) / 2 + 18px));
           z-index: 110;
-          width: min(720px, calc(100vw - 28px));
-          transform: translateX(-50%);
-          border-radius: 999px;
-          background: #111827;
-          color: #ffffff;
+          width: 300px;
+          max-height: calc(100vh - 170px);
+          border: 1px solid rgba(123, 16, 34, 0.12);
+          border-radius: 26px;
+          background: rgba(255, 255, 255, 0.92);
+          color: #111827;
+          overflow: hidden;
+          box-shadow: 0 26px 70px rgba(123, 16, 34, 0.18);
+          backdrop-filter: blur(18px);
+        }
+        .store-floating-cart-head {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          padding: 12px 14px 12px 18px;
-          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.24);
+          padding: 16px 16px 12px;
+          background: linear-gradient(135deg, rgba(123, 16, 34, 0.08), rgba(217, 74, 63, 0.04));
+        }
+        .store-floating-cart-head strong {
+          display: block;
+          font-size: 16px;
+        }
+        .store-floating-cart-head span {
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .store-floating-cart-items {
+          max-height: 290px;
+          overflow: auto;
+          padding: 6px 14px 2px;
+        }
+        .store-floating-cart-item {
+          display: grid;
+          grid-template-columns: 42px minmax(0, 1fr);
+          gap: 10px;
+          padding: 10px 0;
+          border-bottom: 1px solid #f0e6e7;
+        }
+        .store-floating-cart-item:last-child {
+          border-bottom: 0;
+        }
+        .store-floating-cart-thumb {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          object-fit: contain;
+          background: #fff7f4;
+          border: 1px solid #f1dfe0;
+        }
+        .store-floating-cart-name {
+          margin: 0 0 6px;
+          color: #374151;
+          font-size: 12px;
+          font-weight: 900;
+          line-height: 1.25;
+        }
+        .store-floating-cart-controls {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .store-floating-cart-controls button {
+          width: 26px;
+          height: 26px;
+          border: 1px solid #ead8da;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #7b1022;
+          cursor: pointer;
+          font-weight: 950;
+        }
+        .store-floating-cart-controls strong {
+          margin-left: auto;
+          color: #111827;
+          font-size: 12px;
+          white-space: nowrap;
+        }
+        .store-floating-qty-input,
+        .store-qty-input {
+          min-width: 0;
+          border: 1px solid #ead8da;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #111827;
+          font: inherit;
+          font-weight: 900;
+          text-align: center;
+          outline: 0;
+        }
+        .store-floating-qty-input {
+          width: 64px;
+          height: 28px;
+          font-size: 12px;
+        }
+        .store-floating-cart-total {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px 16px;
+          border-top: 1px solid #f0e6e7;
+        }
+        .store-floating-cart-total small {
+          display: block;
+          color: #9f6b70;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .store-floating-cart-total strong {
+          display: block;
+          margin-top: 2px;
+          color: #111827;
+          font-size: 18px;
+        }
+        .store-quantity-notice {
+          position: fixed;
+          left: 50%;
+          bottom: 28px;
+          z-index: 260;
+          transform: translateX(-50%);
+          width: min(460px, calc(100vw - 28px));
+          border-radius: 999px;
+          padding: 13px 18px;
+          background: #7b1022;
+          color: #fffaf5;
+          text-align: center;
+          font-size: 14px;
+          font-weight: 950;
+          box-shadow: 0 18px 42px rgba(123, 16, 34, 0.24);
         }
         .store-button {
           border-radius: 999px;
@@ -1126,6 +1321,11 @@ export default function TiendaVirtualView({
           display: flex;
           align-items: center;
           justify-content: center;
+          font-size: 18px;
+        }
+        .store-stepper .store-qty-input {
+          width: 100%;
+          height: 46px;
           font-size: 18px;
         }
         .store-form {
@@ -1330,6 +1530,35 @@ export default function TiendaVirtualView({
           font-size: 13px;
           line-height: 1.5;
         }
+        @media (min-width: 1181px) {
+          .store-page.with-floating-cart {
+            padding-right: 336px;
+          }
+        }
+        @media (max-width: 1180px) {
+          .store-floating-cart {
+            top: auto;
+            right: 14px;
+            bottom: 14px;
+            left: 14px;
+            width: auto;
+            max-height: none;
+            border-radius: 24px;
+          }
+          .store-floating-cart-items {
+            display: none;
+          }
+          .store-floating-cart-head,
+          .store-floating-cart-total {
+            padding: 12px 14px;
+          }
+          .store-page.with-floating-cart {
+            padding-right: 18px;
+          }
+          .store-quantity-notice {
+            bottom: 116px;
+          }
+        }
         @media (max-width: 980px) {
           .store-auth-page {
             grid-template-columns: 1fr;
@@ -1345,6 +1574,7 @@ export default function TiendaVirtualView({
           .store-page {
             padding-left: 14px;
             padding-right: 14px;
+            padding-bottom: 160px;
           }
           .store-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1362,9 +1592,6 @@ export default function TiendaVirtualView({
           }
           .store-product-name {
             font-size: 14px;
-          }
-          .store-cart-bar {
-            left: 50%;
           }
           .store-brand-row {
             align-items: flex-start;
@@ -1416,7 +1643,7 @@ export default function TiendaVirtualView({
         />
       ) : (
         <>
-      <div className="store-page">
+      <div className={`store-page ${cartItems.length > 0 ? 'with-floating-cart' : ''}`}>
         {isDashboard && (
           <div className="store-admin-bar">
             <strong>Tienda Virtual Carnes San Martin Granada</strong>
@@ -1580,7 +1807,12 @@ export default function TiendaVirtualView({
                       type="button"
                       className="store-add"
                       title="Agregar"
-                      onClick={() => updateQuantity(product.code, quantity + getQuantityStep(product))}
+                      onClick={() =>
+                        updateQuantity(
+                          product.code,
+                          quantity > 0 ? quantity + getQuantityStep(product) : 1
+                        )
+                      }
                     >
                       +
                     </button>
@@ -1602,16 +1834,16 @@ export default function TiendaVirtualView({
       </div>
 
       {cartItems.length > 0 && (
-        <div className="store-cart-bar">
-          <div>
-            <strong>{cartCount === 1 ? '1 producto' : `${cartCount} productos`}</strong>
-            <div style={{ fontSize: 13, opacity: 0.78 }}>{formatCurrency(totalAmount)}</div>
-          </div>
-          <button type="button" className="store-button" onClick={() => setCheckoutOpen(true)}>
-            Ver pedido
-          </button>
-        </div>
+        <FloatingCart
+          cartItems={cartItems}
+          cartCount={cartCount}
+          totalAmount={totalAmount}
+          onCheckout={() => setCheckoutOpen(true)}
+          onQuantityChange={updateQuantity}
+        />
       )}
+
+      {quantityNotice && <div className="store-quantity-notice">{quantityNotice}</div>}
 
       {selectedProduct && (
         <ProductSheet
@@ -1885,6 +2117,108 @@ function PromotionViewer({ promotion, onClose, onViewCombos }) {
   );
 }
 
+function QuantityInput({ value, step, className, onChange, ariaLabel }) {
+  const [draftValue, setDraftValue] = useState(value ? String(value) : '');
+
+  useEffect(() => {
+    setDraftValue(value ? String(value) : '');
+  }, [value]);
+
+  const handleChange = (event) => {
+    const nextValue = event.target.value.replace(',', '.');
+
+    if (!/^\d*\.?\d*$/.test(nextValue)) {
+      return;
+    }
+
+    setDraftValue(nextValue);
+    onChange(nextValue);
+  };
+
+  return (
+    <input
+      className={className}
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      value={draftValue}
+      placeholder="0"
+      onChange={handleChange}
+      onBlur={() => setDraftValue(value ? String(value) : '')}
+    />
+  );
+}
+
+function FloatingCart({ cartItems, cartCount, totalAmount, onCheckout, onQuantityChange }) {
+  return (
+    <aside className="store-floating-cart" aria-label="Carrito flotante">
+      <div className="store-floating-cart-head">
+        <div>
+          <strong>Tu carrito</strong>
+          <span>{cartCount === 1 ? '1 producto agregado' : `${cartCount} productos agregados`}</span>
+        </div>
+        <button type="button" className="store-button" onClick={onCheckout}>
+          Ver pedido
+        </button>
+      </div>
+
+      <div className="store-floating-cart-items">
+        {cartItems.map((item) => {
+          const step = getQuantityStep({ unit: item.unidad });
+          const currentQuantity = Number(item.cantidad || 0);
+
+          return (
+            <div key={item.codigo} className="store-floating-cart-item">
+              <img
+                className="store-floating-cart-thumb"
+                src={item.image || LOGO_PATH}
+                alt={item.nombre}
+              />
+              <div>
+                <p className="store-floating-cart-name">{item.nombre}</p>
+                <div className="store-floating-cart-controls">
+                  <button
+                    type="button"
+                    aria-label={`Quitar ${item.nombre}`}
+                    onClick={() => onQuantityChange(item.codigo, currentQuantity - step)}
+                  >
+                    -
+                  </button>
+                  <QuantityInput
+                    className="store-floating-qty-input"
+                    step={step}
+                    value={currentQuantity}
+                    ariaLabel={`Cantidad de ${item.nombre}`}
+                    onChange={(nextValue) => onQuantityChange(item.codigo, nextValue)}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Agregar ${item.nombre}`}
+                    onClick={() => onQuantityChange(item.codigo, currentQuantity + step)}
+                  >
+                    +
+                  </button>
+                  <strong>{formatCurrency(item.subtotal)}</strong>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="store-floating-cart-total">
+        <div>
+          <small>Total</small>
+          <strong>{formatCurrency(totalAmount)}</strong>
+        </div>
+        <button type="button" className="store-button" onClick={onCheckout}>
+          Confirmar
+        </button>
+      </div>
+    </aside>
+  );
+}
+
 function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
   const subtotal = Number(quantity || 0) * Number(product.price || 0);
   const step = getQuantityStep(product);
@@ -1927,11 +2261,23 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
               <button type="button" onClick={() => onQuantityChange(quantity - step)}>
                 -
               </button>
-              <strong>{formatStoreQuantity(quantity, product.unit)} {product.unit}</strong>
-              <button type="button" onClick={() => onQuantityChange(quantity + step)}>
+              <QuantityInput
+                className="store-qty-input"
+                step={step}
+                value={quantity}
+                ariaLabel={`Cantidad de ${product.name}`}
+                onChange={onQuantityChange}
+              />
+              <button type="button" onClick={() => onQuantityChange(quantity > 0 ? quantity + step : 1)}>
                 +
               </button>
             </div>
+
+            <p className="store-unit" style={{ marginBottom: 14 }}>
+              {quantity > 0
+                ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} seleccionado`
+                : `Elige la cantidad en ${product.unit}`}
+            </p>
 
             <button
               type="button"
