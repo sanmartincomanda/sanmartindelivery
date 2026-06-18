@@ -3,6 +3,7 @@ import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase';
 import logo from '../logo.svg';
 import {
+  buildGoogleMapsAddressUrl,
   buildGoogleMapsPlaceUrl,
   buildGoogleMapsRouteUrl,
   getBrowserLocation,
@@ -22,6 +23,11 @@ const normalizeName = (value) =>
     .replace(/[\u0300-\u036f]/g, '');
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+
+const getWrittenAddress = (order) => {
+  const address = String(order?.direccion || order?.address || '').trim();
+  return address && address !== '-' ? address : '';
+};
 
 export default function DriverView({ orders = [] }) {
   const [drivers, setDrivers] = useState(() => mergeDrivers());
@@ -189,7 +195,11 @@ export default function DriverView({ orders = [] }) {
       ) : (
         <main className="driver-list">
           {routeOrders.map((order, index) => {
+            const hasMapPoint = hasLocation(order.ubicacion);
             const mapUrl = buildGoogleMapsPlaceUrl(order.ubicacion);
+            const writtenAddress = getWrittenAddress(order);
+            const addressUrl = buildGoogleMapsAddressUrl(writtenAddress);
+
             return (
               <article key={order.firebaseKey || order.id} className="driver-order">
                 <div className="driver-order-number">#{formatOrderNumber(order.id)}</div>
@@ -201,18 +211,28 @@ export default function DriverView({ orders = [] }) {
                     </div>
                     <div className="driver-status">{order.estado || 'Asignado'}</div>
                   </div>
-                  <p>{order.direccion || 'Sin direccion'}</p>
+                  <div className={`driver-address ${hasMapPoint ? '' : 'fallback'}`}>
+                    <span>{hasMapPoint ? 'Direccion del pedido' : 'Direccion escrita del cliente'}</span>
+                    <p>{writtenAddress || 'Sin direccion escrita'}</p>
+                    {!hasMapPoint && writtenAddress && (
+                      <small>Este pedido no tiene punto de mapa. Usa esta direccion como referencia.</small>
+                    )}
+                  </div>
                   <div className="driver-meta">
                     <span>Asignado: {order.timestampAsignado || order.timestampEnviado || '-'}</span>
                     {order.total ? <span>{formatCurrency(order.total)}</span> : null}
                   </div>
                   <div className="driver-actions">
-                    {hasLocation(order.ubicacion) ? (
+                    {hasMapPoint ? (
                       <a href={mapUrl} target="_blank" rel="noreferrer">
                         Abrir en Google Maps
                       </a>
+                    ) : addressUrl ? (
+                      <a href={addressUrl} target="_blank" rel="noreferrer" className="address-search">
+                        Buscar direccion escrita
+                      </a>
                     ) : (
-                      <button type="button" disabled>Sin ubicacion</button>
+                      <button type="button" disabled>Sin ubicacion ni direccion</button>
                     )}
                     {order.pedido && (
                       <details>
@@ -427,6 +447,35 @@ const driverStyles = `
     font-weight: 800;
     line-height: 1.4;
   }
+  .driver-address {
+    margin: 12px 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 12px;
+    background: #f8fafc;
+  }
+  .driver-address.fallback {
+    border-color: #fed7aa;
+    background: #fff7ed;
+  }
+  .driver-address span {
+    display: block;
+    margin-bottom: 4px;
+    color: #7b1022;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .driver-address p {
+    margin: 0;
+  }
+  .driver-address small {
+    display: block;
+    margin-top: 6px;
+    color: #9a3412;
+    font-weight: 900;
+  }
   .driver-status {
     border-radius: 999px;
     padding: 7px 10px;
@@ -451,6 +500,9 @@ const driverStyles = `
   .driver-actions details {
     flex: 1;
     min-width: 180px;
+  }
+  .driver-actions a.address-search {
+    background: #f97316;
   }
   .driver-actions summary {
     cursor: pointer;

@@ -18,8 +18,11 @@ export const normalizeLocation = (location = {}) => {
 
 export const hasLocation = (location) => Boolean(normalizeLocation(location));
 
+const buildGoogleMapsSearchUrl = (query) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
 const buildGoogleMapsPlaceUrlFromCoords = (lat, lng) =>
-  `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  buildGoogleMapsSearchUrl(`${lat},${lng}`);
 
 export const buildGoogleMapsPlaceUrl = (location) => {
   const normalized = normalizeLocation(location);
@@ -28,6 +31,15 @@ export const buildGoogleMapsPlaceUrl = (location) => {
   }
 
   return buildGoogleMapsPlaceUrlFromCoords(normalized.lat, normalized.lng);
+};
+
+export const buildGoogleMapsAddressUrl = (address) => {
+  const cleanAddress = String(address || '').trim();
+  if (!cleanAddress || cleanAddress === '-') {
+    return '';
+  }
+
+  return buildGoogleMapsSearchUrl(cleanAddress);
 };
 
 export const buildGoogleMapsEmbedUrl = (location) => {
