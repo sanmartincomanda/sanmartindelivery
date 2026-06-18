@@ -22,6 +22,8 @@ import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orde
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_BACKGROUND_PATH = '/tienda/branding/fondo-combos-tortas.svg';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
+const STORE_WHATSAPP_NUMBER = '50584657949';
+const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino'];
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -43,6 +45,133 @@ const formatStoreQuantity = (quantity, unit) =>
   String(unit).toLowerCase() === 'unidad' ? String(Number(quantity || 0)) : formatWeight(quantity);
 
 const getQuickQuantities = (product) => (isUnitProduct(product) ? [1, 2, 3, 4] : QUICK_WEIGHTS);
+
+const removeTextAccents = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const normalizeCustomerOrderStatus = (status) => {
+  const normalizedStatus = removeTextAccents(status || 'Pendiente');
+
+  if (normalizedStatus.includes('cancel')) {
+    return 'cancelado';
+  }
+
+  if (normalizedStatus.includes('enviado')) {
+    return 'enviado';
+  }
+
+  if (normalizedStatus.includes('preparado')) {
+    return 'preparado';
+  }
+
+  if (normalizedStatus.includes('preparacion')) {
+    return 'preparando';
+  }
+
+  return 'pendiente';
+};
+
+const getShortPersonName = (name, fallback) => {
+  const cleanName = String(name || '').trim();
+  if (!cleanName) {
+    return fallback;
+  }
+
+  const [firstName] = cleanName.split(/\s+/);
+  return firstName || fallback;
+};
+
+const getCustomerStatusMeta = (order = {}) => {
+  const statusKey = normalizeCustomerOrderStatus(order.estado);
+  const cookName = getShortPersonName(order.cocinero, 'Harvey');
+  const riderName = getShortPersonName(order.repartidor, 'Jordin');
+
+  const statusMeta = {
+    pendiente: {
+      accent: '#ef4444',
+      soft: '#fff1f2',
+      emoji: '🧾',
+      label: 'Pedido recibido',
+      message: 'Recibimos tu pedido. Ya esta en la fila de cocina y te iremos avisando cada paso.',
+      progress: 1,
+    },
+    preparando: {
+      accent: '#f59e0b',
+      soft: '#fffbeb',
+      emoji: '👨‍🍳',
+      label: 'En cocina',
+      message: `Cocinero ${cookName} ya esta preparando tu pedido.`,
+      progress: 2,
+    },
+    preparado: {
+      accent: '#10b981',
+      soft: '#ecfdf5',
+      emoji: '✅',
+      label: 'Pedido listo',
+      message: 'Tu pedido ya esta listo. Estamos coordinando la salida para entregarlo con cuidado.',
+      progress: 3,
+    },
+    enviado: {
+      accent: '#2563eb',
+      soft: '#eff6ff',
+      emoji: '🏍️',
+      label: 'En camino',
+      message: `${riderName} lleva tu pedido en camino.`,
+      progress: 4,
+    },
+    cancelado: {
+      accent: '#64748b',
+      soft: '#f8fafc',
+      emoji: 'ℹ️',
+      label: 'Pedido cancelado',
+      message: 'Este pedido fue cancelado. Si necesitas ayuda, escribenos por WhatsApp.',
+      progress: 0,
+    },
+  };
+
+  return statusMeta[statusKey] || statusMeta.pendiente;
+};
+
+const buildOrderItemsMessage = (order = {}) => {
+  if (!Array.isArray(order.items) || order.items.length === 0) {
+    return order.pedido || 'Sin detalle de productos';
+  }
+
+  return order.items
+    .map((item) => {
+      const quantity = formatStoreQuantity(item.cantidad, item.unidad);
+      return `- ${quantity} ${item.unidad || ''} ${item.nombre || ''}`.trim();
+    })
+    .join('\n');
+};
+
+const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
+  const customerName = currentUser?.nombre || order.cliente || 'Cliente';
+  const customerPhone = currentUser?.telefono || order.telefono || '';
+  const orderNumber = formatOrderNumber(order.id);
+
+  return [
+    'Hola Carnes San Martin Granada.',
+    'Tengo este pedido en linea pero me gustaria cambiar tal cosa:',
+    `Pedido #${orderNumber}`,
+    `Cliente: ${customerName}`,
+    customerPhone ? `Telefono: ${customerPhone}` : '',
+    `Estado actual: ${order.estado || 'Pendiente'}`,
+    `Total: ${formatCurrency(order.total)}`,
+    'Productos:',
+    buildOrderItemsMessage(order),
+  ]
+    .filter(Boolean)
+    .join('\n');
+};
+
+const buildOrderWhatsAppLink = (order, currentUser) =>
+  `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    buildOrderWhatsAppMessage(order, currentUser)
+  )}`;
 
 export default function TiendaVirtualView({
   onCreateOrder,
@@ -998,6 +1127,109 @@ export default function TiendaVirtualView({
           padding: 12px;
           margin-top: 10px;
         }
+        .store-friendly-status {
+          position: relative;
+          overflow: hidden;
+          border-radius: 18px;
+          padding: 16px;
+          box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+        }
+        .store-friendly-status::after {
+          content: '';
+          position: absolute;
+          inset: auto -38px -54px auto;
+          width: 132px;
+          height: 132px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.68);
+        }
+        .store-friendly-head {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+        .store-status-emoji {
+          width: 48px;
+          height: 48px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 16px;
+          background: #ffffff;
+          font-size: 26px;
+          box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
+        }
+        .store-status-message {
+          position: relative;
+          z-index: 1;
+          margin: 12px 0 0;
+          color: #475569;
+          line-height: 1.45;
+        }
+        .store-progress {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 6px;
+          margin-top: 14px;
+        }
+        .store-progress-step {
+          min-height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.72);
+          color: #94a3b8;
+          font-size: 11px;
+          font-weight: 900;
+          text-align: center;
+        }
+        .store-progress-step.done {
+          color: #ffffff;
+        }
+        .store-order-meta {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 14px;
+        }
+        .store-order-meta span {
+          display: block;
+          color: #64748b;
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .store-order-meta strong {
+          display: block;
+          margin-top: 2px;
+          color: #111827;
+          font-size: 13px;
+        }
+        .store-whatsapp-button {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          min-height: 46px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 14px;
+          border-radius: 999px;
+          background: #16a34a;
+          color: #ffffff;
+          font-weight: 950;
+          text-decoration: none;
+          box-shadow: 0 16px 30px rgba(22, 163, 74, 0.24);
+        }
         .store-status-pill {
           display: inline-flex;
           align-items: center;
@@ -1008,6 +1240,8 @@ export default function TiendaVirtualView({
           font-weight: 900;
         }
         .store-status-items {
+          position: relative;
+          z-index: 1;
           margin-top: 10px;
           padding-top: 10px;
           border-top: 1px solid #f1f2f4;
@@ -1050,6 +1284,13 @@ export default function TiendaVirtualView({
           }
           .store-cart-bar {
             left: 50%;
+          }
+          .store-order-meta,
+          .store-progress {
+            grid-template-columns: 1fr;
+          }
+          .store-progress-step {
+            min-height: 32px;
           }
         }
       `}</style>
@@ -1690,6 +1931,16 @@ function CheckoutSheet({
 }
 
 function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
+  const listedOrders = Array.isArray(orders) ? orders : [];
+  const createdOrderAlreadyListed =
+    createdOrder &&
+    listedOrders.some((order) =>
+      createdOrder.firebaseKey
+        ? order.firebaseKey === createdOrder.firebaseKey
+        : String(order.id) === String(createdOrder.id)
+    );
+  const featuredOrder = createdOrderAlreadyListed ? null : createdOrder;
+
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet">
@@ -1706,41 +1957,123 @@ function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
           <div style={{ color: '#6b7280' }}>{currentUser.telefono}</div>
         </div>
 
-        {createdOrder && (
-          <div className="store-status-card" style={{ borderColor: '#ef4444' }}>
-            <div className="store-status-pill">Pedido #{formatOrderNumber(createdOrder.id)}</div>
-            <h3 style={{ margin: '10px 0 4px' }}>{createdOrder.estado}</h3>
-            <div style={{ color: '#6b7280' }}>{formatCurrency(createdOrder.total)}</div>
-          </div>
+        {featuredOrder && (
+          <OrderStatusCard order={featuredOrder} currentUser={currentUser} highlight />
         )}
 
-        {orders.length === 0 ? (
+        {!featuredOrder && listedOrders.length === 0 ? (
           <div className="store-empty" style={{ marginTop: 12 }}>
             Todavia no tienes pedidos en esta cuenta.
           </div>
         ) : (
-          orders.map((order) => (
-            <div key={order.firebaseKey} className="store-status-card">
-              <div className="store-status-pill">Pedido #{formatOrderNumber(order.id)}</div>
-              <h3 style={{ margin: '10px 0 4px' }}>{order.estado || 'Pendiente'}</h3>
-              <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
-                {order.fecha} - {order.timestampIngreso || ''}
-                <br />
-                {formatCurrency(order.total)}
-              </div>
-              {Array.isArray(order.items) && order.items.length > 0 && (
-                <div className="store-status-items">
-                  {order.items.map((item) => (
-                    <div key={`${order.firebaseKey}-${item.codigo}`}>
-                      {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          listedOrders.map((order) => (
+            <OrderStatusCard
+              key={order.firebaseKey || order.id}
+              order={order}
+              currentUser={currentUser}
+            />
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function OrderStatusCard({ order, currentUser, highlight = false }) {
+  const meta = getCustomerStatusMeta(order);
+  const orderNumber = formatOrderNumber(order.id);
+  const cookName = order.cocinero ? getShortPersonName(order.cocinero, order.cocinero) : 'Por asignar';
+  const riderName = order.repartidor
+    ? getShortPersonName(order.repartidor, order.repartidor)
+    : 'Por asignar';
+  const whatsappLink = buildOrderWhatsAppLink(order, currentUser);
+
+  return (
+    <div
+      className="store-status-card store-friendly-status"
+      style={{
+        borderColor: meta.accent,
+        background: `linear-gradient(135deg, ${meta.soft} 0%, #ffffff 72%)`,
+      }}
+    >
+      <div className="store-friendly-head">
+        <span className="store-status-emoji" aria-hidden="true">
+          {meta.emoji}
+        </span>
+        <div style={{ flex: 1 }}>
+          <div
+            className="store-status-pill"
+            style={{
+              background: highlight ? '#111827' : '#ffffff',
+              color: highlight ? '#ffffff' : '#111827',
+            }}
+          >
+            Pedido #{orderNumber}
+          </div>
+          <h3 style={{ margin: '10px 0 2px', color: '#111827' }}>{meta.label}</h3>
+          <div style={{ color: meta.accent, fontSize: 13, fontWeight: 900 }}>
+            {order.estado || 'Pendiente'}
+          </div>
+        </div>
+      </div>
+
+      <p className="store-status-message">{meta.message}</p>
+
+      <div className="store-progress" aria-label="Progreso del pedido">
+        {ORDER_PROGRESS_STEPS.map((step, index) => {
+          const isDone = meta.progress >= index + 1;
+          return (
+            <span
+              key={step}
+              className={`store-progress-step ${isDone ? 'done' : ''}`}
+              style={isDone ? { background: meta.accent } : undefined}
+            >
+              {step}
+            </span>
+          );
+        })}
+      </div>
+
+      <div className="store-order-meta">
+        <div>
+          <span>Ingreso</span>
+          <strong>
+            {order.fecha || 'Hoy'} {order.timestampIngreso || ''}
+          </strong>
+        </div>
+        <div>
+          <span>Total</span>
+          <strong>{formatCurrency(order.total)}</strong>
+        </div>
+        <div>
+          <span>Cocina</span>
+          <strong>
+            {cookName}
+            {order.timestampPreparacion ? ` - ${order.timestampPreparacion}` : ''}
+          </strong>
+        </div>
+        <div>
+          <span>Entrega</span>
+          <strong>
+            {riderName}
+            {order.timestampEnviado ? ` - ${order.timestampEnviado}` : ''}
+          </strong>
+        </div>
+      </div>
+
+      {Array.isArray(order.items) && order.items.length > 0 && (
+        <div className="store-status-items">
+          {order.items.map((item) => (
+            <div key={`${order.firebaseKey || order.id}-${item.codigo || item.nombre}`}>
+              {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <a className="store-whatsapp-button" href={whatsappLink} target="_blank" rel="noreferrer">
+        💬 Escribir a WhatsApp de la tienda
+      </a>
     </div>
   );
 }
