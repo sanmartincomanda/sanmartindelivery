@@ -73,6 +73,41 @@ const COCINEROS = [
   { nombre: 'Otro', alias: 'Otro', icono: '👤' }
 ];
 
+const cleanWhatsappPhone = (phone) => String(phone || '').replace(/\D/g, '');
+
+const buildCustomerWhatsappPhone = (phone) => {
+  const cleanPhone = cleanWhatsappPhone(phone);
+
+  if (!cleanPhone) {
+    return '';
+  }
+
+  if (cleanPhone.startsWith('505') && cleanPhone.length >= 11) {
+    return cleanPhone;
+  }
+
+  return `505${cleanPhone.slice(-8)}`;
+};
+
+const buildKitchenWhatsappMessage = (pedido = {}) =>
+  [
+    `Hola ${pedido.cliente || ''}.`.trim(),
+    `Te escribimos de Carnes San Martin Granada sobre tu pedido #${pedido.id || ''}.`.trim(),
+    'Tenemos una actualizacion de tu pedido. Por favor escribenos para coordinar cualquier cambio o producto fuera de inventario.',
+  ].join('\n');
+
+const buildKitchenWhatsappLink = (pedido = {}) => {
+  const whatsappPhone = buildCustomerWhatsappPhone(pedido.telefono);
+
+  if (!whatsappPhone) {
+    return '';
+  }
+
+  return `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
+    buildKitchenWhatsappMessage(pedido)
+  )}`;
+};
+
 export default function KitchenView({ orders }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
@@ -298,7 +333,7 @@ export default function KitchenView({ orders }) {
                   fontWeight: 800, 
                   color: '#1e293b' 
                 }}>
-                  Seleccionar Cocinero
+                  Seleccionar Carnicero
                 </h2>
                 <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
                   Pedido #{pedidosFiltrados.find(p => p.firebaseKey === modalCocinero)?.id}
@@ -418,7 +453,7 @@ export default function KitchenView({ orders }) {
                   boxShadow: cocineroSeleccionado ? '0 8px 25px rgba(245, 158, 11, 0.4)' : 'none'
                 }}
               >
-                {cocineroSeleccionado ? `Asignar a ${COCINEROS.find(c => c.nombre === cocineroSeleccionado)?.alias}` : 'Selecciona un cocinero'}
+                {cocineroSeleccionado ? `Asignar a ${COCINEROS.find(c => c.nombre === cocineroSeleccionado)?.alias}` : 'Selecciona un carnicero'}
               </button>
             </div>
           </div>
@@ -571,6 +606,7 @@ export default function KitchenView({ orders }) {
             const config = STATUS_CONFIG[status];
             const isEditing = editingId === pedido.firebaseKey;
             const isAnimating = animatingCards.has(pedido.firebaseKey);
+            const customerWhatsappLink = buildKitchenWhatsappLink(pedido);
             
             return (
               <div
@@ -667,7 +703,7 @@ export default function KitchenView({ orders }) {
                       </div>
                     </div>
 
-                    {/* Derecha: Cocinero asignado */}
+                    {/* Derecha: Carnicero asignado */}
                     {pedido.cocinero && (
                       <div style={{
                         display: 'flex',
@@ -954,13 +990,41 @@ export default function KitchenView({ orders }) {
                           }}
                         >
                           <span style={{ fontSize: '24px' }}>👨‍🍳</span>
-                          Seleccionar Cocinero
+                          Seleccionar Carnicero
                         </button>
                       </div>
                     )}
 
                     {/* Botones de Acción */}
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                      {customerWhatsappLink && (
+                        <a
+                          href={customerWhatsappLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn-hover"
+                          style={{
+                            flex: '1 1 100%',
+                            padding: '16px 20px',
+                            borderRadius: '14px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            color: 'white',
+                            fontWeight: 800,
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            textDecoration: 'none',
+                            boxShadow: '0 8px 25px rgba(22, 163, 74, 0.34)'
+                          }}
+                        >
+                          <span style={{ fontSize: '20px' }}>💬</span>
+                          Enviar mensaje WhatsApp
+                        </a>
+                      )}
                       {status === 'En preparación' && (
                         <>
                           <button

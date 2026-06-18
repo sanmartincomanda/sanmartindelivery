@@ -103,7 +103,7 @@ const getCustomerStatusMeta = (order = {}) => {
       soft: '#fffbeb',
       emoji: '👨‍🍳',
       label: 'En cocina',
-      message: `Cocinero ${cookName} ya esta preparando tu pedido.`,
+      message: `Carnicero ${cookName} ya esta preparando tu pedido.`,
       progress: 2,
     },
     preparado: {
@@ -2180,7 +2180,7 @@ function OrderStatusCard({ order, currentUser, highlight = false }) {
           <strong>{formatCurrency(order.total)}</strong>
         </div>
         <div>
-          <span>Cocina</span>
+          <span>Carnicero</span>
           <strong>
             {cookName}
             {order.timestampPreparacion ? ` - ${order.timestampPreparacion}` : ''}
