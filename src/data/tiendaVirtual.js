@@ -37,7 +37,7 @@ export const STORE_PRODUCTS = [
 export const STORE_PROMOTIONS = [
   {
     id: 'combo-practico',
-    title: 'Combo Practico',
+    title: 'C2 Jalapeno + Chimichurri',
     image: '/tienda/promos/promo-combo-2.jpg',
   },
   {
@@ -47,12 +47,12 @@ export const STORE_PROMOTIONS = [
   },
   {
     id: 'combo-premium',
-    title: 'Combo Premium',
+    title: 'C3 Cortes para parrilla',
     image: '/tienda/promos/promo-combo-3.jpg',
   },
   {
     id: 'combo-parrillero',
-    title: 'Combo Parrillero',
+    title: 'C1 Torta Hamburguesa',
     image: '/tienda/promos/promo-combo-1.jpg',
   },
   {
@@ -69,20 +69,8 @@ export const STORE_PROMOTIONS = [
 
 export const STORE_COMBOS = [
   {
-    code: 'COMBO-660',
-    name: 'COMBO 2 HAMBURGUESA PRACTICO',
-    price: 660,
-    unit: 'unidad',
-    category: 'promociones',
-    subcategory: 'Combos',
-    active: true,
-    promo: true,
-    image: '/tienda/promos/promo-combo-2.jpg',
-    description: 'Codigo SICAR pendiente. Vinculado por precio C$ 660.',
-  },
-  {
-    code: 'COMBO-730',
-    name: 'COMBO 1 HAMBURGUESA PARRILLERO',
+    code: '1001',
+    name: 'C1 TORTA HAMBURGUESA (100% RES)',
     price: 730,
     unit: 'unidad',
     category: 'promociones',
@@ -90,11 +78,23 @@ export const STORE_COMBOS = [
     active: true,
     promo: true,
     image: '/tienda/promos/promo-combo-1.jpg',
-    description: 'Codigo SICAR pendiente. Vinculado por precio C$ 730.',
+    description: 'Combo SICAR C1. Torta hamburguesa 100% res.',
   },
   {
-    code: 'COMBO-1020',
-    name: 'COMBO 3 PARRILLA PREMIUM',
+    code: '1002',
+    name: 'C2 TORTA SABOR JALAPENO + CHIMICHURRI',
+    price: 660,
+    unit: 'unidad',
+    category: 'promociones',
+    subcategory: 'Combos',
+    active: true,
+    promo: true,
+    image: '/tienda/promos/promo-combo-2.jpg',
+    description: 'Combo SICAR C2. Torta sabor jalapeno + chimichurri.',
+  },
+  {
+    code: '1003',
+    name: 'C3 CORTES PARA PARRILLA',
     price: 1020,
     unit: 'unidad',
     category: 'promociones',
@@ -102,9 +102,11 @@ export const STORE_COMBOS = [
     active: true,
     promo: true,
     image: '/tienda/promos/promo-combo-3.jpg',
-    description: 'Codigo SICAR pendiente. Vinculado por precio C$ 1,020.',
+    description: 'Combo SICAR C3. Cortes para parrilla.',
   },
 ];
+
+export const LEGACY_STORE_COMBO_CODES = ['COMBO-660', 'COMBO-730', 'COMBO-1020'];
 
 export const STORE_PAYMENT_OPTIONS = ['Efectivo', 'POS BAC', 'TRANSFERENCIA', 'LINK DE PAGO'];
 

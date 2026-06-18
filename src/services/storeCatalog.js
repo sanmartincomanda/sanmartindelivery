@@ -1,6 +1,6 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
-import { STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
+import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 
@@ -26,6 +26,10 @@ export const mergeCatalogProducts = (remoteCatalog = {}) => {
 
   Object.values(remoteCatalog || {}).forEach((remoteProduct) => {
     const code = String(remoteProduct?.code || '').trim();
+    if (LEGACY_STORE_COMBO_CODES.includes(code)) {
+      return;
+    }
+
     if (code) {
       byCode.set(code, normalizeCatalogProduct(remoteProduct, byCode.get(code)));
     }
