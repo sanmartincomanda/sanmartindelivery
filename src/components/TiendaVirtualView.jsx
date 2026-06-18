@@ -40,11 +40,6 @@ const formatStoreQuantity = (quantity, unit) =>
 
 const getQuickQuantities = (product) => (isUnitProduct(product) ? [1, 2, 3, 4] : QUICK_WEIGHTS);
 
-const getProductCategoryTokens = (product) =>
-  [product.category, product.subcategory, product.name, product.code]
-    .join(' ')
-    .toLowerCase();
-
 export default function TiendaVirtualView({
   onCreateOrder,
   mode = 'public',
@@ -54,6 +49,7 @@ export default function TiendaVirtualView({
   const [cart, setCart] = useState({});
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('todos');
+  const [activeSubcategory, setActiveSubcategory] = useState('todas');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -153,39 +149,54 @@ export default function TiendaVirtualView({
     [catalog]
   );
 
-  const categoryOptions = useMemo(() => {
-    const subcategories = Array.from(
-      new Set(activeProducts.map((product) => product.subcategory).filter(Boolean))
-    ).map((subcategory) => ({
-      id: subcategory.toLowerCase(),
-      label: subcategory,
-    }));
+  const selectedCategory = useMemo(
+    () => STORE_CATEGORIES.find((category) => category.id === activeCategory) || STORE_CATEGORIES[0],
+    [activeCategory]
+  );
 
-    return [...STORE_CATEGORIES, ...subcategories].filter(
-      (category, index, all) => all.findIndex((item) => item.id === category.id) === index
-    );
-  }, [activeProducts]);
+  const subcategoryOptions = useMemo(() => {
+    if (activeCategory === 'todos') {
+      return [];
+    }
+
+    const officialSubcategories = selectedCategory?.subcategories || [];
+    const productSubcategories = activeProducts
+      .filter((product) => {
+        if (activeCategory === 'promociones') {
+          return product.promo || product.category === 'promociones';
+        }
+
+        return product.category === activeCategory;
+      })
+      .map((product) => product.subcategory)
+      .filter(Boolean);
+
+    return Array.from(new Set([...officialSubcategories, ...productSubcategories]));
+  }, [activeCategory, activeProducts, selectedCategory]);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
 
     return activeProducts.filter((product) => {
-      const productTokens = getProductCategoryTokens(product);
       const matchesCategory =
         activeCategory === 'todos' ||
-        productTokens.includes(activeCategory.toLowerCase()) ||
-        (activeCategory === 'promociones' && product.promo);
+        (activeCategory === 'promociones' && (product.promo || product.category === 'promociones')) ||
+        product.category === activeCategory;
+
+      const matchesSubcategory =
+        activeSubcategory === 'todas' ||
+        String(product.subcategory || '').toLowerCase() === activeSubcategory.toLowerCase();
 
       const matchesSearch =
         !normalizedQuery ||
-        [product.code, product.name, product.description, product.subcategory]
+        [product.code, product.name, product.description, product.category, product.subcategory]
           .join(' ')
           .toLowerCase()
           .includes(normalizedQuery);
 
-      return matchesCategory && matchesSearch;
+      return matchesCategory && matchesSubcategory && matchesSearch;
     });
-  }, [activeCategory, activeProducts, deferredQuery]);
+  }, [activeCategory, activeProducts, activeSubcategory, deferredQuery]);
 
   const cartItems = useMemo(
     () =>
@@ -607,6 +618,12 @@ export default function TiendaVirtualView({
           overflow-x: auto;
           padding: 12px 0 2px;
         }
+        .store-subtabs {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 8px 0 0;
+        }
         .store-chip {
           flex: 0 0 auto;
           padding: 10px 16px;
@@ -621,6 +638,16 @@ export default function TiendaVirtualView({
           background: #111827;
           color: #ffffff;
           border-color: #111827;
+        }
+        .store-subtabs .store-chip {
+          padding: 8px 13px;
+          font-size: 13px;
+          background: #f3f4f6;
+        }
+        .store-subtabs .store-chip.active {
+          background: #ef4444;
+          border-color: #ef4444;
+          color: #ffffff;
         }
         .store-promo {
           margin: 12px 0 18px;
@@ -1087,17 +1114,42 @@ export default function TiendaVirtualView({
           </label>
 
           <nav className="store-tabs">
-            {categoryOptions.map((category) => (
+            {STORE_CATEGORIES.map((category) => (
               <button
                 key={category.id}
                 type="button"
                 className={`store-chip ${activeCategory === category.id ? 'active' : ''}`}
-                onClick={() => setActiveCategory(category.id)}
+                onClick={() => {
+                  setActiveCategory(category.id);
+                  setActiveSubcategory('todas');
+                }}
               >
                 {category.label}
               </button>
             ))}
           </nav>
+
+          {subcategoryOptions.length > 0 && (
+            <nav className="store-subtabs">
+              <button
+                type="button"
+                className={`store-chip ${activeSubcategory === 'todas' ? 'active' : ''}`}
+                onClick={() => setActiveSubcategory('todas')}
+              >
+                Todas
+              </button>
+              {subcategoryOptions.map((subcategory) => (
+                <button
+                  key={subcategory}
+                  type="button"
+                  className={`store-chip ${activeSubcategory === subcategory ? 'active' : ''}`}
+                  onClick={() => setActiveSubcategory(subcategory)}
+                >
+                  {subcategory}
+                </button>
+              ))}
+            </nav>
+          )}
         </header>
 
         <section className="store-promo">
@@ -1128,6 +1180,7 @@ export default function TiendaVirtualView({
               onClick={() => {
                 setQuery('');
                 setActiveCategory('todos');
+                setActiveSubcategory('todas');
               }}
             >
               Limpiar
@@ -1203,6 +1256,7 @@ export default function TiendaVirtualView({
             setSelectedPromotion(null);
             setQuery('');
             setActiveCategory('promociones');
+            setActiveSubcategory('todas');
           }}
         />
       )}

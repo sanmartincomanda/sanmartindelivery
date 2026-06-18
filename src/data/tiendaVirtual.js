@@ -4,8 +4,8 @@ export const STORE_PRODUCTS = [
     name: 'BISTEC POSTA DE PIERNA VP',
     price: 182,
     unit: 'lb',
-    category: 'carniceria',
-    subcategory: 'Res',
+    category: 'res',
+    subcategory: 'Linea Diaria',
     active: true,
     image: '/tienda/page/product-gold.jpg',
     description: 'Bistec por libra.',
@@ -15,8 +15,8 @@ export const STORE_PRODUCTS = [
     name: 'POSTA DE GALLINA VP',
     price: 178,
     unit: 'lb',
-    category: 'carniceria',
-    subcategory: 'Gallina',
+    category: 'pollo',
+    subcategory: 'Pollo',
     active: true,
     image: '/tienda/page/product-birria.jpg',
     description: 'Posta de gallina por libra.',
@@ -26,8 +26,8 @@ export const STORE_PRODUCTS = [
     name: 'MANO DE PIEDRA VP',
     price: 165,
     unit: 'lb',
-    category: 'carniceria',
-    subcategory: 'Res',
+    category: 'res',
+    subcategory: 'Linea Diaria',
     active: true,
     image: '/tienda/page/hero-table.jpg',
     description: 'Mano de piedra por libra.',
@@ -111,11 +111,47 @@ export const LEGACY_STORE_COMBO_CODES = ['COMBO-660', 'COMBO-730', 'COMBO-1020']
 export const STORE_PAYMENT_OPTIONS = ['Efectivo', 'POS BAC', 'TRANSFERENCIA', 'LINK DE PAGO'];
 
 export const STORE_CATEGORIES = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'carniceria', label: 'Carniceria' },
-  { id: 'res', label: 'Res' },
-  { id: 'gallina', label: 'Gallina' },
-  { id: 'promociones', label: 'Promociones' },
+  {
+    id: 'todos',
+    label: 'Todos',
+    subcategories: [],
+  },
+  {
+    id: 'res',
+    label: 'Res',
+    subcategories: [
+      'Linea Gold',
+      'Linea Diaria',
+      'Linea Parrillera',
+      'Linea Practica y Tortas Hamburguesa',
+      'Visceras y Sopas',
+    ],
+  },
+  {
+    id: 'pollo',
+    label: 'Pollo',
+    subcategories: ['Pollo', 'Derivados'],
+  },
+  {
+    id: 'cerdo',
+    label: 'Cerdo',
+    subcategories: ['Cerdo'],
+  },
+  {
+    id: 'embutidos',
+    label: 'Embutidos',
+    subcategories: ['Embutidos'],
+  },
+  {
+    id: 'abarroteria',
+    label: 'Abarroteria',
+    subcategories: ['Salsas', 'Arroz', 'Carbones', 'Huevos', 'Basicos'],
+  },
+  {
+    id: 'promociones',
+    label: 'Promociones',
+    subcategories: ['Combos'],
+  },
 ];
 
 export const QUICK_WEIGHTS = [0.5, 1, 1.5, 2, 2.5];

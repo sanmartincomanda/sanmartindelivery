@@ -8,14 +8,15 @@ import {
   STORE_CATALOG_PATH,
   updateCatalogProduct,
 } from '../services/storeCatalog';
+import { STORE_CATEGORIES } from '../data/tiendaVirtual';
 
 const emptyProduct = {
   code: '',
   name: '',
   price: '',
   unit: 'lb',
-  category: 'carniceria',
-  subcategory: '',
+  category: 'res',
+  subcategory: 'Linea Diaria',
   active: true,
   promo: false,
   image: '',
@@ -51,6 +52,18 @@ export default function ConfiguracionView() {
     );
   }, [products, search]);
 
+  const catalogCategories = useMemo(
+    () => STORE_CATEGORIES.filter((category) => category.id !== 'todos'),
+    []
+  );
+
+  const selectedFormCategory = useMemo(
+    () => catalogCategories.find((category) => category.id === form.category) || catalogCategories[0],
+    [catalogCategories, form.category]
+  );
+
+  const formSubcategories = selectedFormCategory?.subcategories || [];
+
   const updateForm = (field, value) => {
     setForm((current) => ({
       ...current,
@@ -58,14 +71,26 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const updateCategory = (categoryId) => {
+    const nextCategory = catalogCategories.find((category) => category.id === categoryId);
+    setForm((current) => ({
+      ...current,
+      category: categoryId,
+      subcategory: nextCategory?.subcategories?.[0] || '',
+    }));
+  };
+
+  const getCategoryLabel = (categoryId) =>
+    catalogCategories.find((category) => category.id === categoryId)?.label || categoryId || '-';
+
   const editProduct = (product) => {
     setForm({
       code: product.code || '',
       name: product.name || '',
       price: product.price || '',
       unit: product.unit || 'lb',
-      category: product.category || 'carniceria',
-      subcategory: product.subcategory || '',
+      category: product.category || 'res',
+      subcategory: product.subcategory || 'Linea Diaria',
       active: product.active !== false,
       promo: Boolean(product.promo),
       image: product.image || '',
@@ -299,7 +324,7 @@ export default function ConfiguracionView() {
                       <div style={{ color: '#64748b', marginTop: 4 }}>{product.code}</div>
                     </td>
                     <td>
-                      <strong>{product.category || '-'}</strong>
+                      <strong>{getCategoryLabel(product.category)}</strong>
                       <div style={{ color: '#64748b', marginTop: 4 }}>{product.subcategory || '-'}</div>
                       {product.promo && (
                         <div style={{ marginTop: 6 }}>
@@ -388,18 +413,31 @@ export default function ConfiguracionView() {
               <option value="normal">Producto normal</option>
               <option value="promo">Promocion / combo</option>
             </select>
-            <input
-              className="cfg-input"
+            <select
+              className="cfg-select"
               value={form.category}
-              onChange={(event) => updateForm('category', event.target.value)}
-              placeholder="Categoria"
-            />
-            <input
-              className="cfg-input"
+              onChange={(event) => updateCategory(event.target.value)}
+            >
+              {catalogCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="cfg-select"
               value={form.subcategory}
               onChange={(event) => updateForm('subcategory', event.target.value)}
-              placeholder="Subcategoria"
-            />
+            >
+              {formSubcategories.map((subcategory) => (
+                <option key={subcategory} value={subcategory}>
+                  {subcategory}
+                </option>
+              ))}
+              {!formSubcategories.includes(form.subcategory) && form.subcategory && (
+                <option value={form.subcategory}>{form.subcategory}</option>
+              )}
+            </select>
             <textarea
               className="cfg-textarea"
               value={form.description}

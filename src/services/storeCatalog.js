@@ -4,18 +4,54 @@ import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 
-const normalizeCatalogProduct = (product, fallback = {}) => ({
-  code: String(product.code ?? fallback.code ?? '').trim(),
-  name: String(product.name ?? fallback.name ?? '').trim(),
-  price: Number(product.price ?? fallback.price ?? 0),
-  unit: String(product.unit ?? fallback.unit ?? 'lb').trim() || 'lb',
-  category: String(product.category ?? fallback.category ?? 'carniceria').trim() || 'carniceria',
-  subcategory: String(product.subcategory ?? fallback.subcategory ?? '').trim(),
-  active: product.active ?? fallback.active ?? true,
-  promo: Boolean(product.promo ?? fallback.promo),
-  image: String(product.image ?? fallback.image ?? '').trim(),
-  description: String(product.description ?? fallback.description ?? '').trim(),
-});
+const normalizeCategoryValue = (category, subcategory) => {
+  const rawCategory = String(category || '').trim().toLowerCase();
+  const rawSubcategory = String(subcategory || '').trim().toLowerCase();
+
+  if (rawCategory === 'carniceria') {
+    if (rawSubcategory.includes('gallina') || rawSubcategory.includes('pollo')) {
+      return 'pollo';
+    }
+
+    return 'res';
+  }
+
+  return rawCategory || 'res';
+};
+
+const normalizeSubcategoryValue = (subcategory, category) => {
+  const cleanSubcategory = String(subcategory || '').trim();
+  const rawSubcategory = cleanSubcategory.toLowerCase();
+
+  if (category === 'res' && (!rawSubcategory || rawSubcategory === 'res')) {
+    return 'Linea Diaria';
+  }
+
+  if (category === 'pollo' && rawSubcategory === 'gallina') {
+    return 'Pollo';
+  }
+
+  return cleanSubcategory;
+};
+
+const normalizeCatalogProduct = (product, fallback = {}) => {
+  const rawCategory = product.category ?? fallback.category ?? 'res';
+  const rawSubcategory = product.subcategory ?? fallback.subcategory ?? '';
+  const category = normalizeCategoryValue(rawCategory, rawSubcategory);
+
+  return {
+    code: String(product.code ?? fallback.code ?? '').trim(),
+    name: String(product.name ?? fallback.name ?? '').trim(),
+    price: Number(product.price ?? fallback.price ?? 0),
+    unit: String(product.unit ?? fallback.unit ?? 'lb').trim() || 'lb',
+    category,
+    subcategory: normalizeSubcategoryValue(rawSubcategory, category),
+    active: product.active ?? fallback.active ?? true,
+    promo: Boolean(product.promo ?? fallback.promo),
+    image: String(product.image ?? fallback.image ?? '').trim(),
+    description: String(product.description ?? fallback.description ?? '').trim(),
+  };
+};
 
 export const mergeCatalogProducts = (remoteCatalog = {}) => {
   const byCode = new Map();
