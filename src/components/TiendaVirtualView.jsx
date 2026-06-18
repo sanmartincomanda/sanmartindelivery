@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { onValue, ref } from 'firebase/database';
+import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
@@ -472,6 +472,41 @@ export default function TiendaVirtualView({
     setProfileOpen(false);
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(STORE_SESSION_KEY);
+    }
+  };
+
+  const cancelCustomerOrder = async (order) => {
+    if (!order?.firebaseKey) {
+      alert('No pudimos encontrar este pedido para anularlo.');
+      return;
+    }
+
+    const confirmCancel = window.confirm(
+      `Quieres anular el pedido #${formatOrderNumber(order.id)}?`
+    );
+
+    if (!confirmCancel) {
+      return;
+    }
+
+    const now = new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' });
+    const cancelPayload = {
+      estado: 'Cancelado',
+      canceladoPor: 'Cliente tienda virtual',
+      timestampCancelado: now,
+      timestamp: Date.now(),
+    };
+
+    try {
+      await update(ref(database, `orders/${order.firebaseKey}`), cancelPayload);
+      setCreatedOrder((current) =>
+        current && (current.firebaseKey === order.firebaseKey || String(current.id) === String(order.id))
+          ? { ...current, ...cancelPayload }
+          : current
+      );
+    } catch (error) {
+      console.error('Error anulando pedido virtual:', error);
+      alert('No se pudo anular el pedido. Intenta escribirnos por WhatsApp.');
     }
   };
 
@@ -1472,6 +1507,24 @@ export default function TiendaVirtualView({
           text-decoration: none;
           box-shadow: 0 16px 30px rgba(22, 163, 74, 0.24);
         }
+        .store-cancel-order-button {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 10px;
+          border: 1px solid #fecaca;
+          border-radius: 999px;
+          background: #fff7f7;
+          color: #dc2626;
+          cursor: pointer;
+          font: inherit;
+          font-weight: 950;
+        }
         .store-status-pill {
           display: inline-flex;
           align-items: center;
@@ -1888,6 +1941,7 @@ export default function TiendaVirtualView({
           currentUser={currentUser}
           orders={customerOrders}
           createdOrder={createdOrder}
+          onCancelOrder={cancelCustomerOrder}
           onClose={() => setOrdersOpen(false)}
         />
       )}
@@ -2381,7 +2435,7 @@ function CheckoutSheet({
   );
 }
 
-function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
+function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose }) {
   const [showPreviousOrders, setShowPreviousOrders] = useState(false);
   const listedOrders = Array.isArray(orders) ? orders : [];
   const isSameCustomerOrder = (left, right) => {
@@ -2422,7 +2476,12 @@ function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
         {activeOrder ? (
           <>
             <div className="store-section-label">Pedido actual</div>
-            <OrderStatusCard order={activeOrder} currentUser={currentUser} highlight />
+            <OrderStatusCard
+              order={activeOrder}
+              currentUser={currentUser}
+              highlight
+              onCancelOrder={onCancelOrder}
+            />
           </>
         ) : (
           <div className="store-empty" style={{ marginTop: 12 }}>
@@ -2459,7 +2518,7 @@ function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
   );
 }
 
-function OrderStatusCard({ order, currentUser, highlight = false }) {
+function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder }) {
   const meta = getCustomerStatusMeta(order);
   const orderNumber = formatOrderNumber(order.id);
   const cookName = order.cocinero ? getShortPersonName(order.cocinero, order.cocinero) : 'Por asignar';
@@ -2467,6 +2526,9 @@ function OrderStatusCard({ order, currentUser, highlight = false }) {
     ? getShortPersonName(order.repartidor, order.repartidor)
     : 'Por asignar';
   const whatsappLink = buildOrderWhatsAppLink(order, currentUser);
+  const statusKey = normalizeCustomerOrderStatus(order.estado);
+  const canCancelOrder =
+    typeof onCancelOrder === 'function' && !['cancelado', 'enviado'].includes(statusKey);
 
   return (
     <div
@@ -2554,6 +2616,16 @@ function OrderStatusCard({ order, currentUser, highlight = false }) {
       <a className="store-whatsapp-button" href={whatsappLink} target="_blank" rel="noreferrer">
         💬 Escribir a WhatsApp de la tienda
       </a>
+
+      {canCancelOrder && (
+        <button
+          type="button"
+          className="store-cancel-order-button"
+          onClick={() => onCancelOrder(order)}
+        >
+          Anular pedido
+        </button>
+      )}
     </div>
   );
 }
