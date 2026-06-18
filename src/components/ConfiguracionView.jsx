@@ -2,8 +2,13 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase';
 import {
+  applySicarCatalogProductsWithOptions,
+  getCatalogProductKey,
+  getCurrentCatalogMap,
+  isSicarManagedProduct,
   mergeCatalogProducts,
   saveCatalogProduct,
+  SICAR_CATALOG_SYNC_BATCH_SIZE,
   seedDefaultCatalogIfEmpty,
   STORE_CATALOG_PATH,
   updateCatalogProduct,
@@ -12,6 +17,7 @@ import {
   mergeStoreCategories,
   saveStoreCategory,
   seedDefaultStoreCategoriesIfEmpty,
+  syncStoreCategoriesFromCatalogProducts,
   STORE_CATEGORIES_PATH,
   updateStoreCategory,
 } from '../services/storeCategories';
@@ -38,6 +44,12 @@ import {
   saveKitchenUser,
   SYSTEM_USERS_PATH,
 } from '../services/systemUsers';
+import {
+  compressImportedCatalogImage,
+  fetchSicarCatalogSelection,
+  fetchSicarProductImage,
+  getSicarBridgeHealth,
+} from '../services/sicarCatalog';
 
 const COUPONS_PIN = '210397';
 
@@ -89,6 +101,48 @@ const emptyKitchenForm = {
   active: true,
 };
 
+const formatSicarNumber = (value, maximumFractionDigits = 2) =>
+  new Intl.NumberFormat('es-NI', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  }).format(Number(value || 0));
+
+const formatSicarDate = (value) => {
+  if (!value) {
+    return '-';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat('es-NI', {
+    dateStyle: 'medium',
+  }).format(parsed);
+};
+
+const waitForUiPaint = () =>
+  new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      setTimeout(resolve, 0);
+      return;
+    }
+
+    window.requestAnimationFrame(() => resolve());
+  });
+
+const chunkArray = (items = [], size = 1) => {
+  const chunkSize = Math.max(1, Number(size || 1));
+  const chunks = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+};
+
 export default function ConfiguracionView() {
   const [section, setSection] = useState('catalogo');
   const [usersTab, setUsersTab] = useState('administrativo');
@@ -112,6 +166,11 @@ export default function ConfiguracionView() {
   const [savingDriver, setSavingDriver] = useState(false);
   const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
+  const [syncingSicar, setSyncingSicar] = useState(false);
+  const [testingSicar, setTestingSicar] = useState(false);
+  const [loadingSicarPreview, setLoadingSicarPreview] = useState(false);
+  const [sicarHealth, setSicarHealth] = useState(null);
+  const [sicarPreview, setSicarPreview] = useState(null);
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
@@ -211,9 +270,30 @@ export default function ConfiguracionView() {
       [user.nombre, user.telefono, user.codigo, user.direccion]
         .join(' ')
         .toLowerCase()
-        .includes(query)
+      .includes(query)
     );
   }, [storeUsers, userSearch]);
+
+  const sicarPreviewGroups = useMemo(() => {
+    if (!sicarPreview) {
+      return [];
+    }
+
+    const productsByCategory = new Map();
+    (sicarPreview.products || []).forEach((product) => {
+      const categoryId = String(product.category || '').trim();
+      if (!productsByCategory.has(categoryId)) {
+        productsByCategory.set(categoryId, []);
+      }
+
+      productsByCategory.get(categoryId).push(product);
+    });
+
+    return (sicarPreview.summary || []).map((item) => ({
+      ...item,
+      products: productsByCategory.get(String(item.storeCategory || '').trim()) || [],
+    }));
+  }, [sicarPreview]);
 
   const catalogCategories = useMemo(() => {
     if (form.category && !activeCategories.some((category) => category.id === form.category)) {
@@ -368,10 +448,11 @@ export default function ConfiguracionView() {
     setMessage('');
 
     try {
+      const existingProduct = products.find((product) => product.code === form.code) || null;
       await saveCatalogProduct({
         ...form,
         price: Number(form.price || 0),
-      });
+      }, existingProduct);
       setMessage('Producto guardado.');
     } catch (error) {
       console.error('Error guardando producto:', error);
@@ -619,6 +700,145 @@ export default function ConfiguracionView() {
     }
   };
 
+  const testSicarConnection = async () => {
+    setTestingSicar(true);
+    setMessage('Probando conexion con SICAR...');
+
+    try {
+      const health = await getSicarBridgeHealth();
+      setSicarHealth(health);
+      setMessage(
+        `Conexion SICAR OK. Puente activo en puerto ${health.bridgePort} para base ${health.database}.`
+      );
+    } catch (error) {
+      console.error('Error probando conexion SICAR:', error);
+      setMessage(
+        `No se pudo conectar con SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
+      );
+    } finally {
+      setTestingSicar(false);
+    }
+  };
+
+  const loadSicarPreview = async () => {
+    setLoadingSicarPreview(true);
+    setMessage('Generando vista previa SICAR... esto puede tardar entre 10 y 20 segundos.');
+
+    try {
+      const health = await getSicarBridgeHealth();
+      setSicarHealth(health);
+      const payload = await fetchSicarCatalogSelection();
+      setSicarPreview(payload);
+      setMessage(
+        `Vista previa SICAR lista. ${payload.products?.length || 0} SKUs en ${payload.summary?.length || 0} categorias.`
+      );
+    } catch (error) {
+      console.error('Error cargando vista previa SICAR:', error);
+      setMessage(
+        `No se pudo cargar la vista previa SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
+      );
+    } finally {
+      setLoadingSicarPreview(false);
+    }
+  };
+
+  const applySicarCatalog = async (previewPayload = null) => {
+    setSyncingSicar(true);
+    setMessage('Aplicando catalogo SICAR... importando SKUs, categorias y fotos. Esto puede tardar unos momentos.');
+
+    try {
+      const health = await getSicarBridgeHealth();
+      setSicarHealth(health);
+      const payload = previewPayload || (await fetchSicarCatalogSelection());
+      const currentCatalogMap = await getCurrentCatalogMap();
+      const catalogProducts = Array.isArray(payload.products) ? payload.products : [];
+      const totalProducts = catalogProducts.length;
+      const imageCandidates = catalogProducts.filter((importedProduct) => {
+        const productKey = getCatalogProductKey(importedProduct.code);
+        const existingProduct = currentCatalogMap[productKey] || {};
+        const imageIsManual = Boolean(existingProduct?.sync?.overrides?.image);
+        const sameImageHash =
+          String(existingProduct?.sync?.sicarImageHash || '').trim() &&
+          String(existingProduct?.sync?.sicarImageHash || '').trim() ===
+            String(importedProduct?.sicar?.imageHash || '').trim();
+
+        return !imageIsManual && importedProduct?.sicar?.hasImage && !sameImageHash;
+      }).length;
+      let importedImages = 0;
+      const importedProducts = [];
+      const productBatches = chunkArray(catalogProducts, 10);
+
+      for (let batchIndex = 0; batchIndex < productBatches.length; batchIndex += 1) {
+        const batch = productBatches[batchIndex];
+        const batchResults = await Promise.all(
+          batch.map(async (importedProduct) => {
+            const productKey = getCatalogProductKey(importedProduct.code);
+            const existingProduct = currentCatalogMap[productKey] || {};
+            const imageIsManual = Boolean(existingProduct?.sync?.overrides?.image);
+            const sameImageHash =
+              String(existingProduct?.sync?.sicarImageHash || '').trim() &&
+              String(existingProduct?.sync?.sicarImageHash || '').trim() ===
+                String(importedProduct?.sicar?.imageHash || '').trim();
+            let nextImage = String(existingProduct?.image || '').trim();
+            let importedImageCount = 0;
+
+            if (!imageIsManual && importedProduct?.sicar?.hasImage && !sameImageHash) {
+              try {
+                const remoteImage = await fetchSicarProductImage(importedProduct.code);
+                nextImage = await compressImportedCatalogImage(remoteImage.dataUrl);
+                importedImageCount = 1;
+              } catch (error) {
+                console.error(`No se pudo importar la imagen de ${importedProduct.code}:`, error);
+              }
+            } else if (!imageIsManual && !importedProduct?.sicar?.hasImage) {
+              nextImage = String(existingProduct?.image || '').trim();
+            }
+
+            return {
+              product: {
+                ...importedProduct,
+                image: nextImage,
+              },
+              importedImageCount,
+            };
+          })
+        );
+
+        batchResults.forEach(({ product, importedImageCount }) => {
+          importedProducts.push(product);
+          importedImages += importedImageCount;
+        });
+
+        setMessage(
+          `Preparando catalogo SICAR... ${importedProducts.length}/${totalProducts} SKUs listos y ${importedImages}/${imageCandidates} fotos importadas.`
+        );
+        await waitForUiPaint();
+      }
+
+      setMessage('Sincronizando categorias SICAR con la tienda...');
+      const categoryCount = await syncStoreCategoriesFromCatalogProducts(importedProducts);
+      setMessage(`Guardando catalogo SICAR en tienda... 0/${importedProducts.length} SKUs aplicados.`);
+      const { appliedCount } = await applySicarCatalogProductsWithOptions(importedProducts, {
+        currentMap: currentCatalogMap,
+        batchSize: SICAR_CATALOG_SYNC_BATCH_SIZE,
+        onProgress: ({ processed, total }) => {
+          setMessage(`Guardando catalogo SICAR en tienda... ${processed}/${total} SKUs aplicados.`);
+        },
+      });
+      setSicarPreview(null);
+      setMessage(
+        `Catalogo SICAR aplicado. ${appliedCount} SKUs actualizados, ${categoryCount} categorias sincronizadas y ${importedImages} fotos importadas.`
+      );
+    } catch (error) {
+      console.error('Error aplicando catalogo SICAR:', error);
+      setMessage(
+        `No se pudo aplicar el catalogo SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
+      );
+    } finally {
+      setSyncingSicar(false);
+    }
+  };
+
   const sectionMeta = {
     catalogo: {
       path: 'Configuraciones / Tienda Virtual / Catalogo',
@@ -842,9 +1062,40 @@ export default function ConfiguracionView() {
             </h1>
           </div>
           {section === 'catalogo' && (
-            <button type="button" className="cfg-button secondary" onClick={seedCatalog} disabled={saving}>
-              Inicializar catalogo base
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="cfg-button secondary"
+                onClick={seedCatalog}
+                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar}
+              >
+                Inicializar catalogo base
+              </button>
+              <button
+                type="button"
+                className="cfg-button secondary"
+                onClick={testSicarConnection}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar}
+              >
+                {testingSicar ? 'Probando conexion...' : 'Probar conexion SICAR'}
+              </button>
+              <button
+                type="button"
+                className="cfg-button"
+                onClick={loadSicarPreview}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar}
+              >
+                {loadingSicarPreview ? 'Cargando vista previa...' : 'Vista previa 90% SICAR'}
+              </button>
+              <button
+                type="button"
+                className="cfg-button"
+                onClick={() => applySicarCatalog(sicarPreview)}
+                disabled={!sicarPreview || testingSicar || loadingSicarPreview || syncingSicar}
+              >
+                {syncingSicar ? 'Aplicando SICAR...' : 'Aplicar catalogo SICAR'}
+              </button>
+            </div>
           )}
           {section === 'entregadores' && (
             <button type="button" className="cfg-button secondary" onClick={seedDrivers} disabled={savingDriver}>
@@ -865,6 +1116,47 @@ export default function ConfiguracionView() {
             }}
           >
             {message}
+          </div>
+        )}
+
+        {section === 'catalogo' && (sicarHealth || sicarPreview) && (
+          <div
+            style={{
+              marginTop: 16,
+              padding: 14,
+              borderRadius: 12,
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              display: 'grid',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <strong style={{ color: '#1d4ed8' }}>Estado SICAR</strong>
+              {sicarPreview?.generatedAt && (
+                <span style={{ color: '#1e3a8a', fontWeight: 800 }}>
+                  Vista previa generada: {formatSicarDate(sicarPreview.generatedAt)}
+                </span>
+              )}
+            </div>
+            {sicarHealth && (
+              <div style={{ color: '#1e3a8a', fontWeight: 700, lineHeight: 1.5 }}>
+                Bridge local activo en puerto {sicarHealth.bridgePort}. Base detectada: {sicarHealth.database} en{' '}
+                {sicarHealth.host}.
+              </div>
+            )}
+            {sicarPreview && (
+              <div style={{ color: '#1e3a8a', fontWeight: 700, lineHeight: 1.5 }}>
+                Reglas activas: {sicarPreview.rules?.thresholdPct || 0}% acumulado por categoria, categorias con al
+                menos {sicarPreview.rules?.minOverallSharePct || 0}% del total general, y {sicarPreview.products?.length || 0}{' '}
+                SKUs seleccionados para aplicar.
+              </div>
+            )}
+            {!sicarPreview && (
+              <div style={{ color: '#1e3a8a', fontWeight: 700, lineHeight: 1.5 }}>
+                Primero genera la vista previa 90% para habilitar el boton Aplicar catalogo SICAR.
+              </div>
+            )}
           </div>
         )}
 
@@ -1064,6 +1356,14 @@ export default function ConfiguracionView() {
                     <td>
                       <strong>{product.name}</strong>
                       <div style={{ color: '#64748b', marginTop: 4 }}>{product.code}</div>
+                      {isSicarManagedProduct(product) && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                          <span className="cfg-badge">SICAR</span>
+                          {product.sync?.overrides?.name && <span className="cfg-badge">Nombre manual</span>}
+                          {product.sync?.overrides?.price && <span className="cfg-badge">Precio manual</span>}
+                          {product.sync?.overrides?.image && <span className="cfg-badge">Foto manual</span>}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <strong>{getCategoryLabel(product.category)}</strong>
@@ -1108,6 +1408,22 @@ export default function ConfiguracionView() {
             }}
           >
             <h2 style={{ margin: 0, fontSize: 22 }}>Producto</h2>
+            {isSicarManagedProduct(products.find((product) => product.code === form.code)) && (
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 8,
+                  background: '#fff7ed',
+                  border: '1px solid #fed7aa',
+                  color: '#9a3412',
+                  fontWeight: 800,
+                  lineHeight: 1.5,
+                }}
+              >
+                Este SKU esta sincronizado con SICAR. Si cambias nombre, precio o foto aqui, esos campos quedaran
+                protegidos y no se sobreescribiran en la proxima actualizacion.
+              </div>
+            )}
             <input
               className="cfg-input"
               value={form.code}
@@ -1263,6 +1579,192 @@ export default function ConfiguracionView() {
             toggleCoupon={toggleCoupon}
             resetCouponForm={() => setCouponForm(emptyCoupon)}
           />
+        )}
+
+        {sicarPreview && (
+          <div
+            className="cfg-driver-modal-overlay"
+            onClick={() => {
+              if (!syncingSicar) {
+                setSicarPreview(null);
+              }
+            }}
+          >
+            <div
+              className="cfg-driver-modal"
+              style={{ width: 'min(1120px, 100%)' }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+                    Vista previa antes de aplicar
+                  </div>
+                  <h2 style={{ margin: '6px 0 0', fontSize: 28 }}>Catalogo SICAR 90%</h2>
+                  <p style={{ margin: '8px 0 0', color: '#475569', fontWeight: 700, lineHeight: 1.5 }}>
+                    Solo se muestran categorias con al menos {sicarPreview.rules?.minOverallSharePct || 0}% del total
+                    vendido. Dentro de cada categoria se toman SKUs hasta cubrir {sicarPreview.rules?.thresholdPct || 0}
+                    % acumulado de venta.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'start' }}>
+                  <button
+                    type="button"
+                    className="cfg-button secondary"
+                    onClick={() => setSicarPreview(null)}
+                    disabled={syncingSicar}
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    className="cfg-button"
+                    onClick={() => applySicarCatalog(sicarPreview)}
+                    disabled={syncingSicar}
+                  >
+                    {syncingSicar ? 'Aplicando SICAR...' : 'Aplicar catalogo SICAR'}
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 12,
+                  marginTop: 20,
+                }}
+              >
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                    Total SKU
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 28, fontWeight: 900 }}>
+                    {formatSicarNumber(sicarPreview.products?.length || 0, 0)}
+                  </div>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                    Categorias
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 28, fontWeight: 900 }}>
+                    {formatSicarNumber(sicarPreview.summary?.length || 0, 0)}
+                  </div>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                    Ventana
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 16, fontWeight: 900 }}>
+                    {formatSicarDate(sicarPreview.dateWindow?.startDate)} al{' '}
+                    {formatSicarDate(sicarPreview.dateWindow?.endInclusiveDate)}
+                  </div>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 14, background: '#f8fafc' }}>
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                    Venta total
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 28, fontWeight: 900 }}>
+                    {formatSicarNumber(sicarPreview.totalOverallQuantity || 0, 2)}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: 12,
+                  marginTop: 20,
+                }}
+              >
+                {sicarPreviewGroups.map((group) => (
+                  <div
+                    key={group.storeCategory}
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 16,
+                      padding: 14,
+                      background: '#ffffff',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
+                      <div>
+                        <strong style={{ fontSize: 18 }}>{group.storeCategoryLabel}</strong>
+                        <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                          {group.selectedSkuCount} de {group.soldSkuCount} SKUs vendidos
+                        </div>
+                      </div>
+                      <span className="cfg-badge">{group.overallSharePct}% del total</span>
+                    </div>
+                    <div style={{ marginTop: 10, color: '#475569', fontSize: 13, lineHeight: 1.5 }}>
+                      Subcategorias: {group.subcategories?.join(' | ') || 'Sin subcategorias'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 22, display: 'grid', gap: 16 }}>
+                {sicarPreviewGroups.map((group) => (
+                  <section
+                    key={`${group.storeCategory}-products`}
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 16,
+                      padding: 14,
+                      background: '#ffffff',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: 20 }}>{group.storeCategoryLabel}</h3>
+                        <p style={{ margin: '6px 0 0', color: '#64748b', fontWeight: 700 }}>
+                          {group.selectedSkuCount} SKUs que entrarian a la tienda virtual.
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <span className="cfg-badge">{group.overallSharePct}% del total</span>
+                        <span className="cfg-badge">{group.subcategories?.length || 0} subcategorias</span>
+                      </div>
+                    </div>
+
+                    <div style={{ overflowX: 'auto', marginTop: 14 }}>
+                      <table className="cfg-table">
+                        <thead>
+                          <tr>
+                            <th>Codigo</th>
+                            <th>Descripcion</th>
+                            <th>Subcategoria</th>
+                            <th>Precio</th>
+                            <th>Venta 90d</th>
+                            <th>Foto SICAR</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.products.map((product) => (
+                            <tr key={product.code}>
+                              <td>{product.code}</td>
+                              <td>
+                                <strong>{product.name}</strong>
+                              </td>
+                              <td>{product.subcategory || '-'}</td>
+                              <td>C$ {Number(product.price || 0).toFixed(2)}</td>
+                              <td>{formatSicarNumber(product.sicar?.quantitySold90d || 0, 2)}</td>
+                              <td>
+                                <span className={`cfg-badge ${product.sicar?.hasImage ? '' : 'off'}`}>
+                                  {product.sicar?.hasImage ? 'Disponible' : 'Sin foto'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

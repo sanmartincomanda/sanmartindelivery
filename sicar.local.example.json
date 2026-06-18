@@ -1,0 +1,9 @@
+{
+  "host": "127.0.0.1",
+  "port": 3307,
+  "database": "sicar",
+  "user": "root",
+  "password": "REEMPLAZAR",
+  "mysqlExePath": "C:\\Program Files (x86)\\SICAR-S-131AB\\MySQL\\MySQL Server 5.6\\bin\\mysql.exe",
+  "bridgePort": 3077
+}

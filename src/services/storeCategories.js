@@ -93,3 +93,72 @@ export async function seedDefaultStoreCategoriesIfEmpty() {
   await set(ref(database, STORE_CATEGORIES_PATH), updates);
   return true;
 }
+
+export const buildStoreCategoriesFromCatalogProducts = (products = []) => {
+  const byId = new Map();
+
+  products.forEach((product, index) => {
+    const categoryId = normalizeId(product?.category);
+    if (!categoryId) {
+      return;
+    }
+
+    const categoryLabel = String(product?.categoryLabel || product?.category || '').trim() || categoryId;
+    const subcategory = String(product?.subcategory || '').trim();
+    const current = byId.get(categoryId) || {
+      id: categoryId,
+      label: categoryLabel,
+      subcategories: [],
+      active: true,
+      sortOrder: (index + 1) * 10,
+    };
+
+    if (subcategory && !current.subcategories.includes(subcategory)) {
+      current.subcategories.push(subcategory);
+    }
+
+    if (!current.label && categoryLabel) {
+      current.label = categoryLabel;
+    }
+
+    byId.set(categoryId, current);
+  });
+
+  return Array.from(byId.values()).sort(
+    (left, right) => Number(left.sortOrder || 0) - Number(right.sortOrder || 0) ||
+      String(left.label || '').localeCompare(String(right.label || ''))
+  );
+};
+
+export async function syncStoreCategoriesFromCatalogProducts(products = []) {
+  const importedCategories = buildStoreCategoriesFromCatalogProducts(products);
+  if (importedCategories.length === 0) {
+    return 0;
+  }
+
+  const snapshot = await get(ref(database, STORE_CATEGORIES_PATH));
+  const currentCategories = mergeStoreCategories(snapshot.val());
+  const currentById = new Map(currentCategories.map((category) => [category.id, category]));
+  const updates = {};
+
+  importedCategories.forEach((category, index) => {
+    const existing = currentById.get(category.id);
+    const normalized = normalizeStoreCategory(
+      {
+        ...existing,
+        ...category,
+        active: existing?.active ?? true,
+        sortOrder: existing?.sortOrder ?? (index + 1) * 10,
+        subcategories: Array.from(
+          new Set([...(existing?.subcategories || []), ...(category.subcategories || [])])
+        ),
+      },
+      existing
+    );
+
+    updates[getStoreCategoryKey(normalized.id)] = normalized;
+  });
+
+  await update(ref(database, STORE_CATEGORIES_PATH), updates);
+  return importedCategories.length;
+}

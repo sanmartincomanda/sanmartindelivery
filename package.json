@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sicar:bridge": "node scripts/sicarBridgeServer.mjs"
   },
   "dependencies": {
     "firebase": "^11.9.0",
