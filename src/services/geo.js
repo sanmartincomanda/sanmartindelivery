@@ -1,6 +1,7 @@
 export const normalizeLocation = (location = {}) => {
-  const lat = Number(location.lat ?? location.latitude);
-  const lng = Number(location.lng ?? location.longitude);
+  const source = location || {};
+  const lat = Number(source.lat ?? source.latitude);
+  const lng = Number(source.lng ?? source.longitude);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return null;
@@ -9,9 +10,9 @@ export const normalizeLocation = (location = {}) => {
   return {
     lat,
     lng,
-    label: String(location.label || location.address || '').trim(),
+    label: String(source.label || source.address || '').trim(),
     mapsUrl: buildGoogleMapsPlaceUrlFromCoords(lat, lng),
-    updatedAt: Number(location.updatedAt || Date.now()),
+    updatedAt: Number(source.updatedAt || Date.now()),
   };
 };
 
