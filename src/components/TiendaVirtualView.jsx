@@ -143,7 +143,7 @@ const buildOrderItemsMessage = (order = {}) => {
   return order.items
     .map((item) => {
       const quantity = formatStoreQuantity(item.cantidad, item.unidad);
-      return `- ${quantity} ${item.unidad || ''} ${item.nombre || ''}`.trim();
+      return `* ${quantity} ${item.unidad || ''} ${item.nombre || ''}`.trim();
     })
     .join('\n');
 };
@@ -155,7 +155,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
 
   return [
     'Hola Carnes San Martin Granada.',
-    'Tengo este pedido en linea pero me gustaria cambiar tal cosa:',
+    'Tengo este pedido en linea',
     `Pedido #${orderNumber}`,
     `Cliente: ${customerName}`,
     customerPhone ? `Telefono: ${customerPhone}` : '',
