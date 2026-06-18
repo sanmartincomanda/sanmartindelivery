@@ -297,6 +297,19 @@ export default function ConfiguracionView() {
     });
   };
 
+  const linkDriverToUser = (driver) => {
+    setDriverForm((current) => ({
+      ...current,
+      code: driver.code || '',
+      name: driver.name || '',
+      phone: driver.phone || current.phone || '',
+      active: driver.active !== false,
+      sortOrder: driver.sortOrder ?? current.sortOrder,
+      password: current.code === driver.code ? current.password : '',
+    }));
+    setMessage(`Usuario Driver vinculado a ${driver.name || driver.code}. Define la contrasena y guarda.`);
+  };
+
   const handleImageFile = (event) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -646,6 +659,83 @@ export default function ConfiguracionView() {
         .cfg-badge.off {
           background: #fee2e2;
           color: #b91c1c;
+        }
+        .cfg-driver-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background: rgba(15, 23, 42, 0.68);
+          backdrop-filter: blur(5px);
+        }
+        .cfg-driver-modal {
+          width: min(680px, 100%);
+          max-height: calc(100vh - 36px);
+          overflow: auto;
+          border-radius: 24px;
+          padding: 24px;
+          background: #ffffff;
+          box-shadow: 0 28px 80px rgba(15, 23, 42, 0.32);
+        }
+        .cfg-driver-picker-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+          gap: 12px;
+          margin-top: 18px;
+        }
+        .cfg-driver-picker-card {
+          min-height: 126px;
+          border: 2px solid #e2e8f0;
+          border-radius: 18px;
+          padding: 14px 10px;
+          background: #f8fafc;
+          color: #475569;
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          font: inherit;
+          text-align: center;
+          transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .cfg-driver-picker-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        }
+        .cfg-driver-picker-card.selected {
+          border-color: #6366f1;
+          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+          color: #ffffff;
+          box-shadow: 0 16px 34px rgba(99, 102, 241, 0.28);
+        }
+        .cfg-driver-picker-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.72);
+          color: #4f46e5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 950;
+          text-transform: uppercase;
+        }
+        .cfg-driver-picker-card strong {
+          font-size: 14px;
+          line-height: 1.2;
+        }
+        .cfg-driver-picker-card small,
+        .cfg-driver-picker-card em {
+          font-size: 12px;
+          font-style: normal;
+          font-weight: 850;
+          opacity: 0.82;
         }
         @media (max-width: 980px) {
           .cfg-grid {
@@ -1062,6 +1152,7 @@ export default function ConfiguracionView() {
             updateDriverForm={updateDriverForm}
             saveDeliveryDriver={saveDeliveryDriver}
             editDriver={editDriver}
+            linkDriverToUser={linkDriverToUser}
             toggleDriver={toggleDriver}
             resetDriverForm={() => setDriverForm(emptyDriver)}
           />
@@ -1093,9 +1184,31 @@ function DriversManager({
   updateDriverForm,
   saveDeliveryDriver,
   editDriver,
+  linkDriverToUser,
   toggleDriver,
   resetDriverForm,
 }) {
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [selectedDriverCode, setSelectedDriverCode] = useState(driverForm.code || '');
+
+  useEffect(() => {
+    setSelectedDriverCode(driverForm.code || '');
+  }, [driverForm.code]);
+
+  const chooseDriver = (driver) => {
+    setSelectedDriverCode(driver.code);
+  };
+
+  const confirmDriverLink = () => {
+    const selectedDriver = drivers.find((driver) => driver.code === selectedDriverCode);
+    if (!selectedDriver) {
+      return;
+    }
+
+    linkDriverToUser(selectedDriver);
+    setSelectorOpen(false);
+  };
+
   return (
     <div
       className="cfg-grid"
@@ -1177,7 +1290,38 @@ function DriversManager({
           gap: 10,
         }}
       >
-        <h2 style={{ margin: 0, fontSize: 22 }}>Entregador</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Usuario Driver</h2>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.45 }}>
+              Vincula el usuario con el mismo entregador que se selecciona en Lista de Pedidos.
+            </p>
+          </div>
+          <button type="button" className="cfg-button secondary" onClick={() => setSelectorOpen(true)}>
+            Elegir entregador
+          </button>
+        </div>
+
+        {driverForm.code && (
+          <div
+            style={{
+              border: '1px solid #dbeafe',
+              borderRadius: 12,
+              padding: 12,
+              background: '#eff6ff',
+              color: '#1d4ed8',
+              fontWeight: 900,
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 10,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>Vinculado a: {driverForm.name || 'Sin nombre'}</span>
+            <span>{driverForm.code}</span>
+          </div>
+        )}
+
         <input
           className="cfg-input"
           value={driverForm.code}
@@ -1233,6 +1377,56 @@ function DriversManager({
           </button>
         </div>
       </form>
+
+      {selectorOpen && (
+        <div
+          className="cfg-driver-modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectorOpen(false);
+            }
+          }}
+        >
+          <div className="cfg-driver-modal">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 24 }}>Seleccionar entregador</h2>
+                <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
+                  Es la misma lista que aparece al asignar un pedido.
+                </p>
+              </div>
+              <button type="button" className="cfg-button secondary" onClick={() => setSelectorOpen(false)}>
+                Cerrar
+              </button>
+            </div>
+
+            <div className="cfg-driver-picker-grid">
+              {drivers.map((driver) => (
+                <button
+                  key={driver.code}
+                  type="button"
+                  className={`cfg-driver-picker-card ${selectedDriverCode === driver.code ? 'selected' : ''}`}
+                  onClick={() => chooseDriver(driver)}
+                >
+                  <span className="cfg-driver-picker-icon">Moto</span>
+                  <strong>{driver.name}</strong>
+                  <small>{driver.code}</small>
+                  <em>{driver.active === false ? 'Inactivo' : 'Activo'}</em>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button type="button" className="cfg-button secondary" style={{ flex: 1 }} onClick={() => setSelectorOpen(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="cfg-button" style={{ flex: 2 }} onClick={confirmDriverLink} disabled={!selectedDriverCode}>
+                Vincular usuario
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
