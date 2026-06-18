@@ -12,6 +12,12 @@ import {
   STORE_CATEGORIES_PATH,
 } from '../services/storeCategories';
 import {
+  calculateCouponDiscount,
+  mergeStoreCoupons,
+  normalizeCouponCode,
+  STORE_COUPONS_PATH,
+} from '../services/storeCoupons';
+import {
   cleanStorePhone,
   loginStoreUser,
   registerStoreUser,
@@ -171,7 +177,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
     `Cliente: ${customerName}`,
     customerPhone ? `Telefono: ${customerPhone}` : '',
     `Estado actual: ${order.estado || 'Pendiente'}`,
-    `Total: ${formatCurrency(order.total)}`,
+    `Total aproximado: ${formatCurrency(order.total)}`,
     'Productos:',
     buildOrderItemsMessage(order),
   ]
@@ -191,7 +197,11 @@ export default function TiendaVirtualView({
 }) {
   const [catalog, setCatalog] = useState(() => mergeCatalogProducts());
   const [categories, setCategories] = useState(() => mergeStoreCategories());
+  const [coupons, setCoupons] = useState([]);
   const [cart, setCart] = useState({});
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponMessage, setCouponMessage] = useState('');
   const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('todos');
@@ -251,6 +261,14 @@ export default function TiendaVirtualView({
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
       setCategories(mergeStoreCategories(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
+      setCoupons(mergeStoreCoupons(snapshot.val()));
     });
 
     return () => unsubscribe();
@@ -401,7 +419,57 @@ export default function TiendaVirtualView({
     [cartItems]
   );
 
+  const couponDiscount = useMemo(
+    () => calculateCouponDiscount(appliedCoupon, totalAmount),
+    [appliedCoupon, totalAmount]
+  );
+
+  const approximateTotalAmount = useMemo(
+    () => Number(Math.max(totalAmount - couponDiscount, 0).toFixed(2)),
+    [couponDiscount, totalAmount]
+  );
+
   const cartCount = cartItems.length;
+
+  useEffect(() => {
+    if (cartItems.length === 0 && appliedCoupon) {
+      setAppliedCoupon(null);
+      setCouponInput('');
+      setCouponMessage('');
+    }
+  }, [appliedCoupon, cartItems.length]);
+
+  useEffect(() => {
+    if (!appliedCoupon) {
+      return;
+    }
+
+    const refreshedCoupon = coupons.find((coupon) => coupon.code === appliedCoupon.code);
+    if (!refreshedCoupon || refreshedCoupon.active === false) {
+      setAppliedCoupon(null);
+      setCouponMessage('Este cupon ya no esta disponible.');
+      return;
+    }
+
+    if (JSON.stringify(refreshedCoupon) !== JSON.stringify(appliedCoupon)) {
+      setAppliedCoupon(refreshedCoupon);
+    }
+  }, [appliedCoupon, coupons]);
+
+  useEffect(() => {
+    if (!appliedCoupon) {
+      return;
+    }
+
+    if (appliedCoupon.minimum > 0 && totalAmount < appliedCoupon.minimum) {
+      setCouponMessage(`Este cupon aplica desde ${formatCurrency(appliedCoupon.minimum)}.`);
+      return;
+    }
+
+    if (couponDiscount > 0) {
+      setCouponMessage(`Cupon aplicado: -${formatCurrency(couponDiscount)}.`);
+    }
+  }, [appliedCoupon, couponDiscount, totalAmount]);
 
   const showQuantityNotice = (message) => {
     setQuantityNotice(message);
@@ -444,6 +512,44 @@ export default function TiendaVirtualView({
       ...current,
       [field]: value,
     }));
+  };
+
+  const applyCoupon = () => {
+    const code = normalizeCouponCode(couponInput);
+    if (!code) {
+      setCouponMessage('Ingresa un codigo de cupon.');
+      return;
+    }
+
+    const coupon = coupons.find((item) => item.code === code);
+    if (!coupon || coupon.active === false) {
+      setAppliedCoupon(null);
+      setCouponMessage('Cupon no encontrado o inactivo.');
+      return;
+    }
+
+    if (coupon.minimum > 0 && totalAmount < coupon.minimum) {
+      setAppliedCoupon(null);
+      setCouponMessage(`Este cupon aplica desde ${formatCurrency(coupon.minimum)}.`);
+      return;
+    }
+
+    const discount = calculateCouponDiscount(coupon, totalAmount);
+    if (discount <= 0) {
+      setAppliedCoupon(null);
+      setCouponMessage('Este cupon no genera descuento para este pedido.');
+      return;
+    }
+
+    setAppliedCoupon(coupon);
+    setCouponInput(coupon.code);
+    setCouponMessage(`Cupon aplicado: -${formatCurrency(discount)}.`);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponMessage('');
   };
 
   const updateAuthForm = (field, value) => {
@@ -636,7 +742,17 @@ export default function TiendaVirtualView({
           telefono: currentUser.telefono,
           referencia: currentUser.referencia,
           items: cartItems,
-          total: totalAmount,
+          subtotalEstimado: totalAmount,
+          descuentoCupon: couponDiscount,
+          cupon: appliedCoupon
+            ? {
+                code: appliedCoupon.code,
+                title: appliedCoupon.title,
+                type: appliedCoupon.type,
+                value: appliedCoupon.value,
+              }
+            : null,
+          total: approximateTotalAmount,
           observaciones: notes.trim(),
           metodoPago: customer.metodoPago,
         },
@@ -645,6 +761,9 @@ export default function TiendaVirtualView({
 
       setCreatedOrder(order);
       setCart({});
+      setAppliedCoupon(null);
+      setCouponInput('');
+      setCouponMessage('');
       setNotes('');
       setCheckoutOpen(false);
       setOrdersOpen(true);
@@ -1234,6 +1353,21 @@ export default function TiendaVirtualView({
           color: #111827;
           font-size: 18px;
         }
+        .store-floating-cart-total span {
+          display: block;
+          margin-top: 2px;
+          color: #047857;
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .store-floating-cart-total em {
+          display: block;
+          margin-top: 2px;
+          color: #9f6b70;
+          font-size: 11px;
+          font-style: normal;
+          font-weight: 800;
+        }
         .store-quantity-notice {
           position: fixed;
           left: 50%;
@@ -1361,6 +1495,7 @@ export default function TiendaVirtualView({
           gap: 10px;
         }
         .store-field,
+        .store-input,
         .store-textarea,
         .store-select {
           width: 100%;
@@ -1375,6 +1510,67 @@ export default function TiendaVirtualView({
         .store-textarea {
           min-height: 88px;
           resize: vertical;
+        }
+        .store-coupon-card {
+          display: grid;
+          gap: 10px;
+          border: 1px solid #f1dfe0;
+          border-radius: 16px;
+          padding: 12px;
+          background: linear-gradient(135deg, rgba(123, 16, 34, 0.06), rgba(255, 247, 244, 0.82));
+        }
+        .store-coupon-card strong {
+          display: block;
+          color: #111827;
+        }
+        .store-coupon-card span,
+        .store-coupon-card p {
+          margin: 3px 0 0;
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .store-coupon-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 8px;
+        }
+        .store-coupon-discount,
+        .store-total-note div {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .store-coupon-discount {
+          border-top: 1px solid #ead8da;
+          padding-top: 8px;
+        }
+        .store-coupon-discount strong {
+          color: #047857;
+        }
+        .store-total-note {
+          border: 1px solid #fde2e2;
+          border-radius: 16px;
+          padding: 13px;
+          background: #fff7f4;
+        }
+        .store-total-note span {
+          color: #7b1022;
+          font-size: 13px;
+          font-weight: 950;
+          text-transform: uppercase;
+        }
+        .store-total-note strong {
+          color: #111827;
+          font-size: 22px;
+        }
+        .store-total-note p {
+          margin: 8px 0 0;
+          color: #7c5b5f;
+          font-size: 13px;
+          font-weight: 800;
+          line-height: 1.4;
         }
         .store-order-line {
           display: grid;
@@ -1874,7 +2070,8 @@ export default function TiendaVirtualView({
         <FloatingCart
           cartItems={cartItems}
           cartCount={cartCount}
-          totalAmount={totalAmount}
+          couponDiscount={couponDiscount}
+          approximateTotalAmount={approximateTotalAmount}
           onCheckout={() => setCheckoutOpen(true)}
           onQuantityChange={updateQuantity}
         />
@@ -1911,11 +2108,19 @@ export default function TiendaVirtualView({
           customer={customer}
           notes={notes}
           submitting={submitting}
+          appliedCoupon={appliedCoupon}
+          couponDiscount={couponDiscount}
+          couponInput={couponInput}
+          couponMessage={couponMessage}
+          approximateTotalAmount={approximateTotalAmount}
           totalAmount={totalAmount}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
+          onApplyCoupon={applyCoupon}
+          onCouponInputChange={setCouponInput}
           onEditProfile={() => setProfileOpen(true)}
           onNotesChange={setNotes}
+          onRemoveCoupon={removeCoupon}
           onSubmit={submitOrder}
         />
       )}
@@ -2174,7 +2379,14 @@ function QuantityInput({ value, step, className, onChange, ariaLabel }) {
   );
 }
 
-function FloatingCart({ cartItems, cartCount, totalAmount, onCheckout, onQuantityChange }) {
+function FloatingCart({
+  cartItems,
+  cartCount,
+  couponDiscount,
+  approximateTotalAmount,
+  onCheckout,
+  onQuantityChange,
+}) {
   return (
     <aside className="store-floating-cart" aria-label="Carrito flotante">
       <div className="store-floating-cart-head">
@@ -2233,8 +2445,10 @@ function FloatingCart({ cartItems, cartCount, totalAmount, onCheckout, onQuantit
 
       <div className="store-floating-cart-total">
         <div>
-          <small>Total</small>
-          <strong>{formatCurrency(totalAmount)}</strong>
+          <small>Total aproximado</small>
+          {couponDiscount > 0 && <span>-{formatCurrency(couponDiscount)} en cupon</span>}
+          <strong>{formatCurrency(approximateTotalAmount)}</strong>
+          <em>Puede variar por pesos exactos.</em>
         </div>
         <button type="button" className="store-button" onClick={onCheckout}>
           Confirmar
@@ -2325,11 +2539,19 @@ function CheckoutSheet({
   customer,
   notes,
   submitting,
+  appliedCoupon,
+  couponDiscount,
+  couponInput,
+  couponMessage,
+  approximateTotalAmount,
   totalAmount,
   onClose,
+  onApplyCoupon,
   onCustomerChange,
+  onCouponInputChange,
   onEditProfile,
   onNotesChange,
+  onRemoveCoupon,
   onSubmit,
 }) {
   return (
@@ -2356,12 +2578,60 @@ function CheckoutSheet({
           </div>
         ))}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 16px' }}>
-          <strong>Total</strong>
+        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
+          <strong>Subtotal estimado</strong>
           <strong>{formatCurrency(totalAmount)}</strong>
         </div>
 
         <form className="store-form" onSubmit={onSubmit}>
+          <div className="store-coupon-card">
+            <div>
+              <strong>Cupon</strong>
+              <span>Si tienes un codigo promocional, aplicalo aqui.</span>
+            </div>
+            <div className="store-coupon-row">
+              <input
+                className="store-input"
+                value={couponInput}
+                onChange={(event) => onCouponInputChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onApplyCoupon();
+                  }
+                }}
+                placeholder="Codigo de cupon"
+              />
+              {appliedCoupon ? (
+                <button type="button" className="store-button secondary" onClick={onRemoveCoupon}>
+                  Quitar
+                </button>
+              ) : (
+                <button type="button" className="store-button secondary" onClick={onApplyCoupon}>
+                  Aplicar
+                </button>
+              )}
+            </div>
+            {couponMessage && <p>{couponMessage}</p>}
+            {couponDiscount > 0 && (
+              <div className="store-coupon-discount">
+                <span>{appliedCoupon?.code}</span>
+                <strong>-{formatCurrency(couponDiscount)}</strong>
+              </div>
+            )}
+          </div>
+
+          <div className="store-total-note">
+            <div>
+              <span>Total aproximado</span>
+              <strong>{formatCurrency(approximateTotalAmount)}</strong>
+            </div>
+            <p>
+              Puede variar por los pesos exactos de los productos. Se le actualizara el nuevo monto
+              cuando este listo el pedido.
+            </p>
+          </div>
+
           <div className="store-status-card" style={{ marginTop: 0 }}>
             <div className="store-status-pill">Entrega</div>
             <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
@@ -2555,7 +2825,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           </strong>
         </div>
         <div>
-          <span>Total</span>
+          <span>Total aproximado</span>
           <strong>{formatCurrency(order.total)}</strong>
         </div>
         <div>

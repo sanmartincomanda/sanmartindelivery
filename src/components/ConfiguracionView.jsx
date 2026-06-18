@@ -16,9 +16,17 @@ import {
   updateStoreCategory,
 } from '../services/storeCategories';
 import {
+  mergeStoreCoupons,
+  saveStoreCoupon,
+  STORE_COUPONS_PATH,
+  updateStoreCoupon,
+} from '../services/storeCoupons';
+import {
   STORE_USERS_PATH,
   updateStoreUserPassword,
 } from '../services/storeUsers';
+
+const COUPONS_PIN = '210397';
 
 const emptyProduct = {
   code: '',
@@ -41,17 +49,32 @@ const emptyCategory = {
   sortOrder: '',
 };
 
+const emptyCoupon = {
+  code: '',
+  title: '',
+  type: 'percent',
+  value: '',
+  minimum: '',
+  active: true,
+  notes: '',
+};
+
 export default function ConfiguracionView() {
   const [section, setSection] = useState('catalogo');
   const [usersTab, setUsersTab] = useState('administrativo');
   const [products, setProducts] = useState(() => mergeCatalogProducts());
   const [categories, setCategories] = useState(() => mergeStoreCategories());
+  const [coupons, setCoupons] = useState(() => mergeStoreCoupons());
   const [storeUsers, setStoreUsers] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
+  const [couponForm, setCouponForm] = useState(emptyCoupon);
+  const [couponsUnlocked, setCouponsUnlocked] = useState(false);
+  const [couponPin, setCouponPin] = useState('');
   const [passwordForms, setPasswordForms] = useState({});
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [savingCoupon, setSavingCoupon] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
@@ -68,6 +91,14 @@ export default function ConfiguracionView() {
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
       setCategories(mergeStoreCategories(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
+      setCoupons(mergeStoreCoupons(snapshot.val()));
     });
 
     return () => unsubscribe();
@@ -155,6 +186,13 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const updateCouponForm = (field, value) => {
+    setCouponForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const updatePasswordForm = (userKey, field, value) => {
     setPasswordForms((current) => ({
       ...current,
@@ -199,6 +237,18 @@ export default function ConfiguracionView() {
       promo: Boolean(product.promo),
       image: product.image || '',
       description: product.description || '',
+    });
+  };
+
+  const editCoupon = (coupon) => {
+    setCouponForm({
+      code: coupon.code || '',
+      title: coupon.title || '',
+      type: coupon.type || 'percent',
+      value: coupon.value ?? '',
+      minimum: coupon.minimum ?? '',
+      active: coupon.active !== false,
+      notes: coupon.notes || '',
     });
   };
 
@@ -257,6 +307,39 @@ export default function ConfiguracionView() {
     }
   };
 
+  const unlockCoupons = (event) => {
+    event.preventDefault();
+    if (couponPin.trim() === COUPONS_PIN) {
+      setCouponsUnlocked(true);
+      setCouponPin('');
+      setMessage('');
+      return;
+    }
+
+    setMessage('PIN incorrecto para entrar a cupones.');
+  };
+
+  const saveCoupon = async (event) => {
+    event.preventDefault();
+    setSavingCoupon(true);
+    setMessage('');
+
+    try {
+      await saveStoreCoupon({
+        ...couponForm,
+        value: Number(couponForm.value || 0),
+        minimum: Number(couponForm.minimum || 0),
+      });
+      setCouponForm(emptyCoupon);
+      setMessage('Cupon guardado.');
+    } catch (error) {
+      console.error('Error guardando cupon:', error);
+      setMessage('No se pudo guardar el cupon. Revisa codigo y valor.');
+    } finally {
+      setSavingCoupon(false);
+    }
+  };
+
   const toggleProduct = async (product) => {
     try {
       await updateCatalogProduct(product.code, { active: product.active === false });
@@ -272,6 +355,15 @@ export default function ConfiguracionView() {
     } catch (error) {
       console.error('Error actualizando categoria:', error);
       setMessage('No se pudo actualizar la categoria.');
+    }
+  };
+
+  const toggleCoupon = async (coupon) => {
+    try {
+      await updateStoreCoupon(coupon.code, { active: coupon.active === false });
+    } catch (error) {
+      console.error('Error actualizando cupon:', error);
+      setMessage('No se pudo actualizar el cupon.');
     }
   };
 
@@ -335,6 +427,24 @@ export default function ConfiguracionView() {
     } finally {
       setSavingCategory(false);
     }
+  };
+
+  const sectionMeta = {
+    catalogo: {
+      path: 'Configuraciones / Tienda Virtual / Catalogo',
+      title: 'Catalogo de tienda virtual',
+    },
+    usuarios: {
+      path: 'Configuraciones / Usuarios',
+      title: 'Usuarios',
+    },
+    cupones: {
+      path: 'Configuraciones / Cupones',
+      title: 'Cupones',
+    },
+  }[section] || {
+    path: 'Configuraciones',
+    title: 'Configuraciones',
   };
 
   return (
@@ -454,12 +564,10 @@ export default function ConfiguracionView() {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
-              {section === 'usuarios'
-                ? 'Configuraciones / Usuarios'
-                : 'Configuraciones / Tienda Virtual / Catalogo'}
+              {sectionMeta.path}
             </div>
             <h1 style={{ margin: '6px 0 0', fontSize: 30 }}>
-              {section === 'usuarios' ? 'Usuarios' : 'Catalogo de tienda virtual'}
+              {sectionMeta.title}
             </h1>
           </div>
           {section === 'catalogo' && (
@@ -498,6 +606,13 @@ export default function ConfiguracionView() {
             onClick={() => setSection('usuarios')}
           >
             Usuarios
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${section === 'cupones' ? 'active' : ''}`}
+            onClick={() => setSection('cupones')}
+          >
+            Cupones
           </button>
         </div>
 
@@ -820,7 +935,7 @@ export default function ConfiguracionView() {
           </form>
         </div>
           </>
-        ) : (
+        ) : section === 'usuarios' ? (
           <UsersManager
             usersTab={usersTab}
             setUsersTab={setUsersTab}
@@ -833,8 +948,241 @@ export default function ConfiguracionView() {
             saveClientPassword={saveClientPassword}
             savingPasswordKey={savingPasswordKey}
           />
+        ) : (
+          <CouponsManager
+            coupons={coupons}
+            couponsUnlocked={couponsUnlocked}
+            couponPin={couponPin}
+            couponForm={couponForm}
+            savingCoupon={savingCoupon}
+            setCouponPin={setCouponPin}
+            unlockCoupons={unlockCoupons}
+            updateCouponForm={updateCouponForm}
+            saveCoupon={saveCoupon}
+            editCoupon={editCoupon}
+            toggleCoupon={toggleCoupon}
+            resetCouponForm={() => setCouponForm(emptyCoupon)}
+          />
         )}
       </div>
+    </div>
+  );
+}
+
+function CouponsManager({
+  coupons,
+  couponsUnlocked,
+  couponPin,
+  couponForm,
+  savingCoupon,
+  setCouponPin,
+  unlockCoupons,
+  updateCouponForm,
+  saveCoupon,
+  editCoupon,
+  toggleCoupon,
+  resetCouponForm,
+}) {
+  const formatCouponValue = (coupon) =>
+    coupon.type === 'amount' ? `C$ ${Number(coupon.value || 0).toFixed(2)}` : `${Number(coupon.value || 0)}%`;
+
+  if (!couponsUnlocked) {
+    return (
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 18,
+          marginTop: 18,
+          maxWidth: 520,
+        }}
+      >
+        <div className="cfg-badge off">Acceso protegido</div>
+        <h2 style={{ margin: '12px 0 6px', fontSize: 22 }}>Entrar a cupones</h2>
+        <p style={{ margin: '0 0 14px', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+          Ingresa el PIN administrativo para crear o editar cupones de la tienda virtual.
+        </p>
+        <form onSubmit={unlockCoupons} style={{ display: 'grid', gap: 10 }}>
+          <input
+            className="cfg-input"
+            type="password"
+            inputMode="numeric"
+            value={couponPin}
+            onChange={(event) => setCouponPin(event.target.value)}
+            placeholder="PIN"
+          />
+          <button type="submit" className="cfg-button">
+            Entrar
+          </button>
+        </form>
+      </section>
+    );
+  }
+
+  return (
+    <div
+      className="cfg-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.35fr) minmax(340px, 0.85fr)',
+        gap: 18,
+        marginTop: 18,
+        alignItems: 'start',
+      }}
+    >
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Cupones activos</h2>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
+              El cliente escribe el codigo en el checkout de la tienda.
+            </p>
+          </div>
+          <strong>{coupons.length} cupones</strong>
+        </div>
+
+        {coupons.length === 0 ? (
+          <div
+            style={{
+              padding: 28,
+              border: '1px dashed #cbd5e1',
+              borderRadius: 8,
+              color: '#64748b',
+              textAlign: 'center',
+              fontWeight: 800,
+            }}
+          >
+            No hay cupones creados todavia.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {coupons.map((coupon) => (
+              <div
+                key={coupon.code}
+                style={{
+                  border: '1px solid #edf2f7',
+                  borderRadius: 8,
+                  padding: 12,
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) auto',
+                  gap: 12,
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <strong style={{ fontSize: 18 }}>{coupon.code}</strong>
+                  <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                    {coupon.title || 'Cupon sin descripcion'} | {formatCouponValue(coupon)}
+                  </div>
+                  <div style={{ color: '#94a3b8', marginTop: 4, fontSize: 13 }}>
+                    Minimo: C$ {Number(coupon.minimum || 0).toFixed(2)}
+                    {coupon.notes ? ` | ${coupon.notes}` : ''}
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <span className={`cfg-badge ${coupon.active === false ? 'off' : ''}`}>
+                      {coupon.active === false ? 'Inactivo' : 'Activo'}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button type="button" className="cfg-button secondary" onClick={() => editCoupon(coupon)}>
+                    Editar
+                  </button>
+                  <button type="button" className="cfg-button secondary" onClick={() => toggleCoupon(coupon)}>
+                    {coupon.active === false ? 'Activar' : 'Desactivar'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <form
+        onSubmit={saveCoupon}
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+          display: 'grid',
+          gap: 10,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 22 }}>Cupon</h2>
+        <input
+          className="cfg-input"
+          value={couponForm.code}
+          onChange={(event) => updateCouponForm('code', event.target.value.toUpperCase())}
+          placeholder="Codigo. Ej: GRANADA10"
+        />
+        <input
+          className="cfg-input"
+          value={couponForm.title}
+          onChange={(event) => updateCouponForm('title', event.target.value)}
+          placeholder="Descripcion corta"
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <select
+            className="cfg-select"
+            value={couponForm.type}
+            onChange={(event) => updateCouponForm('type', event.target.value)}
+          >
+            <option value="percent">Porcentaje</option>
+            <option value="amount">Monto fijo</option>
+          </select>
+          <select
+            className="cfg-select"
+            value={couponForm.active ? 'activo' : 'inactivo'}
+            onChange={(event) => updateCouponForm('active', event.target.value === 'activo')}
+          >
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <input
+            className="cfg-input"
+            type="number"
+            min="0"
+            step="0.01"
+            value={couponForm.value}
+            onChange={(event) => updateCouponForm('value', event.target.value)}
+            placeholder={couponForm.type === 'amount' ? 'Monto C$' : 'Porcentaje'}
+          />
+          <input
+            className="cfg-input"
+            type="number"
+            min="0"
+            step="0.01"
+            value={couponForm.minimum}
+            onChange={(event) => updateCouponForm('minimum', event.target.value)}
+            placeholder="Minimo de compra"
+          />
+        </div>
+        <textarea
+          className="cfg-textarea"
+          value={couponForm.notes}
+          onChange={(event) => updateCouponForm('notes', event.target.value)}
+          placeholder="Notas internas"
+        />
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="submit" className="cfg-button" disabled={savingCoupon}>
+            {savingCoupon ? 'Guardando...' : 'Guardar cupon'}
+          </button>
+          <button type="button" className="cfg-button secondary" onClick={resetCouponForm}>
+            Nuevo
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

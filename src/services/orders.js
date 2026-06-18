@@ -46,7 +46,7 @@ const normalizeStoreItems = (items = []) =>
     })
     .filter((item) => item.codigo && item.nombre && item.cantidad > 0 && item.precioUnitario > 0);
 
-export const buildStoreOrderText = (items = [], notes = '') => {
+export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
   const normalizedItems = normalizeStoreItems(items);
   const lines = normalizedItems.map(
     (item) =>
@@ -59,10 +59,18 @@ export const buildStoreOrderText = (items = [], notes = '') => {
     lines.push(`Observaciones: ${cleanNotes}`);
   }
 
-  const total = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
-  if (total > 0) {
+  const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const discount = Number(summary.discount || 0);
+  const total = Number(summary.total ?? Math.max(subtotal - discount, 0));
+
+  if (subtotal > 0) {
     lines.push('');
-    lines.push(`Total estimado: C$${formatAmount(total)}`);
+    lines.push(`Subtotal estimado: C$${formatAmount(subtotal)}`);
+    if (discount > 0) {
+      const discountLabel = summary.couponCode ? `Cupon ${summary.couponCode}` : 'Descuento cupon';
+      lines.push(`${discountLabel}: -C$${formatAmount(discount)}`);
+    }
+    lines.push(`Total aproximado: C$${formatAmount(total)}`);
   }
 
   return lines.join('\n').trim();
@@ -100,13 +108,34 @@ export async function createOrder(payload, options = {}) {
   }
 
   const normalizedItems = normalizeStoreItems(payload.items || []);
-  const total =
+  const subtotal =
     normalizedItems.length > 0
       ? Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2))
       : Number(payload.total || 0) || null;
+  const couponDiscount = Math.max(
+    0,
+    Math.min(Number(payload.descuentoCupon || 0), Number(subtotal || 0))
+  );
+  const total =
+    normalizedItems.length > 0
+      ? Number(Math.max(Number(subtotal || 0) - couponDiscount, 0).toFixed(2))
+      : Number(payload.total || 0) || null;
+  const coupon = payload.cupon && payload.cupon.code
+    ? {
+        code: String(payload.cupon.code || '').trim().toUpperCase(),
+        title: String(payload.cupon.title || '').trim(),
+        type: String(payload.cupon.type || '').trim(),
+        value: Number(payload.cupon.value || 0),
+      }
+    : null;
 
   const pedidoTexto =
-    String(payload.pedido || '').trim() || buildStoreOrderText(normalizedItems, payload.observaciones);
+    String(payload.pedido || '').trim() ||
+    buildStoreOrderText(normalizedItems, payload.observaciones, {
+      discount: couponDiscount,
+      couponCode: coupon?.code,
+      total,
+    });
 
   const orderRecord = {
     cliente: String(payload.cliente || '').trim() || 'Cliente sin nombre',
@@ -120,7 +149,11 @@ export async function createOrder(payload, options = {}) {
     pedido: pedidoTexto,
     observaciones: String(payload.observaciones || '').trim(),
     items: normalizedItems,
+    subtotalEstimado: subtotal,
+    descuentoCupon: couponDiscount,
+    cupon: coupon,
     total,
+    totalAproximado: channel === STORE_CHANNEL,
     estado: 'Pendiente',
     metodoPago: String(payload.metodoPago || 'Efectivo').trim() || 'Efectivo',
     fecha,
