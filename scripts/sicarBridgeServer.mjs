@@ -43,7 +43,7 @@ const json = (statusCode, payload) => ({
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   },
 });
 
@@ -55,7 +55,7 @@ const text = (statusCode, payload) => ({
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   },
 });
 
@@ -105,6 +105,18 @@ const normalizeStoreUnit = (value = '') => {
     return 'lb';
   }
   return 'unidad';
+};
+
+const splitIntoChunks = (items = [], size = 1) => {
+  const source = Array.isArray(items) ? items : [];
+  const chunkSize = Math.max(1, Number(size || 1));
+  const chunks = [];
+
+  for (let index = 0; index < source.length; index += chunkSize) {
+    chunks.push(source.slice(index, index + chunkSize));
+  }
+
+  return chunks;
 };
 
 const resolveRowDepartment = (row) => {
@@ -283,6 +295,78 @@ const getSicarCatalogRows = async (startDate, endExclusiveDate) => {
       imageHash: String(parts[13] || '').trim(),
     }))
     .filter((row) => row.code && row.name && row.price > 0 && row.quantitySold > 0);
+};
+
+const getSicarPriceRowsByCodes = async (codes = []) => {
+  const uniqueCodes = Array.from(new Set(codes.map((code) => String(code || '').trim()).filter(Boolean)));
+  if (uniqueCodes.length === 0) {
+    return [];
+  }
+
+  const rows = [];
+
+  for (const codeChunk of splitIntoChunks(uniqueCodes, 200)) {
+    const codeList = codeChunk.map((code) => `'${sqlEscape(code)}'`).join(', ');
+    const chunkRows = await runMysqlQuery(`
+      SELECT
+        a.art_id,
+        a.clave,
+        a.descripcion,
+        COALESCE(d.nombre, ''),
+        COALESCE(c.nombre, ''),
+        UPPER(TRIM(COALESCE(u.nombre, 'PZA'))),
+        ROUND(a.precio1, 6),
+        ROUND(a.precio1 * (1 + COALESCE(tax.taxRatePct, 0) / 100), 6),
+        COALESCE(tax.taxRatePct, 0)
+      FROM articulo a
+      LEFT JOIN categoria c ON c.cat_id = a.cat_id
+      LEFT JOIN departamento d ON d.dep_id = c.dep_id
+      LEFT JOIN unidad u ON u.uni_id = a.unidadVenta
+      LEFT JOIN (
+        SELECT
+          ai.art_id,
+          ROUND(
+            SUM(
+              CASE
+                WHEN COALESCE(imp.status, 1) = 1
+                  AND COALESCE(imp.tras, 0) = 1
+                  AND UPPER(COALESCE(imp.tipoFactor, 'Tasa')) = 'TASA'
+                THEN COALESCE(imp.impuesto, 0)
+                ELSE 0
+              END
+            ),
+            6
+          ) AS taxRatePct
+        FROM articuloimpuesto ai
+        INNER JOIN impuesto imp ON imp.imp_id = ai.imp_id
+        GROUP BY ai.art_id
+      ) tax ON tax.art_id = a.art_id
+      WHERE a.status = 1
+        AND a.servicio = 0
+        AND a.precio1 > 0
+        AND a.clave IN (${codeList})
+      ORDER BY a.clave ASC;
+    `);
+
+    chunkRows
+      .map((line) => line.split('\t'))
+      .filter((parts) => parts.length >= 9)
+      .forEach((parts) => {
+        rows.push({
+          artId: Number(parts[0] || 0),
+          code: String(parts[1] || '').trim(),
+          name: String(parts[2] || '').trim(),
+          sicarDepartment: String(parts[3] || '').trim(),
+          sicarCategory: String(parts[4] || '').trim(),
+          unit: String(parts[5] || '').trim(),
+          basePrice: Number(parts[6] || 0),
+          price: Number(parts[7] || 0),
+          taxRatePct: Number(parts[8] || 0),
+        });
+      });
+  }
+
+  return rows.filter((row) => row.code && row.price > 0);
 };
 
 const buildCatalogSelection = async () => {
@@ -506,7 +590,7 @@ const getImageForSku = async (code) => {
   };
 };
 
-const routeRequest = async (requestUrl) => {
+const routeRequest = async (request, requestUrl, requestBody = null) => {
   if (requestUrl.pathname === '/api/sicar/health') {
     return json(200, {
       ok: true,
@@ -537,8 +621,65 @@ const routeRequest = async (requestUrl) => {
     return json(200, image);
   }
 
+  if (requestUrl.pathname === '/api/sicar/prices') {
+    if (String(request.method || '').toUpperCase() !== 'POST') {
+      return json(405, { ok: false, error: 'Metodo no permitido.' });
+    }
+
+    const requestedCodes = Array.isArray(requestBody?.codes) ? requestBody.codes : [];
+    const products = await getSicarPriceRowsByCodes(requestedCodes);
+
+    return json(200, {
+      ok: true,
+      requestedCodes: Array.from(new Set(requestedCodes.map((code) => String(code || '').trim()).filter(Boolean))).length,
+      matchedCodes: products.length,
+      products: products.map((row) => ({
+        code: row.code,
+        name: row.name,
+        price: Number(row.price.toFixed(2)),
+        unit: normalizeStoreUnit(row.unit),
+        sicar: {
+          artId: row.artId,
+          department: row.sicarDepartment,
+          category: row.sicarCategory,
+          basePrice: Number(row.basePrice.toFixed(4)),
+          taxRatePct: Number(row.taxRatePct.toFixed(4)),
+        },
+      })),
+    });
+  }
+
   return text(404, 'SICAR bridge activo');
 };
+
+const readJsonBody = (request) =>
+  new Promise((resolvePromise, rejectPromise) => {
+    let rawBody = '';
+
+    request.on('data', (chunk) => {
+      rawBody += chunk.toString('utf8');
+      if (rawBody.length > 1024 * 1024 * 2) {
+        rejectPromise(new Error('El cuerpo de la solicitud es demasiado grande.'));
+        request.destroy();
+      }
+    });
+
+    request.on('end', () => {
+      const cleanBody = rawBody.trim();
+      if (!cleanBody) {
+        resolvePromise({});
+        return;
+      }
+
+      try {
+        resolvePromise(JSON.parse(cleanBody));
+      } catch (error) {
+        rejectPromise(new Error('El cuerpo JSON de la solicitud no es valido.'));
+      }
+    });
+
+    request.on('error', (error) => rejectPromise(error));
+  });
 
 const server = createServer(async (request, response) => {
   if (!request.url) {
@@ -551,14 +692,15 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (request.method !== 'GET') {
+  if (!['GET', 'POST'].includes(String(request.method || '').toUpperCase())) {
     writeResponse(response, json(405, { ok: false, error: 'Metodo no permitido.' }));
     return;
   }
 
   try {
     const requestUrl = new URL(request.url, `http://127.0.0.1:${bridgeConfig.bridgePort}`);
-    const result = await routeRequest(requestUrl);
+    const requestBody = request.method === 'POST' ? await readJsonBody(request) : null;
+    const result = await routeRequest(request, requestUrl, requestBody);
     writeResponse(response, result);
   } catch (error) {
     writeResponse(

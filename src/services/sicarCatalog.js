@@ -46,6 +46,43 @@ export async function fetchSicarProductImage(code) {
   return parseJsonResponse(response);
 }
 
+export async function fetchSicarPricesByCodes(codes = []) {
+  const uniqueCodes = Array.from(
+    new Set(
+      (Array.isArray(codes) ? codes : [])
+        .map((code) => String(code || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (uniqueCodes.length === 0) {
+    return {
+      ok: true,
+      requestedCodes: 0,
+      matchedCodes: 0,
+      products: [],
+    };
+  }
+
+  const response = await fetch(`${getSicarBridgeUrl()}/api/sicar/prices`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      codes: uniqueCodes,
+    }),
+  });
+
+  const payload = await parseJsonResponse(response);
+  if (!Array.isArray(payload?.products)) {
+    throw new Error('La respuesta de SICAR no trae precios.');
+  }
+
+  return payload;
+}
+
 const loadImageElement = (src) =>
   new Promise((resolve, reject) => {
     const image = new Image();

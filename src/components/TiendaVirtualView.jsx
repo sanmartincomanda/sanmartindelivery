@@ -56,6 +56,7 @@ const MAP_PICKER_TILE_SIZE = 256;
 const MAP_PICKER_WIDTH = 360;
 const MAP_PICKER_HEIGHT = 260;
 const QUANTITY_EPSILON = 0.00001;
+const STORE_STORY_DURATION_MS = 4500;
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -327,7 +328,7 @@ export default function TiendaVirtualView({
   const [activeCategory, setActiveCategory] = useState('todos');
   const [activeSubcategory, setActiveSubcategory] = useState('todas');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [selectedPromotion, setSelectedPromotion] = useState(null);
+  const [selectedPromotionIndex, setSelectedPromotionIndex] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1273,33 +1274,192 @@ export default function TiendaVirtualView({
           display: block;
           white-space: normal;
         }
-        .store-promo-viewer {
-          width: min(420px, calc(100vw - 28px));
-          max-height: calc(100vh - 36px);
-          background: #0f172a;
-          border-radius: 18px;
+        .store-story-viewer-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 240;
+          background: rgba(15, 23, 42, 0.72);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
           padding: 12px;
-          box-shadow: 0 22px 56px rgba(15, 23, 42, 0.28);
         }
-        .store-promo-viewer img {
+        .store-story-viewer {
+          position: relative;
+          width: min(430px, calc(100vw - 24px), calc((100vh - 24px) * 0.5625));
+          aspect-ratio: 9 / 16;
+          border-radius: 28px;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 42%),
+            linear-gradient(180deg, #1f2937 0%, #0f172a 100%);
+          box-shadow: 0 30px 80px rgba(15, 23, 42, 0.45);
+        }
+        .store-story-viewer img {
           width: 100%;
-          max-height: calc(100vh - 160px);
-          object-fit: contain;
-          border-radius: 12px;
-          background: #111827;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
-        .store-promo-viewer-head {
+        .store-story-progress {
+          position: absolute;
+          top: 14px;
+          left: 14px;
+          right: 14px;
+          z-index: 5;
+          display: flex;
+          gap: 6px;
+        }
+        .store-story-progress-track {
+          flex: 1;
+          height: 4px;
+          border-radius: 999px;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.28);
+        }
+        .store-story-progress-fill {
+          display: block;
+          width: 0;
+          height: 100%;
+          border-radius: inherit;
+          background: #ffffff;
+        }
+        .store-story-progress-fill.done {
+          width: 100%;
+        }
+        .store-story-progress-fill.active {
+          animation: storeStoryProgress linear forwards;
+        }
+        .store-story-viewer-head {
+          position: absolute;
+          top: 28px;
+          left: 18px;
+          right: 18px;
+          z-index: 5;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
           color: #ffffff;
-          margin-bottom: 10px;
         }
-        .store-promo-viewer-actions {
+        .store-story-viewer-meta {
+          min-width: 0;
           display: flex;
-          gap: 8px;
-          margin-top: 10px;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .store-story-viewer-count {
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: rgba(255, 255, 255, 0.72);
+        }
+        .store-story-viewer-meta strong {
+          font-size: 16px;
+          line-height: 1.1;
+          text-shadow: 0 2px 16px rgba(15, 23, 42, 0.6);
+        }
+        .store-story-close {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 auto;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.48);
+          color: #ffffff;
+          font-size: 28px;
+          line-height: 1;
+          backdrop-filter: blur(12px);
+        }
+        .store-story-frame {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+        .store-story-scrim {
+          position: absolute;
+          left: 0;
+          right: 0;
+          z-index: 2;
+          pointer-events: none;
+        }
+        .store-story-scrim.top {
+          top: 0;
+          height: 28%;
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.82) 0%, rgba(15, 23, 42, 0) 100%);
+        }
+        .store-story-scrim.bottom {
+          bottom: 0;
+          height: 38%;
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.84) 100%);
+        }
+        .store-story-nav {
+          position: absolute;
+          inset: 0;
+          z-index: 3;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .store-story-nav button {
+          border: 0;
+          background: transparent;
+          cursor: pointer;
+        }
+        .store-story-nav button:disabled {
+          cursor: default;
+        }
+        .store-story-copy {
+          position: absolute;
+          left: 18px;
+          right: 18px;
+          bottom: 88px;
+          z-index: 4;
+          color: #ffffff;
+          pointer-events: none;
+          text-shadow: 0 2px 20px rgba(15, 23, 42, 0.72);
+        }
+        .store-story-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          min-height: 28px;
+          border-radius: 999px;
+          padding: 0 12px;
+          background: rgba(255, 255, 255, 0.18);
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          backdrop-filter: blur(12px);
+        }
+        .store-story-copy h3 {
+          margin: 12px 0 8px;
+          font-size: clamp(24px, 4vw, 34px);
+          line-height: 1.02;
+        }
+        .store-story-copy p {
+          margin: 0;
+          font-size: 14px;
+          line-height: 1.45;
+          max-width: 28ch;
+          color: rgba(255, 255, 255, 0.9);
+        }
+        .store-story-actions {
+          position: absolute;
+          left: 18px;
+          right: 18px;
+          bottom: 18px;
+          z-index: 4;
+          display: flex;
+          gap: 10px;
+        }
+        @keyframes storeStoryProgress {
+          from {
+            width: 0;
+          }
+          to {
+            width: 100%;
+          }
         }
         .store-product-head {
           display: flex;
@@ -2121,6 +2281,38 @@ export default function TiendaVirtualView({
             width: 68px;
             height: 68px;
           }
+          .store-story-viewer {
+            width: min(calc(100vw - 20px), calc((100vh - 20px) * 0.5625));
+            border-radius: 24px;
+          }
+          .store-story-viewer-head {
+            top: 24px;
+            left: 14px;
+            right: 14px;
+          }
+          .store-story-progress {
+            top: 10px;
+            left: 10px;
+            right: 10px;
+          }
+          .store-story-copy {
+            left: 14px;
+            right: 14px;
+            bottom: 82px;
+          }
+          .store-story-copy h3 {
+            font-size: 26px;
+          }
+          .store-story-copy p {
+            max-width: none;
+            font-size: 13px;
+          }
+          .store-story-actions {
+            left: 14px;
+            right: 14px;
+            bottom: 14px;
+            flex-direction: column;
+          }
           .store-detail-grid {
             grid-template-columns: 1fr;
           }
@@ -2304,7 +2496,7 @@ export default function TiendaVirtualView({
                 key={promotion.id}
                 type="button"
                 className="store-story"
-                onClick={() => setSelectedPromotion(promotion)}
+                onClick={() => setSelectedPromotionIndex(STORE_PROMOTIONS.findIndex((item) => item.id === promotion.id))}
               >
                 <span className="store-story-ring">
                   <img src={promotion.image} alt={promotion.title} />
@@ -2399,12 +2591,14 @@ export default function TiendaVirtualView({
         />
       )}
 
-      {selectedPromotion && (
+      {selectedPromotionIndex !== null && (
         <PromotionViewer
-          promotion={selectedPromotion}
-          onClose={() => setSelectedPromotion(null)}
+          promotions={STORE_PROMOTIONS}
+          activeIndex={selectedPromotionIndex}
+          onChange={setSelectedPromotionIndex}
+          onClose={() => setSelectedPromotionIndex(null)}
           onViewCombos={() => {
-            setSelectedPromotion(null);
+            setSelectedPromotionIndex(null);
             setQuery('');
             setActiveCategory('promociones');
             setActiveSubcategory('todas');
@@ -2871,24 +3065,144 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
   );
 }
 
-function PromotionViewer({ promotion, onClose, onViewCombos }) {
+function PromotionViewer({ promotions, activeIndex, onChange, onClose, onViewCombos }) {
+  const promotion = promotions[activeIndex] || null;
+  const isFirstPromotion = activeIndex <= 0;
+  const isLastPromotion = activeIndex >= promotions.length - 1;
+
+  const goToPrevious = () => {
+    if (isFirstPromotion) {
+      return;
+    }
+
+    onChange(activeIndex - 1);
+  };
+
+  const goToNext = () => {
+    if (isLastPromotion) {
+      onClose();
+      return;
+    }
+
+    onChange(activeIndex + 1);
+  };
+
+  useEffect(() => {
+    if (!promotion || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      goToNext();
+    }, STORE_STORY_DURATION_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [promotion, activeIndex]);
+
+  useEffect(() => {
+    if (!promotion || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goToPrevious();
+        return;
+      }
+
+      if (event.key === 'ArrowRight' || event.key === ' ') {
+        event.preventDefault();
+        goToNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [promotion, activeIndex]);
+
+  if (!promotion) {
+    return null;
+  }
+
   return (
-    <div className="store-sheet-overlay">
-      <div className="store-promo-viewer">
-        <div className="store-promo-viewer-head">
-          <strong>{promotion.title}</strong>
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
+    <div className="store-story-viewer-overlay" onClick={onClose}>
+      <div
+        className="store-story-viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Promocion ${activeIndex + 1} de ${promotions.length}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="store-story-progress" aria-hidden="true">
+          {promotions.map((item, index) => (
+            <span key={item.id} className="store-story-progress-track">
+              <span
+                className={[
+                  'store-story-progress-fill',
+                  index < activeIndex ? 'done' : '',
+                  index === activeIndex ? 'active' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                style={index === activeIndex ? { animationDuration: `${STORE_STORY_DURATION_MS}ms` } : undefined}
+              />
+            </span>
+          ))}
+        </div>
+
+        <div className="store-story-viewer-head">
+          <div className="store-story-viewer-meta">
+            <span className="store-story-viewer-count">
+              Historia {activeIndex + 1} / {promotions.length}
+            </span>
+            <strong>{promotion.title}</strong>
+          </div>
+          <button type="button" className="store-story-close" onClick={onClose} aria-label="Cerrar historias">
+            ×
           </button>
         </div>
-        <img src={promotion.image} alt={promotion.title} />
-        <div className="store-promo-viewer-actions">
-          <button type="button" className="store-button" style={{ flex: 1 }} onClick={onViewCombos}>
-            Ver combos
-          </button>
-          <button type="button" className="store-button secondary" onClick={onClose}>
-            Cerrar
-          </button>
+
+        <div className="store-story-frame">
+          <img src={promotion.image} alt={promotion.title} />
+          <div className="store-story-scrim top" />
+          <div className="store-story-scrim bottom" />
+
+          <div className="store-story-nav" aria-hidden="true">
+            <button
+              type="button"
+              onClick={goToPrevious}
+              disabled={isFirstPromotion}
+              aria-label="Promocion anterior"
+            />
+            <button
+              type="button"
+              onClick={goToNext}
+              aria-label={isLastPromotion ? 'Cerrar historias' : 'Siguiente promocion'}
+            />
+          </div>
+
+          <div className="store-story-copy">
+            <span className="store-story-eyebrow">Promocion activa</span>
+            <h3>{promotion.title}</h3>
+            <p>
+              Toca a la izquierda para regresar o a la derecha para ver la siguiente historia.
+            </p>
+          </div>
+
+          <div className="store-story-actions">
+            <button type="button" className="store-button" style={{ flex: 1 }} onClick={onViewCombos}>
+              Ver combos
+            </button>
+            <button type="button" className="store-button secondary" onClick={onClose}>
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     </div>

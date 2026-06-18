@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase';
 import {
+  applySicarPriceUpdatesWithOptions,
   applySicarCatalogProductsWithOptions,
   getCatalogProductKey,
   getCurrentCatalogMap,
@@ -53,6 +54,7 @@ import {
 import {
   compressImportedCatalogImage,
   fetchSicarCatalogSelection,
+  fetchSicarPricesByCodes,
   fetchSicarProductImage,
   getSicarBridgeHealth,
 } from '../services/sicarCatalog';
@@ -188,6 +190,7 @@ export default function ConfiguracionView() {
   const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [syncingSicar, setSyncingSicar] = useState(false);
+  const [syncingSicarPrices, setSyncingSicarPrices] = useState(false);
   const [testingSicar, setTestingSicar] = useState(false);
   const [loadingSicarPreview, setLoadingSicarPreview] = useState(false);
   const [sicarHealth, setSicarHealth] = useState(null);
@@ -878,6 +881,59 @@ export default function ConfiguracionView() {
     }
   };
 
+  const updateSicarPrices = async () => {
+    setSyncingSicarPrices(true);
+    setMessage('Actualizando precios SICAR por clave... buscando coincidencias en tu catalogo actual.');
+
+    try {
+      const health = await getSicarBridgeHealth();
+      setSicarHealth(health);
+
+      const currentCatalogMap = await getCurrentCatalogMap();
+      const catalogCodes = Array.from(
+        new Set(
+          Object.values(currentCatalogMap || {})
+            .map((product) => String(product?.code || '').trim())
+            .filter(Boolean)
+        )
+      );
+
+      if (catalogCodes.length === 0) {
+        setMessage('No hay SKUs con codigo en el catalogo actual para actualizar precios desde SICAR.');
+        return;
+      }
+
+      const pricePayload = await fetchSicarPricesByCodes(catalogCodes);
+      const matchedProducts = Array.isArray(pricePayload?.products) ? pricePayload.products : [];
+
+      if (matchedProducts.length === 0) {
+        setMessage('SICAR no devolvio coincidencias por clave para actualizar precios.');
+        return;
+      }
+
+      setMessage(`Guardando precios SICAR... 0/${matchedProducts.length} SKUs actualizados por clave.`);
+      const { appliedCount } = await applySicarPriceUpdatesWithOptions(matchedProducts, {
+        currentMap: currentCatalogMap,
+        batchSize: SICAR_CATALOG_SYNC_BATCH_SIZE,
+        onProgress: ({ processed, total }) => {
+          setMessage(`Guardando precios SICAR... ${processed}/${total} SKUs actualizados por clave.`);
+        },
+      });
+
+      const missingCount = Math.max(0, catalogCodes.length - matchedProducts.length);
+      setMessage(
+        `Precios SICAR actualizados. ${appliedCount} SKUs actualizados por clave y ${missingCount} no tuvieron coincidencia en SICAR.`
+      );
+    } catch (error) {
+      console.error('Error actualizando precios SICAR:', error);
+      setMessage(
+        `No se pudieron actualizar los precios SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
+      );
+    } finally {
+      setSyncingSicarPrices(false);
+    }
+  };
+
   const sectionMeta = {
     catalogo: {
       path: 'Configuraciones / Tienda Virtual / Catalogo',
@@ -1106,7 +1162,7 @@ export default function ConfiguracionView() {
                 type="button"
                 className="cfg-button secondary"
                 onClick={seedCatalog}
-                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar}
+                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
               >
                 Inicializar catalogo base
               </button>
@@ -1114,15 +1170,23 @@ export default function ConfiguracionView() {
                 type="button"
                 className="cfg-button secondary"
                 onClick={testSicarConnection}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
               >
                 {testingSicar ? 'Probando conexion...' : 'Probar conexion SICAR'}
               </button>
               <button
                 type="button"
+                className="cfg-button secondary"
+                onClick={updateSicarPrices}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
+              >
+                {syncingSicarPrices ? 'Actualizando precios...' : 'Actualizar precios SICAR'}
+              </button>
+              <button
+                type="button"
                 className="cfg-button"
                 onClick={loadSicarPreview}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
               >
                 {loadingSicarPreview ? 'Cargando vista previa...' : 'Vista previa 90% SICAR'}
               </button>
@@ -1130,7 +1194,7 @@ export default function ConfiguracionView() {
                 type="button"
                 className="cfg-button"
                 onClick={() => applySicarCatalog(sicarPreview)}
-                disabled={!sicarPreview || testingSicar || loadingSicarPreview || syncingSicar}
+                disabled={!sicarPreview || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
               >
                 {syncingSicar ? 'Aplicando SICAR...' : 'Aplicar catalogo SICAR'}
               </button>

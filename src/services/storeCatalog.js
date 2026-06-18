@@ -283,6 +283,45 @@ const buildSicarManagedProduct = (importedProduct = {}, existingProduct = {}) =>
   };
 };
 
+const buildSicarPriceManagedProduct = (priceProduct = {}, existingProduct = {}) => {
+  const existing = normalizeCatalogProduct(existingProduct);
+  if (!existing.code) {
+    return null;
+  }
+
+  const previousSync = normalizeSyncMetadata(existing.sync, existing.sync);
+  const importedPrice = roundPrice(priceProduct.price || 0);
+  const finalPrice = importedPrice > 0 ? importedPrice : roundPrice(existing.price || 0);
+
+  return {
+    ...existing,
+    price: finalPrice,
+    sync: {
+      source: SICAR_SYNC_SOURCE,
+      managedAt: previousSync?.managedAt || new Date().toISOString(),
+      syncedAt: new Date().toISOString(),
+      sicarArtId: Number(priceProduct?.sicar?.artId || previousSync?.sicarArtId || 0),
+      sicarDepartment: String(priceProduct?.sicar?.department || previousSync?.sicarDepartment || '').trim(),
+      sicarCategory: String(priceProduct?.sicar?.category || previousSync?.sicarCategory || '').trim(),
+      sicarName: String(priceProduct?.name || previousSync?.sicarName || '').trim(),
+      sicarPrice: finalPrice,
+      sicarImage: String(previousSync?.sicarImage || '').trim(),
+      sicarImageHash: String(previousSync?.sicarImageHash || '').trim(),
+      quantitySold90d: Number(previousSync?.quantitySold90d || 0),
+      amountSold90d: roundPrice(previousSync?.amountSold90d || 0),
+      tickets90d: Number(previousSync?.tickets90d || 0),
+      departmentRank: Number(previousSync?.departmentRank || 0),
+      cumulativeDepartmentPct: Number(previousSync?.cumulativeDepartmentPct || 0),
+      overallDepartmentSharePct: Number(previousSync?.overallDepartmentSharePct || 0),
+      overrides: {
+        name: true,
+        price: false,
+        image: true,
+      },
+    },
+  };
+};
+
 export async function applySicarCatalogProducts(importedProducts = []) {
   return applySicarCatalogProductsWithOptions(importedProducts);
 }
@@ -333,5 +372,64 @@ export async function applySicarCatalogProductsWithOptions(importedProducts = []
   return {
     appliedCount: total,
     appliedProducts: entries.map(([, product]) => product),
+  };
+}
+
+export async function applySicarPriceUpdatesWithOptions(priceProducts = [], options = {}) {
+  const catalog = Array.isArray(priceProducts) ? priceProducts : [];
+  if (catalog.length === 0) {
+    return { appliedCount: 0, appliedProducts: [], missingCodes: [] };
+  }
+
+  const currentMap = options.currentMap || (await getCurrentCatalogMap());
+  const batchSize = Math.max(1, Number(options.batchSize || SICAR_CATALOG_SYNC_BATCH_SIZE));
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+  const updates = {};
+  const missingCodes = [];
+
+  catalog.forEach((product) => {
+    const code = String(product?.code || '').trim();
+    if (!code) {
+      return;
+    }
+
+    const existing = currentMap[getCatalogProductKey(code)] || {};
+    if (!existing?.code) {
+      missingCodes.push(code);
+      return;
+    }
+
+    const nextProduct = buildSicarPriceManagedProduct(product, existing);
+    if (nextProduct) {
+      updates[getCatalogProductKey(code)] = nextProduct;
+    }
+  });
+
+  const entries = Object.entries(updates);
+  const total = entries.length;
+
+  for (let index = 0; index < entries.length; index += batchSize) {
+    const chunkEntries = entries.slice(index, index + batchSize);
+    const chunkUpdates = Object.fromEntries(chunkEntries);
+    await update(ref(database, STORE_CATALOG_PATH), chunkUpdates);
+
+    if (onProgress) {
+      onProgress({
+        processed: Math.min(index + chunkEntries.length, total),
+        total,
+        batch: Math.floor(index / batchSize) + 1,
+        batches: Math.ceil(total / batchSize),
+      });
+    }
+
+    if (index + chunkEntries.length < entries.length) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  return {
+    appliedCount: total,
+    appliedProducts: entries.map(([, product]) => product),
+    missingCodes,
   };
 }
