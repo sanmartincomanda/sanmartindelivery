@@ -20,7 +20,6 @@ import {
 import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orders';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
-const STORE_BACKGROUND_PATH = '/tienda/branding/fondo-combos-tortas.svg';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino'];
@@ -704,74 +703,67 @@ export default function TiendaVirtualView({
           position: relative;
           z-index: 1;
           min-height: ${isDashboard ? 'calc(100vh - 64px)' : '100vh'};
-          display: grid;
-          grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.75fr);
-          gap: 22px;
+          display: flex;
           align-items: center;
-          max-width: 1120px;
+          justify-content: center;
+          max-width: 100%;
           margin: 0 auto;
-          padding: 28px 18px;
-        }
-        .store-auth-hero {
-          min-height: 560px;
-          border-radius: 24px;
-          padding: 28px;
-          color: #fffaf5;
+          padding: 44px 18px;
           background:
-            linear-gradient(90deg, rgba(48, 8, 15, 0.52), rgba(95, 14, 27, 0.2) 55%, rgba(255, 255, 255, 0.05)),
-            url('${STORE_BACKGROUND_PATH}') center / cover;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
+            radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.12), transparent 18%),
+            radial-gradient(circle at 82% 16%, rgba(255, 224, 214, 0.12), transparent 24%),
+            linear-gradient(135deg, rgba(73, 12, 24, 0.92), rgba(111, 16, 33, 0.9) 48%, rgba(135, 39, 42, 0.82));
           overflow: hidden;
-          box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
         }
-        .store-auth-copy {
-          max-width: 520px;
-          padding: 18px;
-          border: 1px solid rgba(255, 250, 245, 0.22);
-          border-radius: 22px;
-          background: linear-gradient(135deg, rgba(68, 13, 21, 0.42), rgba(68, 13, 21, 0.16));
-          box-shadow: 0 20px 45px rgba(38, 6, 12, 0.16);
-          backdrop-filter: blur(8px);
-        }
-        .store-auth-hero h1 {
-          margin: 14px 0 10px;
-          max-width: 500px;
-          font-size: clamp(32px, 4.6vw, 56px);
-          line-height: 0.98;
-          letter-spacing: -0.045em;
-          text-shadow: 0 12px 26px rgba(38, 6, 12, 0.24);
-        }
-        .store-auth-copy p {
-          max-width: 460px;
-          margin: 0;
-          font-size: 16px;
-          line-height: 1.45;
-          color: rgba(255, 250, 245, 0.9);
-        }
-        .store-auth-pills {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .store-auth-pills .store-status-pill {
-          background: rgba(255, 250, 245, 0.9);
-          color: #3b1216;
-          box-shadow: 0 12px 26px rgba(38, 6, 12, 0.12);
+        .store-auth-page::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.18;
+          background-image: url("data:image/svg+xml,%3Csvg width='520' height='520' viewBox='0 0 520 520' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23fff7ef' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='92' cy='82' r='35' stroke-width='17'/%3E%3Cpath d='M322 78 l64 28 l-44 48 z M334 102 l34 12 M326 130 l30 9'/%3E%3Cpath d='M76 356 C98 300 162 296 190 342 C206 370 182 408 136 414 C92 420 58 390 76 356Z M112 344 C132 326 160 330 168 352'/%3E%3Cpath d='M328 346 C342 302 408 300 426 346Z M330 356 H428 M352 382 C370 400 404 400 422 382'/%3E%3Cpath d='M34 198 C78 154 128 154 172 198 S266 242 310 198'/%3E%3Cpath d='M204 472 C248 428 298 428 342 472 S436 516 480 472'/%3E%3C/g%3E%3C/svg%3E");
+          background-size: 520px 520px;
+          background-position: 6% 10%;
         }
         .store-auth-card {
+          position: relative;
+          z-index: 1;
+          width: min(450px, 100%);
           background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 24px;
-          padding: 20px;
-          box-shadow: 0 22px 54px rgba(15, 23, 42, 0.12);
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          border-radius: 20px;
+          padding: 30px 32px 32px;
+          box-shadow: 0 28px 80px rgba(38, 6, 12, 0.28);
+        }
+        .store-auth-brand {
+          text-align: center;
+          margin-bottom: 22px;
+        }
+        .store-auth-brand .store-logo {
+          width: 72px;
+          height: 72px;
+          margin: 0 auto 12px;
+          border-radius: 18px;
+          box-shadow: 0 18px 40px rgba(123, 16, 34, 0.16);
+        }
+        .store-auth-brand h1 {
+          margin: 0;
+          color: #111827;
+          font-size: 24px;
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+        }
+        .store-auth-brand p {
+          margin: 10px 0 0;
+          color: #6b7280;
+          font-size: 14px;
+          font-weight: 800;
         }
         .store-auth-toggle {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 8px;
-          margin-bottom: 14px;
+          margin-bottom: 18px;
           padding: 4px;
           border-radius: 999px;
           background: #f3f4f6;
@@ -786,8 +778,9 @@ export default function TiendaVirtualView({
           color: #6b7280;
         }
         .store-auth-toggle button.active {
-          background: #111827;
+          background: #7b1022;
           color: #ffffff;
+          box-shadow: 0 10px 22px rgba(123, 16, 34, 0.18);
         }
         .store-auth-error {
           border-radius: 12px;
@@ -1613,12 +1606,6 @@ export default function TiendaVirtualView({
           }
         }
         @media (max-width: 980px) {
-          .store-auth-page {
-            grid-template-columns: 1fr;
-          }
-          .store-auth-hero {
-            min-height: 430px;
-          }
           .store-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
           }
@@ -1658,17 +1645,14 @@ export default function TiendaVirtualView({
             padding: 0 12px;
             font-size: 11px;
           }
-          .store-auth-hero {
-            min-height: 420px;
-            padding: 18px;
-            border-radius: 20px;
+          .store-auth-page {
+            padding: 24px 14px;
           }
-          .store-auth-copy {
-            max-width: 100%;
-            padding: 14px;
+          .store-auth-card {
+            padding: 24px 18px;
           }
-          .store-auth-hero h1 {
-            font-size: clamp(30px, 10vw, 42px);
+          .store-auth-brand h1 {
+            font-size: 22px;
           }
           .store-order-meta,
           .store-progress {
@@ -1974,28 +1958,15 @@ function StoreAuthView({
 
   return (
     <div className="store-auth-page">
-      <section className="store-auth-hero">
-        <div className="store-auth-copy">
+      <section className="store-auth-card">
+        <div className="store-auth-brand">
           <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
           <h1>Tienda Virtual Carnes San Martin Granada</h1>
           <p>
-            Crea tu cuenta una vez, guarda tu direccion y revisa el estado de tus pedidos desde el mismo lugar.
+            Ingresa o crea tu cuenta para pedir en linea.
           </p>
         </div>
-        <div className="store-auth-pills">
-          <span className="store-status-pill">
-            Pedidos a cocina
-          </span>
-          <span className="store-status-pill">
-            Historial por usuario
-          </span>
-          <span className="store-status-pill">
-            Direccion guardada
-          </span>
-        </div>
-      </section>
 
-      <section className="store-auth-card">
         <div className="store-auth-toggle">
           <button
             type="button"
