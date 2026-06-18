@@ -606,9 +606,9 @@ export default function TiendaVirtualView({
           min-height: 560px;
           border-radius: 24px;
           padding: 28px;
-          color: #ffffff;
+          color: #fffaf5;
           background:
-            linear-gradient(135deg, rgba(17, 24, 39, 0.16), rgba(127, 29, 29, 0.12)),
+            linear-gradient(90deg, rgba(48, 8, 15, 0.52), rgba(95, 14, 27, 0.2) 55%, rgba(255, 255, 255, 0.05)),
             url('${STORE_BACKGROUND_PATH}') center / cover;
           display: flex;
           flex-direction: column;
@@ -616,12 +616,39 @@ export default function TiendaVirtualView({
           overflow: hidden;
           box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
         }
+        .store-auth-copy {
+          max-width: 520px;
+          padding: 18px;
+          border: 1px solid rgba(255, 250, 245, 0.22);
+          border-radius: 22px;
+          background: linear-gradient(135deg, rgba(68, 13, 21, 0.42), rgba(68, 13, 21, 0.16));
+          box-shadow: 0 20px 45px rgba(38, 6, 12, 0.16);
+          backdrop-filter: blur(8px);
+        }
         .store-auth-hero h1 {
-          margin: 22px 0 10px;
-          max-width: 560px;
-          font-size: clamp(38px, 6vw, 74px);
-          line-height: 0.9;
-          letter-spacing: -0.06em;
+          margin: 14px 0 10px;
+          max-width: 500px;
+          font-size: clamp(32px, 4.6vw, 56px);
+          line-height: 0.98;
+          letter-spacing: -0.045em;
+          text-shadow: 0 12px 26px rgba(38, 6, 12, 0.24);
+        }
+        .store-auth-copy p {
+          max-width: 460px;
+          margin: 0;
+          font-size: 16px;
+          line-height: 1.45;
+          color: rgba(255, 250, 245, 0.9);
+        }
+        .store-auth-pills {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .store-auth-pills .store-status-pill {
+          background: rgba(255, 250, 245, 0.9);
+          color: #3b1216;
+          box-shadow: 0 12px 26px rgba(38, 6, 12, 0.12);
         }
         .store-auth-card {
           background: #ffffff;
@@ -1254,7 +1281,7 @@ export default function TiendaVirtualView({
             grid-template-columns: 1fr;
           }
           .store-auth-hero {
-            min-height: 340px;
+            min-height: 430px;
           }
           .store-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1284,6 +1311,18 @@ export default function TiendaVirtualView({
           }
           .store-cart-bar {
             left: 50%;
+          }
+          .store-auth-hero {
+            min-height: 420px;
+            padding: 18px;
+            border-radius: 20px;
+          }
+          .store-auth-copy {
+            max-width: 100%;
+            padding: 14px;
+          }
+          .store-auth-hero h1 {
+            font-size: clamp(30px, 10vw, 42px);
           }
           .store-order-meta,
           .store-progress {
@@ -1584,21 +1623,21 @@ function StoreAuthView({
   return (
     <div className="store-auth-page">
       <section className="store-auth-hero">
-        <div>
+        <div className="store-auth-copy">
           <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
           <h1>Tienda Virtual Carnes San Martin Granada</h1>
-          <p style={{ maxWidth: 480, margin: 0, fontSize: 18, lineHeight: 1.45, opacity: 0.9 }}>
+          <p>
             Crea tu cuenta una vez, guarda tu direccion y revisa el estado de tus pedidos desde el mismo lugar.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <span className="store-status-pill" style={{ background: '#ffffff', color: '#111827' }}>
+        <div className="store-auth-pills">
+          <span className="store-status-pill">
             Pedidos a cocina
           </span>
-          <span className="store-status-pill" style={{ background: '#ffffff', color: '#111827' }}>
+          <span className="store-status-pill">
             Historial por usuario
           </span>
-          <span className="store-status-pill" style={{ background: '#ffffff', color: '#111827' }}>
+          <span className="store-status-pill">
             Direccion guardada
           </span>
         </div>
