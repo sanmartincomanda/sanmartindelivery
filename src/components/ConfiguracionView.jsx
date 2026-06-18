@@ -32,6 +32,12 @@ import {
   seedDefaultDriversIfEmpty,
   updateDriver,
 } from '../services/drivers';
+import {
+  KITCHEN_USER_KEY,
+  normalizeKitchenUser,
+  saveKitchenUser,
+  SYSTEM_USERS_PATH,
+} from '../services/systemUsers';
 
 const COUPONS_PIN = '210397';
 
@@ -75,6 +81,14 @@ const emptyDriver = {
   password: '',
 };
 
+const emptyKitchenForm = {
+  username: 'cocina',
+  displayName: 'Cocina',
+  password: '',
+  confirmPassword: '',
+  active: true,
+};
+
 export default function ConfiguracionView() {
   const [section, setSection] = useState('catalogo');
   const [usersTab, setUsersTab] = useState('administrativo');
@@ -82,11 +96,13 @@ export default function ConfiguracionView() {
   const [categories, setCategories] = useState(() => mergeStoreCategories());
   const [coupons, setCoupons] = useState(() => mergeStoreCoupons());
   const [drivers, setDrivers] = useState(() => mergeDrivers());
+  const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
   const [storeUsers, setStoreUsers] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [couponForm, setCouponForm] = useState(emptyCoupon);
   const [driverForm, setDriverForm] = useState(emptyDriver);
+  const [kitchenForm, setKitchenForm] = useState(emptyKitchenForm);
   const [couponsUnlocked, setCouponsUnlocked] = useState(false);
   const [couponPin, setCouponPin] = useState('');
   const [passwordForms, setPasswordForms] = useState({});
@@ -94,6 +110,7 @@ export default function ConfiguracionView() {
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
+  const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
@@ -126,6 +143,21 @@ export default function ConfiguracionView() {
   useEffect(() => {
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
       setDrivers(mergeDrivers(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, `${SYSTEM_USERS_PATH}/${KITCHEN_USER_KEY}`), (snapshot) => {
+      const nextUser = normalizeKitchenUser(snapshot.val());
+      setKitchenUser(nextUser);
+      setKitchenForm((current) => ({
+        ...current,
+        username: nextUser.username || 'cocina',
+        displayName: nextUser.displayName || 'Cocina',
+        active: nextUser.active !== false,
+      }));
     });
 
     return () => unsubscribe();
@@ -222,6 +254,13 @@ export default function ConfiguracionView() {
 
   const updateDriverForm = (field, value) => {
     setDriverForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const updateKitchenForm = (field, value) => {
+    setKitchenForm((current) => ({
       ...current,
       [field]: value,
     }));
@@ -417,6 +456,54 @@ export default function ConfiguracionView() {
       setMessage('No se pudo guardar el entregador.');
     } finally {
       setSavingDriver(false);
+    }
+  };
+
+  const saveKitchenAccess = async (event) => {
+    event.preventDefault();
+    const password = String(kitchenForm.password || '').trim();
+    const confirmPassword = String(kitchenForm.confirmPassword || '').trim();
+
+    if (!String(kitchenForm.username || '').trim()) {
+      setMessage('El usuario de cocina es obligatorio.');
+      return;
+    }
+
+    if (!kitchenUser.hasPassword && password.length < 4) {
+      setMessage('Define una contrasena inicial para Cocina de al menos 4 caracteres.');
+      return;
+    }
+
+    if (password || confirmPassword) {
+      if (password.length < 4) {
+        setMessage('La contrasena debe tener al menos 4 caracteres.');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setMessage('Las contrasenas no coinciden.');
+        return;
+      }
+    }
+
+    setSavingKitchen(true);
+    setMessage('');
+
+    try {
+      const savedUser = await saveKitchenUser(kitchenForm);
+      setKitchenForm({
+        username: savedUser.username,
+        displayName: savedUser.displayName,
+        password: '',
+        confirmPassword: '',
+        active: savedUser.active !== false,
+      });
+      setMessage('Usuario unico de Cocina guardado.');
+    } catch (error) {
+      console.error('Error guardando usuario de cocina:', error);
+      setMessage(error?.message || 'No se pudo guardar el usuario de Cocina.');
+    } finally {
+      setSavingKitchen(false);
     }
   };
 
@@ -1135,6 +1222,11 @@ export default function ConfiguracionView() {
           <UsersManager
             usersTab={usersTab}
             setUsersTab={setUsersTab}
+            kitchenUser={kitchenUser}
+            kitchenForm={kitchenForm}
+            updateKitchenForm={updateKitchenForm}
+            saveKitchenAccess={saveKitchenAccess}
+            savingKitchen={savingKitchen}
             storeUsers={storeUsers}
             filteredStoreUsers={filteredStoreUsers}
             userSearch={userSearch}
@@ -1652,6 +1744,11 @@ function CouponsManager({
 function UsersManager({
   usersTab,
   setUsersTab,
+  kitchenUser,
+  kitchenForm,
+  updateKitchenForm,
+  saveKitchenAccess,
+  savingKitchen,
   storeUsers,
   filteredStoreUsers,
   userSearch,
@@ -1685,6 +1782,13 @@ function UsersManager({
             onClick={() => setUsersTab('administrativo')}
           >
             Administrativo
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${usersTab === 'cocina' ? 'active' : ''}`}
+            onClick={() => setUsersTab('cocina')}
+          >
+            Cocina
           </button>
           <button
             type="button"
@@ -1736,6 +1840,99 @@ function UsersManager({
             En esta etapa dejamos listo el modulo administrativo separado. El cambio de contrasena solicitado
             esta disponible en la pestana Clientes.
           </div>
+        </div>
+      ) : usersTab === 'cocina' ? (
+        <div
+          style={{
+            marginTop: 18,
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 0.8fr)',
+            gap: 14,
+            alignItems: 'start',
+          }}
+        >
+          <div
+            style={{
+              border: '1px solid #edf2f7',
+              borderRadius: 8,
+              padding: 16,
+              background: '#f8fafc',
+            }}
+          >
+            <div className={`cfg-badge ${kitchenUser.active === false ? 'off' : ''}`}>
+              {kitchenUser.active === false ? 'Inactivo' : 'Activo'}
+            </div>
+            <h3 style={{ margin: '12px 0 4px', fontSize: 20 }}>Acceso unico para Cocina</h3>
+            <p style={{ margin: 0, color: '#64748b', lineHeight: 1.5, fontWeight: 700 }}>
+              Este es el unico usuario general para entrar al modulo Cocina. Todos los carniceros
+              usan estas credenciales para ver y preparar pedidos.
+            </p>
+            <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
+              <div style={{ color: '#0f172a', fontWeight: 900 }}>
+                Usuario actual: {kitchenUser.username || 'cocina'}
+              </div>
+              <div style={{ color: '#64748b', fontWeight: 800 }}>
+                Nombre visible: {kitchenUser.displayName || 'Cocina'}
+              </div>
+              <span className={`cfg-badge ${kitchenUser.hasPassword ? '' : 'off'}`}>
+                {kitchenUser.hasPassword ? 'Con contrasena configurada' : 'Clave temporal: cocina2026'}
+              </span>
+            </div>
+          </div>
+
+          <form
+            onSubmit={saveKitchenAccess}
+            style={{
+              border: '1px solid #edf2f7',
+              borderRadius: 8,
+              padding: 16,
+              background: '#fff',
+              display: 'grid',
+              gap: 10,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 20 }}>Crear / editar usuario Cocina</h3>
+            <input
+              className="cfg-input"
+              value={kitchenForm.username}
+              onChange={(event) => updateKitchenForm('username', event.target.value.toLowerCase())}
+              placeholder="Usuario. Ej: cocina"
+            />
+            <input
+              className="cfg-input"
+              value={kitchenForm.displayName}
+              onChange={(event) => updateKitchenForm('displayName', event.target.value)}
+              placeholder="Nombre visible"
+            />
+            <select
+              className="cfg-select"
+              value={kitchenForm.active ? 'activo' : 'inactivo'}
+              onChange={(event) => updateKitchenForm('active', event.target.value === 'activo')}
+            >
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+            <input
+              className="cfg-input"
+              type="password"
+              value={kitchenForm.password}
+              onChange={(event) => updateKitchenForm('password', event.target.value)}
+              placeholder={kitchenUser.hasPassword ? 'Nueva contrasena opcional' : 'Contrasena inicial'}
+            />
+            <input
+              className="cfg-input"
+              type="password"
+              value={kitchenForm.confirmPassword}
+              onChange={(event) => updateKitchenForm('confirmPassword', event.target.value)}
+              placeholder="Confirmar contrasena"
+            />
+            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
+              Si ya existe una contrasena y dejas estos campos vacios, se mantiene la actual.
+            </div>
+            <button type="submit" className="cfg-button" disabled={savingKitchen}>
+              {savingKitchen ? 'Guardando...' : 'Guardar usuario Cocina'}
+            </button>
+          </form>
         </div>
       ) : (
         <div style={{ marginTop: 18 }}>

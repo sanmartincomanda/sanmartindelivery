@@ -12,6 +12,12 @@ import TiendaVirtualView from './components/TiendaVirtualView';
 import ConfiguracionView from './components/ConfiguracionView';
 import DriverView from './components/DriverView';
 import { createOrder, ORDER_LIMIT_PER_DAY } from './services/orders';
+import {
+  KITCHEN_USER_KEY,
+  loginKitchenUser,
+  normalizeKitchenUser,
+  SYSTEM_USERS_PATH,
+} from './services/systemUsers';
 
 const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
 
@@ -84,6 +90,7 @@ function App() {
     return window.localStorage.getItem('sanmartin_kitchen_auth') === 'true';
   });
   const [kitchenLoginError, setKitchenLoginError] = useState(false);
+  const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
 
   const [orders, setOrders] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -102,6 +109,15 @@ function App() {
     const handleHashChange = () => setRoute(getRouteFromHash());
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const kitchenUserRef = ref(database, `${SYSTEM_USERS_PATH}/${KITCHEN_USER_KEY}`);
+    const unsubscribe = onValue(kitchenUserRef, (snapshot) => {
+      setKitchenUser(normalizeKitchenUser(snapshot.val()));
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -239,16 +255,18 @@ function App() {
     setLoginError(true);
   };
 
-  const handleKitchenLogin = ({ user, password }) => {
-    if (String(user || '').trim().toLowerCase() === 'cocina' && password === 'cocina2026') {
+  const handleKitchenLogin = async ({ user, password }) => {
+    try {
+      await loginKitchenUser({ user, password }, kitchenUser);
       setKitchenAuth(true);
       setKitchenLoginError(false);
       window.localStorage.setItem('sanmartin_kitchen_auth', 'true');
       return true;
+    } catch (error) {
+      console.error('Error iniciando sesion cocina:', error);
+      setKitchenLoginError(true);
+      return false;
     }
-
-    setKitchenLoginError(true);
-    return false;
   };
 
   const addOrder = async (payload, options = {}) => {
@@ -301,7 +319,7 @@ function App() {
         <RoleLogin
           title="Cocina"
           subtitle="Acceso general para todos los carniceros"
-          userPlaceholder="Usuario: cocina"
+          userPlaceholder={`Usuario: ${kitchenUser.username || 'cocina'}`}
           error={kitchenLoginError}
           onLogin={handleKitchenLogin}
         />
@@ -728,10 +746,16 @@ function App() {
 function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
   const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    onLogin({ user, password });
+    setSubmitting(true);
+    try {
+      await onLogin({ user, password });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -805,6 +829,7 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
         />
         <button
           type="submit"
+          disabled={submitting}
           style={{
             minHeight: 46,
             border: 0,
@@ -813,10 +838,11 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
             color: 'white',
             font: 'inherit',
             fontWeight: 900,
-            cursor: 'pointer',
+            cursor: submitting ? 'not-allowed' : 'pointer',
+            opacity: submitting ? 0.7 : 1,
           }}
         >
-          Entrar
+          {submitting ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
     </div>
