@@ -28,7 +28,7 @@ const fallbackHash = (value) => {
   return `fallback:${value}`;
 };
 
-async function hashStorePassword(phone, password) {
+export async function hashStorePassword(phone, password) {
   const cleanPhone = cleanStorePhone(phone);
   const rawValue = `${cleanPhone}:${String(password || '')}`;
 
@@ -218,4 +218,25 @@ export async function updateStoreUserProfile(user, patch) {
     ...safeUser,
     hasPassword: currentUser.hasPassword,
   };
+}
+
+export async function updateStoreUserPassword(user, password) {
+  const cleanPhone = cleanStorePhone(user?.telefono);
+  const userKey = user?.key || getStoreUserKey(cleanPhone);
+  const cleanPassword = String(password || '').trim();
+
+  if (!userKey || !cleanPhone || cleanPassword.length < 4) {
+    const error = new Error('Contrasena incompleta');
+    error.code = 'PASSWORD_INCOMPLETE';
+    throw error;
+  }
+
+  const passwordHash = await hashStorePassword(cleanPhone, cleanPassword);
+
+  await update(ref(database, `${STORE_USERS_PATH}/${userKey}`), {
+    passwordHash,
+    passwordUpdatedAt: Date.now(),
+  });
+
+  return true;
 }

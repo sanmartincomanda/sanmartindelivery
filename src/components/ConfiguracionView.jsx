@@ -15,6 +15,10 @@ import {
   STORE_CATEGORIES_PATH,
   updateStoreCategory,
 } from '../services/storeCategories';
+import {
+  STORE_USERS_PATH,
+  updateStoreUserPassword,
+} from '../services/storeUsers';
 
 const emptyProduct = {
   code: '',
@@ -38,14 +42,20 @@ const emptyCategory = {
 };
 
 export default function ConfiguracionView() {
+  const [section, setSection] = useState('catalogo');
+  const [usersTab, setUsersTab] = useState('administrativo');
   const [products, setProducts] = useState(() => mergeCatalogProducts());
   const [categories, setCategories] = useState(() => mergeStoreCategories());
+  const [storeUsers, setStoreUsers] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
+  const [passwordForms, setPasswordForms] = useState({});
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
@@ -58,6 +68,25 @@ export default function ConfiguracionView() {
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
       setCategories(mergeStoreCategories(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, STORE_USERS_PATH), (snapshot) => {
+      const data = snapshot.val() || {};
+      const users = Object.entries(data).map(([key, value]) => ({
+        key,
+        ...value,
+        hasPassword: Boolean(value?.passwordHash),
+      }));
+
+      users.sort((left, right) =>
+        String(left.nombre || '').localeCompare(String(right.nombre || ''))
+      );
+
+      setStoreUsers(users);
     });
 
     return () => unsubscribe();
@@ -81,6 +110,20 @@ export default function ConfiguracionView() {
     () => categories.filter((category) => category.active !== false),
     [categories]
   );
+
+  const filteredStoreUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    if (!query) {
+      return storeUsers;
+    }
+
+    return storeUsers.filter((user) =>
+      [user.nombre, user.telefono, user.codigo, user.direccion]
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [storeUsers, userSearch]);
 
   const catalogCategories = useMemo(() => {
     if (form.category && !activeCategories.some((category) => category.id === form.category)) {
@@ -109,6 +152,16 @@ export default function ConfiguracionView() {
     setCategoryForm((current) => ({
       ...current,
       [field]: value,
+    }));
+  };
+
+  const updatePasswordForm = (userKey, field, value) => {
+    setPasswordForms((current) => ({
+      ...current,
+      [userKey]: {
+        ...(current[userKey] || {}),
+        [field]: value,
+      },
     }));
   };
 
@@ -222,6 +275,40 @@ export default function ConfiguracionView() {
     }
   };
 
+  const saveClientPassword = async (event, user) => {
+    event.preventDefault();
+    const formData = passwordForms[user.key] || {};
+    const password = String(formData.password || '').trim();
+    const confirmPassword = String(formData.confirmPassword || '').trim();
+
+    if (password.length < 4) {
+      setMessage('La contrasena debe tener al menos 4 caracteres.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setMessage('Las contrasenas no coinciden.');
+      return;
+    }
+
+    setSavingPasswordKey(user.key);
+    setMessage('');
+
+    try {
+      await updateStoreUserPassword(user, password);
+      setPasswordForms((current) => ({
+        ...current,
+        [user.key]: { password: '', confirmPassword: '' },
+      }));
+      setMessage(`Contrasena actualizada para ${user.nombre || user.telefono}.`);
+    } catch (error) {
+      console.error('Error actualizando contrasena de cliente:', error);
+      setMessage('No se pudo actualizar la contrasena del cliente.');
+    } finally {
+      setSavingPasswordKey('');
+    }
+  };
+
   const seedCatalog = async () => {
     setSaving(true);
     setMessage('');
@@ -275,6 +362,28 @@ export default function ConfiguracionView() {
           background: #fff;
           color: #0f172a;
           border: 1px solid #e2e8f0;
+        }
+        .cfg-tabs {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-top: 18px;
+        }
+        .cfg-tab {
+          border: 1px solid #e2e8f0;
+          border-radius: 999px;
+          padding: 11px 16px;
+          background: #fff;
+          color: #475569;
+          cursor: pointer;
+          font: inherit;
+          font-weight: 900;
+        }
+        .cfg-tab.active {
+          background: #0f172a;
+          border-color: #0f172a;
+          color: #fff;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
         }
         .cfg-input,
         .cfg-textarea,
@@ -345,13 +454,19 @@ export default function ConfiguracionView() {
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
-              Configuraciones / Tienda Virtual / Catalogo
+              {section === 'usuarios'
+                ? 'Configuraciones / Usuarios'
+                : 'Configuraciones / Tienda Virtual / Catalogo'}
             </div>
-            <h1 style={{ margin: '6px 0 0', fontSize: 30 }}>Catalogo de tienda virtual</h1>
+            <h1 style={{ margin: '6px 0 0', fontSize: 30 }}>
+              {section === 'usuarios' ? 'Usuarios' : 'Catalogo de tienda virtual'}
+            </h1>
           </div>
-          <button type="button" className="cfg-button secondary" onClick={seedCatalog} disabled={saving}>
-            Inicializar catalogo base
-          </button>
+          {section === 'catalogo' && (
+            <button type="button" className="cfg-button secondary" onClick={seedCatalog} disabled={saving}>
+              Inicializar catalogo base
+            </button>
+          )}
         </div>
 
         {message && (
@@ -369,6 +484,25 @@ export default function ConfiguracionView() {
           </div>
         )}
 
+        <div className="cfg-tabs">
+          <button
+            type="button"
+            className={`cfg-tab ${section === 'catalogo' ? 'active' : ''}`}
+            onClick={() => setSection('catalogo')}
+          >
+            Tienda Virtual
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${section === 'usuarios' ? 'active' : ''}`}
+            onClick={() => setSection('usuarios')}
+          >
+            Usuarios
+          </button>
+        </div>
+
+        {section === 'catalogo' ? (
+          <>
         <section
           style={{
             background: '#fff',
@@ -685,7 +819,199 @@ export default function ConfiguracionView() {
             </div>
           </form>
         </div>
+          </>
+        ) : (
+          <UsersManager
+            usersTab={usersTab}
+            setUsersTab={setUsersTab}
+            storeUsers={storeUsers}
+            filteredStoreUsers={filteredStoreUsers}
+            userSearch={userSearch}
+            setUserSearch={setUserSearch}
+            passwordForms={passwordForms}
+            updatePasswordForm={updatePasswordForm}
+            saveClientPassword={saveClientPassword}
+            savingPasswordKey={savingPasswordKey}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+function UsersManager({
+  usersTab,
+  setUsersTab,
+  storeUsers,
+  filteredStoreUsers,
+  userSearch,
+  setUserSearch,
+  passwordForms,
+  updatePasswordForm,
+  saveClientPassword,
+  savingPasswordKey,
+}) {
+  return (
+    <section
+      style={{
+        background: '#fff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        padding: 16,
+        marginTop: 18,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22 }}>Gestion de usuarios</h2>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
+            Separa usuarios internos administrativos de usuarios clientes de la tienda virtual.
+          </p>
+        </div>
+        <div className="cfg-tabs" style={{ marginTop: 0 }}>
+          <button
+            type="button"
+            className={`cfg-tab ${usersTab === 'administrativo' ? 'active' : ''}`}
+            onClick={() => setUsersTab('administrativo')}
+          >
+            Administrativo
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${usersTab === 'clientes' ? 'active' : ''}`}
+            onClick={() => setUsersTab('clientes')}
+          >
+            Clientes
+          </button>
+        </div>
+      </div>
+
+      {usersTab === 'administrativo' ? (
+        <div
+          style={{
+            marginTop: 18,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              border: '1px solid #edf2f7',
+              borderRadius: 8,
+              padding: 16,
+              background: '#f8fafc',
+            }}
+          >
+            <div className="cfg-badge">Administrativo</div>
+            <h3 style={{ margin: '12px 0 4px', fontSize: 20 }}>Panel interno</h3>
+            <p style={{ margin: 0, color: '#64748b', lineHeight: 1.5, fontWeight: 700 }}>
+              Este espacio queda separado para los usuarios del sistema administrativo.
+            </p>
+            <div style={{ marginTop: 14, color: '#0f172a', fontWeight: 900 }}>
+              Usuario actual: delivery
+            </div>
+          </div>
+          <div
+            style={{
+              border: '1px dashed #cbd5e1',
+              borderRadius: 8,
+              padding: 16,
+              background: '#fff',
+              color: '#64748b',
+              lineHeight: 1.5,
+              fontWeight: 700,
+            }}
+          >
+            En esta etapa dejamos listo el modulo administrativo separado. El cambio de contrasena solicitado
+            esta disponible en la pestana Clientes.
+          </div>
+        </div>
+      ) : (
+        <div style={{ marginTop: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <input
+              className="cfg-input"
+              value={userSearch}
+              onChange={(event) => setUserSearch(event.target.value)}
+              placeholder="Buscar cliente por nombre, telefono o codigo"
+              style={{ maxWidth: 420 }}
+            />
+            <strong>{filteredStoreUsers.length} de {storeUsers.length} clientes</strong>
+          </div>
+
+          {filteredStoreUsers.length === 0 ? (
+            <div
+              style={{
+                padding: 28,
+                border: '1px dashed #cbd5e1',
+                borderRadius: 8,
+                color: '#64748b',
+                textAlign: 'center',
+                fontWeight: 800,
+              }}
+            >
+              No hay clientes de tienda virtual para mostrar.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {filteredStoreUsers.map((user) => {
+                const passwordForm = passwordForms[user.key] || {};
+                return (
+                  <form
+                    key={user.key}
+                    onSubmit={(event) => saveClientPassword(event, user)}
+                    style={{
+                      border: '1px solid #edf2f7',
+                      borderRadius: 8,
+                      padding: 14,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                      gap: 14,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: 17 }}>{user.nombre || 'Cliente sin nombre'}</strong>
+                      <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                        {user.telefono || 'Sin telefono'} {user.codigo ? `| ${user.codigo}` : ''}
+                      </div>
+                      <div style={{ color: '#94a3b8', marginTop: 4, fontSize: 13 }}>
+                        {user.direccion || 'Sin direccion guardada'}
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        <span className={`cfg-badge ${user.hasPassword ? '' : 'off'}`}>
+                          {user.hasPassword ? 'Con contrasena' : 'Sin contrasena'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 8 }}>
+                      <input
+                        className="cfg-input"
+                        type="password"
+                        value={passwordForm.password || ''}
+                        onChange={(event) => updatePasswordForm(user.key, 'password', event.target.value)}
+                        placeholder="Nueva contrasena"
+                      />
+                      <input
+                        className="cfg-input"
+                        type="password"
+                        value={passwordForm.confirmPassword || ''}
+                        onChange={(event) => updatePasswordForm(user.key, 'confirmPassword', event.target.value)}
+                        placeholder="Confirmar contrasena"
+                      />
+                      <button type="submit" className="cfg-button" disabled={savingPasswordKey === user.key}>
+                        {savingPasswordKey === user.key ? 'Actualizando...' : 'Cambiar contrasena'}
+                      </button>
+                    </div>
+                  </form>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
