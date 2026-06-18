@@ -15,22 +15,25 @@ export const getStoreCouponKey = (code) =>
   sanitizeCouponCode(code).replace(/[.#$/[\]]/g, '_');
 
 export const normalizeStoreCoupon = (coupon = {}, fallback = {}) => {
-  const code = sanitizeCouponCode(coupon.code ?? fallback.code);
-  const type = coupon.type === 'amount' || fallback.type === 'amount' ? 'amount' : 'percent';
+  const source = coupon || {};
+  const backup = fallback || {};
+  const code = sanitizeCouponCode(source.code ?? backup.code);
+  const type = source.type === 'amount' || backup.type === 'amount' ? 'amount' : 'percent';
 
   return {
     code,
-    title: String(coupon.title ?? fallback.title ?? '').trim(),
+    title: String(source.title ?? backup.title ?? '').trim(),
     type,
-    value: Number(coupon.value ?? fallback.value ?? 0),
-    minimum: Number(coupon.minimum ?? fallback.minimum ?? 0),
-    active: coupon.active ?? fallback.active ?? true,
-    notes: String(coupon.notes ?? fallback.notes ?? '').trim(),
+    value: Number(source.value ?? backup.value ?? 0),
+    minimum: Number(source.minimum ?? backup.minimum ?? 0),
+    active: source.active ?? backup.active ?? true,
+    notes: String(source.notes ?? backup.notes ?? '').trim(),
   };
 };
 
 export const mergeStoreCoupons = (remoteCoupons = {}) =>
   Object.values(remoteCoupons || {})
+    .filter(Boolean)
     .map((coupon) => normalizeStoreCoupon(coupon))
     .filter((coupon) => coupon.code)
     .sort((left, right) => String(left.code || '').localeCompare(String(right.code || '')));

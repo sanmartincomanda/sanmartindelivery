@@ -34,22 +34,24 @@ const normalizeSubcategoryValue = (subcategory, category) => {
   return cleanSubcategory;
 };
 
-const normalizeCatalogProduct = (product, fallback = {}) => {
-  const rawCategory = product.category ?? fallback.category ?? 'res';
-  const rawSubcategory = product.subcategory ?? fallback.subcategory ?? '';
+const normalizeCatalogProduct = (product = {}, fallback = {}) => {
+  const source = product || {};
+  const backup = fallback || {};
+  const rawCategory = source.category ?? backup.category ?? 'res';
+  const rawSubcategory = source.subcategory ?? backup.subcategory ?? '';
   const category = normalizeCategoryValue(rawCategory, rawSubcategory);
 
   return {
-    code: String(product.code ?? fallback.code ?? '').trim(),
-    name: String(product.name ?? fallback.name ?? '').trim(),
-    price: Number(product.price ?? fallback.price ?? 0),
-    unit: String(product.unit ?? fallback.unit ?? 'lb').trim() || 'lb',
+    code: String(source.code ?? backup.code ?? '').trim(),
+    name: String(source.name ?? backup.name ?? '').trim(),
+    price: Number(source.price ?? backup.price ?? 0),
+    unit: String(source.unit ?? backup.unit ?? 'lb').trim() || 'lb',
     category,
     subcategory: normalizeSubcategoryValue(rawSubcategory, category),
-    active: product.active ?? fallback.active ?? true,
-    promo: Boolean(product.promo ?? fallback.promo),
-    image: String(product.image ?? fallback.image ?? '').trim(),
-    description: String(product.description ?? fallback.description ?? '').trim(),
+    active: source.active ?? backup.active ?? true,
+    promo: Boolean(source.promo ?? backup.promo),
+    image: String(source.image ?? backup.image ?? '').trim(),
+    description: String(source.description ?? backup.description ?? '').trim(),
   };
 };
 
@@ -60,7 +62,7 @@ export const mergeCatalogProducts = (remoteCatalog = {}) => {
     byCode.set(product.code, normalizeCatalogProduct(product));
   });
 
-  Object.values(remoteCatalog || {}).forEach((remoteProduct) => {
+  Object.values(remoteCatalog || {}).filter(Boolean).forEach((remoteProduct) => {
     const code = String(remoteProduct?.code || '').trim();
     if (LEGACY_STORE_COMBO_CODES.includes(code)) {
       return;

@@ -19,15 +19,17 @@ const normalizeSubcategories = (value) => {
 };
 
 export const normalizeStoreCategory = (category = {}, fallback = {}) => {
-  const label = String(category.label ?? fallback.label ?? '').trim();
-  const id = normalizeId(category.id ?? fallback.id ?? label);
+  const source = category || {};
+  const backup = fallback || {};
+  const label = String(source.label ?? backup.label ?? '').trim();
+  const id = normalizeId(source.id ?? backup.id ?? label);
 
   return {
     id,
     label: label || id,
-    subcategories: normalizeSubcategories(category.subcategories ?? fallback.subcategories),
-    active: category.active ?? fallback.active ?? true,
-    sortOrder: Number(category.sortOrder ?? fallback.sortOrder ?? 999),
+    subcategories: normalizeSubcategories(source.subcategories ?? backup.subcategories),
+    active: source.active ?? backup.active ?? true,
+    sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
   };
 };
 
@@ -45,7 +47,7 @@ export const mergeStoreCategories = (remoteCategories = {}) => {
     byId.set(normalized.id, normalized);
   });
 
-  Object.values(remoteCategories || {}).forEach((category) => {
+  Object.values(remoteCategories || {}).filter(Boolean).forEach((category) => {
     const normalized = normalizeStoreCategory(category, byId.get(normalizeId(category?.id || category?.label)));
     if (normalized.id) {
       byId.set(normalized.id, normalized);
