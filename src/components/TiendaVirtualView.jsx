@@ -22,6 +22,7 @@ import {
   buildGoogleMapsPlaceUrl,
   getBrowserLocation,
   hasLocation,
+  normalizeLocation,
 } from '../services/geo';
 import {
   cleanStorePhone,
@@ -35,6 +36,14 @@ const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
+const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
+  lat: 11.9299,
+  lng: -85.956,
+  label: 'Granada, Nicaragua',
+});
+const MAP_PICKER_TILE_SIZE = 256;
+const MAP_PICKER_WIDTH = 360;
+const MAP_PICKER_HEIGHT = 260;
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -68,6 +77,47 @@ const formatStoreQuantity = (quantity, unit) =>
   String(unit).toLowerCase() === 'unidad' ? String(Number(quantity || 0)) : formatWeight(quantity);
 
 const getQuickQuantities = (product) => (isUnitProduct(product) ? [1, 2, 3, 4] : QUICK_WEIGHTS);
+
+const clampLatitude = (value) => Math.max(-85, Math.min(85, Number(value) || 0));
+
+const normalizeLongitude = (value) => {
+  const numeric = Number(value) || 0;
+  return ((((numeric + 180) % 360) + 360) % 360) - 180;
+};
+
+const locationToWorldPoint = (location, zoom) => {
+  const scale = MAP_PICKER_TILE_SIZE * 2 ** zoom;
+  const lat = clampLatitude(location?.lat);
+  const lng = normalizeLongitude(location?.lng);
+  const sinLat = Math.sin((lat * Math.PI) / 180);
+
+  return {
+    x: ((lng + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale,
+  };
+};
+
+const worldPointToLocation = (x, y, zoom) => {
+  const scale = MAP_PICKER_TILE_SIZE * 2 ** zoom;
+  const lng = normalizeLongitude((x / scale) * 360 - 180);
+  const mercatorY = Math.PI - (2 * Math.PI * y) / scale;
+  const lat = (180 / Math.PI) * Math.atan(Math.sinh(mercatorY));
+
+  return normalizeLocation({
+    lat,
+    lng,
+    label: 'Punto seleccionado en mapa',
+    updatedAt: Date.now(),
+  });
+};
+
+const buildManualLocation = (lat, lng) =>
+  normalizeLocation({
+    lat: clampLatitude(lat),
+    lng: normalizeLongitude(lng),
+    label: 'Punto seleccionado en mapa',
+    updatedAt: Date.now(),
+  });
 
 const removeTextAccents = (value) =>
   String(value || '')
@@ -1650,6 +1700,117 @@ export default function TiendaVirtualView({
           height: 100%;
           border: 0;
         }
+        .store-location-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+        .store-map-picker {
+          width: min(430px, calc(100vw - 32px));
+          border-radius: 24px;
+          padding: 18px;
+          background: #ffffff;
+          box-shadow: 0 28px 80px rgba(38, 6, 12, 0.28);
+        }
+        .store-map-picker-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        .store-map-picker-head strong {
+          display: block;
+          color: #111827;
+          font-size: 18px;
+        }
+        .store-map-picker-head span {
+          display: block;
+          margin-top: 3px;
+          color: #7c5b5f;
+          font-size: 12px;
+          font-weight: 800;
+        }
+        .store-map-canvas {
+          position: relative;
+          width: ${MAP_PICKER_WIDTH}px;
+          max-width: 100%;
+          height: ${MAP_PICKER_HEIGHT}px;
+          margin: 0 auto;
+          overflow: hidden;
+          border: 1px solid #ead8da;
+          border-radius: 18px;
+          background: #f3f4f6;
+          cursor: crosshair;
+          touch-action: manipulation;
+        }
+        .store-map-canvas img {
+          position: absolute;
+          width: ${MAP_PICKER_TILE_SIZE}px;
+          height: ${MAP_PICKER_TILE_SIZE}px;
+          user-select: none;
+          pointer-events: none;
+        }
+        .store-map-pin {
+          position: absolute;
+          width: 30px;
+          height: 30px;
+          border: 4px solid #ffffff;
+          border-radius: 999px 999px 999px 0;
+          background: #b91c1c;
+          box-shadow: 0 10px 25px rgba(185, 28, 28, 0.35);
+          transform: translate(-50%, -100%) rotate(-45deg);
+        }
+        .store-map-pin::after {
+          content: '';
+          position: absolute;
+          inset: 7px;
+          border-radius: 999px;
+          background: #ffffff;
+        }
+        .store-map-hint {
+          position: absolute;
+          left: 12px;
+          right: 12px;
+          bottom: 10px;
+          border-radius: 999px;
+          padding: 8px 10px;
+          background: rgba(255, 255, 255, 0.92);
+          color: #7b1022;
+          font-size: 11px;
+          font-weight: 950;
+          text-align: center;
+          pointer-events: none;
+        }
+        .store-map-fields {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .store-map-tools,
+        .store-map-picker-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-top: 12px;
+        }
+        .store-mini-button {
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #ead8da;
+          border-radius: 999px;
+          padding: 0 13px;
+          background: #fff7f4;
+          color: #7b1022;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 950;
+          cursor: pointer;
+          text-decoration: none;
+        }
         .store-order-line {
           display: grid;
           grid-template-columns: 52px minmax(0, 1fr) auto;
@@ -1716,7 +1877,7 @@ export default function TiendaVirtualView({
           position: relative;
           z-index: 1;
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 6px;
           margin-top: 14px;
         }
@@ -1932,6 +2093,10 @@ export default function TiendaVirtualView({
           .store-progress {
             grid-template-columns: 1fr;
           }
+          .store-location-actions,
+          .store-map-fields {
+            grid-template-columns: 1fr;
+          }
           .store-progress-step {
             min-height: 32px;
           }
@@ -1951,6 +2116,12 @@ export default function TiendaVirtualView({
           }}
           onFormChange={updateAuthForm}
           onCaptureLocation={captureAuthLocation}
+          onManualLocation={(location) => {
+            updateAuthForm('ubicacion', location);
+            if (!authForm.direccion.trim()) {
+              updateAuthForm('direccion', 'Ubicacion seleccionada en el mapa');
+            }
+          }}
           onLogin={handleStoreLogin}
           onRegister={handleStoreRegister}
         />
@@ -2237,6 +2408,7 @@ function StoreAuthView({
   authLocating,
   onAuthModeChange,
   onCaptureLocation,
+  onManualLocation,
   onFormChange,
   onLogin,
   onRegister,
@@ -2334,6 +2506,7 @@ function StoreAuthView({
                 location={authForm.ubicacion}
                 locating={authLocating}
                 onCapture={onCaptureLocation}
+                onManualLocation={onManualLocation}
               />
             </>
           )}
@@ -2346,7 +2519,8 @@ function StoreAuthView({
   );
 }
 
-function LocationCaptureBlock({ location, locating, onCapture }) {
+function LocationCaptureBlock({ location, locating, onCapture, onManualLocation }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const mapUrl = buildGoogleMapsPlaceUrl(location);
   const embedUrl = buildGoogleMapsEmbedUrl(location);
 
@@ -2358,9 +2532,14 @@ function LocationCaptureBlock({ location, locating, onCapture }) {
           Guarda el punto del mapa para que el entregador pueda llegar directo.
         </span>
       </div>
-      <button type="button" className="store-button secondary" onClick={onCapture} disabled={locating}>
-        {locating ? 'Tomando ubicacion...' : hasLocation(location) ? 'Actualizar ubicacion' : 'Usar mi ubicacion actual'}
-      </button>
+      <div className="store-location-actions">
+        <button type="button" className="store-button secondary" onClick={onCapture} disabled={locating}>
+          {locating ? 'Tomando ubicacion...' : hasLocation(location) ? 'Usar mi ubicacion actual' : 'Ubicacion actual'}
+        </button>
+        <button type="button" className="store-button secondary" onClick={() => setPickerOpen(true)}>
+          Ajustar en mapa
+        </button>
+      </div>
       {hasLocation(location) && (
         <>
           <div className="store-location-map">
@@ -2371,6 +2550,170 @@ function LocationCaptureBlock({ location, locating, onCapture }) {
           </a>
         </>
       )}
+      {pickerOpen && (
+        <MapPointPicker
+          location={location}
+          onClose={() => setPickerOpen(false)}
+          onSave={(nextLocation) => {
+            onManualLocation(nextLocation);
+            setPickerOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MapPointPicker({ location, onClose, onSave }) {
+  const initialLocation = normalizeLocation(location) || MAP_PICKER_DEFAULT_LOCATION;
+  const [center, setCenter] = useState(initialLocation);
+  const [selected, setSelected] = useState(initialLocation);
+  const [zoom, setZoom] = useState(16);
+  const [latDraft, setLatDraft] = useState(initialLocation.lat.toFixed(6));
+  const [lngDraft, setLngDraft] = useState(initialLocation.lng.toFixed(6));
+
+  useEffect(() => {
+    setLatDraft(selected.lat.toFixed(6));
+    setLngDraft(selected.lng.toFixed(6));
+  }, [selected.lat, selected.lng]);
+
+  const mapGeometry = useMemo(() => {
+    const centerPoint = locationToWorldPoint(center, zoom);
+    const topLeft = {
+      x: centerPoint.x - MAP_PICKER_WIDTH / 2,
+      y: centerPoint.y - MAP_PICKER_HEIGHT / 2,
+    };
+    const tileStartX = Math.floor(topLeft.x / MAP_PICKER_TILE_SIZE);
+    const tileEndX = Math.floor((topLeft.x + MAP_PICKER_WIDTH) / MAP_PICKER_TILE_SIZE);
+    const tileStartY = Math.floor(topLeft.y / MAP_PICKER_TILE_SIZE);
+    const tileEndY = Math.floor((topLeft.y + MAP_PICKER_HEIGHT) / MAP_PICKER_TILE_SIZE);
+    const tileCount = 2 ** zoom;
+    const tiles = [];
+
+    for (let x = tileStartX; x <= tileEndX; x += 1) {
+      for (let y = tileStartY; y <= tileEndY; y += 1) {
+        if (y < 0 || y >= tileCount) {
+          continue;
+        }
+
+        const wrappedX = ((x % tileCount) + tileCount) % tileCount;
+        tiles.push({
+          key: `${zoom}-${x}-${y}`,
+          src: `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${y}.png`,
+          left: x * MAP_PICKER_TILE_SIZE - topLeft.x,
+          top: y * MAP_PICKER_TILE_SIZE - topLeft.y,
+        });
+      }
+    }
+
+    return { tiles, topLeft };
+  }, [center, zoom]);
+
+  const selectedPoint = useMemo(() => {
+    const point = locationToWorldPoint(selected, zoom);
+    return {
+      left: point.x - mapGeometry.topLeft.x,
+      top: point.y - mapGeometry.topLeft.y,
+    };
+  }, [mapGeometry.topLeft.x, mapGeometry.topLeft.y, selected, zoom]);
+
+  const applyManualCoordinates = () => {
+    const nextLocation = buildManualLocation(latDraft, lngDraft);
+    if (!nextLocation) {
+      return;
+    }
+
+    setSelected(nextLocation);
+    setCenter(nextLocation);
+  };
+
+  const handleMapClick = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickX = (event.clientX - rect.left) * (MAP_PICKER_WIDTH / rect.width);
+    const clickY = (event.clientY - rect.top) * (MAP_PICKER_HEIGHT / rect.height);
+    const nextLocation = worldPointToLocation(
+      mapGeometry.topLeft.x + clickX,
+      mapGeometry.topLeft.y + clickY,
+      zoom
+    );
+
+    if (nextLocation) {
+      setSelected(nextLocation);
+    }
+  };
+
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-map-picker">
+        <div className="store-map-picker-head">
+          <div>
+            <strong>Ubicar punto de entrega</strong>
+            <span>Toca el mapa donde debe llegar el entregador y guarda el punto.</span>
+          </div>
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
+          </button>
+        </div>
+
+        <div className="store-map-canvas" onClick={handleMapClick}>
+          {mapGeometry.tiles.map((tile) => (
+            <img
+              key={tile.key}
+              src={tile.src}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              style={{ left: tile.left, top: tile.top }}
+            />
+          ))}
+          <span className="store-map-pin" style={{ left: selectedPoint.left, top: selectedPoint.top }} />
+          <div className="store-map-hint">Toca el mapa para mover el pin</div>
+        </div>
+
+        <div className="store-map-tools">
+          <button type="button" className="store-mini-button" onClick={() => setZoom((value) => Math.min(18, value + 1))}>
+            Acercar
+          </button>
+          <button type="button" className="store-mini-button" onClick={() => setZoom((value) => Math.max(12, value - 1))}>
+            Alejar
+          </button>
+          <button type="button" className="store-mini-button" onClick={() => setCenter(selected)}>
+            Centrar pin
+          </button>
+        </div>
+
+        <div className="store-map-fields">
+          <input
+            className="store-field"
+            value={latDraft}
+            onChange={(event) => setLatDraft(event.target.value)}
+            placeholder="Latitud"
+          />
+          <input
+            className="store-field"
+            value={lngDraft}
+            onChange={(event) => setLngDraft(event.target.value)}
+            placeholder="Longitud"
+          />
+        </div>
+        <div className="store-map-tools">
+          <button type="button" className="store-mini-button" onClick={applyManualCoordinates}>
+            Aplicar coordenadas
+          </button>
+          <a className="store-mini-button" href={buildGoogleMapsPlaceUrl(selected)} target="_blank" rel="noreferrer">
+            Ver en Google Maps
+          </a>
+        </div>
+
+        <div className="store-map-picker-actions">
+          <button type="button" className="store-button secondary" style={{ flex: 1 }} onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="button" className="store-button" style={{ flex: 2 }} onClick={() => onSave(selected)}>
+            Guardar este punto
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2452,6 +2795,12 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
             location={profile.ubicacion}
             locating={locating}
             onCapture={captureProfileLocation}
+            onManualLocation={(location) => {
+              updateProfile('ubicacion', location);
+              if (!profile.direccion.trim()) {
+                updateProfile('direccion', 'Ubicacion seleccionada en el mapa');
+              }
+            }}
           />
           <button type="submit" className="store-button" disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar perfil'}
