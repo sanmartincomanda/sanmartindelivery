@@ -67,6 +67,45 @@ export const STORE_PROMOTIONS = [
   },
 ];
 
+export const STORE_COMBOS = [
+  {
+    code: 'COMBO-660',
+    name: 'COMBO 2 HAMBURGUESA PRACTICO',
+    price: 660,
+    unit: 'unidad',
+    category: 'promociones',
+    subcategory: 'Combos',
+    active: true,
+    promo: true,
+    image: '/tienda/promos/promo-combo-2.jpg',
+    description: 'Codigo SICAR pendiente. Vinculado por precio C$ 660.',
+  },
+  {
+    code: 'COMBO-730',
+    name: 'COMBO 1 HAMBURGUESA PARRILLERO',
+    price: 730,
+    unit: 'unidad',
+    category: 'promociones',
+    subcategory: 'Combos',
+    active: true,
+    promo: true,
+    image: '/tienda/promos/promo-combo-1.jpg',
+    description: 'Codigo SICAR pendiente. Vinculado por precio C$ 730.',
+  },
+  {
+    code: 'COMBO-1020',
+    name: 'COMBO 3 PARRILLA PREMIUM',
+    price: 1020,
+    unit: 'unidad',
+    category: 'promociones',
+    subcategory: 'Combos',
+    active: true,
+    promo: true,
+    image: '/tienda/promos/promo-combo-3.jpg',
+    description: 'Codigo SICAR pendiente. Vinculado por precio C$ 1,020.',
+  },
+];
+
 export const STORE_PAYMENT_OPTIONS = ['Efectivo', 'POS BAC', 'TRANSFERENCIA', 'LINK DE PAGO'];
 
 export const STORE_CATEGORIES = [

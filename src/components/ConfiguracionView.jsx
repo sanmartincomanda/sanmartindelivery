@@ -17,6 +17,7 @@ const emptyProduct = {
   category: 'carniceria',
   subcategory: '',
   active: true,
+  promo: false,
   image: '',
   description: '',
 };
@@ -66,6 +67,7 @@ export default function ConfiguracionView() {
       category: product.category || 'carniceria',
       subcategory: product.subcategory || '',
       active: product.active !== false,
+      promo: Boolean(product.promo),
       image: product.image || '',
       description: product.description || '',
     });
@@ -299,6 +301,11 @@ export default function ConfiguracionView() {
                     <td>
                       <strong>{product.category || '-'}</strong>
                       <div style={{ color: '#64748b', marginTop: 4 }}>{product.subcategory || '-'}</div>
+                      {product.promo && (
+                        <div style={{ marginTop: 6 }}>
+                          <span className="cfg-badge">Promocion</span>
+                        </div>
+                      )}
                     </td>
                     <td>C$ {Number(product.price || 0).toFixed(2)}</td>
                     <td>
@@ -373,6 +380,14 @@ export default function ConfiguracionView() {
                 <option value="inactivo">Inactivo</option>
               </select>
             </div>
+            <select
+              className="cfg-select"
+              value={form.promo ? 'promo' : 'normal'}
+              onChange={(event) => updateForm('promo', event.target.value === 'promo')}
+            >
+              <option value="normal">Producto normal</option>
+              <option value="promo">Promocion / combo</option>
+            </select>
             <input
               className="cfg-input"
               value={form.category}

@@ -15,14 +15,24 @@ const LOGO_PATH = '/tienda/branding/logo.png';
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
-const clampQuantity = (value) => {
-  const rounded = Math.round(Number(value || 0) * 2) / 2;
+const isUnitProduct = (product) => String(product?.unit || '').toLowerCase() === 'unidad';
+
+const getQuantityStep = (product) => (isUnitProduct(product) ? 1 : 0.5);
+
+const clampQuantity = (value, product) => {
+  const step = getQuantityStep(product);
+  const rounded = Math.round(Number(value || 0) / step) * step;
   if (rounded <= 0) {
     return 0;
   }
 
-  return Number(rounded.toFixed(1));
+  return Number(rounded.toFixed(step === 1 ? 0 : 1));
 };
+
+const formatStoreQuantity = (quantity, unit) =>
+  String(unit).toLowerCase() === 'unidad' ? String(Number(quantity || 0)) : formatWeight(quantity);
+
+const getQuickQuantities = (product) => (isUnitProduct(product) ? [1, 2, 3, 4] : QUICK_WEIGHTS);
 
 const getProductCategoryTokens = (product) =>
   [product.category, product.subcategory, product.name, product.code]
@@ -39,6 +49,7 @@ export default function TiendaVirtualView({
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('todos');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [statusPhone, setStatusPhone] = useState('');
@@ -149,12 +160,13 @@ export default function TiendaVirtualView({
     [cartItems]
   );
 
-  const cartCount = cartItems.reduce((sum, item) => sum + Number(item.cantidad || 0), 0);
+  const cartCount = cartItems.length;
 
   const updateQuantity = (code, nextValue) => {
+    const product = activeProducts.find((item) => item.code === code) || catalog.find((item) => item.code === code);
     setCart((current) => ({
       ...current,
-      [code]: clampQuantity(nextValue),
+      [code]: clampQuantity(nextValue, product),
     }));
   };
 
@@ -368,29 +380,79 @@ export default function TiendaVirtualView({
           font-weight: 900;
           margin: 0 0 10px;
         }
-        .store-promo-track {
-          display: grid;
-          grid-auto-flow: column;
-          grid-auto-columns: minmax(128px, 168px);
+        .store-stories {
+          display: flex;
           gap: 12px;
           overflow-x: auto;
           padding-bottom: 4px;
         }
-        .store-promo-card {
-          height: 198px;
-          border-radius: 8px;
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          overflow: hidden;
+        .store-story {
+          flex: 0 0 82px;
+          border: 0;
+          background: transparent;
+          color: #111827;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 900;
+          line-height: 1.15;
+          cursor: pointer;
+          padding: 0;
+          text-align: center;
+        }
+        .store-story-ring {
+          width: 74px;
+          height: 74px;
+          margin: 0 auto 7px;
+          border-radius: 999px;
+          padding: 3px;
+          background: conic-gradient(from 160deg, #fbbf24, #ef4444, #991b1b, #fbbf24);
           display: flex;
           align-items: center;
           justify-content: center;
+          box-shadow: 0 10px 24px rgba(153, 27, 27, 0.16);
         }
-        .store-promo-card img {
+        .store-story-ring img {
           width: 100%;
           height: 100%;
+          border: 3px solid #ffffff;
+          border-radius: 999px;
+          object-fit: cover;
+          background: #ffffff;
+        }
+        .store-story:hover .store-story-ring {
+          transform: translateY(-1px);
+        }
+        .store-story-title {
+          display: block;
+          white-space: normal;
+        }
+        .store-promo-viewer {
+          width: min(420px, calc(100vw - 28px));
+          max-height: calc(100vh - 36px);
+          background: #0f172a;
+          border-radius: 18px;
+          padding: 12px;
+          box-shadow: 0 22px 56px rgba(15, 23, 42, 0.28);
+        }
+        .store-promo-viewer img {
+          width: 100%;
+          max-height: calc(100vh - 160px);
           object-fit: contain;
+          border-radius: 12px;
           background: #111827;
+        }
+        .store-promo-viewer-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          color: #ffffff;
+          margin-bottom: 10px;
+        }
+        .store-promo-viewer-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 10px;
         }
         .store-product-head {
           display: flex;
@@ -654,11 +716,12 @@ export default function TiendaVirtualView({
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 18px 14px;
           }
-          .store-promo-track {
-            grid-auto-columns: minmax(128px, 146px);
+          .store-story {
+            flex-basis: 76px;
           }
-          .store-promo-card {
-            height: 184px;
+          .store-story-ring {
+            width: 68px;
+            height: 68px;
           }
           .store-detail-grid {
             grid-template-columns: 1fr;
@@ -741,11 +804,19 @@ export default function TiendaVirtualView({
 
         <section className="store-promo">
           <h2 className="store-section-title">Promociones activas</h2>
-          <div className="store-promo-track">
+          <div className="store-stories">
             {STORE_PROMOTIONS.map((promotion) => (
-              <div key={promotion.id} className="store-promo-card">
-                <img src={promotion.image} alt={promotion.title} />
-              </div>
+              <button
+                key={promotion.id}
+                type="button"
+                className="store-story"
+                onClick={() => setSelectedPromotion(promotion)}
+              >
+                <span className="store-story-ring">
+                  <img src={promotion.image} alt={promotion.title} />
+                </span>
+                <span className="store-story-title">{promotion.title}</span>
+              </button>
             ))}
           </div>
         </section>
@@ -784,7 +855,7 @@ export default function TiendaVirtualView({
                       type="button"
                       className="store-add"
                       title="Agregar"
-                      onClick={() => updateQuantity(product.code, quantity + 0.5)}
+                      onClick={() => updateQuantity(product.code, quantity + getQuantityStep(product))}
                     >
                       +
                     </button>
@@ -794,7 +865,7 @@ export default function TiendaVirtualView({
                     <p className="store-price">{formatCurrency(product.price)}</p>
                     <p className="store-unit">
                       {quantity > 0
-                        ? `${formatWeight(quantity)} ${product.unit} en carrito`
+                        ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} en carrito`
                         : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
                     </p>
                   </article>
@@ -808,7 +879,7 @@ export default function TiendaVirtualView({
       {cartItems.length > 0 && (
         <div className="store-cart-bar">
           <div>
-            <strong>{formatWeight(cartCount)} lb</strong>
+            <strong>{cartCount === 1 ? '1 producto' : `${cartCount} productos`}</strong>
             <div style={{ fontSize: 13, opacity: 0.78 }}>{formatCurrency(totalAmount)}</div>
           </div>
           <button type="button" className="store-button" onClick={() => setCheckoutOpen(true)}>
@@ -823,6 +894,18 @@ export default function TiendaVirtualView({
           quantity={Number(cart[selectedProduct.code] || 0)}
           onClose={() => setSelectedProduct(null)}
           onQuantityChange={(nextQuantity) => updateQuantity(selectedProduct.code, nextQuantity)}
+        />
+      )}
+
+      {selectedPromotion && (
+        <PromotionViewer
+          promotion={selectedPromotion}
+          onClose={() => setSelectedPromotion(null)}
+          onViewCombos={() => {
+            setSelectedPromotion(null);
+            setQuery('');
+            setActiveCategory('promociones');
+          }}
         />
       )}
 
@@ -853,8 +936,33 @@ export default function TiendaVirtualView({
   );
 }
 
+function PromotionViewer({ promotion, onClose, onViewCombos }) {
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-promo-viewer">
+        <div className="store-promo-viewer-head">
+          <strong>{promotion.title}</strong>
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
+          </button>
+        </div>
+        <img src={promotion.image} alt={promotion.title} />
+        <div className="store-promo-viewer-actions">
+          <button type="button" className="store-button" style={{ flex: 1 }} onClick={onViewCombos}>
+            Ver combos
+          </button>
+          <button type="button" className="store-button secondary" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
   const subtotal = Number(quantity || 0) * Number(product.price || 0);
+  const step = getQuantityStep(product);
 
   return (
     <div className="store-sheet-overlay">
@@ -878,24 +986,24 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
             <p className="store-unit">{product.description || `Precio por ${product.unit}`}</p>
 
             <div className="store-qty-row">
-              {QUICK_WEIGHTS.map((weight) => (
+              {getQuickQuantities(product).map((weight) => (
                 <button
                   key={weight}
                   type="button"
                   className={`store-chip ${quantity === weight ? 'active' : ''}`}
                   onClick={() => onQuantityChange(weight)}
                 >
-                  {formatWeight(weight)} {product.unit}
+                  {formatStoreQuantity(weight, product.unit)} {product.unit}
                 </button>
               ))}
             </div>
 
             <div className="store-stepper">
-              <button type="button" onClick={() => onQuantityChange(quantity - 0.5)}>
+              <button type="button" onClick={() => onQuantityChange(quantity - step)}>
                 -
               </button>
-              <strong>{formatWeight(quantity)} {product.unit}</strong>
-              <button type="button" onClick={() => onQuantityChange(quantity + 0.5)}>
+              <strong>{formatStoreQuantity(quantity, product.unit)} {product.unit}</strong>
+              <button type="button" onClick={() => onQuantityChange(quantity + step)}>
                 +
               </button>
             </div>
@@ -942,7 +1050,8 @@ function CheckoutSheet({
             <div>
               <strong>{item.nombre}</strong>
               <div style={{ color: '#6b7280', fontSize: 13 }}>
-                {formatWeight(item.cantidad)} {item.unidad} x {formatCurrency(item.precioUnitario)}
+                {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} x{' '}
+                {formatCurrency(item.precioUnitario)}
               </div>
             </div>
             <strong>{formatCurrency(item.subtotal)}</strong>

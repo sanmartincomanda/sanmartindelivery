@@ -1,35 +1,33 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
-import { STORE_PRODUCTS } from '../data/tiendaVirtual';
+import { STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 
-const normalizeCatalogProduct = (product) => ({
-  code: String(product.code || '').trim(),
-  name: String(product.name || '').trim(),
-  price: Number(product.price || 0),
-  unit: String(product.unit || 'lb').trim() || 'lb',
-  category: String(product.category || 'carniceria').trim() || 'carniceria',
-  subcategory: String(product.subcategory || '').trim(),
-  active: product.active !== false,
-  image: String(product.image || '').trim(),
-  description: String(product.description || '').trim(),
+const normalizeCatalogProduct = (product, fallback = {}) => ({
+  code: String(product.code ?? fallback.code ?? '').trim(),
+  name: String(product.name ?? fallback.name ?? '').trim(),
+  price: Number(product.price ?? fallback.price ?? 0),
+  unit: String(product.unit ?? fallback.unit ?? 'lb').trim() || 'lb',
+  category: String(product.category ?? fallback.category ?? 'carniceria').trim() || 'carniceria',
+  subcategory: String(product.subcategory ?? fallback.subcategory ?? '').trim(),
+  active: product.active ?? fallback.active ?? true,
+  promo: Boolean(product.promo ?? fallback.promo),
+  image: String(product.image ?? fallback.image ?? '').trim(),
+  description: String(product.description ?? fallback.description ?? '').trim(),
 });
 
 export const mergeCatalogProducts = (remoteCatalog = {}) => {
-  const remoteProducts = Object.values(remoteCatalog || {}).map(normalizeCatalogProduct);
   const byCode = new Map();
 
-  STORE_PRODUCTS.forEach((product) => {
+  [...STORE_PRODUCTS, ...STORE_COMBOS].forEach((product) => {
     byCode.set(product.code, normalizeCatalogProduct(product));
   });
 
-  remoteProducts.forEach((product) => {
-    if (product.code) {
-      byCode.set(product.code, {
-        ...(byCode.get(product.code) || {}),
-        ...product,
-      });
+  Object.values(remoteCatalog || {}).forEach((remoteProduct) => {
+    const code = String(remoteProduct?.code || '').trim();
+    if (code) {
+      byCode.set(code, normalizeCatalogProduct(remoteProduct, byCode.get(code)));
     }
   });
 
@@ -56,7 +54,10 @@ export async function updateCatalogProduct(code, patch) {
     throw new Error('Codigo invalido');
   }
 
-  await update(ref(database, `${STORE_CATALOG_PATH}/${productKey}`), patch);
+  await update(ref(database, `${STORE_CATALOG_PATH}/${productKey}`), {
+    code: String(code || '').trim(),
+    ...patch,
+  });
 }
 
 export async function seedDefaultCatalogIfEmpty() {
@@ -66,7 +67,7 @@ export async function seedDefaultCatalogIfEmpty() {
   }
 
   const updates = {};
-  STORE_PRODUCTS.forEach((product) => {
+  [...STORE_PRODUCTS, ...STORE_COMBOS].forEach((product) => {
     updates[getCatalogProductKey(product.code)] = normalizeCatalogProduct(product);
   });
 
