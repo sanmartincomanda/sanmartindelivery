@@ -18,6 +18,12 @@ import {
   STORE_COUPONS_PATH,
 } from '../services/storeCoupons';
 import {
+  buildGoogleMapsEmbedUrl,
+  buildGoogleMapsPlaceUrl,
+  getBrowserLocation,
+  hasLocation,
+} from '../services/geo';
+import {
   cleanStorePhone,
   loginStoreUser,
   registerStoreUser,
@@ -231,9 +237,11 @@ export default function TiendaVirtualView({
     confirmPassword: '',
     direccion: '',
     referencia: '',
+    ubicacion: null,
   });
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [authLocating, setAuthLocating] = useState(false);
   const [customerOrders, setCustomerOrders] = useState([]);
   const [customer, setCustomer] = useState({
     nombre: '',
@@ -559,6 +567,24 @@ export default function TiendaVirtualView({
     }));
   };
 
+  const captureAuthLocation = async () => {
+    setAuthLocating(true);
+    setAuthError('');
+
+    try {
+      const location = await getBrowserLocation();
+      updateAuthForm('ubicacion', location);
+      if (!authForm.direccion.trim()) {
+        updateAuthForm('direccion', 'Ubicacion guardada desde el mapa');
+      }
+    } catch (error) {
+      console.error('No se pudo obtener ubicacion:', error);
+      setAuthError('No pudimos tomar tu ubicacion. Activa permisos o escribe tu direccion.');
+    } finally {
+      setAuthLocating(false);
+    }
+  };
+
   const persistStoreSession = (user) => {
     setCurrentUser(user);
     setCreatedOrder(null);
@@ -660,6 +686,7 @@ export default function TiendaVirtualView({
         confirmPassword: '',
         direccion: '',
         referencia: '',
+        ubicacion: null,
       });
     } catch (error) {
       console.error('Error registrando usuario de tienda:', error);
@@ -741,6 +768,7 @@ export default function TiendaVirtualView({
           direccion: fullAddress,
           telefono: currentUser.telefono,
           referencia: currentUser.referencia,
+          ubicacion: currentUser.ubicacion,
           items: cartItems,
           subtotalEstimado: totalAmount,
           descuentoCupon: couponDiscount,
@@ -1572,6 +1600,44 @@ export default function TiendaVirtualView({
           font-weight: 800;
           line-height: 1.4;
         }
+        .store-location-card {
+          display: grid;
+          gap: 10px;
+          border: 1px solid #ead8da;
+          border-radius: 16px;
+          padding: 12px;
+          background: #fff7f4;
+        }
+        .store-location-card strong {
+          display: block;
+          color: #111827;
+        }
+        .store-location-card span {
+          display: block;
+          margin-top: 3px;
+          color: #7c5b5f;
+          font-size: 12px;
+          font-weight: 800;
+          line-height: 1.35;
+        }
+        .store-location-card a {
+          color: #7b1022;
+          font-size: 13px;
+          font-weight: 900;
+          text-decoration: none;
+        }
+        .store-location-map {
+          height: 180px;
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1px solid #ead8da;
+          background: #f3f4f6;
+        }
+        .store-location-map iframe {
+          width: 100%;
+          height: 100%;
+          border: 0;
+        }
         .store-order-line {
           display: grid;
           grid-template-columns: 52px minmax(0, 1fr) auto;
@@ -1866,11 +1932,13 @@ export default function TiendaVirtualView({
           authForm={authForm}
           authError={authError}
           authLoading={authLoading}
+          authLocating={authLocating}
           onAuthModeChange={(mode) => {
             setAuthMode(mode);
             setAuthError('');
           }}
           onFormChange={updateAuthForm}
+          onCaptureLocation={captureAuthLocation}
           onLogin={handleStoreLogin}
           onRegister={handleStoreRegister}
         />
@@ -2154,7 +2222,9 @@ function StoreAuthView({
   authForm,
   authError,
   authLoading,
+  authLocating,
   onAuthModeChange,
+  onCaptureLocation,
   onFormChange,
   onLogin,
   onRegister,
@@ -2248,6 +2318,11 @@ function StoreAuthView({
                 onChange={(event) => onFormChange('referencia', event.target.value)}
                 placeholder="Referencia"
               />
+              <LocationCaptureBlock
+                location={authForm.ubicacion}
+                locating={authLocating}
+                onCapture={onCaptureLocation}
+              />
             </>
           )}
           <button type="submit" className="store-button" disabled={authLoading}>
@@ -2259,12 +2334,43 @@ function StoreAuthView({
   );
 }
 
+function LocationCaptureBlock({ location, locating, onCapture }) {
+  const mapUrl = buildGoogleMapsPlaceUrl(location);
+  const embedUrl = buildGoogleMapsEmbedUrl(location);
+
+  return (
+    <div className="store-location-card">
+      <div>
+        <strong>Ubicacion exacta</strong>
+        <span>
+          Guarda el punto del mapa para que el entregador pueda llegar directo.
+        </span>
+      </div>
+      <button type="button" className="store-button secondary" onClick={onCapture} disabled={locating}>
+        {locating ? 'Tomando ubicacion...' : hasLocation(location) ? 'Actualizar ubicacion' : 'Usar mi ubicacion actual'}
+      </button>
+      {hasLocation(location) && (
+        <>
+          <div className="store-location-map">
+            <iframe title="Ubicacion de entrega" src={embedUrl} loading="lazy" />
+          </div>
+          <a href={mapUrl} target="_blank" rel="noreferrer">
+            Abrir punto en Google Maps
+          </a>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ProfileSheet({ user, saving, onClose, onSave }) {
   const [profile, setProfile] = useState({
     nombre: user?.nombre || '',
     direccion: user?.direccion || '',
     referencia: user?.referencia || '',
+    ubicacion: user?.ubicacion || null,
   });
+  const [locating, setLocating] = useState(false);
 
   const updateProfile = (field, value) => {
     setProfile((current) => ({
@@ -2282,6 +2388,22 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
     }
 
     onSave(profile);
+  };
+
+  const captureProfileLocation = async () => {
+    setLocating(true);
+    try {
+      const location = await getBrowserLocation();
+      updateProfile('ubicacion', location);
+      if (!profile.direccion.trim()) {
+        updateProfile('direccion', 'Ubicacion guardada desde el mapa');
+      }
+    } catch (error) {
+      console.error('No se pudo obtener ubicacion:', error);
+      alert('No pudimos tomar tu ubicacion. Activa permisos o intenta de nuevo.');
+    } finally {
+      setLocating(false);
+    }
   };
 
   return (
@@ -2313,6 +2435,11 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
             value={profile.referencia}
             onChange={(event) => updateProfile('referencia', event.target.value)}
             placeholder="Referencia"
+          />
+          <LocationCaptureBlock
+            location={profile.ubicacion}
+            locating={locating}
+            onCapture={captureProfileLocation}
           />
           <button type="submit" className="store-button" disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar perfil'}

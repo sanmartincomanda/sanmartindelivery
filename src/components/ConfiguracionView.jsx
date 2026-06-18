@@ -25,6 +25,13 @@ import {
   STORE_USERS_PATH,
   updateStoreUserPassword,
 } from '../services/storeUsers';
+import {
+  DRIVERS_PATH,
+  mergeDrivers,
+  saveDriver,
+  seedDefaultDriversIfEmpty,
+  updateDriver,
+} from '../services/drivers';
 
 const COUPONS_PIN = '210397';
 
@@ -59,22 +66,34 @@ const emptyCoupon = {
   notes: '',
 };
 
+const emptyDriver = {
+  code: '',
+  name: '',
+  phone: '',
+  active: true,
+  sortOrder: '',
+  password: '',
+};
+
 export default function ConfiguracionView() {
   const [section, setSection] = useState('catalogo');
   const [usersTab, setUsersTab] = useState('administrativo');
   const [products, setProducts] = useState(() => mergeCatalogProducts());
   const [categories, setCategories] = useState(() => mergeStoreCategories());
   const [coupons, setCoupons] = useState(() => mergeStoreCoupons());
+  const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [storeUsers, setStoreUsers] = useState([]);
   const [form, setForm] = useState(emptyProduct);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [couponForm, setCouponForm] = useState(emptyCoupon);
+  const [driverForm, setDriverForm] = useState(emptyDriver);
   const [couponsUnlocked, setCouponsUnlocked] = useState(false);
   const [couponPin, setCouponPin] = useState('');
   const [passwordForms, setPasswordForms] = useState({});
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
+  const [savingDriver, setSavingDriver] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
@@ -99,6 +118,14 @@ export default function ConfiguracionView() {
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
       setCoupons(mergeStoreCoupons(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
+      setDrivers(mergeDrivers(snapshot.val()));
     });
 
     return () => unsubscribe();
@@ -193,6 +220,13 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const updateDriverForm = (field, value) => {
+    setDriverForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const updatePasswordForm = (userKey, field, value) => {
     setPasswordForms((current) => ({
       ...current,
@@ -249,6 +283,17 @@ export default function ConfiguracionView() {
       minimum: coupon.minimum ?? '',
       active: coupon.active !== false,
       notes: coupon.notes || '',
+    });
+  };
+
+  const editDriver = (driver) => {
+    setDriverForm({
+      code: driver.code || '',
+      name: driver.name || '',
+      phone: driver.phone || '',
+      active: driver.active !== false,
+      sortOrder: driver.sortOrder ?? '',
+      password: '',
     });
   };
 
@@ -340,6 +385,28 @@ export default function ConfiguracionView() {
     }
   };
 
+  const saveDeliveryDriver = async (event) => {
+    event.preventDefault();
+    setSavingDriver(true);
+    setMessage('');
+
+    try {
+      const existingDriver = drivers.find((driver) => driver.code === driverForm.code);
+      await saveDriver({
+        ...(existingDriver || {}),
+        ...driverForm,
+        sortOrder: driverForm.sortOrder === '' ? drivers.length * 10 : Number(driverForm.sortOrder || 0),
+      });
+      setDriverForm(emptyDriver);
+      setMessage('Entregador guardado.');
+    } catch (error) {
+      console.error('Error guardando entregador:', error);
+      setMessage('No se pudo guardar el entregador.');
+    } finally {
+      setSavingDriver(false);
+    }
+  };
+
   const toggleProduct = async (product) => {
     try {
       await updateCatalogProduct(product.code, { active: product.active === false });
@@ -364,6 +431,15 @@ export default function ConfiguracionView() {
     } catch (error) {
       console.error('Error actualizando cupon:', error);
       setMessage('No se pudo actualizar el cupon.');
+    }
+  };
+
+  const toggleDriver = async (driver) => {
+    try {
+      await updateDriver(driver.code, { active: driver.active === false });
+    } catch (error) {
+      console.error('Error actualizando entregador:', error);
+      setMessage('No se pudo actualizar el entregador.');
     }
   };
 
@@ -429,6 +505,20 @@ export default function ConfiguracionView() {
     }
   };
 
+  const seedDrivers = async () => {
+    setSavingDriver(true);
+    setMessage('');
+    try {
+      const seeded = await seedDefaultDriversIfEmpty();
+      setMessage(seeded ? 'Entregadores base creados.' : 'Los entregadores ya existen.');
+    } catch (error) {
+      console.error('Error inicializando entregadores:', error);
+      setMessage('No se pudieron inicializar los entregadores.');
+    } finally {
+      setSavingDriver(false);
+    }
+  };
+
   const sectionMeta = {
     catalogo: {
       path: 'Configuraciones / Tienda Virtual / Catalogo',
@@ -441,6 +531,10 @@ export default function ConfiguracionView() {
     cupones: {
       path: 'Configuraciones / Cupones',
       title: 'Cupones',
+    },
+    entregadores: {
+      path: 'Configuraciones / Entregadores',
+      title: 'Entregadores',
     },
   }[section] || {
     path: 'Configuraciones',
@@ -575,6 +669,11 @@ export default function ConfiguracionView() {
               Inicializar catalogo base
             </button>
           )}
+          {section === 'entregadores' && (
+            <button type="button" className="cfg-button secondary" onClick={seedDrivers} disabled={savingDriver}>
+              Inicializar entregadores base
+            </button>
+          )}
         </div>
 
         {message && (
@@ -606,6 +705,13 @@ export default function ConfiguracionView() {
             onClick={() => setSection('usuarios')}
           >
             Usuarios
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${section === 'entregadores' ? 'active' : ''}`}
+            onClick={() => setSection('entregadores')}
+          >
+            Entregadores
           </button>
           <button
             type="button"
@@ -948,6 +1054,17 @@ export default function ConfiguracionView() {
             saveClientPassword={saveClientPassword}
             savingPasswordKey={savingPasswordKey}
           />
+        ) : section === 'entregadores' ? (
+          <DriversManager
+            drivers={drivers}
+            driverForm={driverForm}
+            savingDriver={savingDriver}
+            updateDriverForm={updateDriverForm}
+            saveDeliveryDriver={saveDeliveryDriver}
+            editDriver={editDriver}
+            toggleDriver={toggleDriver}
+            resetDriverForm={() => setDriverForm(emptyDriver)}
+          />
         ) : (
           <CouponsManager
             coupons={coupons}
@@ -965,6 +1082,157 @@ export default function ConfiguracionView() {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function DriversManager({
+  drivers,
+  driverForm,
+  savingDriver,
+  updateDriverForm,
+  saveDeliveryDriver,
+  editDriver,
+  toggleDriver,
+  resetDriverForm,
+}) {
+  return (
+    <div
+      className="cfg-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.35fr) minmax(340px, 0.85fr)',
+        gap: 18,
+        marginTop: 18,
+        alignItems: 'start',
+      }}
+    >
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Entregadores asignados</h2>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
+              Estos codigos se usan para asignar pedidos y entrar al modulo Driver.
+            </p>
+          </div>
+          <strong>{drivers.length} entregadores</strong>
+        </div>
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          {drivers.map((driver) => (
+            <div
+              key={driver.code}
+              style={{
+                border: '1px solid #edf2f7',
+                borderRadius: 8,
+                padding: 12,
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) auto',
+                gap: 12,
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: 18 }}>{driver.name}</strong>
+                <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                  {driver.code} {driver.phone ? `| ${driver.phone}` : ''}
+                </div>
+                <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span className={`cfg-badge ${driver.active === false ? 'off' : ''}`}>
+                    {driver.active === false ? 'Inactivo' : 'Activo'}
+                  </span>
+                  <span className={`cfg-badge ${driver.passwordHash ? '' : 'off'}`}>
+                    {driver.passwordHash ? 'Con contrasena' : 'Clave inicial: codigo'}
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button type="button" className="cfg-button secondary" onClick={() => editDriver(driver)}>
+                  Editar
+                </button>
+                <button type="button" className="cfg-button secondary" onClick={() => toggleDriver(driver)}>
+                  {driver.active === false ? 'Activar' : 'Desactivar'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <form
+        onSubmit={saveDeliveryDriver}
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+          display: 'grid',
+          gap: 10,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 22 }}>Entregador</h2>
+        <input
+          className="cfg-input"
+          value={driverForm.code}
+          onChange={(event) => updateDriverForm('code', event.target.value.toUpperCase())}
+          placeholder="Codigo. Ej: E-001"
+        />
+        <input
+          className="cfg-input"
+          value={driverForm.name}
+          onChange={(event) => updateDriverForm('name', event.target.value.toUpperCase())}
+          placeholder="Nombre"
+        />
+        <input
+          className="cfg-input"
+          value={driverForm.phone}
+          onChange={(event) => updateDriverForm('phone', event.target.value)}
+          placeholder="Telefono"
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <input
+            className="cfg-input"
+            type="number"
+            value={driverForm.sortOrder}
+            onChange={(event) => updateDriverForm('sortOrder', event.target.value)}
+            placeholder="Orden"
+          />
+          <select
+            className="cfg-select"
+            value={driverForm.active ? 'activo' : 'inactivo'}
+            onChange={(event) => updateDriverForm('active', event.target.value === 'activo')}
+          >
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+        <input
+          className="cfg-input"
+          type="password"
+          value={driverForm.password}
+          onChange={(event) => updateDriverForm('password', event.target.value)}
+          placeholder="Nueva contrasena para Driver"
+        />
+        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
+          Si dejas la contrasena vacia se mantiene la actual. Para los entregadores base sin
+          contrasena, la clave inicial es su mismo codigo.
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="submit" className="cfg-button" disabled={savingDriver}>
+            {savingDriver ? 'Guardando...' : 'Guardar entregador'}
+          </button>
+          <button type="button" className="cfg-button secondary" onClick={resetDriverForm}>
+            Nuevo
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

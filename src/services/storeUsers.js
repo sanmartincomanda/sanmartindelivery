@@ -1,5 +1,6 @@
 import { get, push, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
+import { normalizeLocation } from './geo';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
@@ -54,7 +55,7 @@ const sanitizeStoreUser = (user, key) => {
   };
 };
 
-export async function ensureStoreUser({ nombre, telefono, direccion, referencia, passwordHash }) {
+export async function ensureStoreUser({ nombre, telefono, direccion, referencia, passwordHash, ubicacion }) {
   const cleanPhone = cleanStorePhone(telefono);
   const userKey = getStoreUserKey(cleanPhone);
 
@@ -72,6 +73,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
     telefono: cleanPhone,
     direccion: String(direccion || '').trim(),
     referencia: String(referencia || '').trim(),
+    ubicacion: normalizeLocation(ubicacion) || normalizeLocation(existingUser?.ubicacion) || null,
     codigo: existingUser?.codigo || buildClientCode(cleanPhone),
     updatedAt: now,
   };
@@ -86,6 +88,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
       direccion: profile.referencia
         ? `${profile.direccion} | Ref: ${profile.referencia}`
         : profile.direccion,
+      ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       origen: 'tienda_virtual',
       createdAt: now,
@@ -97,6 +100,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
       direccion: profile.referencia
         ? `${profile.direccion} | Ref: ${profile.referencia}`
         : profile.direccion,
+      ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       origen: 'tienda_virtual',
       updatedAt: now,
@@ -118,7 +122,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
   };
 }
 
-export async function registerStoreUser({ nombre, telefono, direccion, referencia, password }) {
+export async function registerStoreUser({ nombre, telefono, direccion, referencia, password, ubicacion }) {
   const cleanPhone = cleanStorePhone(telefono);
   const userKey = getStoreUserKey(cleanPhone);
   const cleanPassword = String(password || '').trim();
@@ -145,6 +149,7 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
     telefono: cleanPhone,
     direccion,
     referencia,
+    ubicacion,
     passwordHash,
   });
 
@@ -204,6 +209,7 @@ export async function updateStoreUserProfile(user, patch) {
     telefono: currentUser.telefono,
     direccion: patch.direccion ?? currentUser.direccion,
     referencia: patch.referencia ?? currentUser.referencia,
+    ubicacion: patch.ubicacion ?? currentUser.ubicacion,
   });
 
   const safeUser = sanitizeStoreUser(

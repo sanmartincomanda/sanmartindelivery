@@ -10,6 +10,7 @@ import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
 import TiendaVirtualView from './components/TiendaVirtualView';
 import ConfiguracionView from './components/ConfiguracionView';
+import DriverView from './components/DriverView';
 import { createOrder, ORDER_LIMIT_PER_DAY } from './services/orders';
 
 const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
@@ -64,7 +65,11 @@ const getRouteFromHash = () => {
   }
 
   const cleanedHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
-  return cleanedHash.startsWith('tienda') ? 'tienda' : 'dashboard';
+  if (cleanedHash.startsWith('tienda')) return 'tienda';
+  if (cleanedHash.startsWith('cocina')) return 'cocina';
+  if (cleanedHash.startsWith('driver')) return 'driver';
+  if (cleanedHash.startsWith('admin') || cleanedHash.startsWith('administracion')) return 'dashboard';
+  return 'dashboard';
 };
 
 function App() {
@@ -74,6 +79,11 @@ function App() {
   const [inputUser, setInputUser] = useState('');
   const [inputPass, setInputPass] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [kitchenAuth, setKitchenAuth] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('sanmartin_kitchen_auth') === 'true';
+  });
+  const [kitchenLoginError, setKitchenLoginError] = useState(false);
 
   const [orders, setOrders] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -84,6 +94,8 @@ function App() {
   const [todayCounter, setTodayCounter] = useState(0);
 
   const isPublicStoreRoute = route === 'tienda';
+  const isKitchenRoute = route === 'cocina';
+  const isDriverRoute = route === 'driver';
   const todayKey = hoyISO();
 
   useEffect(() => {
@@ -227,6 +239,18 @@ function App() {
     setLoginError(true);
   };
 
+  const handleKitchenLogin = ({ user, password }) => {
+    if (String(user || '').trim().toLowerCase() === 'cocina' && password === 'cocina2026') {
+      setKitchenAuth(true);
+      setKitchenLoginError(false);
+      window.localStorage.setItem('sanmartin_kitchen_auth', 'true');
+      return true;
+    }
+
+    setKitchenLoginError(true);
+    return false;
+  };
+
   const addOrder = async (payload, options = {}) => {
     return createOrder(payload, options);
   };
@@ -265,6 +289,26 @@ function App() {
         mode="public"
       />
     );
+  }
+
+  if (isDriverRoute) {
+    return <DriverView orders={orders} />;
+  }
+
+  if (isKitchenRoute) {
+    if (!kitchenAuth) {
+      return (
+        <RoleLogin
+          title="Cocina"
+          subtitle="Acceso general para todos los carniceros"
+          userPlaceholder="Usuario: cocina"
+          error={kitchenLoginError}
+          onLogin={handleKitchenLogin}
+        />
+      );
+    }
+
+    return <KitchenView orders={orders} />;
   }
 
   if (!isAuthenticated) {
@@ -677,6 +721,104 @@ function App() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
+  const [user, setUser] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onLogin({ user, password });
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background:
+          'radial-gradient(circle at 18% 18%, rgba(255,255,255,0.12), transparent 25%), linear-gradient(135deg, #3b0b16, #7b1022 52%, #a33a36)',
+        fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
+        padding: 20,
+      }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          width: 'min(420px, 100%)',
+          display: 'grid',
+          gap: 12,
+          background: 'white',
+          padding: 30,
+          borderRadius: 22,
+          textAlign: 'center',
+          boxShadow: '0 28px 80px rgba(38, 6, 12, 0.28)',
+        }}
+      >
+        <img src={logo} alt="Logo" style={{ width: 70, height: 70, margin: '0 auto' }} />
+        <h1 style={{ margin: 0, color: '#111827', fontSize: 30 }}>{title}</h1>
+        <p style={{ margin: 0, color: '#64748b', fontWeight: 800 }}>{subtitle}</p>
+        {error && (
+          <div
+            style={{
+              borderRadius: 12,
+              padding: 10,
+              background: '#fee2e2',
+              color: '#991b1b',
+              fontWeight: 900,
+            }}
+          >
+            Credenciales incorrectas
+          </div>
+        )}
+        <input
+          value={user}
+          onChange={(event) => setUser(event.target.value)}
+          placeholder={userPlaceholder}
+          style={{
+            minHeight: 46,
+            border: '1px solid #dbe3ef',
+            borderRadius: 12,
+            padding: '0 14px',
+            font: 'inherit',
+            fontWeight: 800,
+          }}
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          placeholder="Contrasena"
+          style={{
+            minHeight: 46,
+            border: '1px solid #dbe3ef',
+            borderRadius: 12,
+            padding: '0 14px',
+            font: 'inherit',
+            fontWeight: 800,
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            minHeight: 46,
+            border: 0,
+            borderRadius: 999,
+            background: '#7b1022',
+            color: 'white',
+            font: 'inherit',
+            fontWeight: 900,
+            cursor: 'pointer',
+          }}
+        >
+          Entrar
+        </button>
+      </form>
     </div>
   );
 }

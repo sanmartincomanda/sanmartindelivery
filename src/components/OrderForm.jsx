@@ -4,6 +4,7 @@ import { database } from '../firebase';
 import logo from '../logo.svg';
 import { hoyISO, normalizar } from './Utils';
 import { MANUAL_CHANNEL, formatOrderNumber } from '../services/orders';
+import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation } from '../services/geo';
 
 const PAYMENT_OPTIONS = [
   'Efectivo',
@@ -25,8 +26,9 @@ export default function OrderForm({
   const [pedido, setPedido] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
   const [showNewClient, setShowNewClient] = useState(false);
-  const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '' });
+  const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '', ubicacion: null });
   const [savingClient, setSavingClient] = useState(false);
+  const [locatingClient, setLocatingClient] = useState(false);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
   const [hoverIdx, setHoverIdx] = useState(-1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,6 +80,7 @@ export default function OrderForm({
           cliente: selectedClient.nombre,
           clienteCodigo: selectedClient.codigo || '-',
           direccion: selectedClient.direccion || '-',
+          ubicacion: selectedClient.ubicacion || null,
           pedido: pedido.trim(),
           fecha: hoyISO(),
           metodoPago,
@@ -118,12 +121,13 @@ export default function OrderForm({
         nombre: nombre.trim(),
         codigo: codigo.trim(),
         direccion: direccion.trim(),
+        ubicacion: nuevoCliente.ubicacion || null,
       };
 
       await set(newClientRef, clientData);
 
       setShowNewClient(false);
-      setNuevoCliente({ nombre: '', codigo: '', direccion: '' });
+      setNuevoCliente({ nombre: '', codigo: '', direccion: '', ubicacion: null });
       setSelectedClient({ firebaseKey: newClientRef.key, ...clientData });
       setClienteInput(clientData.nombre);
     } catch (error) {
@@ -131,6 +135,23 @@ export default function OrderForm({
       alert('No se pudo guardar el cliente.');
     } finally {
       setSavingClient(false);
+    }
+  };
+
+  const capturarUbicacionCliente = async () => {
+    setLocatingClient(true);
+    try {
+      const ubicacion = await getBrowserLocation();
+      setNuevoCliente((current) => ({
+        ...current,
+        ubicacion,
+        direccion: current.direccion || 'Ubicacion guardada desde el mapa',
+      }));
+    } catch (error) {
+      console.error('No se pudo obtener ubicacion:', error);
+      alert('No pudimos tomar la ubicacion. Activa permisos o escribe la direccion.');
+    } finally {
+      setLocatingClient(false);
     }
   };
 
@@ -595,6 +616,45 @@ export default function OrderForm({
                     />
                     <button
                       type="button"
+                      onClick={capturarUbicacionCliente}
+                      disabled={locatingClient}
+                      className="btn-hover"
+                      style={{
+                        padding: '14px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        background: hasLocation(nuevoCliente.ubicacion)
+                          ? 'rgba(16, 185, 129, 0.18)'
+                          : 'rgba(255,255,255,0.05)',
+                        color: hasLocation(nuevoCliente.ubicacion) ? '#86efac' : 'white',
+                        fontWeight: 800,
+                        fontSize: '14px',
+                        cursor: locatingClient ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {locatingClient
+                        ? 'Tomando ubicacion...'
+                        : hasLocation(nuevoCliente.ubicacion)
+                          ? 'Ubicacion guardada - actualizar'
+                          : 'Guardar ubicacion actual'}
+                    </button>
+                    {hasLocation(nuevoCliente.ubicacion) && (
+                      <a
+                        href={buildGoogleMapsPlaceUrl(nuevoCliente.ubicacion)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: '#93c5fd',
+                          fontSize: '13px',
+                          fontWeight: 800,
+                          textDecoration: 'none',
+                        }}
+                      >
+                        Abrir punto en Google Maps
+                      </a>
+                    )}
+                    <button
+                      type="button"
                       onClick={guardarNuevoCliente}
                       disabled={savingClient}
                       className="btn-hover"
@@ -681,6 +741,16 @@ export default function OrderForm({
                     <span style={{ opacity: 0.6 }}>Direccion:</span>
                     <span>{selectedClient.direccion}</span>
                   </div>
+                  {hasLocation(selectedClient.ubicacion) && (
+                    <a
+                      href={buildGoogleMapsPlaceUrl(selectedClient.ubicacion)}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#93c5fd', fontSize: '13px', fontWeight: 800, textDecoration: 'none' }}
+                    >
+                      Ubicacion en Google Maps
+                    </a>
+                  )}
                 </div>
               </div>
             )}

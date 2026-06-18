@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { ref, update } from 'firebase/database';
+import React, { useEffect, useState } from 'react';
+import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
+import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
+import { DRIVERS_PATH, mergeDrivers } from '../services/drivers';
 
 // Iconos SVG (mismos que en KitchenView)
 const Icons = {
@@ -99,6 +101,15 @@ export default function ListaPedidos({ pedidos = [] }) {
   const [modalRepartidor, setModalRepartidor] = useState(null);
   const [repartidorSeleccionado, setRepartidorSeleccionado] = useState(null);
   const [animatingCards, setAnimatingCards] = useState(new Set());
+  const [repartidores, setRepartidores] = useState(() => mergeDrivers().filter((driver) => driver.active !== false));
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
+      setRepartidores(mergeDrivers(snapshot.val()).filter((driver) => driver.active !== false));
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const isPorEnviar = (p) => p.estado !== 'Enviado' && p.estado !== 'Cancelado';
   const isEnviado = (p) => p.estado === 'Enviado';
@@ -121,8 +132,8 @@ export default function ListaPedidos({ pedidos = [] }) {
     update(ref(database, `${getBasePath()}/${firebaseKey}`), { [campo]: valor });
   };
 
-  const handleEnviarPedido = (firebaseKey, repartidorNombre) => {
-    if (!repartidorNombre) return;
+  const handleEnviarPedido = (firebaseKey, repartidor) => {
+    if (!repartidor?.name) return;
     const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     
     setAnimatingCards(prev => new Set([...prev, firebaseKey]));
@@ -133,9 +144,11 @@ export default function ListaPedidos({ pedidos = [] }) {
     }), 300);
 
     update(ref(database, `${getBasePath()}/${firebaseKey}`), {
-      repartidor: repartidorNombre,
+      repartidor: repartidor.name,
+      repartidorCodigo: repartidor.code,
       estado: 'Enviado',
       timestampEnviado: now,
+      timestampAsignado: now,
       timestamp: Date.now()
     });
     
@@ -154,7 +167,9 @@ export default function ListaPedidos({ pedidos = [] }) {
     update(ref(database, `${getBasePath()}/${firebaseKey}`), {
       estado: 'Preparado',
       repartidor: null,
+      repartidorCodigo: null,
       timestampEnviado: null,
+      timestampAsignado: null,
       timestamp: Date.now()
     });
   };
@@ -366,22 +381,22 @@ export default function ListaPedidos({ pedidos = [] }) {
               gap: '12px',
               marginBottom: '24px'
             }}>
-              {REPARTIDORES.map((repartidor) => (
+              {repartidores.map((repartidor) => (
                 <button
-                  key={repartidor.nombre}
+                  key={repartidor.code}
                   type="button"
-                  onClick={() => setRepartidorSeleccionado(repartidor.nombre)}
-                  className={`repartidor-card ${repartidorSeleccionado === repartidor.nombre ? 'selected' : ''}`}
+                  onClick={() => setRepartidorSeleccionado(repartidor)}
+                  className={`repartidor-card ${repartidorSeleccionado?.code === repartidor.code ? 'selected' : ''}`}
                   style={{
                     padding: '20px 12px',
                     borderRadius: '16px',
                     border: '2px solid',
-                    borderColor: repartidorSeleccionado === repartidor.nombre ? '#6366f1' : '#e2e8f0',
-                    background: repartidorSeleccionado === repartidor.nombre 
+                    borderColor: repartidorSeleccionado?.code === repartidor.code ? '#6366f1' : '#e2e8f0',
+                    background: repartidorSeleccionado?.code === repartidor.code
                       ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' 
                       : '#f8fafc',
-                    color: repartidorSeleccionado === repartidor.nombre ? 'white' : '#475569',
-                    fontWeight: repartidorSeleccionado === repartidor.nombre ? 800 : 700,
+                    color: repartidorSeleccionado?.code === repartidor.code ? 'white' : '#475569',
+                    fontWeight: repartidorSeleccionado?.code === repartidor.code ? 800 : 700,
                     fontSize: '14px',
                     cursor: 'pointer',
                     textAlign: 'center',
@@ -393,8 +408,9 @@ export default function ListaPedidos({ pedidos = [] }) {
                     justifyContent: 'center'
                   }}
                 >
-                  <span style={{ fontSize: '32px' }}>{repartidor.icono}</span>
-                  <span style={{ lineHeight: '1.3' }}>{repartidor.nombre}</span>
+                  <span style={{ fontSize: '32px' }}>Moto</span>
+                  <span style={{ lineHeight: '1.3' }}>{repartidor.name}</span>
+                  <span style={{ fontSize: '11px', opacity: 0.75 }}>{repartidor.code}</span>
                 </button>
               ))}
             </div>
@@ -445,8 +461,8 @@ export default function ListaPedidos({ pedidos = [] }) {
               >
                 {repartidorSeleccionado 
                   ? (pedidos.find(p => p.firebaseKey === modalRepartidor)?.estado === 'Enviado' 
-                      ? `Cambiar a ${repartidorSeleccionado}` 
-                      : `Enviar con ${repartidorSeleccionado}`)
+                      ? `Cambiar a ${repartidorSeleccionado.name}`
+                      : `Enviar con ${repartidorSeleccionado.name}`)
                   : 'Selecciona un repartidor'}
               </button>
             </div>
@@ -860,6 +876,27 @@ export default function ListaPedidos({ pedidos = [] }) {
                           {Icons.mapPin}
                           {pedido.direccion}
                         </div>
+                      )}
+                      {hasLocation(pedido.ubicacion) && (
+                        <a
+                          href={buildGoogleMapsPlaceUrl(pedido.ubicacion)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 16px',
+                            background: 'rgba(99, 102, 241, 0.14)',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            fontWeight: 800,
+                            color: '#4f46e5',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          Abrir mapa
+                        </a>
                       )}
                     </div>
 

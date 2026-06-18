@@ -1,6 +1,7 @@
 import { ref, runTransaction, set } from 'firebase/database';
 import { database } from '../firebase';
 import { hoyISO } from '../components/Utils';
+import { normalizeLocation } from './geo';
 
 export const ORDER_LIMIT_PER_DAY = 125;
 export const MANUAL_CHANNEL = 'manual';
@@ -146,6 +147,7 @@ export async function createOrder(payload, options = {}) {
     direccion: String(payload.direccion || '').trim() || '-',
     telefono: String(payload.telefono || '').trim(),
     referencia: String(payload.referencia || '').trim(),
+    ubicacion: normalizeLocation(payload.ubicacion || payload.location),
     pedido: pedidoTexto,
     observaciones: String(payload.observaciones || '').trim(),
     items: normalizedItems,
