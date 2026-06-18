@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { ref, onValue, push, update } from 'firebase/database';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { onValue, ref, update } from 'firebase/database';
 import { database } from './firebase';
 import logo from './logo.svg';
 import './App.css';
@@ -8,33 +8,65 @@ import { hoyISO } from './components/Utils';
 import OrderForm from './components/OrderForm';
 import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
+import TiendaVirtualView from './components/TiendaVirtualView';
+import { createOrder, ORDER_LIMIT_PER_DAY } from './services/orders';
 
 const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
 
 const Icons = {
-  plus: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>,
-  chef: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 4h12M6 4v16a2 2 0 002 2h8a2 2 0 002-2V4M6 4L4 2m16 2l2-2M12 14v6m-4-4l4 4 4-4"/></svg>,
-  list: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
-  database: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+  plus: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  chef: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 4h12M6 4v16a2 2 0 002 2h8a2 2 0 002-2V4M6 4L4 2m16 2l2-2M12 14v6m-4-4l4 4 4-4" />
+    </svg>
+  ),
+  list: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  ),
+  database: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </svg>
+  ),
+  store: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 9l1.5-5h15L21 9" />
+      <path d="M4 10v9a2 2 0 002 2h12a2 2 0 002-2v-9" />
+      <path d="M3 9h18" />
+      <path d="M9 14h6" />
+    </svg>
+  ),
+};
+
+const getRouteFromHash = () => {
+  if (typeof window === 'undefined') {
+    return 'dashboard';
+  }
+
+  const cleanedHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
+  return cleanedHash.startsWith('tienda') ? 'tienda' : 'dashboard';
 };
 
 function App() {
-  // --- INICIO BLOQUE NUEVO DE LOGIN ---
+  const [route, setRoute] = useState(() => getRouteFromHash());
+
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [inputUser, setInputUser] = useState('');
   const [inputPass, setInputPass] = useState('');
   const [loginError, setLoginError] = useState(false);
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (inputUser === 'delivery' && inputPass === 'delivery2026') {
-      setIsAuthenticated(true);
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-    }
-  };
-  // --- FIN BLOQUE NUEVO DE LOGIN ---
 
   const [orders, setOrders] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -42,152 +74,296 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pendientes: 0, preparando: 0 });
+  const [todayCounter, setTodayCounter] = useState(0);
 
-  // ✅ OPTIMIZACIÓN 1: Solo escuchamos cambios del día actual, no todo el historial
+  const isPublicStoreRoute = route === 'tienda';
+  const todayKey = hoyISO();
+
   useEffect(() => {
-    const today = hoyISO();
-    const ordersRef = ref(database, 'orders');
-    
-    const unsubscribe = onValue(ordersRef, (snapshot) => {
-      const data = snapshot.val();
-      
-      if (!data) {
-        setOrders([]);
-        setStats({ total: 0, pendientes: 0, preparando: 0 });
-        setLoading(false);
-        return;
-      }
+    const handleHashChange = () => setRoute(getRouteFromHash());
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
-      // Procesamos solo los pedidos de hoy (mucho más rápido)
-      const todayOrders = [];
-      let pendientes = 0;
-      let preparando = 0;
-
-      Object.entries(data).forEach(([key, val]) => {
-        if (val.fecha === today) {
-          todayOrders.push({ firebaseKey: key, ...val });
-          
-          if (val.estado === 'Pendiente') pendientes++;
-          else if (val.estado === 'En preparación') preparando++;
-        }
-      });
-
-      todayOrders.sort((a, b) => (a.id || 0) - (b.id || 0));
-      
-      setOrders(todayOrders);
-      setStats({
-        total: todayOrders.length,
-        pendientes,
-        preparando
-      });
-      setLoading(false);
-    }, (error) => {
-      console.error('Error cargando pedidos:', error);
-      setLoading(false);
+  useEffect(() => {
+    const counterRef = ref(database, `orderCounters/${todayKey}`);
+    const unsubscribe = onValue(counterRef, (snapshot) => {
+      setTodayCounter(Number(snapshot.val() || 0));
     });
 
     return () => unsubscribe();
-  }, []); // Solo se ejecuta una vez al montar
+  }, [todayKey]);
 
-  // ✅ OPTIMIZACIÓN 2: Clientes en listener separado (no bloquea la UI)
   useEffect(() => {
+    if (isPublicStoreRoute) {
+      return undefined;
+    }
+
+    setLoading(true);
+    const ordersRef = ref(database, 'orders');
+    let finishedFirstLoad = false;
+    const safeUnlockTimer = window.setTimeout(() => {
+      if (!finishedFirstLoad) {
+        setLoading(false);
+      }
+    }, 1800);
+
+    const unsubscribe = onValue(
+      ordersRef,
+      (snapshot) => {
+        finishedFirstLoad = true;
+        window.clearTimeout(safeUnlockTimer);
+        const data = snapshot.val();
+
+        if (!data) {
+          setOrders([]);
+          setStats({ total: 0, pendientes: 0, preparando: 0 });
+          setLoading(false);
+          return;
+        }
+
+        const todayOrders = [];
+        let pendientes = 0;
+        let preparando = 0;
+
+        Object.entries(data).forEach(([key, value]) => {
+          if (value.fecha === todayKey) {
+            todayOrders.push({ firebaseKey: key, ...value });
+
+            if ((value.estado || 'Pendiente') === 'Pendiente') {
+              pendientes += 1;
+            } else if (value.estado === 'En preparación') {
+              preparando += 1;
+            }
+          }
+        });
+
+        todayOrders.sort((left, right) => (left.id || 0) - (right.id || 0));
+        setOrders(todayOrders);
+        setStats({
+          total: todayOrders.length,
+          pendientes,
+          preparando,
+        });
+        setLoading(false);
+      },
+      (error) => {
+        finishedFirstLoad = true;
+        window.clearTimeout(safeUnlockTimer);
+        console.error('Error cargando pedidos:', error);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      finishedFirstLoad = true;
+      window.clearTimeout(safeUnlockTimer);
+      unsubscribe();
+    };
+  }, [isPublicStoreRoute, todayKey]);
+
+  useEffect(() => {
+    if (isPublicStoreRoute) {
+      return undefined;
+    }
+
     const clientsRef = ref(database, 'clients');
-    
+
     const unsubscribe = onValue(clientsRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) {
         setClientes([]);
         return;
       }
-      
-      const arr = Object.entries(data).map(([key, val]) => ({ 
-        firebaseKey: key, 
-        ...val 
+
+      const nextClients = Object.entries(data).map(([key, value]) => ({
+        firebaseKey: key,
+        ...value,
       }));
-      arr.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
-      setClientes(arr);
+
+      nextClients.sort((left, right) =>
+        String(left.nombre || '').localeCompare(String(right.nombre || ''))
+      );
+      setClientes(nextClients);
     });
 
     return () => unsubscribe();
+  }, [isPublicStoreRoute]);
+
+  const nextOrderNumber = useMemo(
+    () => Math.min(todayCounter + 1, ORDER_LIMIT_PER_DAY + 1),
+    [todayCounter]
+  );
+
+  const remainingOrders = useMemo(
+    () => Math.max(ORDER_LIMIT_PER_DAY - todayCounter, 0),
+    [todayCounter]
+  );
+
+  const publicStoreUrl = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return '#tienda';
+    }
+
+    return `${window.location.origin}${window.location.pathname}#tienda`;
   }, []);
 
-  // 🔥 ELIMINADO: getNextOrderId ya no se necesita porque OrderForm calcula automáticamente
-  // const getNextOrderId = useMemo(() => { ... }, [orders]);
+  const handleLogin = (event) => {
+    event.preventDefault();
 
-  const addOrder = async ({ cliente, clienteCodigo, direccion, pedido, fecha, id, metodoPago }) => {
-    try {
-      await push(ref(database, 'orders'), { 
-        cliente, 
-        clienteCodigo, 
-        direccion, 
-        pedido, 
-        estado: 'Pendiente', 
-        metodoPago: metodoPago || 'Efectivo', 
-        fecha, 
-        id, 
-        timestampIngreso: new Date().toLocaleTimeString(), 
-        justAdded: true,
-        timestamp: Date.now() // Para ordenamiento rápido
-      });
-    } catch (error) {
-      console.error('Error agregando pedido:', error);
-      alert('Error al guardar el pedido');
+    if (inputUser === 'delivery' && inputPass === 'delivery2026') {
+      setIsAuthenticated(true);
+      setLoginError(false);
+      return;
     }
+
+    setLoginError(true);
+  };
+
+  const addOrder = async (payload, options = {}) => {
+    return createOrder(payload, options);
   };
 
   const handleEnviarPedido = (orderId, repartidor) => {
-    const order = orders.find(o => o.id === orderId);
-    if (order && order.firebaseKey) {
-      update(ref(database, `orders/${order.firebaseKey}`), { 
-        estado: 'Enviado', 
-        repartidor, 
-        timestampEnviado: new Date().toLocaleTimeString(),
-        timestamp: Date.now()
-      });
+    const order = orders.find((item) => item.id === orderId);
+    if (!order?.firebaseKey) {
+      return;
     }
+
+    update(ref(database, `orders/${order.firebaseKey}`), {
+      estado: 'Enviado',
+      repartidor,
+      timestampEnviado: new Date().toLocaleTimeString('es-NI'),
+      timestamp: Date.now(),
+    });
   };
 
   const navItems = [
     { id: 'ingreso', label: 'Nuevo Pedido', icon: Icons.plus, color: '#dc2626', short: 'Nuevo' },
+    { id: 'tienda', label: 'Tienda Virtual', icon: Icons.store, color: '#f97316', short: 'Tienda' },
     { id: 'cocina', label: 'Vista Cocina', icon: Icons.chef, color: '#f59e0b', short: 'Cocina' },
     { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: '#3b82f6', short: 'Lista' },
     { id: 'basedatos', label: 'Base de Datos', icon: Icons.database, color: '#10b981', short: 'Datos' },
   ];
 
-  const getViewTitle = () => {
-    const item = navItems.find(n => n.id === view);
-    return item ? item.label : 'Dashboard';
-  };
+  const currentViewMeta = navItems.find((item) => item.id === view);
 
-  // --- PANTALLA DE LOGIN (Se muestra si no está autenticado) ---
+  if (isPublicStoreRoute) {
+    return (
+      <TiendaVirtualView
+        onCreateOrder={addOrder}
+        nextOrderNumber={nextOrderNumber}
+        remainingOrders={remainingOrders}
+        publicStoreUrl={publicStoreUrl}
+        mode="public"
+      />
+    );
+  }
+
   if (!isAuthenticated) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', fontFamily: "'Inter', sans-serif" }}>
-        <form onSubmit={handleLogin} style={{ background: 'white', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '380px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-            <img src={logo} alt="Logo" style={{ width: '40px', filter: 'brightness(0) invert(1)' }} />
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0f172a',
+          fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
+        }}
+      >
+        <form
+          onSubmit={handleLogin}
+          style={{
+            background: 'white',
+            padding: '40px',
+            borderRadius: '24px',
+            width: '100%',
+            maxWidth: '380px',
+            textAlign: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+          }}
+        >
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 24px',
+            }}
+          >
+            <img
+              src={logo}
+              alt="Logo"
+              style={{ width: '40px', height: '40px', filter: 'brightness(0) invert(1)' }}
+            />
           </div>
-          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#1e293b', margin: '0 0 8px 0' }}>San Martín</h2>
-          <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '14px', marginTop: 0 }}>Acceso a Delivery</p>
-          
-          <input 
-            type="text" 
-            placeholder="Usuario" 
-            value={inputUser} 
-            onChange={(e) => setInputUser(e.target.value)} 
-            style={{ width: '100%', boxSizing: 'border-box', padding: '14px', borderRadius: '12px', border: '2px solid #e2e8f0', marginBottom: '16px', outline: 'none', fontSize: '14px' }} 
+
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#1e293b', margin: '0 0 8px 0' }}>
+            San Martin
+          </h2>
+          <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '14px', marginTop: 0 }}>
+            Acceso a Delivery
+          </p>
+
+          <input
+            type="text"
+            placeholder="Usuario"
+            value={inputUser}
+            onChange={(event) => setInputUser(event.target.value)}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '14px',
+              borderRadius: '12px',
+              border: '2px solid #e2e8f0',
+              marginBottom: '16px',
+              outline: 'none',
+              fontSize: '14px',
+            }}
           />
-          <input 
-            type="password" 
-            placeholder="Contraseña" 
-            value={inputPass} 
-            onChange={(e) => setInputPass(e.target.value)} 
-            style={{ width: '100%', boxSizing: 'border-box', padding: '14px', borderRadius: '12px', border: '2px solid #e2e8f0', marginBottom: '16px', outline: 'none', fontSize: '14px' }} 
+
+          <input
+            type="password"
+            placeholder="Contrasena"
+            value={inputPass}
+            onChange={(event) => setInputPass(event.target.value)}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '14px',
+              borderRadius: '12px',
+              border: '2px solid #e2e8f0',
+              marginBottom: '16px',
+              outline: 'none',
+              fontSize: '14px',
+            }}
           />
-          
-          {loginError && <p style={{ color: '#dc2626', fontSize: '12px', fontWeight: 700, margin: '0 0 16px 0' }}>Credenciales incorrectas</p>}
-          
-          <button type="submit" style={{ width: '100%', padding: '16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 800, cursor: 'pointer', fontSize: '14px' }}>
+
+          {loginError && (
+            <p style={{ color: '#dc2626', fontSize: '12px', fontWeight: 700, margin: '0 0 16px 0' }}>
+              Credenciales incorrectas
+            </p>
+          )}
+
+          <button
+            type="submit"
+            style={{
+              width: '100%',
+              padding: '16px',
+              background: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
             ENTRAR
           </button>
         </form>
@@ -195,33 +371,38 @@ function App() {
     );
   }
 
-  // Loading screen mientras carga la primera vez
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f8fafc',
-        flexDirection: 'column',
-        gap: '24px'
-      }}>
-        <div style={{
-          width: '64px',
-          height: '64px',
-          borderRadius: '16px',
-          background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+      <div
+        style={{
+          minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          animation: 'pulse 1.5s ease-in-out infinite'
-        }}>
-          <img src={logo} alt="Logo" style={{ width: '40px', height: '40px', filter: 'brightness(0) invert(1)' }} />
+          background: '#f8fafc',
+          flexDirection: 'column',
+          gap: '24px',
+        }}
+      >
+        <div
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '16px',
+            background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }}
+        >
+          <img
+            src={logo}
+            alt="Logo"
+            style={{ width: '40px', height: '40px', filter: 'brightness(0) invert(1)' }}
+          />
         </div>
-        <div style={{ fontSize: '18px', fontWeight: 600, color: '#64748b' }}>
-          Cargando sistema...
-        </div>
+        <div style={{ fontSize: '18px', fontWeight: 600, color: '#64748b' }}>Cargando sistema...</div>
         <style>{`
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
@@ -233,12 +414,14 @@ function App() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      background: '#f8fafc',
-      fontFamily: "'Inter', system-ui, -apple-system, sans-serif"
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        background: '#f8fafc',
+        fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
+      }}
+    >
       <style>{`
         @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -248,42 +431,51 @@ function App() {
         .nav-item:hover { background: rgba(255,255,255,0.1); }
       `}</style>
 
-      {/* Sidebar */}
-      <aside style={{
-        width: sidebarCollapsed ? '80px' : '260px',
-        background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        height: '100vh',
-        transition: 'width 0.3s ease',
-        zIndex: 1000
-      }}>
-        <div style={{
-          padding: '24px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
+      <aside
+        style={{
+          width: sidebarCollapsed ? '80px' : '260px',
+          background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+          color: 'white',
           display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          justifyContent: sidebarCollapsed ? 'center' : 'flex-start'
-        }}>
-          <div style={{
-            width: '44px',
-            height: '44px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+          flexDirection: 'column',
+          position: 'fixed',
+          height: '100vh',
+          transition: 'width 0.3s ease',
+          zIndex: 1000,
+        }}
+      >
+        <div
+          style={{
+            padding: '24px 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0
-          }}>
-            <img src={logo} alt="Logo" style={{ width: '28px', height: '28px', filter: 'brightness(0) invert(1)' }} />
+            gap: '12px',
+            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+          }}
+        >
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <img
+              src={logo}
+              alt="Logo"
+              style={{ width: '28px', height: '28px', filter: 'brightness(0) invert(1)' }}
+            />
           </div>
           {!sidebarCollapsed && (
             <div>
-              <div style={{ fontSize: '16px', fontWeight: 800 }}>San Martín</div>
-              <div style={{ fontSize: '11px', opacity: 0.6 }}>Delivery</div>
+              <div style={{ fontSize: '16px', fontWeight: 800 }}>San Martin</div>
+              <div style={{ fontSize: '11px', opacity: 0.6 }}>Delivery + Tienda</div>
             </div>
           )}
         </div>
@@ -308,18 +500,20 @@ function App() {
                 fontWeight: view === item.id ? 700 : 600,
                 justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                 borderLeft: view === item.id ? `3px solid ${item.color}` : '3px solid transparent',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
               }}
             >
-              <span style={{ 
-                width: '36px', 
-                height: '36px', 
-                borderRadius: '8px',
-                background: view === item.id ? `${item.color}20` : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
+              <span
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: view === item.id ? `${item.color}20` : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 {item.icon}
               </span>
               {!sidebarCollapsed && <span>{item.label}</span>}
@@ -328,7 +522,7 @@ function App() {
         </nav>
 
         <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onClick={() => setSidebarCollapsed((current) => !current)}
           style={{
             padding: '16px 20px',
             border: 'none',
@@ -340,7 +534,7 @@ function App() {
             justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
             gap: '12px',
             fontSize: '12px',
-            borderTop: '1px solid rgba(255,255,255,0.1)'
+            borderTop: '1px solid rgba(255,255,255,0.1)',
           }}
         >
           <span style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
@@ -350,72 +544,77 @@ function App() {
         </button>
       </aside>
 
-      {/* Main Content */}
-      <main style={{
-        flex: 1,
-        marginLeft: sidebarCollapsed ? '80px' : '260px',
-        transition: 'margin-left 0.3s ease',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Header */}
-        <header style={{
-          height: '64px',
-          background: 'white',
-          borderBottom: '1px solid #e2e8f0',
+      <main
+        style={{
+          flex: 1,
+          marginLeft: sidebarCollapsed ? '80px' : '260px',
+          transition: 'margin-left 0.3s ease',
+          minHeight: '100vh',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100
-        }}>
-          <h1 style={{ 
-            margin: 0, 
-            fontSize: '20px', 
-            fontWeight: 800, 
-            color: '#1e293b',
+          flexDirection: 'column',
+        }}
+      >
+        <header
+          style={{
+            height: '64px',
+            background: 'white',
+            borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
-          }}>
-            <span style={{ 
-              width: '8px', 
-              height: '8px', 
-              borderRadius: '50%', 
-              background: navItems.find(n => n.id === view)?.color || '#64748b'
-            }} />
-            {getViewTitle()}
+            justifyContent: 'space-between',
+            padding: '0 24px',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+          }}
+        >
+          <h1
+            style={{
+              margin: 0,
+              fontSize: '20px',
+              fontWeight: 800,
+              color: '#1e293b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: currentViewMeta?.color || '#64748b',
+              }}
+            />
+            {currentViewMeta?.label || 'Dashboard'}
           </h1>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            {/* Stats */}
             <div style={{ display: 'flex', gap: '24px' }}>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
                   Hoy
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>
-                  {stats.total}
-                </div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>{stats.total}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>
                   Pendientes
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>
-                  {stats.pendientes}
-                </div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>{stats.pendientes}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase' }}>
                   Cocina
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#3b82f6' }}>
-                  {stats.preparando}
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#3b82f6' }}>{stats.preparando}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '11px', color: '#f97316', fontWeight: 700, textTransform: 'uppercase' }}>
+                  Cupos
                 </div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f97316' }}>{remainingOrders}</div>
               </div>
             </div>
 
@@ -423,31 +622,39 @@ function App() {
 
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>
-                {new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                {new Date().toLocaleDateString('es-NI', { day: 'numeric', month: 'short' })}
               </div>
               <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
-                {new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                {new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
           </div>
         </header>
 
-        {/* Content */}
         <div className="animate-fadeIn" style={{ flex: 1 }}>
           {view === 'ingreso' && (
-            <OrderForm 
-              onAddOrder={addOrder} 
-              pedidosExistentes={orders}  // 🔥 AGREGADO: Pasa los pedidos para calcular ID 1-125
-              clientes={clientes} 
+            <OrderForm
+              onAddOrder={addOrder}
+              clientes={clientes}
+              nextOrderNumber={nextOrderNumber}
+              remainingOrders={remainingOrders}
             />
           )}
+
+          {view === 'tienda' && (
+            <TiendaVirtualView
+              onCreateOrder={addOrder}
+              nextOrderNumber={nextOrderNumber}
+              remainingOrders={remainingOrders}
+              publicStoreUrl={publicStoreUrl}
+              mode="dashboard"
+            />
+          )}
+
           {view === 'cocina' && <KitchenView orders={orders} />}
-          {view === 'lista' && (
-            <ListaPedidos 
-              pedidos={orders} 
-              onEnviarPedido={handleEnviarPedido} 
-            />
-          )}
+
+          {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
+
           {view === 'basedatos' && (
             <Suspense
               fallback={

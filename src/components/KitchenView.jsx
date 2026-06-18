@@ -728,6 +728,22 @@ export default function KitchenView({ orders }) {
                         <span style={{ fontSize: '20px' }}>👤</span>
                         {pedido.cliente}
                       </div>
+                      {pedido.canal === 'tienda_virtual' && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(249, 115, 22, 0.14)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 800,
+                          color: '#f97316',
+                          border: '1px solid rgba(249, 115, 22, 0.28)'
+                        }}>
+                          TIENDA VIRTUAL
+                        </div>
+                      )}
                       <div style={{
                         padding: '10px 16px',
                         background: 'rgba(255,255,255,0.6)',
@@ -739,6 +755,36 @@ export default function KitchenView({ orders }) {
                       }}>
                         {pedido.clienteCodigo || 'Sin código'}
                       </div>
+                      {pedido.telefono && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          color: '#34d399'
+                        }}>
+                          TEL {pedido.telefono}
+                        </div>
+                      )}
+                      {pedido.total && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          color: '#fbbf24'
+                        }}>
+                          TOTAL C${Number(pedido.total).toFixed(2)}
+                        </div>
+                      )}
                       {pedido.direccion && pedido.direccion !== '-' && (
                         <div style={{
                           display: 'flex',

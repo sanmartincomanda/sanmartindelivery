@@ -116,6 +116,11 @@ const Icons = {
       <circle cx="12" cy="10" r="3" />
     </svg>
   ),
+  phone: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.86 19.86 0 01-8.63-3.07A19.5 19.5 0 015.15 12.8 19.86 19.86 0 012.08 4.09 2 2 0 014.06 1.9h3a2 2 0 012 1.72l.38 3.05a2 2 0 01-.57 1.72l-1.3 1.3a16 16 0 006.74 6.74l1.3-1.3a2 2 0 011.72-.57l3.05.38A2 2 0 0122 16.92z" />
+    </svg>
+  ),
   notes: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
@@ -268,10 +273,16 @@ const orderMatchesSearch = (order, normalizedTerm) => {
     order.fecha,
     order.cliente,
     order.clienteCodigo,
+    order.telefono,
     order.direccion,
+    order.referencia,
     order.pedido,
+    order.observaciones,
     order.estado,
     order.metodoPago,
+    order.canal,
+    order.canalLabel,
+    order.total,
     order.cocinero,
     order.repartidor,
     order.timestampIngreso,
@@ -298,7 +309,10 @@ const buildHistoryExportRows = (orders) =>
     Pedido: order.id || '-',
     Cliente: order.cliente || '-',
     Codigo: order.clienteCodigo || '-',
+    Telefono: order.telefono || '-',
     Direccion: order.direccion || '-',
+    Canal: order.canalLabel || order.canal || 'Manual',
+    Total: order.total ?? '-',
     Estado: normalizeStatus(order.estado),
     'Metodo de pago': order.metodoPago || 'Efectivo',
     'Hora ingreso': order.timestampIngreso || '-',
@@ -1757,6 +1771,12 @@ function HistoryCard({ order, onOpen }) {
         <MiniChip icon={Icons.calendar} label={formatDateLabel(order.fecha)} tone={{ color: '#93c5fd', soft: 'rgba(59, 130, 246, 0.12)' }} />
         <MiniChip icon={Icons.clock} label={order.timestampIngreso || 'Sin hora'} tone={{ color: '#f8fafc', soft: 'rgba(255, 255, 255, 0.08)' }} />
         <MiniChip icon={Icons.creditCard} label={order.metodoPago || 'Efectivo'} tone={paymentTone} />
+        {order.canalLabel && (
+          <MiniChip icon={Icons.box} label={order.canalLabel} tone={{ color: '#f97316', soft: 'rgba(249, 115, 22, 0.14)' }} />
+        )}
+        {order.telefono && (
+          <MiniChip icon={Icons.phone} label={order.telefono} tone={{ color: '#34d399', soft: 'rgba(16, 185, 129, 0.12)' }} />
+        )}
       </div>
 
       <div
@@ -1893,8 +1913,11 @@ function HistoryDetailModal({ order, onClose }) {
               <div className="bd-history-filters" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
                 <DetailStat label="Nombre" value={order.cliente || 'Sin nombre'} />
                 <DetailStat label="Codigo" value={order.clienteCodigo || '-'} />
+                <DetailStat label="Telefono" value={order.telefono || 'Sin telefono'} />
                 <DetailStat label="Metodo de pago" value={order.metodoPago || 'Efectivo'} accent={paymentTone.color} />
+                <DetailStat label="Canal" value={order.canalLabel || order.canal || 'Manual'} accent="#f97316" />
                 <DetailStat label="Direccion" value={order.direccion || 'Sin direccion'} />
+                <DetailStat label="Total" value={order.total ? `C$${Number(order.total).toFixed(2)}` : 'Sin total'} />
               </div>
             </DetailPanel>
 

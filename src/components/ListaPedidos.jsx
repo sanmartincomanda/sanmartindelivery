@@ -771,6 +771,22 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                       
                       {/* 🔥 MÉTODO DE PAGO AGREGADO */}
+                      {pedido.canal === 'tienda_virtual' && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(249, 115, 22, 0.14)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(249, 115, 22, 0.28)',
+                          color: '#f97316',
+                          fontSize: '14px',
+                          fontWeight: 800
+                        }}>
+                          TIENDA VIRTUAL
+                        </div>
+                      )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -799,6 +815,36 @@ export default function ListaPedidos({ pedidos = [] }) {
                       }}>
                         {pedido.clienteCodigo || 'Sin código'}
                       </div>
+                      {pedido.telefono && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          color: '#34d399'
+                        }}>
+                          TEL {pedido.telefono}
+                        </div>
+                      )}
+                      {pedido.total && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 700,
+                          color: '#fbbf24'
+                        }}>
+                          TOTAL C${Number(pedido.total).toFixed(2)}
+                        </div>
+                      )}
                       {pedido.direccion && pedido.direccion !== '-' && (
                         <div style={{
                           display: 'flex',
