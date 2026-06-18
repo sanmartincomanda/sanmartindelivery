@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { get, push, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase';
+import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
 import { hoyISO, normalizar } from './Utils';
 
 const Icons = {
@@ -803,6 +804,41 @@ function ClientesManager({ clientes, onToast }) {
     }
   };
 
+  const handleSaveClientLocation = async (firebaseKey, locationPayload) => {
+    const location = normalizeLocation(locationPayload);
+    if (!firebaseKey || !location) {
+      onToast('Ubicacion invalida. Revisa latitud y longitud.', 'error');
+      return false;
+    }
+
+    try {
+      await update(ref(database, `clients/${firebaseKey}`), {
+        ubicacion: location,
+        ubicacionActualizadaAt: Date.now(),
+      });
+      onToast('Ubicacion del cliente guardada');
+      return true;
+    } catch (error) {
+      console.error('Error saving client location:', error);
+      onToast('No se pudo guardar la ubicacion del cliente', 'error');
+      return false;
+    }
+  };
+
+  const handleCaptureClientLocation = async (firebaseKey, label) => {
+    try {
+      const location = await getBrowserLocation();
+      return handleSaveClientLocation(firebaseKey, {
+        ...location,
+        label: String(label || '').trim() || location.label,
+      });
+    } catch (error) {
+      console.error('Error capturing client location:', error);
+      onToast('No se pudo tomar la ubicacion actual. Revisa el permiso de GPS.', 'error');
+      return false;
+    }
+  };
+
   const handleDeleteClient = async (firebaseKey) => {
     if (!window.confirm('Seguro que deseas eliminar este cliente?')) {
       return;
@@ -1130,7 +1166,7 @@ function ClientesManager({ clientes, onToast }) {
           className="bd-client-head"
           style={{
             display: 'grid',
-            gridTemplateColumns: '140px 1fr 1.2fr 120px',
+            gridTemplateColumns: '140px minmax(180px, 1fr) minmax(220px, 1.1fr) minmax(260px, 0.9fr) 120px',
             gap: '16px',
             padding: '16px 18px',
             background: 'rgba(255, 255, 255, 0.05)',
@@ -1144,6 +1180,7 @@ function ClientesManager({ clientes, onToast }) {
           <div>Codigo</div>
           <div>Nombre</div>
           <div>Direccion</div>
+          <div>Mapa</div>
           <div style={{ textAlign: 'center' }}>Accion</div>
         </div>
 
@@ -1153,6 +1190,8 @@ function ClientesManager({ clientes, onToast }) {
               key={client.firebaseKey}
               cliente={client}
               onSave={handleSaveClient}
+              onSaveLocation={handleSaveClientLocation}
+              onCaptureLocation={handleCaptureClientLocation}
               onDelete={handleDeleteClient}
             />
           ))}
@@ -1190,13 +1229,21 @@ function ClientesManager({ clientes, onToast }) {
   );
 }
 
-function ClienteRow({ cliente, onSave, onDelete }) {
+function ClienteRow({ cliente, onSave, onSaveLocation, onCaptureLocation, onDelete }) {
   const [editData, setEditData] = useState({
     codigo: cliente.codigo || '',
     nombre: cliente.nombre || '',
     direccion: cliente.direccion || '',
   });
+  const [locationDraft, setLocationDraft] = useState(() => {
+    const location = normalizeLocation(cliente.ubicacion);
+    return {
+      lat: location ? String(location.lat) : '',
+      lng: location ? String(location.lng) : '',
+    };
+  });
   const [saveState, setSaveState] = useState('idle');
+  const [locationState, setLocationState] = useState('idle');
 
   useEffect(() => {
     setEditData({
@@ -1205,6 +1252,14 @@ function ClienteRow({ cliente, onSave, onDelete }) {
       direccion: cliente.direccion || '',
     });
   }, [cliente.codigo, cliente.direccion, cliente.firebaseKey, cliente.nombre]);
+
+  useEffect(() => {
+    const location = normalizeLocation(cliente.ubicacion);
+    setLocationDraft({
+      lat: location ? String(location.lat) : '',
+      lng: location ? String(location.lng) : '',
+    });
+  }, [cliente.firebaseKey, cliente.ubicacion]);
 
   useEffect(() => {
     const hasChanges =
@@ -1247,6 +1302,45 @@ function ClienteRow({ cliente, onSave, onDelete }) {
     return () => clearTimeout(clearStatusTimeout);
   }, [saveState]);
 
+  useEffect(() => {
+    if (locationState !== 'saved' && locationState !== 'error') {
+      return undefined;
+    }
+
+    const clearStatusTimeout = setTimeout(() => setLocationState('idle'), 1200);
+    return () => clearTimeout(clearStatusTimeout);
+  }, [locationState]);
+
+  const savedLocation = normalizeLocation(cliente.ubicacion);
+  const clientHasLocation = hasLocation(cliente.ubicacion);
+  const mapUrl = savedLocation ? buildGoogleMapsPlaceUrl(savedLocation) : '';
+
+  const handleManualLocationSave = async () => {
+    setLocationState('saving');
+    const location = normalizeLocation({
+      lat: locationDraft.lat,
+      lng: locationDraft.lng,
+      label: editData.direccion || cliente.direccion || cliente.nombre,
+    });
+
+    if (!location) {
+      setLocationState('error');
+      return;
+    }
+
+    const wasSaved = await onSaveLocation(cliente.firebaseKey, location);
+    setLocationState(wasSaved ? 'saved' : 'error');
+  };
+
+  const handleCurrentLocationSave = async () => {
+    setLocationState('saving');
+    const wasSaved = await onCaptureLocation(
+      cliente.firebaseKey,
+      editData.direccion || cliente.direccion || cliente.nombre
+    );
+    setLocationState(wasSaved ? 'saved' : 'error');
+  };
+
   const saveLabel =
     saveState === 'saving'
       ? 'Guardando'
@@ -1255,6 +1349,26 @@ function ClienteRow({ cliente, onSave, onDelete }) {
         : saveState === 'error'
           ? 'Revisar'
           : 'Listo';
+
+  const locationLabel =
+    locationState === 'saving'
+      ? 'Guardando pin'
+      : locationState === 'saved'
+        ? 'Pin guardado'
+        : locationState === 'error'
+          ? 'Revisar pin'
+          : clientHasLocation
+            ? 'Con pin'
+            : 'Sin pin';
+
+  const locationColor =
+    locationState === 'saving'
+      ? '#f59e0b'
+      : locationState === 'saved' || clientHasLocation
+        ? '#10b981'
+        : locationState === 'error'
+          ? '#ef4444'
+          : '#94a3b8';
 
   const saveColor =
     saveState === 'saving'
@@ -1270,7 +1384,7 @@ function ClienteRow({ cliente, onSave, onDelete }) {
       className="bd-client-row"
       style={{
         display: 'grid',
-        gridTemplateColumns: '140px 1fr 1.2fr 120px',
+        gridTemplateColumns: '140px minmax(180px, 1fr) minmax(220px, 1.1fr) minmax(260px, 0.9fr) 120px',
         gap: '16px',
         alignItems: 'center',
         padding: '14px 18px',
@@ -1306,6 +1420,90 @@ function ClienteRow({ cliente, onSave, onDelete }) {
           onChange={(event) => setEditData((current) => ({ ...current, direccion: event.target.value }))}
           style={{ padding: '12px 12px', fontSize: '14px' }}
         />
+      </div>
+
+      <div>
+        <div style={{ fontSize: '11px', opacity: 0.5, marginBottom: '6px' }}>Mapa</div>
+        <div style={{ display: 'grid', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <input
+              className="bd-input"
+              value={locationDraft.lat}
+              placeholder="Lat"
+              inputMode="decimal"
+              onChange={(event) => setLocationDraft((current) => ({ ...current, lat: event.target.value }))}
+              style={{ padding: '10px 10px', fontSize: '12px' }}
+            />
+            <input
+              className="bd-input"
+              value={locationDraft.lng}
+              placeholder="Lng"
+              inputMode="decimal"
+              onChange={(event) => setLocationDraft((current) => ({ ...current, lng: event.target.value }))}
+              style={{ padding: '10px 10px', fontSize: '12px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleManualLocationSave}
+              disabled={locationState === 'saving'}
+              style={{
+                border: 'none',
+                background: 'rgba(245, 158, 11, 0.18)',
+                color: '#fbbf24',
+                borderRadius: '999px',
+                padding: '8px 10px',
+                fontSize: '11px',
+                fontWeight: 900,
+                cursor: locationState === 'saving' ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Guardar coords
+            </button>
+            <button
+              type="button"
+              onClick={handleCurrentLocationSave}
+              disabled={locationState === 'saving'}
+              style={{
+                border: 'none',
+                background: 'rgba(59, 130, 246, 0.18)',
+                color: '#93c5fd',
+                borderRadius: '999px',
+                padding: '8px 10px',
+                fontSize: '11px',
+                fontWeight: 900,
+                cursor: locationState === 'saving' ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Ubicacion actual
+            </button>
+            {mapUrl && (
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  border: 'none',
+                  background: 'rgba(16, 185, 129, 0.16)',
+                  color: '#6ee7b7',
+                  borderRadius: '999px',
+                  padding: '8px 10px',
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  textDecoration: 'none',
+                }}
+              >
+                Ver mapa
+              </a>
+            )}
+          </div>
+
+          <span style={{ color: locationColor, fontSize: '11px', fontWeight: 900 }}>{locationLabel}</span>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gap: '10px', justifyItems: 'center' }}>

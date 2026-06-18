@@ -8,6 +8,7 @@ import {
   buildGoogleMapsRouteUrl,
   getBrowserLocation,
   hasLocation,
+  normalizeLocation,
   optimizeStopsByNearest,
 } from '../services/geo';
 import { DRIVERS_PATH, loginDriver, mergeDrivers } from '../services/drivers';
@@ -177,9 +178,11 @@ export default function DriverView({ orders = [] }) {
   });
   const [loginForm, setLoginForm] = useState({ code: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [clients, setClients] = useState([]);
   const [routeOrders, setRouteOrders] = useState([]);
   const [optimizing, setOptimizing] = useState(false);
   const [deliveringOrderKey, setDeliveringOrderKey] = useState('');
+  const [locatingOrderKey, setLocatingOrderKey] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [confirmDeliveryOrder, setConfirmDeliveryOrder] = useState(null);
   const [routeFilter, setRouteFilter] = useState('activos');
@@ -188,6 +191,20 @@ export default function DriverView({ orders = [] }) {
   useEffect(() => {
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
       setDrivers(mergeDrivers(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, 'clients'), (snapshot) => {
+      const data = snapshot.val() || {};
+      setClients(
+        Object.entries(data).map(([firebaseKey, client]) => ({
+          firebaseKey,
+          ...client,
+        }))
+      );
     });
 
     return () => unsubscribe();
@@ -276,6 +293,85 @@ export default function DriverView({ orders = [] }) {
       }
     } finally {
       setOptimizing(false);
+    }
+  };
+
+  const findClientKeyForOrder = (order = {}) => {
+    if (order.clienteFirebaseKey) {
+      return order.clienteFirebaseKey;
+    }
+
+    const orderCode = String(order.clienteCodigo || '').trim();
+    const safeOrderCode = orderCode && orderCode !== '-' && orderCode.toUpperCase() !== 'TIENDA VIRTUAL' ? orderCode : '';
+    const orderPhone = cleanPhone(order.telefono);
+    const orderName = normalizeName(order.cliente);
+
+    const matchedClient = clients.find((client) => {
+      if (safeOrderCode && String(client.codigo || '').trim() === safeOrderCode) {
+        return true;
+      }
+
+      if (orderPhone && cleanPhone(client.telefono) === orderPhone) {
+        return true;
+      }
+
+      return orderName && normalizeName(client.nombre) === orderName;
+    });
+
+    return matchedClient?.firebaseKey || '';
+  };
+
+  const saveCustomerLocation = async (order) => {
+    if (!order?.firebaseKey) {
+      alert('No se pudo identificar este pedido.');
+      return;
+    }
+
+    setLocatingOrderKey(order.firebaseKey);
+
+    try {
+      const browserLocation = await getBrowserLocation();
+      const location = normalizeLocation({
+        ...browserLocation,
+        label: getWrittenAddress(order) || order.cliente || browserLocation.label,
+      });
+
+      if (!location) {
+        throw new Error('Ubicacion invalida');
+      }
+
+      const now = Date.now();
+      const updates = {
+        [`orders/${order.firebaseKey}/ubicacion`]: location,
+        [`orders/${order.firebaseKey}/ubicacionCapturadaPor`]: driver.name,
+        [`orders/${order.firebaseKey}/ubicacionCapturadaPorCodigo`]: driver.code,
+        [`orders/${order.firebaseKey}/timestampUbicacionCliente`]: formatTimeLabel(),
+        [`orders/${order.firebaseKey}/timestamp`]: now,
+      };
+
+      const clientKey = findClientKeyForOrder(order);
+      if (clientKey) {
+        updates[`clients/${clientKey}/ubicacion`] = location;
+        updates[`clients/${clientKey}/ubicacionActualizadaPor`] = driver.name;
+        updates[`clients/${clientKey}/ubicacionActualizadaPorCodigo`] = driver.code;
+        updates[`clients/${clientKey}/ubicacionActualizadaAt`] = now;
+      }
+
+      await update(ref(database), updates);
+      setRouteOrders((current) =>
+        current.map((routeOrder) =>
+          routeOrder.firebaseKey === order.firebaseKey ? { ...routeOrder, ubicacion: location } : routeOrder
+        )
+      );
+      setSelectedOrder((current) =>
+        current?.firebaseKey === order.firebaseKey ? { ...current, ubicacion: location } : current
+      );
+      setNotice(clientKey ? 'Ubicacion guardada en pedido y cliente.' : 'Ubicacion guardada en el pedido.');
+    } catch (error) {
+      console.error('Error guardando ubicacion del cliente:', error);
+      alert('No se pudo guardar la ubicacion. Revisa el permiso de GPS e intenta nuevamente desde el punto de entrega.');
+    } finally {
+      setLocatingOrderKey('');
     }
   };
 
@@ -438,8 +534,10 @@ export default function DriverView({ orders = [] }) {
               order={order}
               index={index}
               delivering={deliveringOrderKey === order.firebaseKey}
+              locating={locatingOrderKey === order.firebaseKey}
               onOpenDetails={setSelectedOrder}
               onOpenMap={openOrderMap}
+              onAddLocation={saveCustomerLocation}
               onRequestDelivered={setConfirmDeliveryOrder}
             />
           ))}
@@ -450,8 +548,10 @@ export default function DriverView({ orders = [] }) {
         <DriverDetailModal
           order={selectedOrder}
           delivering={deliveringOrderKey === selectedOrder.firebaseKey}
+          locating={locatingOrderKey === selectedOrder.firebaseKey}
           onClose={() => setSelectedOrder(null)}
           onOpenMap={openOrderMap}
+          onAddLocation={saveCustomerLocation}
           onRequestDelivered={setConfirmDeliveryOrder}
         />
       )}
@@ -491,12 +591,13 @@ function DriverProgress({ progress }) {
   );
 }
 
-function DriverOrderCard({ order, index, delivering, onOpenDetails, onOpenMap, onRequestDelivered }) {
+function DriverOrderCard({ order, index, delivering, locating, onOpenDetails, onOpenMap, onAddLocation, onRequestDelivered }) {
   const status = getStatusMeta(order);
   const delivered = isDeliveredOrder(order);
   const address = getWrittenAddress(order);
   const navigationUrl = getOrderNavigationUrl(order);
   const whatsappLink = buildCustomerWhatsappLink(order);
+  const hasMapPoint = hasLocation(order.ubicacion);
 
   return (
     <article className={`driver-order-card ${status.tone}`}>
@@ -521,6 +622,17 @@ function DriverOrderCard({ order, index, delivering, onOpenDetails, onOpenMap, o
       </div>
 
       <div className="driver-card-actions">
+        {!hasMapPoint && (
+          <button
+            type="button"
+            className="driver-location-action"
+            onClick={() => onAddLocation(order)}
+            disabled={locating || delivered}
+          >
+            {Icons.map}
+            {locating ? 'Guardando pin...' : 'Agregar ubicacion del cliente'}
+          </button>
+        )}
         <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
           {Icons.map}
           Mapa
@@ -544,12 +656,13 @@ function DriverOrderCard({ order, index, delivering, onOpenDetails, onOpenMap, o
   );
 }
 
-function DriverDetailModal({ order, delivering, onClose, onOpenMap, onRequestDelivered }) {
+function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, onAddLocation, onRequestDelivered }) {
   const status = getStatusMeta(order);
   const delivered = isDeliveredOrder(order);
   const address = getWrittenAddress(order);
   const navigationUrl = getOrderNavigationUrl(order);
   const whatsappLink = buildCustomerWhatsappLink(order);
+  const hasMapPoint = hasLocation(order.ubicacion);
 
   return (
     <div
@@ -593,10 +706,10 @@ function DriverDetailModal({ order, delivering, onClose, onOpenMap, onRequestDel
           </div>
         </div>
 
-        <div className={`driver-detail-address ${hasLocation(order.ubicacion) ? '' : 'fallback'}`}>
-          <span>{hasLocation(order.ubicacion) ? 'Punto de mapa guardado' : 'Direccion escrita del cliente'}</span>
+        <div className={`driver-detail-address ${hasMapPoint ? '' : 'fallback'}`}>
+          <span>{hasMapPoint ? 'Punto de mapa guardado' : 'Direccion escrita del cliente'}</span>
           <strong>{address || 'Sin direccion escrita'}</strong>
-          {!hasLocation(order.ubicacion) && address && (
+          {!hasMapPoint && address && (
             <p>Este pedido no tiene punto de mapa. Usa la direccion escrita como referencia.</p>
           )}
         </div>
@@ -618,6 +731,17 @@ function DriverDetailModal({ order, delivering, onClose, onOpenMap, onRequestDel
         </div>
 
         <footer className="driver-detail-actions">
+          {!hasMapPoint && (
+            <button
+              type="button"
+              className="driver-location-action"
+              onClick={() => onAddLocation(order)}
+              disabled={locating || delivered}
+            >
+              {Icons.map}
+              {locating ? 'Guardando pin...' : 'Agregar ubicacion del cliente'}
+            </button>
+          )}
           <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
             {Icons.map}
             Abrir mapa
@@ -1462,6 +1586,14 @@ const driverStyles = `
   .driver-detail-actions .driver-deliver-action {
     background: #16a34a;
     color: #ffffff;
+  }
+  .driver-card-actions .driver-location-action,
+  .driver-detail-actions .driver-location-action {
+    background: #f97316;
+    color: #ffffff;
+  }
+  .driver-card-actions .driver-location-action {
+    flex-basis: 100%;
   }
   .driver-done-chip {
     min-height: 40px;
