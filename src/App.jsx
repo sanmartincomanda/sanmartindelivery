@@ -9,6 +9,7 @@ import OrderForm from './components/OrderForm';
 import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
 import TiendaVirtualView from './components/TiendaVirtualView';
+import ConfiguracionView from './components/ConfiguracionView';
 import { createOrder, ORDER_LIMIT_PER_DAY } from './services/orders';
 
 const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
@@ -47,6 +48,12 @@ const Icons = {
       <path d="M4 10v9a2 2 0 002 2h12a2 2 0 002-2v-9" />
       <path d="M3 9h18" />
       <path d="M9 14h6" />
+    </svg>
+  ),
+  settings: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6 1.7 1.7 0 00-.4 1.1V21a2 2 0 01-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.88.34l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1 1.7 1.7 0 00-1.1-.4H3a2 2 0 010-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.88l-.06-.06a2 2 0 012.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6 1.7 1.7 0 00.4-1.1V3a2 2 0 014 0v.09A1.7 1.7 0 0015 4.6a1.7 1.7 0 001.88-.34l.06-.06a2 2 0 012.83 2.83l-.06.06A1.7 1.7 0 0019.4 9a1.7 1.7 0 00.6 1 1.7 1.7 0 001.1.4H21a2 2 0 010 4h-.09A1.7 1.7 0 0019.4 15z" />
     </svg>
   ),
 };
@@ -244,6 +251,7 @@ function App() {
     { id: 'cocina', label: 'Vista Cocina', icon: Icons.chef, color: '#f59e0b', short: 'Cocina' },
     { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: '#3b82f6', short: 'Lista' },
     { id: 'basedatos', label: 'Base de Datos', icon: Icons.database, color: '#10b981', short: 'Datos' },
+    { id: 'configuracion', label: 'Configuraciones', icon: Icons.settings, color: '#6366f1', short: 'Config' },
   ];
 
   const currentViewMeta = navItems.find((item) => item.id === view);
@@ -654,6 +662,8 @@ function App() {
           {view === 'cocina' && <KitchenView orders={orders} />}
 
           {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
+
+          {view === 'configuracion' && <ConfiguracionView />}
 
           {view === 'basedatos' && (
             <Suspense

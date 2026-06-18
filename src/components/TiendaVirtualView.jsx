@@ -1,35 +1,19 @@
-import React, {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { onValue, ref } from 'firebase/database';
+import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
-  STORE_FEATURES,
-  STORE_FILTERS,
+  STORE_CATEGORIES,
   STORE_PAYMENT_OPTIONS,
-  STORE_PRODUCTS,
   STORE_PROMOTIONS,
 } from '../data/tiendaVirtual';
-import {
-  formatOrderNumber,
-  formatWeight,
-  ORDER_LIMIT_PER_DAY,
-  STORE_CHANNEL,
-} from '../services/orders';
+import { mergeCatalogProducts, STORE_CATALOG_PATH } from '../services/storeCatalog';
+import { cleanStorePhone, ensureStoreUser } from '../services/storeUsers';
+import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orders';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
-const HERO_IMAGE = '/tienda/page/hero-table.jpg';
 
-const formatCurrency = (value) => `C$${Number(value || 0).toFixed(2)}`;
-
-const CATEGORY_BY_CODE = {
-  '00393': 'parrilla',
-  '00444': 'hogar',
-  '00442': 'especiales',
-};
+const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
 const clampQuantity = (value) => {
   const rounded = Math.round(Number(value || 0) * 2) / 2;
@@ -40,26 +24,25 @@ const clampQuantity = (value) => {
   return Number(rounded.toFixed(1));
 };
 
-const sanitizePhone = (value) => String(value || '').replace(/[^\d+]/g, '').trim();
-
-const buildClientCode = (phone) => {
-  const lastDigits = sanitizePhone(phone).replace(/\D/g, '').slice(-4);
-  return `TV-${lastDigits || 'WEB'}`;
-};
+const getProductCategoryTokens = (product) =>
+  [product.category, product.subcategory, product.name, product.code]
+    .join(' ')
+    .toLowerCase();
 
 export default function TiendaVirtualView({
   onCreateOrder,
-  nextOrderNumber,
-  remainingOrders,
   mode = 'public',
   publicStoreUrl = '#tienda',
 }) {
-  const [cart, setCart] = useState(() =>
-    STORE_PRODUCTS.reduce((accumulator, product) => {
-      accumulator[product.code] = 0;
-      return accumulator;
-    }, {})
-  );
+  const [catalog, setCatalog] = useState(() => mergeCatalogProducts());
+  const [cart, setCart] = useState({});
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('todos');
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [statusPhone, setStatusPhone] = useState('');
+  const [customerOrders, setCustomerOrders] = useState([]);
   const [customer, setCustomer] = useState({
     nombre: '',
     telefono: '',
@@ -68,67 +51,97 @@ export default function TiendaVirtualView({
     metodoPago: STORE_PAYMENT_OPTIONS[0],
   });
   const [notes, setNotes] = useState('');
-  const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('todos');
-  const [activePromo, setActivePromo] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [successOrder, setSuccessOrder] = useState(null);
+  const [createdOrder, setCreatedOrder] = useState(null);
 
-  const deferredSearch = useDeferredValue(search);
-  const isEmbedded = mode === 'dashboard';
-  const hasAvailability = remainingOrders > 0;
-  const estimatedOrder = hasAvailability ? formatOrderNumber(nextOrderNumber) : 'MAX';
+  const deferredQuery = useDeferredValue(query);
+  const isDashboard = mode === 'dashboard';
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      startTransition(() => {
-        setActivePromo((current) => (current + 1) % STORE_PROMOTIONS.length);
-      });
-    }, 5200);
+    const unsubscribe = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
+      setCatalog(mergeCatalogProducts(snapshot.val()));
+    });
 
-    return () => window.clearInterval(intervalId);
+    return () => unsubscribe();
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    const normalizedTerm = deferredSearch.trim().toLowerCase();
+  useEffect(() => {
+    const cleanPhone = cleanStorePhone(statusPhone);
+    if (!cleanPhone) {
+      setCustomerOrders([]);
+      return undefined;
+    }
 
-    return STORE_PRODUCTS.filter((product) => {
-      const matchesFilter =
-        activeFilter === 'todos' || CATEGORY_BY_CODE[product.code] === activeFilter;
+    const unsubscribe = onValue(ref(database, 'orders'), (snapshot) => {
+      const data = snapshot.val() || {};
+      const orders = Object.entries(data)
+        .map(([firebaseKey, order]) => ({ firebaseKey, ...order }))
+        .filter((order) => cleanStorePhone(order.telefono) === cleanPhone)
+        .sort((left, right) => Number(right.timestamp || 0) - Number(left.timestamp || 0))
+        .slice(0, 10);
 
-      const searchableText = [
-        product.code,
-        product.name,
-        product.description,
-        product.badge,
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      const matchesSearch = !normalizedTerm || searchableText.includes(normalizedTerm);
-      return matchesFilter && matchesSearch;
+      setCustomerOrders(orders);
     });
-  }, [activeFilter, deferredSearch]);
+
+    return () => unsubscribe();
+  }, [statusPhone]);
+
+  const activeProducts = useMemo(
+    () => catalog.filter((product) => product.active !== false),
+    [catalog]
+  );
+
+  const categoryOptions = useMemo(() => {
+    const subcategories = Array.from(
+      new Set(activeProducts.map((product) => product.subcategory).filter(Boolean))
+    ).map((subcategory) => ({
+      id: subcategory.toLowerCase(),
+      label: subcategory,
+    }));
+
+    return [...STORE_CATEGORIES, ...subcategories].filter(
+      (category, index, all) => all.findIndex((item) => item.id === category.id) === index
+    );
+  }, [activeProducts]);
+
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+
+    return activeProducts.filter((product) => {
+      const productTokens = getProductCategoryTokens(product);
+      const matchesCategory =
+        activeCategory === 'todos' ||
+        productTokens.includes(activeCategory.toLowerCase()) ||
+        (activeCategory === 'promociones' && product.promo);
+
+      const matchesSearch =
+        !normalizedQuery ||
+        [product.code, product.name, product.description, product.subcategory]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedQuery);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [activeCategory, activeProducts, deferredQuery]);
 
   const cartItems = useMemo(
     () =>
-      STORE_PRODUCTS.filter((product) => Number(cart[product.code] || 0) > 0).map((product) => {
-        const cantidad = Number(cart[product.code] || 0);
-        return {
-          codigo: product.code,
-          nombre: product.name,
-          unidad: product.unit,
-          cantidad,
-          precioUnitario: product.price,
-          subtotal: Number((cantidad * product.price).toFixed(2)),
-        };
-      }),
-    [cart]
-  );
-
-  const totalWeight = useMemo(
-    () => cartItems.reduce((sum, item) => sum + Number(item.cantidad || 0), 0),
-    [cartItems]
+      activeProducts
+        .filter((product) => Number(cart[product.code] || 0) > 0)
+        .map((product) => {
+          const cantidad = Number(cart[product.code] || 0);
+          return {
+            codigo: product.code,
+            nombre: product.name,
+            unidad: product.unit,
+            cantidad,
+            precioUnitario: product.price,
+            subtotal: Number((cantidad * product.price).toFixed(2)),
+            image: product.image,
+          };
+        }),
+    [activeProducts, cart]
   );
 
   const totalAmount = useMemo(
@@ -136,65 +149,66 @@ export default function TiendaVirtualView({
     [cartItems]
   );
 
-  const activePromotion = STORE_PROMOTIONS[activePromo];
+  const cartCount = cartItems.reduce((sum, item) => sum + Number(item.cantidad || 0), 0);
 
-  const handleQuantityChange = (code, nextValue) => {
+  const updateQuantity = (code, nextValue) => {
     setCart((current) => ({
       ...current,
       [code]: clampQuantity(nextValue),
     }));
   };
 
-  const handleCustomerChange = (field, value) => {
+  const updateCustomer = (field, value) => {
     setCustomer((current) => ({
       ...current,
       [field]: value,
     }));
   };
 
-  const handleCopyLink = async () => {
+  const openProduct = (product) => {
+    setSelectedProduct(product);
+  };
+
+  const copyPublicLink = async () => {
     try {
       await navigator.clipboard.writeText(publicStoreUrl);
-      alert('Enlace de la tienda copiado.');
+      alert('Enlace copiado.');
     } catch (error) {
       console.error('No se pudo copiar el enlace:', error);
-      alert(`Copiá este enlace manualmente: ${publicStoreUrl}`);
+      alert(publicStoreUrl);
     }
   };
 
-  const handleSubmit = async (event) => {
+  const submitOrder = async (event) => {
     event.preventDefault();
 
-    if (!hasAvailability) {
-      alert('Hoy ya se alcanzo el limite de pedidos disponibles.');
-      return;
-    }
-
     if (cartItems.length === 0) {
-      alert('Agrega al menos un producto al carrito.');
+      alert('Agrega al menos un producto.');
       return;
     }
 
-    const cleanPhone = sanitizePhone(customer.telefono);
-    if (!customer.nombre.trim() || !cleanPhone || !customer.direccion.trim()) {
-      alert('Completá nombre, telefono y direccion para enviar el pedido.');
+    if (!customer.nombre.trim() || !customer.telefono.trim() || !customer.direccion.trim()) {
+      alert('Completa nombre, telefono y direccion.');
       return;
     }
-
-    const direccionCompleta = customer.referencia.trim()
-      ? `${customer.direccion.trim()} | Ref: ${customer.referencia.trim()}`
-      : customer.direccion.trim();
 
     setSubmitting(true);
 
     try {
-      const createdOrder = await onCreateOrder(
+      const storeUser = await ensureStoreUser(customer);
+      const fullAddress = storeUser.referencia
+        ? `${storeUser.direccion} | Ref: ${storeUser.referencia}`
+        : storeUser.direccion;
+
+      const order = await onCreateOrder(
         {
-          cliente: customer.nombre.trim(),
-          clienteCodigo: buildClientCode(cleanPhone),
-          direccion: direccionCompleta,
-          telefono: cleanPhone,
-          referencia: customer.referencia.trim(),
+          cliente: storeUser.nombre,
+          clienteCodigo: storeUser.codigo,
+          clienteFirebaseKey: storeUser.clientKey,
+          storeUserKey: storeUser.key,
+          direccion: fullAddress,
+          telefono: storeUser.telefono,
+          referencia: storeUser.referencia,
           items: cartItems,
           total: totalAmount,
           observaciones: notes.trim(),
@@ -203,29 +217,18 @@ export default function TiendaVirtualView({
         { channel: STORE_CHANNEL }
       );
 
-      setSuccessOrder(createdOrder);
-      window.setTimeout(() => setSuccessOrder(null), 3200);
-
-      setCart(
-        STORE_PRODUCTS.reduce((accumulator, product) => {
-          accumulator[product.code] = 0;
-          return accumulator;
-        }, {})
-      );
-      setCustomer({
-        nombre: '',
-        telefono: '',
-        direccion: '',
-        referencia: '',
-        metodoPago: STORE_PAYMENT_OPTIONS[0],
-      });
+      setCreatedOrder(order);
+      setStatusPhone(storeUser.telefono);
+      setCart({});
       setNotes('');
+      setCheckoutOpen(false);
+      setOrdersOpen(true);
     } catch (error) {
       console.error('Error creando pedido virtual:', error);
       if (error.code === 'ORDER_LIMIT_REACHED') {
-        alert('Hoy ya no quedan numeros disponibles para seguir recibiendo pedidos.');
+        alert('Hoy ya no quedan numeros disponibles.');
       } else {
-        alert('No pudimos enviar el pedido. Intenta nuevamente.');
+        alert('No se pudo enviar el pedido.');
       }
     } finally {
       setSubmitting(false);
@@ -233,1050 +236,819 @@ export default function TiendaVirtualView({
   };
 
   return (
-    <div
-      className="sv-shell"
-      style={{
-        minHeight: isEmbedded ? 'calc(100vh - 64px)' : '100vh',
-        background:
-          'radial-gradient(circle at top left, rgba(239, 68, 68, 0.22), transparent 32%), linear-gradient(180deg, #150607 0%, #22090b 28%, #0d1117 100%)',
-        color: '#fff7ed',
-        padding: isEmbedded ? '24px' : '0',
-      }}
-    >
+    <div className="store-shell">
       <style>{`
-        .sv-shell {
-          --sv-red: #ef4444;
-          --sv-wine: #70161f;
-          --sv-gold: #f59e0b;
-          --sv-bone: #fff7ed;
-          --sv-ink: #0f172a;
-          --sv-panel: rgba(23, 23, 23, 0.74);
-          --sv-line: rgba(255, 255, 255, 0.12);
+        .store-shell {
+          min-height: ${isDashboard ? 'calc(100vh - 64px)' : '100vh'};
+          background: #f7f7f8;
+          color: #111827;
           font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         }
-        .sv-shell * {
+        .store-shell * {
           box-sizing: border-box;
         }
-        .sv-headline {
-          font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-          letter-spacing: 0.02em;
-        }
-        .sv-glass {
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          backdrop-filter: blur(14px);
-        }
-        .sv-button,
-        .sv-thumb,
-        .sv-card,
-        .sv-qty-btn,
-        .sv-filter-btn,
-        .sv-pay-btn {
-          transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease;
-        }
-        .sv-button:hover,
-        .sv-thumb:hover,
-        .sv-card:hover,
-        .sv-qty-btn:hover,
-        .sv-filter-btn:hover,
-        .sv-pay-btn:hover {
-          transform: translateY(-2px);
-        }
-        .sv-shell a {
-          color: inherit;
-          text-decoration: none;
-        }
-        .sv-root {
-          width: min(1440px, 100%);
+        .store-page {
+          max-width: 1180px;
           margin: 0 auto;
+          padding: ${isDashboard ? '18px' : '12px'} 18px 108px;
         }
-        .sv-hero {
-          position: relative;
-          overflow: hidden;
-          border-radius: 0 0 36px 36px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          background-image:
-            linear-gradient(115deg, rgba(14, 4, 6, 0.92) 8%, rgba(79, 13, 20, 0.84) 46%, rgba(11, 15, 20, 0.86) 100%),
-            url('${HERO_IMAGE}');
-          background-size: cover;
-          background-position: center;
-        }
-        .sv-hero::after {
-          content: "";
-          position: absolute;
-          inset: auto 0 0 0;
-          height: 160px;
-          background: linear-gradient(180deg, transparent, rgba(13, 17, 23, 0.9));
-          pointer-events: none;
-        }
-        .sv-hero-grid {
-          position: relative;
-          z-index: 1;
-          display: grid;
-          grid-template-columns: minmax(0, 1.2fr) minmax(320px, 430px);
-          gap: 28px;
-          align-items: center;
-          padding: 28px;
-        }
-        .sv-badge-row,
-        .sv-filter-row,
-        .sv-cart-tags,
-        .sv-quick-row,
-        .sv-payment-grid,
-        .sv-promo-grid {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 10px;
-        }
-        .sv-metrics {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 12px;
-          margin-top: 24px;
-        }
-        .sv-metric,
-        .sv-feature,
-        .sv-inline-card,
-        .sv-cart-panel,
-        .sv-section-card,
-        .sv-promo-stage,
-        .sv-card {
-          border-radius: 24px;
-        }
-        .sv-metric {
-          padding: 16px 18px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .sv-main-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1.15fr) minmax(330px, 420px);
-          gap: 24px;
-          padding: 24px;
-          align-items: start;
-        }
-        .sv-column {
-          display: grid;
-          gap: 24px;
-        }
-        .sv-section-card {
-          padding: 22px;
-        }
-        .sv-section-head {
+        .store-admin-bar {
           display: flex;
           justify-content: space-between;
-          gap: 16px;
-          align-items: end;
-          margin-bottom: 18px;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 14px;
+          padding: 12px;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
         }
-        .sv-promo-layout {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 280px;
-          gap: 18px;
+        .store-top {
+          position: sticky;
+          top: ${isDashboard ? '64px' : '0'};
+          z-index: 80;
+          background: rgba(247, 247, 248, 0.96);
+          backdrop-filter: blur(12px);
+          padding: 10px 0 14px;
         }
-        .sv-promo-stage {
-          position: relative;
-          min-height: 420px;
-          overflow: hidden;
-          background-size: cover;
-          background-position: center;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .sv-promo-stage::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.82));
-        }
-        .sv-promo-copy {
-          position: absolute;
-          inset: auto 18px 18px 18px;
-          z-index: 1;
-        }
-        .sv-thumb {
-          width: 100%;
-          border: 1px solid transparent;
-          padding: 10px;
-          text-align: left;
-          cursor: pointer;
-        }
-        .sv-thumb.is-active {
-          border-color: rgba(245, 158, 11, 0.66);
-          box-shadow: 0 10px 30px rgba(245, 158, 11, 0.22);
-        }
-        .sv-thumb-image {
-          width: 100%;
-          aspect-ratio: 16 / 11;
-          border-radius: 16px;
-          background-size: cover;
-          background-position: center;
+        .store-brand-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
           margin-bottom: 10px;
         }
-        .sv-toolbar {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          flex-wrap: wrap;
-          margin-bottom: 16px;
+        .store-logo {
+          width: 42px;
+          height: 42px;
+          border-radius: 8px;
+          object-fit: contain;
+          background: #ffffff;
         }
-        .sv-filter-btn,
-        .sv-pay-btn,
-        .sv-quick-chip {
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(255, 255, 255, 0.05);
-          color: #fff7ed;
-          border-radius: 999px;
-          padding: 10px 14px;
-          cursor: pointer;
-          font-weight: 700;
-        }
-        .sv-filter-btn.is-active,
-        .sv-pay-btn.is-active,
-        .sv-quick-chip.is-active {
-          background: rgba(245, 158, 11, 0.18);
-          border-color: rgba(245, 158, 11, 0.64);
-          color: #fcd34d;
-        }
-        .sv-search {
-          min-width: 260px;
-          padding: 14px 16px;
-          border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(6, 9, 15, 0.58);
-          color: white;
-          outline: none;
-        }
-        .sv-product-grid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 18px;
-        }
-        .sv-card {
-          position: relative;
-          overflow: hidden;
-          min-height: 420px;
-          display: flex;
-          flex-direction: column;
-          justify-content: end;
-          padding: 18px;
-          background-size: cover;
-          background-position: center;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
-        }
-        .sv-card::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(15, 23, 42, 0.08), rgba(15, 23, 42, 0.9) 78%);
-        }
-        .sv-card-content {
-          position: relative;
-          z-index: 1;
-          display: grid;
-          gap: 14px;
-        }
-        .sv-card-top {
-          display: flex;
-          justify-content: space-between;
-          gap: 12px;
-          align-items: flex-start;
-        }
-        .sv-card-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 8px 12px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.12);
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          font-size: 12px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-        }
-        .sv-stepper {
-          display: grid;
-          grid-template-columns: 48px 1fr 48px;
-          gap: 10px;
-          align-items: center;
-        }
-        .sv-qty-btn {
-          height: 46px;
-          border-radius: 14px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(255, 255, 255, 0.08);
-          color: white;
-          font-size: 24px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-        .sv-qty-box {
-          border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          background: rgba(8, 10, 15, 0.7);
-          padding: 12px;
-          text-align: center;
-        }
-        .sv-cart-panel {
-          position: sticky;
-          top: 88px;
-          padding: 22px;
-        }
-        .sv-order-card {
-          padding: 18px;
-          border-radius: 22px;
-          background: linear-gradient(145deg, rgba(239, 68, 68, 0.18), rgba(245, 158, 11, 0.1));
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          margin-bottom: 18px;
-        }
-        .sv-cart-list {
-          display: grid;
-          gap: 12px;
-          margin: 18px 0;
-        }
-        .sv-cart-item {
-          display: grid;
-          gap: 8px;
-          padding: 14px;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .sv-cart-summary {
-          display: grid;
-          gap: 10px;
-          padding: 16px;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          margin-bottom: 18px;
-        }
-        .sv-form-grid {
-          display: grid;
-          gap: 12px;
-        }
-        .sv-field,
-        .sv-textarea {
-          width: 100%;
-          padding: 14px 16px;
-          border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(9, 11, 16, 0.66);
-          color: white;
-          outline: none;
-        }
-        .sv-textarea {
-          min-height: 110px;
-          resize: vertical;
-          font-family: inherit;
-        }
-        .sv-button {
-          width: 100%;
-          border: none;
-          border-radius: 18px;
-          padding: 18px;
-          cursor: pointer;
+        .store-title {
+          font-size: 18px;
           font-weight: 900;
-          font-size: 16px;
-          color: #fff7ed;
-          background: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%);
-          box-shadow: 0 20px 36px rgba(239, 68, 68, 0.24);
+          line-height: 1.1;
         }
-        .sv-inline-actions {
+        .store-actions {
+          margin-left: auto;
           display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          margin-top: 18px;
+          gap: 8px;
         }
-        .sv-inline-card {
-          padding: 14px 16px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+        .store-icon-button,
+        .store-button,
+        .store-chip,
+        .store-back,
+        .store-add {
+          border: 0;
+          cursor: pointer;
+          font-family: inherit;
+          transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
         }
-        .sv-admin-strip {
+        .store-icon-button:hover,
+        .store-button:hover,
+        .store-chip:hover,
+        .store-back:hover,
+        .store-add:hover {
+          transform: translateY(-1px);
+        }
+        .store-icon-button {
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          color: #111827;
+          font-size: 18px;
+          font-weight: 900;
+        }
+        .store-search-wrap {
           display: flex;
-          flex-wrap: wrap;
-          justify-content: space-between;
-          gap: 16px;
           align-items: center;
-          margin-bottom: 18px;
-          padding: 18px 22px;
-          border-radius: 26px;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          gap: 10px;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 999px;
+          padding: 0 14px;
+          height: 48px;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
         }
-        .sv-empty {
-          padding: 28px;
-          border-radius: 24px;
-          border: 1px dashed rgba(255, 255, 255, 0.16);
-          text-align: center;
-          color: rgba(255, 247, 237, 0.72);
+        .store-search {
+          width: 100%;
+          border: 0;
+          outline: 0;
+          font-size: 15px;
+          background: transparent;
         }
-        .sv-success-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 1600;
-          background: rgba(7, 10, 14, 0.58);
-          backdrop-filter: blur(10px);
+        .store-tabs {
+          display: flex;
+          gap: 10px;
+          overflow-x: auto;
+          padding: 12px 0 2px;
+        }
+        .store-chip {
+          flex: 0 0 auto;
+          padding: 10px 16px;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #374151;
+          border: 1px solid #e5e7eb;
+          font-size: 14px;
+          font-weight: 800;
+        }
+        .store-chip.active {
+          background: #111827;
+          color: #ffffff;
+          border-color: #111827;
+        }
+        .store-promo {
+          margin: 12px 0 18px;
+        }
+        .store-section-title {
+          font-size: 18px;
+          font-weight: 900;
+          margin: 0 0 10px;
+        }
+        .store-promo-track {
+          display: grid;
+          grid-auto-flow: column;
+          grid-auto-columns: minmax(128px, 168px);
+          gap: 12px;
+          overflow-x: auto;
+          padding-bottom: 4px;
+        }
+        .store-promo-card {
+          height: 198px;
+          border-radius: 8px;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          overflow: hidden;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 20px;
         }
-        .sv-success-card {
-          width: min(460px, 100%);
-          padding: 28px;
-          border-radius: 28px;
+        .store-promo-card img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          background: #111827;
+        }
+        .store-product-head {
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .store-count {
+          margin: 0;
+          font-size: 26px;
+          line-height: 1;
+          font-weight: 900;
+        }
+        .store-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 18px;
+        }
+        .store-product {
+          position: relative;
+          min-width: 0;
+        }
+        .store-product-image {
+          width: 100%;
+          aspect-ratio: 1 / 1;
+          border-radius: 8px;
+          background: #ffffff;
+          border: 1px solid #eef0f3;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          cursor: pointer;
+        }
+        .store-product-image img {
+          width: 92%;
+          height: 92%;
+          object-fit: contain;
+        }
+        .store-add {
+          position: absolute;
+          top: calc(100% - 68px);
+          right: 10px;
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          background: #ffffff;
+          color: #111827;
+          font-size: 25px;
+          line-height: 1;
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+          border: 1px solid #e5e7eb;
+        }
+        .store-product-name {
+          margin: 10px 0 4px;
+          min-height: 42px;
+          color: #6b7280;
+          font-size: 15px;
+          line-height: 1.35;
+          cursor: pointer;
+        }
+        .store-price {
+          margin: 0;
+          font-size: 17px;
+          font-weight: 900;
+          color: #111827;
+        }
+        .store-unit {
+          margin: 3px 0 0;
+          color: #9ca3af;
+          font-size: 13px;
+          font-weight: 700;
+        }
+        .store-empty {
+          padding: 34px;
+          border: 1px dashed #d1d5db;
+          border-radius: 8px;
+          color: #6b7280;
           text-align: center;
-          background: linear-gradient(180deg, rgba(18, 25, 36, 0.98), rgba(61, 10, 14, 0.96));
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 26px 70px rgba(0, 0, 0, 0.4);
         }
-        @media (max-width: 1180px) {
-          .sv-hero-grid,
-          .sv-main-grid,
-          .sv-promo-layout {
-            grid-template-columns: 1fr;
+        .store-cart-bar {
+          position: fixed;
+          left: ${isDashboard ? 'calc(50% + 130px)' : '50%'};
+          bottom: 18px;
+          z-index: 110;
+          width: min(720px, calc(100vw - 28px));
+          transform: translateX(-50%);
+          border-radius: 999px;
+          background: #111827;
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 14px 12px 18px;
+          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.24);
+        }
+        .store-button {
+          border-radius: 999px;
+          padding: 12px 18px;
+          background: #ef4444;
+          color: #ffffff;
+          font-weight: 900;
+          font-size: 14px;
+        }
+        .store-button.secondary {
+          background: #ffffff;
+          color: #111827;
+          border: 1px solid #e5e7eb;
+        }
+        .store-sheet-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 200;
+          background: rgba(17, 24, 39, 0.38);
+          display: flex;
+          align-items: end;
+          justify-content: center;
+        }
+        .store-sheet {
+          width: min(720px, 100%);
+          max-height: calc(100vh - 28px);
+          overflow: auto;
+          background: #ffffff;
+          border-radius: 18px 18px 0 0;
+          padding: 16px;
+          box-shadow: 0 -18px 42px rgba(15, 23, 42, 0.18);
+        }
+        .store-sheet.full {
+          width: min(980px, 100%);
+        }
+        .store-back {
+          width: 40px;
+          height: 40px;
+          border-radius: 999px;
+          background: #f3f4f6;
+          color: #111827;
+          font-size: 22px;
+        }
+        .store-sheet-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .store-detail-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+          gap: 18px;
+          align-items: start;
+        }
+        .store-detail-image {
+          width: 100%;
+          aspect-ratio: 1 / 1;
+          border-radius: 8px;
+          background: #f7f7f8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid #e5e7eb;
+        }
+        .store-detail-image img {
+          width: 94%;
+          height: 94%;
+          object-fit: contain;
+        }
+        .store-qty-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin: 16px 0;
+        }
+        .store-stepper {
+          display: grid;
+          grid-template-columns: 48px 1fr 48px;
+          gap: 8px;
+          align-items: center;
+          margin-bottom: 14px;
+        }
+        .store-stepper button {
+          height: 46px;
+          border-radius: 999px;
+          border: 1px solid #e5e7eb;
+          background: #ffffff;
+          font-size: 24px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .store-stepper strong {
+          height: 46px;
+          border-radius: 999px;
+          background: #f3f4f6;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+        }
+        .store-form {
+          display: grid;
+          gap: 10px;
+        }
+        .store-field,
+        .store-textarea,
+        .store-select {
+          width: 100%;
+          min-height: 46px;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 12px;
+          outline: 0;
+          font: inherit;
+          background: #ffffff;
+        }
+        .store-textarea {
+          min-height: 88px;
+          resize: vertical;
+        }
+        .store-order-line {
+          display: grid;
+          grid-template-columns: 52px minmax(0, 1fr) auto;
+          gap: 10px;
+          align-items: center;
+          padding: 10px 0;
+          border-bottom: 1px solid #f1f2f4;
+        }
+        .store-order-line img {
+          width: 52px;
+          height: 52px;
+          border-radius: 8px;
+          object-fit: contain;
+          background: #f7f7f8;
+        }
+        .store-status-card {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 12px;
+          margin-top: 10px;
+        }
+        .store-status-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 6px 10px;
+          background: #f3f4f6;
+          font-size: 12px;
+          font-weight: 900;
+        }
+        @media (max-width: 980px) {
+          .store-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
           }
-          .sv-cart-panel {
-            position: static;
+        }
+        @media (max-width: 720px) {
+          .store-page {
+            padding-left: 14px;
+            padding-right: 14px;
           }
-          .sv-product-grid {
+          .store-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px 14px;
           }
-        }
-        @media (max-width: 760px) {
-          .sv-hero {
-            border-radius: 0 0 28px 28px;
+          .store-promo-track {
+            grid-auto-columns: minmax(128px, 146px);
           }
-          .sv-hero-grid,
-          .sv-main-grid,
-          .sv-section-card {
-            padding-left: 16px;
-            padding-right: 16px;
+          .store-promo-card {
+            height: 184px;
           }
-          .sv-hero-grid {
-            padding-top: 22px;
-            padding-bottom: 22px;
-          }
-          .sv-metrics {
+          .store-detail-grid {
             grid-template-columns: 1fr;
           }
-          .sv-product-grid {
-            grid-template-columns: 1fr;
+          .store-product-name {
+            font-size: 14px;
           }
-          .sv-toolbar {
-            flex-direction: column;
-          }
-          .sv-search {
-            min-width: 100%;
+          .store-cart-bar {
+            left: 50%;
           }
         }
       `}</style>
 
-      {successOrder && (
-        <div className="sv-success-overlay">
-          <div className="sv-success-card">
-            <div style={{ fontSize: '58px', marginBottom: '14px' }}>🔥</div>
-            <div className="sv-headline" style={{ fontSize: '44px', lineHeight: 0.95 }}>
-              PEDIDO #{formatOrderNumber(successOrder.id)}
-            </div>
-            <div style={{ marginTop: '12px', fontSize: '18px', fontWeight: 800 }}>
-              Entrando directo a cocina
-            </div>
-            <div style={{ marginTop: '10px', color: 'rgba(255, 247, 237, 0.76)', lineHeight: 1.6 }}>
-              Cliente: {successOrder.cliente}
-              <br />
-              Total estimado: {formatCurrency(successOrder.total)}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="sv-root">
-        {isEmbedded && (
-          <div className="sv-admin-strip">
-            <div>
-              <div style={{ fontSize: '12px', letterSpacing: '0.08em', opacity: 0.7, fontWeight: 800 }}>
-                MODULO DE TIENDA VIRTUAL
-              </div>
-              <div style={{ fontSize: '28px', fontWeight: 900, marginTop: '4px' }}>
-                Vista lista para compartir con clientes
-              </div>
-              <div style={{ marginTop: '6px', color: 'rgba(255, 247, 237, 0.72)' }}>
-                Enlace publico sugerido: {publicStoreUrl}
-              </div>
-            </div>
-
-            <div className="sv-inline-actions">
-              <button type="button" onClick={handleCopyLink} className="sv-filter-btn">
+      <div className="store-page">
+        {isDashboard && (
+          <div className="store-admin-bar">
+            <strong>Tienda Virtual Carnes San Martin Granada</strong>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="store-button secondary" onClick={copyPublicLink}>
                 Copiar enlace
               </button>
               <button
                 type="button"
+                className="store-button"
                 onClick={() => window.open(publicStoreUrl, '_blank', 'noopener,noreferrer')}
-                className="sv-filter-btn is-active"
               >
-                Abrir tienda publica
+                Abrir tienda
               </button>
             </div>
           </div>
         )}
 
-        <section className="sv-hero">
-          <div className="sv-hero-grid">
-            <div>
-              <div
-                className="sv-glass"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '14px',
-                  borderRadius: '999px',
-                  padding: '10px 16px',
-                }}
+        <header className="store-top">
+          <div className="store-brand-row">
+            <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
+            <div className="store-title">Tienda Virtual Carnes San Martin Granada</div>
+            <div className="store-actions">
+              <button
+                type="button"
+                className="store-icon-button"
+                title="Mis pedidos"
+                onClick={() => setOrdersOpen(true)}
               >
-                <img
-                  src={LOGO_PATH}
-                  alt="Carnes San Martin"
-                  style={{
-                    width: '56px',
-                    height: '56px',
-                    objectFit: 'contain',
-                    borderRadius: '14px',
-                    background: 'white',
-                    padding: '6px',
-                  }}
-                />
-                <div>
-                  <div style={{ fontSize: '12px', opacity: 0.72, letterSpacing: '0.08em', fontWeight: 800 }}>
-                    CARNES SAN MARTIN GRANADA
-                  </div>
-                  <div style={{ fontSize: '15px', fontWeight: 700 }}>
-                    Pedido online conectado al flujo real de delivery
-                  </div>
-                </div>
-              </div>
-
-              <div
-                className="sv-headline"
-                style={{
-                  marginTop: '22px',
-                  fontSize: 'clamp(52px, 8vw, 108px)',
-                  lineHeight: 0.88,
-                  maxWidth: '860px',
-                }}
+                #
+              </button>
+              <button
+                type="button"
+                className="store-icon-button"
+                title="Carrito"
+                onClick={() => setCheckoutOpen(true)}
               >
-                LA CARNE
-                <br />
-                ENTRA DIRECTO
-                <br />
-                A COCINA
-              </div>
-
-              <p
-                style={{
-                  marginTop: '18px',
-                  maxWidth: '720px',
-                  fontSize: '18px',
-                  lineHeight: 1.7,
-                  color: 'rgba(255, 247, 237, 0.78)',
-                }}
-              >
-                Esta tienda piloto usa codigos listos para SICAR, cantidades solo en libras y una
-                numeracion unificada con el modulo manual para que los pedidos no choquen.
-              </p>
-
-              <div className="sv-badge-row" style={{ marginTop: '18px' }}>
-                <span className="sv-filter-btn is-active">Desde 0.5 lb</span>
-                <span className="sv-filter-btn">3 productos piloto</span>
-                <span className="sv-filter-btn">Especiales de marca incluidos</span>
-              </div>
-
-              <div className="sv-inline-actions">
-                <a href="#catalogo" className="sv-filter-btn is-active">
-                  Elegir cortes
-                </a>
-                <a href="#promos" className="sv-filter-btn">
-                  Ver promociones
-                </a>
-              </div>
-
-              <div className="sv-metrics">
-                <div className="sv-metric">
-                  <div style={{ fontSize: '12px', opacity: 0.68, fontWeight: 800, letterSpacing: '0.08em' }}>
-                    TURNO ESTIMADO
-                  </div>
-                  <div style={{ fontSize: '34px', fontWeight: 900, marginTop: '6px' }}>#{estimatedOrder}</div>
-                </div>
-                <div className="sv-metric">
-                  <div style={{ fontSize: '12px', opacity: 0.68, fontWeight: 800, letterSpacing: '0.08em' }}>
-                    DISPONIBLES HOY
-                  </div>
-                  <div style={{ fontSize: '34px', fontWeight: 900, marginTop: '6px' }}>{remainingOrders}</div>
-                </div>
-                <div className="sv-metric">
-                  <div style={{ fontSize: '12px', opacity: 0.68, fontWeight: 800, letterSpacing: '0.08em' }}>
-                    REGLA DE PESO
-                  </div>
-                  <div style={{ fontSize: '34px', fontWeight: 900, marginTop: '6px' }}>0.5 lb</div>
-                </div>
-              </div>
+                {cartItems.length || '+'}
+              </button>
             </div>
+          </div>
 
-            <div className="sv-glass" style={{ padding: '16px', borderRadius: '30px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '12px', opacity: 0.68, letterSpacing: '0.08em', fontWeight: 800 }}>
-                    ESPECIAL DESTACADO
-                  </div>
-                  <div className="sv-headline" style={{ fontSize: '36px', marginTop: '8px', lineHeight: 0.95 }}>
-                    {activePromotion.title}
-                  </div>
-                </div>
-                <span className="sv-filter-btn is-active">{activePromotion.tag}</span>
+          <label className="store-search-wrap">
+            <span style={{ fontWeight: 900 }}>Buscar</span>
+            <input
+              className="store-search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar en Carnes San Martin Granada"
+            />
+          </label>
+
+          <nav className="store-tabs">
+            {categoryOptions.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className={`store-chip ${activeCategory === category.id ? 'active' : ''}`}
+                onClick={() => setActiveCategory(category.id)}
+              >
+                {category.label}
+              </button>
+            ))}
+          </nav>
+        </header>
+
+        <section className="store-promo">
+          <h2 className="store-section-title">Promociones activas</h2>
+          <div className="store-promo-track">
+            {STORE_PROMOTIONS.map((promotion) => (
+              <div key={promotion.id} className="store-promo-card">
+                <img src={promotion.image} alt={promotion.title} />
               </div>
-
-              <div
-                style={{
-                  marginTop: '16px',
-                  borderRadius: '24px',
-                  overflow: 'hidden',
-                  aspectRatio: '4 / 5',
-                  backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.48)), url('${activePromotion.image}')`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  boxShadow: '0 24px 50px rgba(0, 0, 0, 0.26)',
-                }}
-              />
-
-              <div style={{ marginTop: '14px', color: 'rgba(255, 247, 237, 0.78)', lineHeight: 1.65 }}>
-                {activePromotion.subtitle}
-              </div>
-
-              <div className="sv-promo-grid" style={{ marginTop: '16px' }}>
-                {STORE_PROMOTIONS.slice(0, 4).map((promotion, index) => (
-                  <button
-                    key={promotion.id}
-                    type="button"
-                    className={`sv-filter-btn ${activePromo === index ? 'is-active' : ''}`}
-                    onClick={() => setActivePromo(index)}
-                  >
-                    {promotion.title}
-                  </button>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
         </section>
 
-        <div className="sv-main-grid">
-          <div className="sv-column">
-            <section id="promos" className="sv-section-card sv-glass">
-              <div className="sv-section-head">
-                <div>
-                  <div style={{ fontSize: '12px', letterSpacing: '0.08em', opacity: 0.62, fontWeight: 800 }}>
-                    ZONA DE PROMOCIONALES
-                  </div>
-                  <div className="sv-headline" style={{ fontSize: '44px', marginTop: '6px', lineHeight: 0.96 }}>
-                    ESPECIALES
-                    <br />
-                    DE MARCA
-                  </div>
-                </div>
-                <div style={{ maxWidth: '340px', color: 'rgba(255, 247, 237, 0.72)', lineHeight: 1.6 }}>
-                  Estas piezas publicitarias viven separadas del catalogo para mantener una tienda clara y
-                  visualmente potente.
-                </div>
-              </div>
-
-              <div className="sv-promo-layout">
-                <article
-                  className="sv-promo-stage"
-                  style={{ backgroundImage: `url('${activePromotion.image}')` }}
-                >
-                  <div className="sv-promo-copy">
-                    <div className="sv-filter-btn is-active" style={{ display: 'inline-flex' }}>
-                      {activePromotion.tag}
-                    </div>
-                    <div className="sv-headline" style={{ fontSize: '42px', marginTop: '14px', lineHeight: 0.95 }}>
-                      {activePromotion.title}
-                    </div>
-                    <div style={{ marginTop: '10px', maxWidth: '460px', lineHeight: 1.65 }}>
-                      {activePromotion.subtitle}
-                    </div>
-                  </div>
-                </article>
-
-                <div className="sv-column" style={{ gap: '12px' }}>
-                  {STORE_PROMOTIONS.map((promotion, index) => (
-                    <button
-                      key={promotion.id}
-                      type="button"
-                      className={`sv-thumb sv-glass ${activePromo === index ? 'is-active' : ''}`}
-                      onClick={() => {
-                        startTransition(() => setActivePromo(index));
-                      }}
-                    >
-                      <div
-                        className="sv-thumb-image"
-                        style={{ backgroundImage: `url('${promotion.image}')` }}
-                      />
-                      <div style={{ fontSize: '12px', opacity: 0.62, fontWeight: 800, letterSpacing: '0.08em' }}>
-                        {promotion.tag}
-                      </div>
-                      <div style={{ marginTop: '4px', fontSize: '16px', fontWeight: 800 }}>
-                        {promotion.title}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section id="catalogo" className="sv-section-card sv-glass">
-              <div className="sv-section-head">
-                <div>
-                  <div style={{ fontSize: '12px', letterSpacing: '0.08em', opacity: 0.62, fontWeight: 800 }}>
-                    CATALOGO PILOTO
-                  </div>
-                  <div className="sv-headline" style={{ fontSize: '44px', marginTop: '6px', lineHeight: 0.96 }}>
-                    CORTES PARA
-                    <br />
-                    PEDIDO EN LINEA
-                  </div>
-                </div>
-                <div style={{ maxWidth: '340px', color: 'rgba(255, 247, 237, 0.72)', lineHeight: 1.6 }}>
-                  Solo por libra, siempre en pasos de media libra, usando el codigo que luego se puede enlazar
-                  a SICAR.
-                </div>
-              </div>
-
-              <div className="sv-toolbar">
-                <div className="sv-filter-row">
-                  {STORE_FILTERS.map((filterOption) => (
-                    <button
-                      key={filterOption.id}
-                      type="button"
-                      className={`sv-filter-btn ${activeFilter === filterOption.id ? 'is-active' : ''}`}
-                      onClick={() => setActiveFilter(filterOption.id)}
-                    >
-                      {filterOption.label}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  className="sv-search"
-                  type="search"
-                  placeholder="Buscar por codigo, nombre o estilo..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </div>
-
-              {filteredProducts.length === 0 ? (
-                <div className="sv-empty">
-                  No encontramos productos con ese filtro. Probá otra palabra o volvé a "Todo el catalogo".
-                </div>
-              ) : (
-                <div className="sv-product-grid">
-                  {filteredProducts.map((product) => {
-                    const quantity = Number(cart[product.code] || 0);
-                    const subtotal = quantity * product.price;
-
-                    return (
-                      <article
-                        key={product.code}
-                        className="sv-card"
-                        style={{ backgroundImage: `url('${product.image}')` }}
-                      >
-                        <div className="sv-card-content">
-                          <div className="sv-card-top">
-                            <span className="sv-card-tag">{product.badge}</span>
-                            <span
-                              className="sv-card-tag"
-                              style={{
-                                background: `${product.accent}22`,
-                                borderColor: `${product.accent}55`,
-                                color: product.accent,
-                              }}
-                            >
-                              SICAR {product.code}
-                            </span>
-                          </div>
-
-                          <div>
-                            <div style={{ fontSize: '13px', opacity: 0.68, fontWeight: 700 }}>
-                              Precio por libra
-                            </div>
-                            <div className="sv-headline" style={{ fontSize: '34px', marginTop: '4px', lineHeight: 0.95 }}>
-                              {formatCurrency(product.price)}
-                            </div>
-                          </div>
-
-                          <div>
-                            <div style={{ fontSize: '24px', fontWeight: 900, lineHeight: 1.1 }}>
-                              {product.name}
-                            </div>
-                            <div style={{ marginTop: '8px', color: 'rgba(255, 247, 237, 0.76)', lineHeight: 1.55 }}>
-                              {product.description}
-                            </div>
-                          </div>
-
-                          <div className="sv-quick-row">
-                            {QUICK_WEIGHTS.map((weight) => (
-                              <button
-                                key={`${product.code}-${weight}`}
-                                type="button"
-                                className={`sv-quick-chip ${quantity === weight ? 'is-active' : ''}`}
-                                onClick={() => handleQuantityChange(product.code, weight)}
-                              >
-                                {formatWeight(weight)} lb
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="sv-stepper">
-                            <button
-                              type="button"
-                              className="sv-qty-btn"
-                              onClick={() => handleQuantityChange(product.code, quantity - 0.5)}
-                            >
-                              −
-                            </button>
-                            <div className="sv-qty-box">
-                              <div style={{ fontSize: '12px', opacity: 0.64, fontWeight: 800, letterSpacing: '0.08em' }}>
-                                CANTIDAD
-                              </div>
-                              <div className="sv-headline" style={{ fontSize: '34px', lineHeight: 0.9, marginTop: '6px' }}>
-                                {formatWeight(quantity || 0)}
-                              </div>
-                              <div style={{ marginTop: '6px', fontSize: '13px', opacity: 0.72 }}>
-                                {quantity > 0 ? `${formatCurrency(subtotal)} estimado` : 'Elegí un peso'}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="sv-qty-btn"
-                              onClick={() => handleQuantityChange(product.code, quantity + 0.5)}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            <section className="sv-section-card sv-glass">
-              <div className="sv-section-head">
-                <div>
-                  <div style={{ fontSize: '12px', letterSpacing: '0.08em', opacity: 0.62, fontWeight: 800 }}>
-                    EXPERIENCIA OPERATIVA
-                  </div>
-                  <div className="sv-headline" style={{ fontSize: '38px', marginTop: '6px', lineHeight: 0.98 }}>
-                    TIENDA BONITA
-                    <br />
-                    PERO BIEN ATERRIZADA
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '14px',
-                }}
-              >
-                {STORE_FEATURES.map((feature) => (
-                  <div key={feature.title} className="sv-feature sv-glass" style={{ padding: '18px' }}>
-                    <div style={{ fontSize: '13px', letterSpacing: '0.08em', opacity: 0.66, fontWeight: 800 }}>
-                      BENEFICIO
-                    </div>
-                    <div style={{ marginTop: '8px', fontSize: '22px', fontWeight: 900 }}>
-                      {feature.title}
-                    </div>
-                    <div style={{ marginTop: '10px', color: 'rgba(255, 247, 237, 0.72)', lineHeight: 1.6 }}>
-                      {feature.description}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+        <main>
+          <div className="store-product-head">
+            <h2 className="store-count">{filteredProducts.length} productos</h2>
+            <button
+              type="button"
+              className="store-button secondary"
+              onClick={() => {
+                setQuery('');
+                setActiveCategory('todos');
+              }}
+            >
+              Limpiar
+            </button>
           </div>
 
-          <aside className="sv-cart-panel sv-glass">
-            <div className="sv-order-card">
-              <div style={{ fontSize: '12px', opacity: 0.68, fontWeight: 800, letterSpacing: '0.08em' }}>
-                PEDIDO EN PREPARACION
-              </div>
-              <div className="sv-headline" style={{ fontSize: '52px', lineHeight: 0.9, marginTop: '8px' }}>
-                #{estimatedOrder}
-              </div>
-              <div style={{ marginTop: '12px', color: 'rgba(255, 247, 237, 0.78)', lineHeight: 1.6 }}>
-                Se confirma al guardar. El numero sale del mismo contador que usan los pedidos manuales.
-              </div>
-            </div>
-
-            {!hasAvailability && (
-              <div
-                style={{
-                  marginBottom: '18px',
-                  padding: '14px 16px',
-                  borderRadius: '18px',
-                  background: 'rgba(239, 68, 68, 0.14)',
-                  border: '1px solid rgba(239, 68, 68, 0.36)',
-                  color: '#fecaca',
-                  lineHeight: 1.55,
-                }}
-              >
-                Hoy ya se alcanzo el limite de {ORDER_LIMIT_PER_DAY} pedidos. La tienda queda visible pero el
-                envio se bloquea hasta el siguiente dia.
-              </div>
-            )}
-
-            <div className="sv-cart-tags">
-              <span className="sv-filter-btn is-active">{cartItems.length} productos</span>
-              <span className="sv-filter-btn">{formatWeight(totalWeight)} lb</span>
-              <span className="sv-filter-btn">{formatCurrency(totalAmount)}</span>
-            </div>
-
-            <div className="sv-cart-list">
-              {cartItems.length === 0 ? (
-                <div className="sv-empty">
-                  Agrega tus cortes favoritos y aqui mismo preparamos el resumen para enviarlo a cocina.
-                </div>
-              ) : (
-                cartItems.map((item) => (
-                  <div key={item.codigo} className="sv-cart-item">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                      <div>
-                        <div style={{ fontSize: '12px', opacity: 0.62, fontWeight: 800 }}>COD {item.codigo}</div>
-                        <div style={{ marginTop: '4px', fontSize: '16px', fontWeight: 800 }}>{item.nombre}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '12px', opacity: 0.62, fontWeight: 800 }}>SUBTOTAL</div>
-                        <div style={{ marginTop: '4px', fontSize: '16px', fontWeight: 900 }}>
-                          {formatCurrency(item.subtotal)}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ color: 'rgba(255, 247, 237, 0.7)', lineHeight: 1.55 }}>
-                      {formatWeight(item.cantidad)} {item.unidad} x {formatCurrency(item.precioUnitario)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="sv-cart-summary">
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ opacity: 0.72 }}>Peso total</span>
-                <strong>{formatWeight(totalWeight)} lb</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ opacity: 0.72 }}>Total estimado</span>
-                <strong>{formatCurrency(totalAmount)}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ opacity: 0.72 }}>Cupos disponibles</span>
-                <strong>{remainingOrders}</strong>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="sv-form-grid">
-              <div>
-                <div style={{ fontSize: '12px', opacity: 0.62, fontWeight: 800, letterSpacing: '0.08em' }}>
-                  DATOS DEL CLIENTE
-                </div>
-              </div>
-
-              <input
-                className="sv-field"
-                type="text"
-                placeholder="Nombre completo"
-                value={customer.nombre}
-                onChange={(event) => handleCustomerChange('nombre', event.target.value)}
-              />
-
-              <input
-                className="sv-field"
-                type="tel"
-                placeholder="Telefono o WhatsApp"
-                value={customer.telefono}
-                onChange={(event) => handleCustomerChange('telefono', event.target.value)}
-              />
-
-              <input
-                className="sv-field"
-                type="text"
-                placeholder="Direccion de entrega"
-                value={customer.direccion}
-                onChange={(event) => handleCustomerChange('direccion', event.target.value)}
-              />
-
-              <input
-                className="sv-field"
-                type="text"
-                placeholder="Referencia adicional"
-                value={customer.referencia}
-                onChange={(event) => handleCustomerChange('referencia', event.target.value)}
-              />
-
-              <div>
-                <div style={{ fontSize: '12px', opacity: 0.62, fontWeight: 800, letterSpacing: '0.08em', marginBottom: '10px' }}>
-                  METODO DE PAGO
-                </div>
-                <div className="sv-payment-grid">
-                  {STORE_PAYMENT_OPTIONS.map((paymentOption) => (
+          {filteredProducts.length === 0 ? (
+            <div className="store-empty">No encontramos productos con esa busqueda.</div>
+          ) : (
+            <div className="store-grid">
+              {filteredProducts.map((product) => {
+                const quantity = Number(cart[product.code] || 0);
+                return (
+                  <article key={product.code} className="store-product">
                     <button
-                      key={paymentOption}
                       type="button"
-                      className={`sv-pay-btn ${customer.metodoPago === paymentOption ? 'is-active' : ''}`}
-                      onClick={() => handleCustomerChange('metodoPago', paymentOption)}
+                      className="store-product-image"
+                      onClick={() => openProduct(product)}
                     >
-                      {paymentOption}
+                      <img src={product.image || LOGO_PATH} alt={product.name} />
                     </button>
-                  ))}
-                </div>
-              </div>
+                    <button
+                      type="button"
+                      className="store-add"
+                      title="Agregar"
+                      onClick={() => updateQuantity(product.code, quantity + 0.5)}
+                    >
+                      +
+                    </button>
+                    <h3 className="store-product-name" onClick={() => openProduct(product)}>
+                      {product.name}
+                    </h3>
+                    <p className="store-price">{formatCurrency(product.price)}</p>
+                    <p className="store-unit">
+                      {quantity > 0
+                        ? `${formatWeight(quantity)} ${product.unit} en carrito`
+                        : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
+                    </p>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      </div>
 
-              <textarea
-                className="sv-textarea"
-                placeholder="Observaciones para cocina o entrega"
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-              />
-
-              <button
-                type="submit"
-                className="sv-button"
-                disabled={submitting || !hasAvailability}
-                style={{
-                  opacity: submitting || !hasAvailability ? 0.66 : 1,
-                  cursor: submitting || !hasAvailability ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {submitting
-                  ? 'Enviando pedido a cocina...'
-                  : hasAvailability
-                    ? `Enviar pedido #${estimatedOrder}`
-                    : 'Cupos agotados por hoy'}
-              </button>
-
-              <div style={{ color: 'rgba(255, 247, 237, 0.62)', lineHeight: 1.6, fontSize: '13px' }}>
-                El cliente compra aqui y el pedido se registra en el mismo flujo del delivery. Esta prueba ya
-                deja los codigos, cantidades y canal listos para crecer hacia SICAR.
-              </div>
-            </form>
-          </aside>
+      {cartItems.length > 0 && (
+        <div className="store-cart-bar">
+          <div>
+            <strong>{formatWeight(cartCount)} lb</strong>
+            <div style={{ fontSize: 13, opacity: 0.78 }}>{formatCurrency(totalAmount)}</div>
+          </div>
+          <button type="button" className="store-button" onClick={() => setCheckoutOpen(true)}>
+            Ver pedido
+          </button>
         </div>
+      )}
+
+      {selectedProduct && (
+        <ProductSheet
+          product={selectedProduct}
+          quantity={Number(cart[selectedProduct.code] || 0)}
+          onClose={() => setSelectedProduct(null)}
+          onQuantityChange={(nextQuantity) => updateQuantity(selectedProduct.code, nextQuantity)}
+        />
+      )}
+
+      {checkoutOpen && (
+        <CheckoutSheet
+          cartItems={cartItems}
+          customer={customer}
+          notes={notes}
+          submitting={submitting}
+          totalAmount={totalAmount}
+          onClose={() => setCheckoutOpen(false)}
+          onCustomerChange={updateCustomer}
+          onNotesChange={setNotes}
+          onSubmit={submitOrder}
+        />
+      )}
+
+      {ordersOpen && (
+        <OrdersSheet
+          statusPhone={statusPhone || customer.telefono}
+          orders={customerOrders}
+          createdOrder={createdOrder}
+          onPhoneChange={setStatusPhone}
+          onClose={() => setOrdersOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
+  const subtotal = Number(quantity || 0) * Number(product.price || 0);
+
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-sheet full">
+        <div className="store-sheet-head">
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
+          </button>
+          <strong>{product.code}</strong>
+        </div>
+
+        <div className="store-detail-grid">
+          <div className="store-detail-image">
+            <img src={product.image || LOGO_PATH} alt={product.name} />
+          </div>
+          <div>
+            <h2 style={{ margin: '0 0 8px', fontSize: 28, lineHeight: 1.08 }}>{product.name}</h2>
+            <p className="store-price" style={{ fontSize: 24 }}>
+              {formatCurrency(product.price)}
+            </p>
+            <p className="store-unit">{product.description || `Precio por ${product.unit}`}</p>
+
+            <div className="store-qty-row">
+              {QUICK_WEIGHTS.map((weight) => (
+                <button
+                  key={weight}
+                  type="button"
+                  className={`store-chip ${quantity === weight ? 'active' : ''}`}
+                  onClick={() => onQuantityChange(weight)}
+                >
+                  {formatWeight(weight)} {product.unit}
+                </button>
+              ))}
+            </div>
+
+            <div className="store-stepper">
+              <button type="button" onClick={() => onQuantityChange(quantity - 0.5)}>
+                -
+              </button>
+              <strong>{formatWeight(quantity)} {product.unit}</strong>
+              <button type="button" onClick={() => onQuantityChange(quantity + 0.5)}>
+                +
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="store-button"
+              style={{ width: '100%' }}
+              onClick={onClose}
+            >
+              {quantity > 0 ? `Agregar ${formatCurrency(subtotal)}` : 'Agregar al pedido'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CheckoutSheet({
+  cartItems,
+  customer,
+  notes,
+  submitting,
+  totalAmount,
+  onClose,
+  onCustomerChange,
+  onNotesChange,
+  onSubmit,
+}) {
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-sheet">
+        <div className="store-sheet-head">
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
+          </button>
+          <strong>Tu pedido</strong>
+        </div>
+
+        {cartItems.map((item) => (
+          <div key={item.codigo} className="store-order-line">
+            <img src={item.image || LOGO_PATH} alt={item.nombre} />
+            <div>
+              <strong>{item.nombre}</strong>
+              <div style={{ color: '#6b7280', fontSize: 13 }}>
+                {formatWeight(item.cantidad)} {item.unidad} x {formatCurrency(item.precioUnitario)}
+              </div>
+            </div>
+            <strong>{formatCurrency(item.subtotal)}</strong>
+          </div>
+        ))}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 16px' }}>
+          <strong>Total</strong>
+          <strong>{formatCurrency(totalAmount)}</strong>
+        </div>
+
+        <form className="store-form" onSubmit={onSubmit}>
+          <input
+            className="store-field"
+            value={customer.nombre}
+            onChange={(event) => onCustomerChange('nombre', event.target.value)}
+            placeholder="Nombre completo"
+          />
+          <input
+            className="store-field"
+            value={customer.telefono}
+            onChange={(event) => onCustomerChange('telefono', event.target.value)}
+            placeholder="Telefono o WhatsApp"
+          />
+          <input
+            className="store-field"
+            value={customer.direccion}
+            onChange={(event) => onCustomerChange('direccion', event.target.value)}
+            placeholder="Direccion"
+          />
+          <input
+            className="store-field"
+            value={customer.referencia}
+            onChange={(event) => onCustomerChange('referencia', event.target.value)}
+            placeholder="Referencia"
+          />
+          <select
+            className="store-select"
+            value={customer.metodoPago}
+            onChange={(event) => onCustomerChange('metodoPago', event.target.value)}
+          >
+            {STORE_PAYMENT_OPTIONS.map((payment) => (
+              <option key={payment} value={payment}>
+                {payment}
+              </option>
+            ))}
+          </select>
+          <textarea
+            className="store-textarea"
+            value={notes}
+            onChange={(event) => onNotesChange(event.target.value)}
+            placeholder="Observaciones"
+          />
+          <button type="submit" className="store-button" disabled={submitting}>
+            {submitting ? 'Enviando...' : 'Crear usuario y enviar'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function OrdersSheet({ statusPhone, orders, createdOrder, onPhoneChange, onClose }) {
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-sheet">
+        <div className="store-sheet-head">
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
+          </button>
+          <strong>Estado de pedido</strong>
+        </div>
+
+        {createdOrder && (
+          <div className="store-status-card" style={{ borderColor: '#ef4444' }}>
+            <div className="store-status-pill">Pedido #{formatOrderNumber(createdOrder.id)}</div>
+            <h3 style={{ margin: '10px 0 4px' }}>{createdOrder.estado}</h3>
+            <div style={{ color: '#6b7280' }}>{formatCurrency(createdOrder.total)}</div>
+          </div>
+        )}
+
+        <input
+          className="store-field"
+          style={{ marginTop: 12 }}
+          value={statusPhone}
+          onChange={(event) => onPhoneChange(event.target.value)}
+          placeholder="Telefono para consultar"
+        />
+
+        {orders.length === 0 ? (
+          <div className="store-empty" style={{ marginTop: 12 }}>
+            Ingresa tu telefono para ver tus pedidos.
+          </div>
+        ) : (
+          orders.map((order) => (
+            <div key={order.firebaseKey} className="store-status-card">
+              <div className="store-status-pill">Pedido #{formatOrderNumber(order.id)}</div>
+              <h3 style={{ margin: '10px 0 4px' }}>{order.estado || 'Pendiente'}</h3>
+              <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+                {order.fecha} - {order.timestampIngreso || ''}
+                <br />
+                {formatCurrency(order.total)}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

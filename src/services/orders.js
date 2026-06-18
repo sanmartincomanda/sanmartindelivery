@@ -50,7 +50,7 @@ export const buildStoreOrderText = (items = [], notes = '') => {
   const normalizedItems = normalizeStoreItems(items);
   const lines = normalizedItems.map(
     (item) =>
-      `• ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre} [${item.codigo}] · C$${formatAmount(item.subtotal)}`
+      `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre} [${item.codigo}] | C$${formatAmount(item.subtotal)}`
   );
 
   const cleanNotes = String(notes || '').trim();
@@ -112,6 +112,8 @@ export async function createOrder(payload, options = {}) {
     cliente: String(payload.cliente || '').trim() || 'Cliente sin nombre',
     clienteCodigo:
       String(payload.clienteCodigo || '').trim() || (channel === STORE_CHANNEL ? 'TIENDA VIRTUAL' : '-'),
+    clienteFirebaseKey: String(payload.clienteFirebaseKey || '').trim(),
+    storeUserKey: String(payload.storeUserKey || '').trim(),
     direccion: String(payload.direccion || '').trim() || '-',
     telefono: String(payload.telefono || '').trim(),
     referencia: String(payload.referencia || '').trim(),
@@ -130,11 +132,11 @@ export async function createOrder(payload, options = {}) {
     timestamp: Date.now(),
   };
 
-  const orderRef = ref(database, `orders/${buildOrderKey(fecha, id)}`);
-  await set(orderRef, orderRecord);
+  const orderKey = buildOrderKey(fecha, id);
+  await set(ref(database, `orders/${orderKey}`), orderRecord);
 
   return {
-    firebaseKey: buildOrderKey(fecha, id),
+    firebaseKey: orderKey,
     ...orderRecord,
   };
 }
