@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from './firebase';
 import logo from './logo.svg';
@@ -11,6 +11,7 @@ import ListaPedidos from './components/ListaPedidos';
 import TiendaVirtualView from './components/TiendaVirtualView';
 import ConfiguracionView from './components/ConfiguracionView';
 import DriverView from './components/DriverView';
+import BaseDatosView from './components/BaseDatosView';
 import { createOrder, ORDER_LIMIT_PER_DAY } from './services/orders';
 import {
   KITCHEN_USER_KEY,
@@ -18,8 +19,6 @@ import {
   normalizeKitchenUser,
   SYSTEM_USERS_PATH,
 } from './services/systemUsers';
-
-const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
 
 const Icons = {
   plus: (
@@ -716,27 +715,7 @@ function App() {
 
           {view === 'configuracion' && <ConfiguracionView />}
 
-          {view === 'basedatos' && (
-            <Suspense
-              fallback={
-                <div
-                  style={{
-                    minHeight: '60vh',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#64748b',
-                    fontSize: '18px',
-                    fontWeight: 700,
-                  }}
-                >
-                  Cargando base de datos...
-                </div>
-              }
-            >
-              <BaseDatosView clientes={clientes} />
-            </Suspense>
-          )}
+          {view === 'basedatos' && <BaseDatosView clientes={clientes} />}
         </div>
       </main>
     </div>
