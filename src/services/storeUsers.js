@@ -15,7 +15,46 @@ const buildClientCode = (phone) => {
   return `TV-${digits.slice(-4) || 'WEB'}`;
 };
 
-export async function ensureStoreUser({ nombre, telefono, direccion, referencia }) {
+const toHex = (buffer) =>
+  Array.from(new Uint8Array(buffer))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+const fallbackHash = (value) => {
+  if (typeof btoa === 'function') {
+    return `fallback:${btoa(unescape(encodeURIComponent(value)))}`;
+  }
+
+  return `fallback:${value}`;
+};
+
+async function hashStorePassword(phone, password) {
+  const cleanPhone = cleanStorePhone(phone);
+  const rawValue = `${cleanPhone}:${String(password || '')}`;
+
+  if (globalThis.crypto?.subtle && typeof TextEncoder !== 'undefined') {
+    const encoded = new TextEncoder().encode(rawValue);
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', encoded);
+    return `sha256:${toHex(digest)}`;
+  }
+
+  return fallbackHash(rawValue);
+}
+
+const sanitizeStoreUser = (user, key) => {
+  if (!user) {
+    return null;
+  }
+
+  const { passwordHash, ...safeUser } = user;
+  return {
+    ...safeUser,
+    key,
+    hasPassword: Boolean(passwordHash),
+  };
+};
+
+export async function ensureStoreUser({ nombre, telefono, direccion, referencia, passwordHash }) {
   const cleanPhone = cleanStorePhone(telefono);
   const userKey = getStoreUserKey(cleanPhone);
 
@@ -68,6 +107,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia 
     ...(existingUser || {}),
     ...profile,
     clientKey,
+    passwordHash: passwordHash || existingUser?.passwordHash || '',
     createdAt: existingUser?.createdAt || now,
   });
 
@@ -75,5 +115,107 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia 
     ...profile,
     key: userKey,
     clientKey,
+  };
+}
+
+export async function registerStoreUser({ nombre, telefono, direccion, referencia, password }) {
+  const cleanPhone = cleanStorePhone(telefono);
+  const userKey = getStoreUserKey(cleanPhone);
+  const cleanPassword = String(password || '').trim();
+
+  if (!userKey || !String(nombre || '').trim() || !String(direccion || '').trim() || cleanPassword.length < 4) {
+    const error = new Error('Datos de registro incompletos');
+    error.code = 'REGISTER_INCOMPLETE';
+    throw error;
+  }
+
+  const userRef = ref(database, `${STORE_USERS_PATH}/${userKey}`);
+  const userSnapshot = await get(userRef);
+  const existingUser = userSnapshot.val();
+
+  if (existingUser?.passwordHash) {
+    const error = new Error('El usuario ya existe');
+    error.code = 'USER_EXISTS';
+    throw error;
+  }
+
+  const passwordHash = await hashStorePassword(cleanPhone, cleanPassword);
+  const profile = await ensureStoreUser({
+    nombre,
+    telefono: cleanPhone,
+    direccion,
+    referencia,
+    passwordHash,
+  });
+
+  await update(userRef, {
+    passwordHash,
+    lastLoginAt: Date.now(),
+  });
+
+  return sanitizeStoreUser(
+    {
+      ...profile,
+      passwordHash,
+    },
+    userKey
+  );
+}
+
+export async function loginStoreUser({ telefono, password }) {
+  const cleanPhone = cleanStorePhone(telefono);
+  const userKey = getStoreUserKey(cleanPhone);
+  const cleanPassword = String(password || '').trim();
+
+  if (!userKey || !cleanPassword) {
+    const error = new Error('Credenciales incompletas');
+    error.code = 'LOGIN_INCOMPLETE';
+    throw error;
+  }
+
+  const userRef = ref(database, `${STORE_USERS_PATH}/${userKey}`);
+  const userSnapshot = await get(userRef);
+  const user = userSnapshot.val();
+
+  if (!user?.passwordHash) {
+    const error = new Error('Usuario no encontrado');
+    error.code = 'USER_NOT_FOUND';
+    throw error;
+  }
+
+  const passwordHash = await hashStorePassword(cleanPhone, cleanPassword);
+  if (passwordHash !== user.passwordHash) {
+    const error = new Error('Contrasena incorrecta');
+    error.code = 'INVALID_PASSWORD';
+    throw error;
+  }
+
+  await update(userRef, {
+    lastLoginAt: Date.now(),
+  });
+
+  return sanitizeStoreUser(user, userKey);
+}
+
+export async function updateStoreUserProfile(user, patch) {
+  const currentUser = user || {};
+  const nextProfile = await ensureStoreUser({
+    nombre: patch.nombre ?? currentUser.nombre,
+    telefono: currentUser.telefono,
+    direccion: patch.direccion ?? currentUser.direccion,
+    referencia: patch.referencia ?? currentUser.referencia,
+  });
+
+  const safeUser = sanitizeStoreUser(
+    {
+      ...currentUser,
+      ...nextProfile,
+    },
+    currentUser.key || getStoreUserKey(currentUser.telefono)
+  );
+
+  return {
+    ...safeUser,
+    hasPassword: currentUser.hasPassword,
   };
 }

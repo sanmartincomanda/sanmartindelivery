@@ -8,10 +8,16 @@ import {
   STORE_PROMOTIONS,
 } from '../data/tiendaVirtual';
 import { mergeCatalogProducts, STORE_CATALOG_PATH } from '../services/storeCatalog';
-import { cleanStorePhone, ensureStoreUser } from '../services/storeUsers';
+import {
+  cleanStorePhone,
+  loginStoreUser,
+  registerStoreUser,
+  updateStoreUserProfile,
+} from '../services/storeUsers';
 import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orders';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
+const STORE_SESSION_KEY = 'sanmartin_store_user';
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -52,7 +58,30 @@ export default function TiendaVirtualView({
   const [selectedPromotion, setSelectedPromotion] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [statusPhone, setStatusPhone] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      return JSON.parse(window.localStorage.getItem(STORE_SESSION_KEY) || 'null');
+    } catch (error) {
+      console.error('No se pudo leer la sesion de tienda:', error);
+      return null;
+    }
+  });
+  const [authMode, setAuthMode] = useState('login');
+  const [authForm, setAuthForm] = useState({
+    nombre: '',
+    telefono: '',
+    password: '',
+    confirmPassword: '',
+    direccion: '',
+    referencia: '',
+  });
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   const [customerOrders, setCustomerOrders] = useState([]);
   const [customer, setCustomer] = useState({
     nombre: '',
@@ -77,7 +106,12 @@ export default function TiendaVirtualView({
   }, []);
 
   useEffect(() => {
-    const cleanPhone = cleanStorePhone(statusPhone);
+    if (!currentUser) {
+      setCustomerOrders([]);
+      return undefined;
+    }
+
+    const cleanPhone = cleanStorePhone(currentUser.telefono);
     if (!cleanPhone) {
       setCustomerOrders([]);
       return undefined;
@@ -87,7 +121,10 @@ export default function TiendaVirtualView({
       const data = snapshot.val() || {};
       const orders = Object.entries(data)
         .map(([firebaseKey, order]) => ({ firebaseKey, ...order }))
-        .filter((order) => cleanStorePhone(order.telefono) === cleanPhone)
+        .filter(
+          (order) =>
+            order.storeUserKey === currentUser.key || cleanStorePhone(order.telefono) === cleanPhone
+        )
         .sort((left, right) => Number(right.timestamp || 0) - Number(left.timestamp || 0))
         .slice(0, 10);
 
@@ -95,7 +132,21 @@ export default function TiendaVirtualView({
     });
 
     return () => unsubscribe();
-  }, [statusPhone]);
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    setCustomer((current) => ({
+      ...current,
+      nombre: currentUser.nombre || '',
+      telefono: currentUser.telefono || '',
+      direccion: currentUser.direccion || '',
+      referencia: currentUser.referencia || '',
+    }));
+  }, [currentUser]);
 
   const activeProducts = useMemo(
     () => catalog.filter((product) => product.active !== false),
@@ -177,6 +228,111 @@ export default function TiendaVirtualView({
     }));
   };
 
+  const updateAuthForm = (field, value) => {
+    setAuthForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const persistStoreSession = (user) => {
+    setCurrentUser(user);
+    setCreatedOrder(null);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(STORE_SESSION_KEY, JSON.stringify(user));
+    }
+  };
+
+  const clearStoreSession = () => {
+    setCurrentUser(null);
+    setCart({});
+    setCreatedOrder(null);
+    setCustomerOrders([]);
+    setOrdersOpen(false);
+    setCheckoutOpen(false);
+    setProfileOpen(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(STORE_SESSION_KEY);
+    }
+  };
+
+  const handleStoreLogin = async (event) => {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      const user = await loginStoreUser({
+        telefono: authForm.telefono,
+        password: authForm.password,
+      });
+      persistStoreSession(user);
+      setAuthForm((current) => ({
+        ...current,
+        password: '',
+        confirmPassword: '',
+      }));
+    } catch (error) {
+      console.error('Error iniciando sesion de tienda:', error);
+      setAuthError('Telefono o contrasena incorrecta.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleStoreRegister = async (event) => {
+    event.preventDefault();
+    setAuthLoading(true);
+    setAuthError('');
+
+    if (authForm.password !== authForm.confirmPassword) {
+      setAuthLoading(false);
+      setAuthError('Las contrasenas no coinciden.');
+      return;
+    }
+
+    try {
+      const user = await registerStoreUser(authForm);
+      persistStoreSession(user);
+      setAuthForm({
+        nombre: '',
+        telefono: '',
+        password: '',
+        confirmPassword: '',
+        direccion: '',
+        referencia: '',
+      });
+    } catch (error) {
+      console.error('Error registrando usuario de tienda:', error);
+      if (error.code === 'USER_EXISTS') {
+        setAuthError('Ese telefono ya tiene cuenta. Inicia sesion.');
+        setAuthMode('login');
+      } else {
+        setAuthError('Completa nombre, telefono, contrasena y direccion.');
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleProfileSave = async (profile) => {
+    if (!currentUser) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const nextUser = await updateStoreUserProfile(currentUser, profile);
+      persistStoreSession(nextUser);
+      setProfileOpen(false);
+    } catch (error) {
+      console.error('Error actualizando perfil:', error);
+      alert('No se pudo actualizar tu perfil.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const openProduct = (product) => {
     setSelectedProduct(product);
   };
@@ -194,33 +350,38 @@ export default function TiendaVirtualView({
   const submitOrder = async (event) => {
     event.preventDefault();
 
+    if (!currentUser) {
+      alert('Inicia sesion para crear tu pedido.');
+      return;
+    }
+
     if (cartItems.length === 0) {
       alert('Agrega al menos un producto.');
       return;
     }
 
-    if (!customer.nombre.trim() || !customer.telefono.trim() || !customer.direccion.trim()) {
-      alert('Completa nombre, telefono y direccion.');
+    if (!currentUser.direccion) {
+      alert('Agrega tu direccion antes de enviar el pedido.');
+      setProfileOpen(true);
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const storeUser = await ensureStoreUser(customer);
-      const fullAddress = storeUser.referencia
-        ? `${storeUser.direccion} | Ref: ${storeUser.referencia}`
-        : storeUser.direccion;
+      const fullAddress = currentUser.referencia
+        ? `${currentUser.direccion} | Ref: ${currentUser.referencia}`
+        : currentUser.direccion;
 
       const order = await onCreateOrder(
         {
-          cliente: storeUser.nombre,
-          clienteCodigo: storeUser.codigo,
-          clienteFirebaseKey: storeUser.clientKey,
-          storeUserKey: storeUser.key,
+          cliente: currentUser.nombre,
+          clienteCodigo: currentUser.codigo,
+          clienteFirebaseKey: currentUser.clientKey,
+          storeUserKey: currentUser.key,
           direccion: fullAddress,
-          telefono: storeUser.telefono,
-          referencia: storeUser.referencia,
+          telefono: currentUser.telefono,
+          referencia: currentUser.referencia,
           items: cartItems,
           total: totalAmount,
           observaciones: notes.trim(),
@@ -230,7 +391,6 @@ export default function TiendaVirtualView({
       );
 
       setCreatedOrder(order);
-      setStatusPhone(storeUser.telefono);
       setCart({});
       setNotes('');
       setCheckoutOpen(false);
@@ -263,6 +423,96 @@ export default function TiendaVirtualView({
           max-width: 1180px;
           margin: 0 auto;
           padding: ${isDashboard ? '18px' : '12px'} 18px 108px;
+        }
+        .store-auth-page {
+          min-height: ${isDashboard ? 'calc(100vh - 64px)' : '100vh'};
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.75fr);
+          gap: 22px;
+          align-items: center;
+          max-width: 1120px;
+          margin: 0 auto;
+          padding: 28px 18px;
+        }
+        .store-auth-hero {
+          min-height: 560px;
+          border-radius: 24px;
+          padding: 28px;
+          color: #ffffff;
+          background:
+            linear-gradient(135deg, rgba(17, 24, 39, 0.82), rgba(127, 29, 29, 0.74)),
+            url('/tienda/page/hero-table.jpg') center / cover;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          overflow: hidden;
+          box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
+        }
+        .store-auth-hero h1 {
+          margin: 22px 0 10px;
+          max-width: 560px;
+          font-size: clamp(38px, 6vw, 74px);
+          line-height: 0.9;
+          letter-spacing: -0.06em;
+        }
+        .store-auth-card {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-radius: 24px;
+          padding: 20px;
+          box-shadow: 0 22px 54px rgba(15, 23, 42, 0.12);
+        }
+        .store-auth-toggle {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-bottom: 14px;
+          padding: 4px;
+          border-radius: 999px;
+          background: #f3f4f6;
+        }
+        .store-auth-toggle button {
+          border: 0;
+          border-radius: 999px;
+          padding: 11px;
+          background: transparent;
+          cursor: pointer;
+          font-weight: 900;
+          color: #6b7280;
+        }
+        .store-auth-toggle button.active {
+          background: #111827;
+          color: #ffffff;
+        }
+        .store-auth-error {
+          border-radius: 12px;
+          padding: 10px 12px;
+          background: #fee2e2;
+          color: #991b1b;
+          font-size: 13px;
+          font-weight: 900;
+          margin-bottom: 10px;
+        }
+        .store-account-card {
+          margin: 0 0 14px;
+          padding: 12px;
+          border: 1px solid #e5e7eb;
+          border-radius: 14px;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .store-account-card strong {
+          display: block;
+        }
+        .store-account-card span {
+          display: block;
+          margin-top: 2px;
+          color: #6b7280;
+          font-size: 13px;
+          font-weight: 700;
         }
         .store-admin-bar {
           display: flex;
@@ -702,7 +952,21 @@ export default function TiendaVirtualView({
           font-size: 12px;
           font-weight: 900;
         }
+        .store-status-items {
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid #f1f2f4;
+          color: #6b7280;
+          font-size: 13px;
+          line-height: 1.5;
+        }
         @media (max-width: 980px) {
+          .store-auth-page {
+            grid-template-columns: 1fr;
+          }
+          .store-auth-hero {
+            min-height: 340px;
+          }
           .store-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
           }
@@ -735,6 +999,22 @@ export default function TiendaVirtualView({
         }
       `}</style>
 
+      {!currentUser ? (
+        <StoreAuthView
+          authMode={authMode}
+          authForm={authForm}
+          authError={authError}
+          authLoading={authLoading}
+          onAuthModeChange={(mode) => {
+            setAuthMode(mode);
+            setAuthError('');
+          }}
+          onFormChange={updateAuthForm}
+          onLogin={handleStoreLogin}
+          onRegister={handleStoreRegister}
+        />
+      ) : (
+        <>
       <div className="store-page">
         {isDashboard && (
           <div className="store-admin-bar">
@@ -753,6 +1033,24 @@ export default function TiendaVirtualView({
             </div>
           </div>
         )}
+
+        <div className="store-account-card">
+          <div>
+            <strong>{currentUser.nombre}</strong>
+            <span>
+              {currentUser.direccion}
+              {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button type="button" className="store-button secondary" onClick={() => setProfileOpen(true)}>
+              Perfil
+            </button>
+            <button type="button" className="store-button secondary" onClick={clearStoreSession}>
+              Salir
+            </button>
+          </div>
+        </div>
 
         <header className="store-top">
           <div className="store-brand-row">
@@ -912,12 +1210,14 @@ export default function TiendaVirtualView({
       {checkoutOpen && (
         <CheckoutSheet
           cartItems={cartItems}
+          currentUser={currentUser}
           customer={customer}
           notes={notes}
           submitting={submitting}
           totalAmount={totalAmount}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
+          onEditProfile={() => setProfileOpen(true)}
           onNotesChange={setNotes}
           onSubmit={submitOrder}
         />
@@ -925,13 +1225,210 @@ export default function TiendaVirtualView({
 
       {ordersOpen && (
         <OrdersSheet
-          statusPhone={statusPhone || customer.telefono}
+          currentUser={currentUser}
           orders={customerOrders}
           createdOrder={createdOrder}
-          onPhoneChange={setStatusPhone}
           onClose={() => setOrdersOpen(false)}
         />
       )}
+
+      {profileOpen && (
+        <ProfileSheet
+          user={currentUser}
+          saving={submitting}
+          onClose={() => setProfileOpen(false)}
+          onSave={handleProfileSave}
+        />
+      )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StoreAuthView({
+  authMode,
+  authForm,
+  authError,
+  authLoading,
+  onAuthModeChange,
+  onFormChange,
+  onLogin,
+  onRegister,
+}) {
+  const isRegister = authMode === 'register';
+
+  return (
+    <div className="store-auth-page">
+      <section className="store-auth-hero">
+        <div>
+          <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
+          <h1>Tienda Virtual Carnes San Martin Granada</h1>
+          <p style={{ maxWidth: 480, margin: 0, fontSize: 18, lineHeight: 1.45, opacity: 0.9 }}>
+            Crea tu cuenta una vez, guarda tu direccion y revisa el estado de tus pedidos desde el mismo lugar.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <span className="store-status-pill" style={{ background: '#ffffff', color: '#111827' }}>
+            Pedidos a cocina
+          </span>
+          <span className="store-status-pill" style={{ background: '#ffffff', color: '#111827' }}>
+            Historial por usuario
+          </span>
+          <span className="store-status-pill" style={{ background: '#ffffff', color: '#111827' }}>
+            Direccion guardada
+          </span>
+        </div>
+      </section>
+
+      <section className="store-auth-card">
+        <div className="store-auth-toggle">
+          <button
+            type="button"
+            className={!isRegister ? 'active' : ''}
+            onClick={() => onAuthModeChange('login')}
+          >
+            Ingresar
+          </button>
+          <button
+            type="button"
+            className={isRegister ? 'active' : ''}
+            onClick={() => onAuthModeChange('register')}
+          >
+            Crear cuenta
+          </button>
+        </div>
+
+        <h2 style={{ margin: '0 0 4px', fontSize: 26 }}>
+          {isRegister ? 'Crea tu usuario' : 'Bienvenido'}
+        </h2>
+        <p style={{ margin: '0 0 16px', color: '#6b7280', fontWeight: 700 }}>
+          {isRegister
+            ? 'Usaremos estos datos para tus pedidos delivery.'
+            : 'Ingresa con tu telefono y contrasena.'}
+        </p>
+
+        {authError && <div className="store-auth-error">{authError}</div>}
+
+        <form className="store-form" onSubmit={isRegister ? onRegister : onLogin}>
+          {isRegister && (
+            <input
+              className="store-field"
+              value={authForm.nombre}
+              onChange={(event) => onFormChange('nombre', event.target.value)}
+              placeholder="Nombre completo"
+              required
+            />
+          )}
+          <input
+            className="store-field"
+            value={authForm.telefono}
+            onChange={(event) => onFormChange('telefono', event.target.value)}
+            placeholder="Telefono o WhatsApp"
+            required
+          />
+          <input
+            className="store-field"
+            type="password"
+            value={authForm.password}
+            onChange={(event) => onFormChange('password', event.target.value)}
+            placeholder="Contrasena"
+            required
+          />
+          {isRegister && (
+            <>
+              <input
+                className="store-field"
+                type="password"
+                value={authForm.confirmPassword}
+                onChange={(event) => onFormChange('confirmPassword', event.target.value)}
+                placeholder="Confirmar contrasena"
+                required
+              />
+              <input
+                className="store-field"
+                value={authForm.direccion}
+                onChange={(event) => onFormChange('direccion', event.target.value)}
+                placeholder="Direccion de entrega"
+                required
+              />
+              <input
+                className="store-field"
+                value={authForm.referencia}
+                onChange={(event) => onFormChange('referencia', event.target.value)}
+                placeholder="Referencia"
+              />
+            </>
+          )}
+          <button type="submit" className="store-button" disabled={authLoading}>
+            {authLoading ? 'Procesando...' : isRegister ? 'Crear cuenta y entrar' : 'Entrar a la tienda'}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ProfileSheet({ user, saving, onClose, onSave }) {
+  const [profile, setProfile] = useState({
+    nombre: user?.nombre || '',
+    direccion: user?.direccion || '',
+    referencia: user?.referencia || '',
+  });
+
+  const updateProfile = (field, value) => {
+    setProfile((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    if (!profile.nombre.trim() || !profile.direccion.trim()) {
+      alert('Nombre y direccion son obligatorios.');
+      return;
+    }
+
+    onSave(profile);
+  };
+
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-sheet">
+        <div className="store-sheet-head">
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
+          </button>
+          <strong>Mi perfil</strong>
+        </div>
+
+        <form className="store-form" onSubmit={handleSubmit}>
+          <input
+            className="store-field"
+            value={profile.nombre}
+            onChange={(event) => updateProfile('nombre', event.target.value)}
+            placeholder="Nombre completo"
+          />
+          <input className="store-field" value={user?.telefono || ''} disabled />
+          <input
+            className="store-field"
+            value={profile.direccion}
+            onChange={(event) => updateProfile('direccion', event.target.value)}
+            placeholder="Direccion de entrega"
+          />
+          <input
+            className="store-field"
+            value={profile.referencia}
+            onChange={(event) => updateProfile('referencia', event.target.value)}
+            placeholder="Referencia"
+          />
+          <button type="submit" className="store-button" disabled={saving}>
+            {saving ? 'Guardando...' : 'Guardar perfil'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -1025,12 +1522,14 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
 
 function CheckoutSheet({
   cartItems,
+  currentUser,
   customer,
   notes,
   submitting,
   totalAmount,
   onClose,
   onCustomerChange,
+  onEditProfile,
   onNotesChange,
   onSubmit,
 }) {
@@ -1064,30 +1563,24 @@ function CheckoutSheet({
         </div>
 
         <form className="store-form" onSubmit={onSubmit}>
-          <input
-            className="store-field"
-            value={customer.nombre}
-            onChange={(event) => onCustomerChange('nombre', event.target.value)}
-            placeholder="Nombre completo"
-          />
-          <input
-            className="store-field"
-            value={customer.telefono}
-            onChange={(event) => onCustomerChange('telefono', event.target.value)}
-            placeholder="Telefono o WhatsApp"
-          />
-          <input
-            className="store-field"
-            value={customer.direccion}
-            onChange={(event) => onCustomerChange('direccion', event.target.value)}
-            placeholder="Direccion"
-          />
-          <input
-            className="store-field"
-            value={customer.referencia}
-            onChange={(event) => onCustomerChange('referencia', event.target.value)}
-            placeholder="Referencia"
-          />
+          <div className="store-status-card" style={{ marginTop: 0 }}>
+            <div className="store-status-pill">Entrega</div>
+            <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+            <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+              {currentUser.telefono}
+              <br />
+              {currentUser.direccion}
+              {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+            </div>
+            <button
+              type="button"
+              className="store-button secondary"
+              style={{ marginTop: 10 }}
+              onClick={onEditProfile}
+            >
+              Cambiar direccion
+            </button>
+          </div>
           <select
             className="store-select"
             value={customer.metodoPago}
@@ -1106,7 +1599,7 @@ function CheckoutSheet({
             placeholder="Observaciones"
           />
           <button type="submit" className="store-button" disabled={submitting}>
-            {submitting ? 'Enviando...' : 'Crear usuario y enviar'}
+            {submitting ? 'Enviando...' : 'Enviar pedido'}
           </button>
         </form>
       </div>
@@ -1114,7 +1607,7 @@ function CheckoutSheet({
   );
 }
 
-function OrdersSheet({ statusPhone, orders, createdOrder, onPhoneChange, onClose }) {
+function OrdersSheet({ currentUser, orders, createdOrder, onClose }) {
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet">
@@ -1125,6 +1618,12 @@ function OrdersSheet({ statusPhone, orders, createdOrder, onPhoneChange, onClose
           <strong>Estado de pedido</strong>
         </div>
 
+        <div className="store-status-card" style={{ marginTop: 0 }}>
+          <div className="store-status-pill">Cuenta</div>
+          <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+          <div style={{ color: '#6b7280' }}>{currentUser.telefono}</div>
+        </div>
+
         {createdOrder && (
           <div className="store-status-card" style={{ borderColor: '#ef4444' }}>
             <div className="store-status-pill">Pedido #{formatOrderNumber(createdOrder.id)}</div>
@@ -1133,17 +1632,9 @@ function OrdersSheet({ statusPhone, orders, createdOrder, onPhoneChange, onClose
           </div>
         )}
 
-        <input
-          className="store-field"
-          style={{ marginTop: 12 }}
-          value={statusPhone}
-          onChange={(event) => onPhoneChange(event.target.value)}
-          placeholder="Telefono para consultar"
-        />
-
         {orders.length === 0 ? (
           <div className="store-empty" style={{ marginTop: 12 }}>
-            Ingresa tu telefono para ver tus pedidos.
+            Todavia no tienes pedidos en esta cuenta.
           </div>
         ) : (
           orders.map((order) => (
@@ -1155,6 +1646,15 @@ function OrdersSheet({ statusPhone, orders, createdOrder, onPhoneChange, onClose
                 <br />
                 {formatCurrency(order.total)}
               </div>
+              {Array.isArray(order.items) && order.items.length > 0 && (
+                <div className="store-status-items">
+                  {order.items.map((item) => (
+                    <div key={`${order.firebaseKey}-${item.codigo}`}>
+                      {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}
