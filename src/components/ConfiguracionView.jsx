@@ -5,7 +5,13 @@ import {
   applySicarCatalogProductsWithOptions,
   getCatalogProductKey,
   getCurrentCatalogMap,
+  getDefaultProductMinQuantity,
+  getDefaultProductQuantityStep,
+  getProductMinQuantity,
+  getProductQuantityStep,
+  hasCustomProductQuantityRules,
   isSicarManagedProduct,
+  isUnitMeasure,
   mergeCatalogProducts,
   saveCatalogProduct,
   SICAR_CATALOG_SYNC_BATCH_SIZE,
@@ -53,18 +59,22 @@ import {
 
 const COUPONS_PIN = '210397';
 
-const emptyProduct = {
+const buildEmptyProduct = (unit = 'lb') => ({
   code: '',
   name: '',
   price: '',
-  unit: 'lb',
+  unit,
   category: 'res',
   subcategory: 'Linea Diaria',
+  minQuantity: String(getDefaultProductMinQuantity(unit)),
+  quantityStep: String(getDefaultProductQuantityStep(unit)),
   active: true,
   promo: false,
   image: '',
   description: '',
-};
+});
+
+const emptyProduct = buildEmptyProduct();
 
 const emptyCategory = {
   id: '',
@@ -120,6 +130,17 @@ const formatSicarDate = (value) => {
   return new Intl.DateTimeFormat('es-NI', {
     dateStyle: 'medium',
   }).format(parsed);
+};
+
+const formatRestrictionValue = (value, unit) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return '-';
+  }
+
+  return isUnitMeasure(unit)
+    ? `${Number(numeric)} ${unit}`
+    : `${Number.isInteger(numeric) ? numeric : numeric.toFixed(1).replace(/\.0$/, '')} ${unit}`;
 };
 
 const waitForUiPaint = () =>
@@ -365,6 +386,26 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const updateProductUnit = (nextUnit) => {
+    setForm((current) => {
+      const previousMinDefault = getDefaultProductMinQuantity(current.unit);
+      const previousStepDefault = getDefaultProductQuantityStep(current.unit);
+      const nextMinDefault = getDefaultProductMinQuantity(nextUnit);
+      const nextStepDefault = getDefaultProductQuantityStep(nextUnit);
+      const currentMin = Number(current.minQuantity || 0);
+      const currentStep = Number(current.quantityStep || 0);
+      const keepCustomMin = Number.isFinite(currentMin) && Math.abs(currentMin - previousMinDefault) > 0.0001;
+      const keepCustomStep = Number.isFinite(currentStep) && Math.abs(currentStep - previousStepDefault) > 0.0001;
+
+      return {
+        ...current,
+        unit: nextUnit,
+        minQuantity: keepCustomMin ? current.minQuantity : String(nextMinDefault),
+        quantityStep: keepCustomStep ? current.quantityStep : String(nextStepDefault),
+      };
+    });
+  };
+
   const getCategoryLabel = (categoryId) =>
     categories.find((category) => category.id === categoryId)?.label || categoryId || '-';
 
@@ -386,6 +427,8 @@ export default function ConfiguracionView() {
       unit: product.unit || 'lb',
       category: product.category || 'res',
       subcategory: product.subcategory || 'Linea Diaria',
+      minQuantity: String(getProductMinQuantity(product)),
+      quantityStep: String(getProductQuantityStep(product)),
       active: product.active !== false,
       promo: Boolean(product.promo),
       image: product.image || '',
@@ -452,8 +495,15 @@ export default function ConfiguracionView() {
       await saveCatalogProduct({
         ...form,
         price: Number(form.price || 0),
+        minQuantity: Number(form.minQuantity || getDefaultProductMinQuantity(form.unit)),
+        quantityStep: Number(form.quantityStep || getDefaultProductQuantityStep(form.unit)),
       }, existingProduct);
-      setMessage('Producto guardado.');
+      setForm((current) => ({
+        ...current,
+        minQuantity: String(Number(form.minQuantity || getDefaultProductMinQuantity(form.unit))),
+        quantityStep: String(Number(form.quantityStep || getDefaultProductQuantityStep(form.unit))),
+      }));
+      setMessage('Producto guardado con sus restricciones.');
     } catch (error) {
       console.error('Error guardando producto:', error);
       setMessage('No se pudo guardar el producto.');
@@ -756,13 +806,8 @@ export default function ConfiguracionView() {
       const imageCandidates = catalogProducts.filter((importedProduct) => {
         const productKey = getCatalogProductKey(importedProduct.code);
         const existingProduct = currentCatalogMap[productKey] || {};
-        const imageIsManual = Boolean(existingProduct?.sync?.overrides?.image);
-        const sameImageHash =
-          String(existingProduct?.sync?.sicarImageHash || '').trim() &&
-          String(existingProduct?.sync?.sicarImageHash || '').trim() ===
-            String(importedProduct?.sicar?.imageHash || '').trim();
-
-        return !imageIsManual && importedProduct?.sicar?.hasImage && !sameImageHash;
+        const hasExistingRecord = Boolean(existingProduct?.code);
+        return !hasExistingRecord && importedProduct?.sicar?.hasImage;
       }).length;
       let importedImages = 0;
       const importedProducts = [];
@@ -774,15 +819,11 @@ export default function ConfiguracionView() {
           batch.map(async (importedProduct) => {
             const productKey = getCatalogProductKey(importedProduct.code);
             const existingProduct = currentCatalogMap[productKey] || {};
-            const imageIsManual = Boolean(existingProduct?.sync?.overrides?.image);
-            const sameImageHash =
-              String(existingProduct?.sync?.sicarImageHash || '').trim() &&
-              String(existingProduct?.sync?.sicarImageHash || '').trim() ===
-                String(importedProduct?.sicar?.imageHash || '').trim();
+            const hasExistingRecord = Boolean(existingProduct?.code);
             let nextImage = String(existingProduct?.image || '').trim();
             let importedImageCount = 0;
 
-            if (!imageIsManual && importedProduct?.sicar?.hasImage && !sameImageHash) {
+            if (!hasExistingRecord && importedProduct?.sicar?.hasImage) {
               try {
                 const remoteImage = await fetchSicarProductImage(importedProduct.code);
                 nextImage = await compressImportedCatalogImage(remoteImage.dataUrl);
@@ -790,8 +831,6 @@ export default function ConfiguracionView() {
               } catch (error) {
                 console.error(`No se pudo importar la imagen de ${importedProduct.code}:`, error);
               }
-            } else if (!imageIsManual && !importedProduct?.sicar?.hasImage) {
-              nextImage = String(existingProduct?.image || '').trim();
             }
 
             return {
@@ -815,16 +854,16 @@ export default function ConfiguracionView() {
         await waitForUiPaint();
       }
 
-      setMessage('Sincronizando categorias SICAR con la tienda...');
-      const categoryCount = await syncStoreCategoriesFromCatalogProducts(importedProducts);
       setMessage(`Guardando catalogo SICAR en tienda... 0/${importedProducts.length} SKUs aplicados.`);
-      const { appliedCount } = await applySicarCatalogProductsWithOptions(importedProducts, {
+      const { appliedCount, appliedProducts } = await applySicarCatalogProductsWithOptions(importedProducts, {
         currentMap: currentCatalogMap,
         batchSize: SICAR_CATALOG_SYNC_BATCH_SIZE,
         onProgress: ({ processed, total }) => {
           setMessage(`Guardando catalogo SICAR en tienda... ${processed}/${total} SKUs aplicados.`);
         },
       });
+      setMessage('Sincronizando categorias SICAR con la tienda...');
+      const categoryCount = await syncStoreCategoriesFromCatalogProducts(appliedProducts);
       setSicarPreview(null);
       setMessage(
         `Catalogo SICAR aplicado. ${appliedCount} SKUs actualizados, ${categoryCount} categorias sincronizadas y ${importedImages} fotos importadas.`
@@ -1364,6 +1403,16 @@ export default function ConfiguracionView() {
                           {product.sync?.overrides?.image && <span className="cfg-badge">Foto manual</span>}
                         </div>
                       )}
+                      {hasCustomProductQuantityRules(product) && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                          <span className="cfg-badge">
+                            Min {formatRestrictionValue(getProductMinQuantity(product), product.unit)}
+                          </span>
+                          <span className="cfg-badge">
+                            Paso {formatRestrictionValue(getProductQuantityStep(product), product.unit)}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td>
                       <strong>{getCategoryLabel(product.category)}</strong>
@@ -1449,7 +1498,7 @@ export default function ConfiguracionView() {
               <select
                 className="cfg-select"
                 value={form.unit}
-                onChange={(event) => updateForm('unit', event.target.value)}
+                onChange={(event) => updateProductUnit(event.target.value)}
               >
                 <option value="lb">lb</option>
                 <option value="unidad">unidad</option>
@@ -1462,6 +1511,30 @@ export default function ConfiguracionView() {
                 <option value="activo">Activo</option>
                 <option value="inactivo">Inactivo</option>
               </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <input
+                className="cfg-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.minQuantity}
+                onChange={(event) => updateForm('minQuantity', event.target.value)}
+                placeholder={`Minimo en ${form.unit}`}
+              />
+              <input
+                className="cfg-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.quantityStep}
+                onChange={(event) => updateForm('quantityStep', event.target.value)}
+                placeholder={`Incremento en ${form.unit}`}
+              />
+            </div>
+            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
+              Ejemplo: minimo 1 y paso 1 para New York deja solo 1 lb, 2 lb, 3 lb. Si dejas 0.5 y 0.5,
+              permite media libra, 1 lb, 1.5 lb y asi sucesivamente.
             </div>
             <select
               className="cfg-select"
@@ -1527,7 +1600,7 @@ export default function ConfiguracionView() {
               <button type="submit" className="cfg-button" disabled={saving}>
                 {saving ? 'Guardando...' : 'Guardar producto'}
               </button>
-              <button type="button" className="cfg-button secondary" onClick={() => setForm(emptyProduct)}>
+              <button type="button" className="cfg-button secondary" onClick={() => setForm(buildEmptyProduct())}>
                 Nuevo
               </button>
             </div>
@@ -1604,7 +1677,8 @@ export default function ConfiguracionView() {
                   <p style={{ margin: '8px 0 0', color: '#475569', fontWeight: 700, lineHeight: 1.5 }}>
                     Solo se muestran categorias con al menos {sicarPreview.rules?.minOverallSharePct || 0}% del total
                     vendido. Dentro de cada categoria se toman SKUs hasta cubrir {sicarPreview.rules?.thresholdPct || 0}
-                    % acumulado de venta.
+                    % acumulado de venta. En Res tambien se incluye completa la subcategoria Linea Practica y Tortas
+                    Hamburguesa.
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'start' }}>

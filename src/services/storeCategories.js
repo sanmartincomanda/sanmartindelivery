@@ -1,6 +1,7 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { STORE_CATEGORIES } from '../data/tiendaVirtual';
+import { normalizeStoreSubcategories, normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
 
 export const STORE_CATEGORIES_PATH = 'storeCategories';
 
@@ -13,10 +14,8 @@ const normalizeId = (value) =>
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
-const normalizeSubcategories = (value) => {
-  const source = Array.isArray(value) ? value : String(value || '').split(/\n|,/);
-  return Array.from(new Set(source.map((item) => String(item || '').trim()).filter(Boolean)));
-};
+const normalizeSubcategories = (value, categoryId = '') =>
+  normalizeStoreSubcategories(value, categoryId);
 
 export const normalizeStoreCategory = (category = {}, fallback = {}) => {
   const source = category || {};
@@ -27,7 +26,7 @@ export const normalizeStoreCategory = (category = {}, fallback = {}) => {
   return {
     id,
     label: label || id,
-    subcategories: normalizeSubcategories(source.subcategories ?? backup.subcategories),
+    subcategories: normalizeSubcategories(source.subcategories ?? backup.subcategories, id),
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
   };
@@ -104,7 +103,7 @@ export const buildStoreCategoriesFromCatalogProducts = (products = []) => {
     }
 
     const categoryLabel = String(product?.categoryLabel || product?.category || '').trim() || categoryId;
-    const subcategory = String(product?.subcategory || '').trim();
+    const subcategory = normalizeStoreSubcategory(product?.subcategory, categoryId);
     const current = byId.get(categoryId) || {
       id: categoryId,
       label: categoryLabel,
@@ -149,8 +148,9 @@ export async function syncStoreCategoriesFromCatalogProducts(products = []) {
         ...category,
         active: existing?.active ?? true,
         sortOrder: existing?.sortOrder ?? (index + 1) * 10,
-        subcategories: Array.from(
-          new Set([...(existing?.subcategories || []), ...(category.subcategories || [])])
+        subcategories: normalizeStoreSubcategories(
+          [...(existing?.subcategories || []), ...(category.subcategories || [])],
+          category.id
         ),
       },
       existing

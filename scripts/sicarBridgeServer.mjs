@@ -9,6 +9,10 @@ import {
   SICAR_SYNC_THRESHOLD_PCT,
   getSicarDepartmentConfig,
 } from '../src/data/sicarCatalogRules.js';
+import {
+  getForcedSicarSubcategories,
+  normalizeStoreSubcategory,
+} from '../src/data/storeSubcategoryRules.js';
 
 const cwd = process.cwd();
 const localConfigPath = resolve(cwd, 'sicar.local.json');
@@ -101,20 +105,6 @@ const normalizeStoreUnit = (value = '') => {
     return 'lb';
   }
   return 'unidad';
-};
-
-const normalizeSubcategory = (category, fallbackLabel) => {
-  const cleanCategory = String(category || '').trim();
-  const normalizedCategory = cleanCategory.toUpperCase();
-
-  if (normalizedCategory === 'PRODUCTO GOLD' || normalizedCategory === 'PRODUCTOS GOLD') {
-    return 'Linea Gold';
-  }
-
-  if (cleanCategory) {
-    return cleanCategory;
-  }
-  return String(fallbackLabel || '').trim() || 'General';
 };
 
 const resolveRowDepartment = (row) => {
@@ -309,7 +299,12 @@ const buildCatalogSelection = async () => {
 
       const storeSubcategory =
         resolved.override?.storeSubcategory ||
-        normalizeSubcategory(row.sicarCategory || resolved.override?.sicarCategory, resolved.departmentConfig.storeCategoryLabel);
+        normalizeStoreSubcategory(
+          row.sicarCategory || resolved.override?.sicarCategory,
+          resolved.departmentConfig.storeCategoryId
+        ) ||
+        String(resolved.departmentConfig.storeCategoryLabel || '').trim() ||
+        'General';
 
       return {
         ...row,
@@ -364,28 +359,50 @@ const buildCatalogSelection = async () => {
         }
 
         cumulativeQuantity += Number(row.quantitySold || 0);
-        selectedRows.push({
-          ...row,
-          cumulativeDepartmentPct: Number(((cumulativeQuantity / departmentTotal) * 100).toFixed(2)),
+        selectedRows.push(row);
+      });
+
+      const forcedSubcategories = new Set(
+        getForcedSicarSubcategories(rows[0]?.storeCategory).map((subcategory) => String(subcategory || '').trim())
+      );
+
+      if (forcedSubcategories.size > 0) {
+        const existingCodes = new Set(selectedRows.map((row) => row.code));
+        sortedRows.forEach((row) => {
+          if (!forcedSubcategories.has(String(row.storeSubcategory || '').trim()) || existingCodes.has(row.code)) {
+            return;
+          }
+
+          selectedRows.push(row);
+          existingCodes.add(row.code);
         });
+      }
+
+      let selectedCumulativeQuantity = 0;
+      const rankedSelectedRows = selectedRows.map((row) => {
+        selectedCumulativeQuantity += Number(row.quantitySold || 0);
+        return {
+          ...row,
+          cumulativeDepartmentPct: Number(((selectedCumulativeQuantity / departmentTotal) * 100).toFixed(2)),
+        };
       });
 
       const subcategories = Array.from(
-        new Set(selectedRows.map((row) => String(row.storeSubcategory || '').trim()).filter(Boolean))
+        new Set(rankedSelectedRows.map((row) => String(row.storeSubcategory || '').trim()).filter(Boolean))
       );
 
       summary.push({
         sicarDepartment: departmentName,
-        storeCategory: selectedRows[0]?.storeCategory || '',
-        storeCategoryLabel: selectedRows[0]?.storeCategoryLabel || departmentName,
+        storeCategory: rankedSelectedRows[0]?.storeCategory || '',
+        storeCategoryLabel: rankedSelectedRows[0]?.storeCategoryLabel || departmentName,
         totalQuantity: Number(departmentTotal.toFixed(4)),
         overallSharePct: Number(departmentShare.toFixed(2)),
         soldSkuCount: sortedRows.length,
-        selectedSkuCount: selectedRows.length,
+        selectedSkuCount: rankedSelectedRows.length,
         subcategories,
       });
 
-      selectedRows.forEach((row, index) => {
+      rankedSelectedRows.forEach((row, index) => {
         selectedProducts.push({
           code: row.code,
           name: row.name,

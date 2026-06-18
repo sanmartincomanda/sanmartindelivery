@@ -6,7 +6,13 @@ import {
   STORE_PAYMENT_OPTIONS,
   STORE_PROMOTIONS,
 } from '../data/tiendaVirtual';
-import { mergeCatalogProducts, STORE_CATALOG_PATH } from '../services/storeCatalog';
+import {
+  getProductMinQuantity,
+  getProductQuantityStep,
+  isUnitMeasure,
+  mergeCatalogProducts,
+  STORE_CATALOG_PATH,
+} from '../services/storeCatalog';
 import {
   mergeStoreCategories,
   STORE_CATEGORIES_PATH,
@@ -49,21 +55,25 @@ const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
 const MAP_PICKER_TILE_SIZE = 256;
 const MAP_PICKER_WIDTH = 360;
 const MAP_PICKER_HEIGHT = 260;
+const QUANTITY_EPSILON = 0.00001;
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
-const isUnitProduct = (product) => String(product?.unit || '').toLowerCase() === 'unidad';
+const isUnitProduct = (product) => isUnitMeasure(product?.unit);
 
-const getQuantityStep = (product) => (isUnitProduct(product) ? 1 : 0.5);
+const getQuantityStep = (product) => getProductQuantityStep(product);
+
+const getMinQuantity = (product) => getProductMinQuantity(product);
 
 const clampQuantity = (value, product) => {
   const step = getQuantityStep(product);
+  const minQuantity = getMinQuantity(product);
   const rounded = Math.round(Number(value || 0) / step) * step;
   if (rounded <= 0) {
     return 0;
   }
 
-  return Number(rounded.toFixed(step === 1 ? 0 : 1));
+  return Number(Math.max(rounded, minQuantity).toFixed(3));
 };
 
 const isValidQuantityStep = (value, product) => {
@@ -73,15 +83,45 @@ const isValidQuantityStep = (value, product) => {
     return true;
   }
 
+  const minQuantity = getMinQuantity(product);
+  if (numberValue < minQuantity - QUANTITY_EPSILON) {
+    return false;
+  }
+
   const step = getQuantityStep(product);
-  const steps = numberValue / step;
-  return Math.abs(steps - Math.round(steps)) < 0.00001;
+  const steps = (numberValue - minQuantity) / step;
+  return Math.abs(steps - Math.round(steps)) < QUANTITY_EPSILON;
 };
 
 const formatStoreQuantity = (quantity, unit) =>
   String(unit).toLowerCase() === 'unidad' ? String(Number(quantity || 0)) : formatWeight(quantity);
 
-const getQuickQuantities = (product) => (isUnitProduct(product) ? [1, 2, 3, 4] : QUICK_WEIGHTS);
+const getQuickQuantities = (product) => {
+  if (!product) {
+    return QUICK_WEIGHTS;
+  }
+
+  const minQuantity = getMinQuantity(product);
+  const step = getQuantityStep(product);
+  const totalOptions = isUnitProduct(product) ? 4 : 5;
+
+  return Array.from({ length: totalOptions }, (_, index) =>
+    Number((minQuantity + index * step).toFixed(3))
+  );
+};
+
+const getQuantityRuleMessage = (product) => {
+  const minQuantity = getMinQuantity(product);
+  const step = getQuantityStep(product);
+  const minLabel = `${formatStoreQuantity(minQuantity, product?.unit)} ${product?.unit || ''}`.trim();
+  const stepLabel = `${formatStoreQuantity(step, product?.unit)} ${product?.unit || ''}`.trim();
+
+  if (!isUnitProduct(product) && step === 1) {
+    return `Se vende desde ${minLabel} y solo permite pesos cerrados en incrementos de ${stepLabel}.`;
+  }
+
+  return `Se vende desde ${minLabel} en incrementos de ${stepLabel}.`;
+};
 
 const clampLatitude = (value) => Math.max(-85, Math.min(85, Number(value) || 0));
 
@@ -497,6 +537,8 @@ export default function TiendaVirtualView({
             precioUnitario: product.price,
             subtotal: Number((cantidad * product.price).toFixed(2)),
             image: product.image,
+            minQuantity: getMinQuantity(product),
+            quantityStep: getQuantityStep(product),
           };
         }),
     [activeProducts, cart]
@@ -582,11 +624,7 @@ export default function TiendaVirtualView({
     }
 
     if (!isValidQuantityStep(numericValue, product)) {
-      showQuantityNotice(
-        isUnitProduct(product)
-          ? 'Solo permite unidades cerradas.'
-          : 'Solo permite pesos de media libra o libra cerrada.'
-      );
+      showQuantityNotice(getQuantityRuleMessage(product));
     }
 
     setCart((current) => ({
@@ -2299,6 +2337,7 @@ export default function TiendaVirtualView({
             <div className="store-grid">
               {filteredProducts.map((product) => {
                 const quantity = Number(cart[product.code] || 0);
+                const minQuantity = getMinQuantity(product);
                 return (
                   <article key={product.code} className="store-product">
                     <button
@@ -2315,7 +2354,7 @@ export default function TiendaVirtualView({
                       onClick={() =>
                         updateQuantity(
                           product.code,
-                          quantity > 0 ? quantity + getQuantityStep(product) : 1
+                          quantity > 0 ? quantity + getQuantityStep(product) : minQuantity
                         )
                       }
                     >
@@ -2910,7 +2949,8 @@ function FloatingCart({
 
       <div className="store-floating-cart-items">
         {cartItems.map((item) => {
-          const step = getQuantityStep({ unit: item.unidad });
+          const step = getQuantityStep({ unit: item.unidad, quantityStep: item.quantityStep });
+          const minQuantity = getMinQuantity({ unit: item.unidad, minQuantity: item.minQuantity });
           const currentQuantity = Number(item.cantidad || 0);
 
           return (
@@ -2926,7 +2966,12 @@ function FloatingCart({
                   <button
                     type="button"
                     aria-label={`Quitar ${item.nombre}`}
-                    onClick={() => onQuantityChange(item.codigo, currentQuantity - step)}
+                    onClick={() =>
+                      onQuantityChange(
+                        item.codigo,
+                        currentQuantity <= minQuantity + QUANTITY_EPSILON ? 0 : currentQuantity - step
+                      )
+                    }
                   >
                     -
                   </button>
@@ -2970,6 +3015,7 @@ function FloatingCart({
 function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
   const subtotal = Number(quantity || 0) * Number(product.price || 0);
   const step = getQuantityStep(product);
+  const minQuantity = getMinQuantity(product);
 
   return (
     <div className="store-sheet-overlay">
@@ -2991,6 +3037,9 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
               {formatCurrency(product.price)}
             </p>
             <p className="store-unit">{product.description || `Precio por ${product.unit}`}</p>
+            <p className="store-unit" style={{ marginTop: 8 }}>
+              {getQuantityRuleMessage(product)}
+            </p>
 
             <div className="store-qty-row">
               {getQuickQuantities(product).map((weight) => (
@@ -3006,7 +3055,10 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
             </div>
 
             <div className="store-stepper">
-              <button type="button" onClick={() => onQuantityChange(quantity - step)}>
+              <button
+                type="button"
+                onClick={() => onQuantityChange(quantity <= minQuantity + QUANTITY_EPSILON ? 0 : quantity - step)}
+              >
                 -
               </button>
               <QuantityInput
@@ -3016,7 +3068,7 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
                 ariaLabel={`Cantidad de ${product.name}`}
                 onChange={onQuantityChange}
               />
-              <button type="button" onClick={() => onQuantityChange(quantity > 0 ? quantity + step : 1)}>
+              <button type="button" onClick={() => onQuantityChange(quantity > 0 ? quantity + step : minQuantity)}>
                 +
               </button>
             </div>

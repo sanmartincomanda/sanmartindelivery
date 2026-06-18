@@ -1,3 +1,5 @@
+import { STORE_SUBCATEGORY_CANONICALS } from './storeSubcategoryRules';
+
 export const STORE_PRODUCTS = [
   {
     code: '00393',
@@ -119,59 +121,37 @@ export const STORE_CATEGORIES = [
   {
     id: 'res',
     label: 'Res',
-    subcategories: [
-      'Linea Diaria',
-      'Linea Parrillera',
-      'Linea Practica',
-      'Producidos',
-      'Productos Especiales',
-      'Productos Gold',
-      'Productos Industriales',
-      'Productos Selectos',
-      'Sopa',
-      'Tortas de Carne',
-      'Visceras',
-      'Americano Choice',
-      'Combos',
-    ],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.res,
   },
   {
     id: 'pollo',
     label: 'Pollo',
-    subcategories: ['Pollo', 'Pollo- Cortes Espec. San Martin'],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.pollo,
   },
   {
     id: 'cerdo',
     label: 'Cerdo',
-    subcategories: ['Cerdo', 'Cerdo Cortes Especiales'],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.cerdo,
   },
   {
     id: 'abarroteria',
     label: 'Abarroteria',
-    subcategories: [
-      'Basicos',
-      'BC- Snacks',
-      'Condimentos (Especies)',
-      'Enlatados',
-      'Salsas',
-      'Sumplementos para asado',
-      'Z - Otros',
-    ],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.abarroteria,
   },
   {
     id: 'congelados',
     label: 'Congelados',
-    subcategories: ['Derivado pollo', 'Mariscos', 'Otros Congelados'],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.congelados,
   },
   {
     id: 'refrigerados',
     label: 'Refrigerados',
-    subcategories: ['Bebidas', 'Embutidos', 'Lacteos', 'Otros Refrigerados'],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.refrigerados,
   },
   {
     id: 'promociones',
     label: 'Promociones',
-    subcategories: ['Combos'],
+    subcategories: STORE_SUBCATEGORY_CANONICALS.promociones,
   },
 ];
 

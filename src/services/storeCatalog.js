@@ -1,12 +1,45 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
+import { normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 export const SICAR_SYNC_SOURCE = 'sicar';
 export const SICAR_CATALOG_SYNC_BATCH_SIZE = 25;
 
 const roundPrice = (value) => Number(Number(value || 0).toFixed(2));
+const roundQuantityRule = (value) => Number(Number(value || 0).toFixed(3));
+
+export const isUnitMeasure = (unit = '') => String(unit || '').trim().toLowerCase() === 'unidad';
+
+export const getDefaultProductMinQuantity = (unit = 'lb') => (isUnitMeasure(unit) ? 1 : 0.5);
+
+export const getDefaultProductQuantityStep = (unit = 'lb') => (isUnitMeasure(unit) ? 1 : 0.5);
+
+const normalizePositiveQuantityRule = (value, fallback) => {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return roundQuantityRule(numeric);
+  }
+
+  return roundQuantityRule(fallback);
+};
+
+export const getProductMinQuantity = (product = {}) =>
+  normalizePositiveQuantityRule(
+    product?.minQuantity,
+    getDefaultProductMinQuantity(product?.unit)
+  );
+
+export const getProductQuantityStep = (product = {}) =>
+  normalizePositiveQuantityRule(
+    product?.quantityStep,
+    getDefaultProductQuantityStep(product?.unit)
+  );
+
+export const hasCustomProductQuantityRules = (product = {}) =>
+  roundQuantityRule(getProductMinQuantity(product)) !== roundQuantityRule(getDefaultProductMinQuantity(product?.unit)) ||
+  roundQuantityRule(getProductQuantityStep(product)) !== roundQuantityRule(getDefaultProductQuantityStep(product?.unit));
 
 const normalizeCategoryValue = (category, subcategory) => {
   const rawCategory = String(category || '').trim().toLowerCase();
@@ -23,24 +56,8 @@ const normalizeCategoryValue = (category, subcategory) => {
   return rawCategory || 'res';
 };
 
-const normalizeSubcategoryValue = (subcategory, category) => {
-  const cleanSubcategory = String(subcategory || '').trim();
-  const rawSubcategory = cleanSubcategory.toLowerCase();
-
-  if (category === 'res' && (!rawSubcategory || rawSubcategory === 'res')) {
-    return 'Linea Diaria';
-  }
-
-  if (category === 'pollo' && rawSubcategory === 'gallina') {
-    return 'Pollo';
-  }
-
-  if (category === 'res' && ['producto gold', 'productos gold'].includes(rawSubcategory)) {
-    return 'Linea Gold';
-  }
-
-  return cleanSubcategory;
-};
+const normalizeSubcategoryValue = (subcategory, category) =>
+  normalizeStoreSubcategory(subcategory, category);
 
 const normalizeSyncOverrides = (overrides = {}, fallback = {}) => ({
   name: Boolean(overrides?.name ?? fallback?.name),
@@ -83,14 +100,25 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
   const rawSubcategory = source.subcategory ?? fallback.subcategory ?? '';
   const category = normalizeCategoryValue(rawCategory, rawSubcategory);
   const sync = normalizeSyncMetadata(source.sync, fallback.sync);
+  const unit = String(source.unit ?? fallback.unit ?? 'lb').trim() || 'lb';
+  const minQuantity = normalizePositiveQuantityRule(
+    source.minQuantity ?? fallback.minQuantity,
+    getDefaultProductMinQuantity(unit)
+  );
+  const quantityStep = normalizePositiveQuantityRule(
+    source.quantityStep ?? fallback.quantityStep,
+    getDefaultProductQuantityStep(unit)
+  );
 
   return {
     code: String(source.code ?? fallback.code ?? '').trim(),
     name: String(source.name ?? fallback.name ?? '').trim(),
     price: roundPrice(source.price ?? fallback.price ?? 0),
-    unit: String(source.unit ?? fallback.unit ?? 'lb').trim() || 'lb',
+    unit,
     category,
     subcategory: normalizeSubcategoryValue(rawSubcategory, category),
+    minQuantity,
+    quantityStep,
     active: source.active ?? fallback.active ?? true,
     promo: Boolean(source.promo ?? fallback.promo),
     image: String(source.image ?? fallback.image ?? '').trim(),
@@ -214,31 +242,18 @@ const buildSicarManagedProduct = (importedProduct = {}, existingProduct = {}) =>
   const importedImage = String(importedProduct.image || '').trim();
   const importedPrice = roundPrice(importedProduct.price || 0);
   const importedName = String(importedProduct.name || '').trim();
-  const nameOverride =
-    previousSync?.overrides?.name ??
-    (hasExistingRecord && importedName && String(existing.name || '').trim() !== importedName);
-  const priceOverride =
-    previousSync?.overrides?.price ??
-    (hasExistingRecord && importedPrice > 0 && roundPrice(existing.price) !== importedPrice);
-  const imageOverride =
-    previousSync?.overrides?.image ??
-    (hasExistingRecord &&
-      importedImage &&
-      String(existing.image || '').trim() &&
-      String(existing.image || '').trim() !== importedImage);
-
-  const finalImage =
-    imageOverride || !importedImage ? String(existing.image || '').trim() || importedImage : importedImage;
-
-  const finalProduct = {
-    ...imported,
-    name: nameOverride ? String(existing.name || '').trim() || importedName : importedName,
-    price: priceOverride ? roundPrice(existing.price || importedPrice) : importedPrice,
-    image: finalImage,
-    description: String(existing.description || imported.description || '').trim(),
-    active: hasExistingRecord ? existing.active !== false : imported.active !== false,
-    promo: hasExistingRecord ? Boolean(existing.promo) : Boolean(imported.promo),
-  };
+  const finalPrice = importedPrice > 0 ? importedPrice : roundPrice(existing.price || importedPrice);
+  const finalProduct = hasExistingRecord
+    ? {
+        ...existing,
+        price: finalPrice,
+      }
+    : {
+        ...imported,
+        price: finalPrice,
+        active: imported.active !== false,
+        promo: Boolean(imported.promo),
+      };
 
   return {
     ...finalProduct,
@@ -260,9 +275,9 @@ const buildSicarManagedProduct = (importedProduct = {}, existingProduct = {}) =>
       cumulativeDepartmentPct: Number(importedProduct?.sicar?.cumulativeDepartmentPct || 0),
       overallDepartmentSharePct: Number(importedProduct?.sicar?.overallDepartmentSharePct || 0),
       overrides: {
-        name: Boolean(nameOverride),
-        price: Boolean(priceOverride),
-        image: Boolean(imageOverride),
+        name: hasExistingRecord ? true : Boolean(previousSync?.overrides?.name),
+        price: false,
+        image: hasExistingRecord ? true : Boolean(previousSync?.overrides?.image),
       },
     },
   };
@@ -317,5 +332,6 @@ export async function applySicarCatalogProductsWithOptions(importedProducts = []
 
   return {
     appliedCount: total,
+    appliedProducts: entries.map(([, product]) => product),
   };
 }
