@@ -247,7 +247,6 @@ function App() {
 
   const navItems = [
     { id: 'ingreso', label: 'Nuevo Pedido', icon: Icons.plus, color: '#dc2626', short: 'Nuevo' },
-    { id: 'tienda', label: 'Tienda Virtual', icon: Icons.store, color: '#f97316', short: 'Tienda' },
     { id: 'cocina', label: 'Vista Cocina', icon: Icons.chef, color: '#f59e0b', short: 'Cocina' },
     { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: '#3b82f6', short: 'Lista' },
     { id: 'basedatos', label: 'Base de Datos', icon: Icons.database, color: '#10b981', short: 'Datos' },
@@ -646,16 +645,6 @@ function App() {
               clientes={clientes}
               nextOrderNumber={nextOrderNumber}
               remainingOrders={remainingOrders}
-            />
-          )}
-
-          {view === 'tienda' && (
-            <TiendaVirtualView
-              onCreateOrder={addOrder}
-              nextOrderNumber={nextOrderNumber}
-              remainingOrders={remainingOrders}
-              publicStoreUrl={publicStoreUrl}
-              mode="dashboard"
             />
           )}
 
