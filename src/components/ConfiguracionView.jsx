@@ -8,7 +8,13 @@ import {
   STORE_CATALOG_PATH,
   updateCatalogProduct,
 } from '../services/storeCatalog';
-import { STORE_CATEGORIES } from '../data/tiendaVirtual';
+import {
+  mergeStoreCategories,
+  saveStoreCategory,
+  seedDefaultStoreCategoriesIfEmpty,
+  STORE_CATEGORIES_PATH,
+  updateStoreCategory,
+} from '../services/storeCategories';
 
 const emptyProduct = {
   code: '',
@@ -23,16 +29,35 @@ const emptyProduct = {
   description: '',
 };
 
+const emptyCategory = {
+  id: '',
+  label: '',
+  subcategoriesText: '',
+  active: true,
+  sortOrder: '',
+};
+
 export default function ConfiguracionView() {
   const [products, setProducts] = useState(() => mergeCatalogProducts());
+  const [categories, setCategories] = useState(() => mergeStoreCategories());
   const [form, setForm] = useState(emptyProduct);
+  const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [saving, setSaving] = useState(false);
+  const [savingCategory, setSavingCategory] = useState(false);
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
       setProducts(mergeCatalogProducts(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
+      setCategories(mergeStoreCategories(snapshot.val()));
     });
 
     return () => unsubscribe();
@@ -52,10 +77,19 @@ export default function ConfiguracionView() {
     );
   }, [products, search]);
 
-  const catalogCategories = useMemo(
-    () => STORE_CATEGORIES.filter((category) => category.id !== 'todos'),
-    []
+  const activeCategories = useMemo(
+    () => categories.filter((category) => category.active !== false),
+    [categories]
   );
+
+  const catalogCategories = useMemo(() => {
+    if (form.category && !activeCategories.some((category) => category.id === form.category)) {
+      const currentCategory = categories.find((category) => category.id === form.category);
+      return currentCategory ? [...activeCategories, currentCategory] : activeCategories;
+    }
+
+    return activeCategories;
+  }, [activeCategories, categories, form.category]);
 
   const selectedFormCategory = useMemo(
     () => catalogCategories.find((category) => category.id === form.category) || catalogCategories[0],
@@ -71,6 +105,13 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const updateCategoryForm = (field, value) => {
+    setCategoryForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const updateCategory = (categoryId) => {
     const nextCategory = catalogCategories.find((category) => category.id === categoryId);
     setForm((current) => ({
@@ -81,7 +122,17 @@ export default function ConfiguracionView() {
   };
 
   const getCategoryLabel = (categoryId) =>
-    catalogCategories.find((category) => category.id === categoryId)?.label || categoryId || '-';
+    categories.find((category) => category.id === categoryId)?.label || categoryId || '-';
+
+  const editCategory = (category) => {
+    setCategoryForm({
+      id: category.id || '',
+      label: category.label || '',
+      subcategoriesText: (category.subcategories || []).join('\n'),
+      active: category.active !== false,
+      sortOrder: category.sortOrder ?? '',
+    });
+  };
 
   const editProduct = (product) => {
     setForm({
@@ -130,12 +181,44 @@ export default function ConfiguracionView() {
     }
   };
 
+  const saveCategory = async (event) => {
+    event.preventDefault();
+    setSavingCategory(true);
+    setMessage('');
+
+    try {
+      await saveStoreCategory({
+        id: categoryForm.id,
+        label: categoryForm.label,
+        subcategories: categoryForm.subcategoriesText,
+        active: categoryForm.active,
+        sortOrder: categoryForm.sortOrder === '' ? categories.length * 10 : Number(categoryForm.sortOrder || 0),
+      });
+      setCategoryForm(emptyCategory);
+      setMessage('Categoria guardada.');
+    } catch (error) {
+      console.error('Error guardando categoria:', error);
+      setMessage('No se pudo guardar la categoria.');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
+
   const toggleProduct = async (product) => {
     try {
       await updateCatalogProduct(product.code, { active: product.active === false });
     } catch (error) {
       console.error('Error actualizando producto:', error);
       setMessage('No se pudo actualizar el producto.');
+    }
+  };
+
+  const toggleCategory = async (category) => {
+    try {
+      await updateStoreCategory(category.id, { active: category.active === false });
+    } catch (error) {
+      console.error('Error actualizando categoria:', error);
+      setMessage('No se pudo actualizar la categoria.');
     }
   };
 
@@ -150,6 +233,20 @@ export default function ConfiguracionView() {
       setMessage('No se pudo inicializar el catalogo.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const seedCategories = async () => {
+    setSavingCategory(true);
+    setMessage('');
+    try {
+      const seeded = await seedDefaultStoreCategoriesIfEmpty();
+      setMessage(seeded ? 'Categorias base creadas.' : 'Las categorias ya existen.');
+    } catch (error) {
+      console.error('Error inicializando categorias:', error);
+      setMessage('No se pudieron inicializar las categorias.');
+    } finally {
+      setSavingCategory(false);
     }
   };
 
@@ -271,6 +368,119 @@ export default function ConfiguracionView() {
             {message}
           </div>
         )}
+
+        <section
+          style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            padding: 16,
+            marginTop: 18,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 22 }}>Categorias y subcategorias</h2>
+              <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
+                Estas opciones alimentan los filtros de la tienda y las listas del catalogo.
+              </p>
+            </div>
+            <button type="button" className="cfg-button secondary" onClick={seedCategories} disabled={savingCategory}>
+              Inicializar categorias base
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+              gap: 14,
+              marginTop: 14,
+              alignItems: 'start',
+            }}
+          >
+            <div style={{ display: 'grid', gap: 10 }}>
+              {categories.map((category) => (
+                <div
+                  key={category.id}
+                  style={{
+                    border: '1px solid #edf2f7',
+                    borderRadius: 8,
+                    padding: 12,
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(0, 1fr) auto',
+                    gap: 10,
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <strong>{category.label}</strong>
+                    <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
+                      {(category.subcategories || []).join(' | ') || 'Sin subcategorias'}
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <span className={`cfg-badge ${category.active === false ? 'off' : ''}`}>
+                        {category.active === false ? 'Inactiva' : 'Activa'}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className="cfg-button secondary" onClick={() => editCategory(category)}>
+                      Editar
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => toggleCategory(category)}>
+                      {category.active === false ? 'Activar' : 'Desactivar'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={saveCategory} style={{ display: 'grid', gap: 10 }}>
+              <input
+                className="cfg-input"
+                value={categoryForm.label}
+                onChange={(event) => updateCategoryForm('label', event.target.value)}
+                placeholder="Nombre de categoria"
+              />
+              <textarea
+                className="cfg-textarea"
+                value={categoryForm.subcategoriesText}
+                onChange={(event) => updateCategoryForm('subcategoriesText', event.target.value)}
+                placeholder="Subcategorias, una por linea o separadas por coma"
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <input
+                  className="cfg-input"
+                  type="number"
+                  value={categoryForm.sortOrder}
+                  onChange={(event) => updateCategoryForm('sortOrder', event.target.value)}
+                  placeholder="Orden"
+                />
+                <select
+                  className="cfg-select"
+                  value={categoryForm.active ? 'activo' : 'inactivo'}
+                  onChange={(event) => updateCategoryForm('active', event.target.value === 'activo')}
+                >
+                  <option value="activo">Activa</option>
+                  <option value="inactivo">Inactiva</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="submit" className="cfg-button" disabled={savingCategory}>
+                  {savingCategory ? 'Guardando...' : 'Guardar categoria'}
+                </button>
+                <button
+                  type="button"
+                  className="cfg-button secondary"
+                  onClick={() => setCategoryForm(emptyCategory)}
+                >
+                  Nueva
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
 
         <div
           className="cfg-grid"

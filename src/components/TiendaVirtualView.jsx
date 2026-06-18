@@ -3,11 +3,14 @@ import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
-  STORE_CATEGORIES,
   STORE_PAYMENT_OPTIONS,
   STORE_PROMOTIONS,
 } from '../data/tiendaVirtual';
 import { mergeCatalogProducts, STORE_CATALOG_PATH } from '../services/storeCatalog';
+import {
+  mergeStoreCategories,
+  STORE_CATEGORIES_PATH,
+} from '../services/storeCategories';
 import {
   cleanStorePhone,
   loginStoreUser,
@@ -46,6 +49,7 @@ export default function TiendaVirtualView({
   publicStoreUrl = '#tienda',
 }) {
   const [catalog, setCatalog] = useState(() => mergeCatalogProducts());
+  const [categories, setCategories] = useState(() => mergeStoreCategories());
   const [cart, setCart] = useState({});
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('todos');
@@ -102,6 +106,14 @@ export default function TiendaVirtualView({
   }, []);
 
   useEffect(() => {
+    const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
+      setCategories(mergeStoreCategories(snapshot.val()));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     if (!currentUser) {
       setCustomerOrders([]);
       return undefined;
@@ -149,10 +161,25 @@ export default function TiendaVirtualView({
     [catalog]
   );
 
-  const selectedCategory = useMemo(
-    () => STORE_CATEGORIES.find((category) => category.id === activeCategory) || STORE_CATEGORIES[0],
-    [activeCategory]
+  const categoryOptions = useMemo(
+    () => [
+      { id: 'todos', label: 'Todos', subcategories: [] },
+      ...categories.filter((category) => category.active !== false),
+    ],
+    [categories]
   );
+
+  const selectedCategory = useMemo(
+    () => categoryOptions.find((category) => category.id === activeCategory) || categoryOptions[0],
+    [activeCategory, categoryOptions]
+  );
+
+  useEffect(() => {
+    if (!categoryOptions.some((category) => category.id === activeCategory)) {
+      setActiveCategory('todos');
+      setActiveSubcategory('todas');
+    }
+  }, [activeCategory, categoryOptions]);
 
   const subcategoryOptions = useMemo(() => {
     if (activeCategory === 'todos') {
@@ -1114,7 +1141,7 @@ export default function TiendaVirtualView({
           </label>
 
           <nav className="store-tabs">
-            {STORE_CATEGORIES.map((category) => (
+            {categoryOptions.map((category) => (
               <button
                 key={category.id}
                 type="button"
