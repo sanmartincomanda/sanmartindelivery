@@ -1406,8 +1406,8 @@ export default function TiendaVirtualView({
         }
         .store-story-scrim.bottom {
           bottom: 0;
-          height: 38%;
-          background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.84) 100%);
+          height: 14%;
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.28) 100%);
         }
         .store-story-nav {
           position: absolute;
@@ -1424,50 +1424,6 @@ export default function TiendaVirtualView({
         }
         .store-story-nav button:disabled {
           cursor: default;
-        }
-        .store-story-copy {
-          position: absolute;
-          left: 18px;
-          right: 18px;
-          bottom: 88px;
-          z-index: 4;
-          color: #ffffff;
-          pointer-events: none;
-          text-shadow: 0 2px 20px rgba(15, 23, 42, 0.72);
-        }
-        .store-story-eyebrow {
-          display: inline-flex;
-          align-items: center;
-          min-height: 28px;
-          border-radius: 999px;
-          padding: 0 12px;
-          background: rgba(255, 255, 255, 0.18);
-          font-size: 11px;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          backdrop-filter: blur(12px);
-        }
-        .store-story-copy h3 {
-          margin: 12px 0 8px;
-          font-size: clamp(24px, 4vw, 34px);
-          line-height: 1.02;
-        }
-        .store-story-copy p {
-          margin: 0;
-          font-size: 14px;
-          line-height: 1.45;
-          max-width: 28ch;
-          color: rgba(255, 255, 255, 0.9);
-        }
-        .store-story-actions {
-          position: absolute;
-          left: 18px;
-          right: 18px;
-          bottom: 18px;
-          z-index: 4;
-          display: flex;
-          gap: 10px;
         }
         .store-product-head {
           display: flex;
@@ -2303,24 +2259,6 @@ export default function TiendaVirtualView({
             left: 10px;
             right: 10px;
           }
-          .store-story-copy {
-            left: 14px;
-            right: 14px;
-            bottom: 82px;
-          }
-          .store-story-copy h3 {
-            font-size: 26px;
-          }
-          .store-story-copy p {
-            max-width: none;
-            font-size: 13px;
-          }
-          .store-story-actions {
-            left: 14px;
-            right: 14px;
-            bottom: 14px;
-            flex-direction: column;
-          }
           .store-detail-grid {
             grid-template-columns: 1fr;
           }
@@ -2605,12 +2543,6 @@ export default function TiendaVirtualView({
           activeIndex={selectedPromotionIndex}
           onChange={setSelectedPromotionIndex}
           onClose={() => setSelectedPromotionIndex(null)}
-          onViewCombos={() => {
-            setSelectedPromotionIndex(null);
-            setQuery('');
-            setActiveCategory('promociones');
-            setActiveSubcategory('todas');
-          }}
         />
       )}
 
@@ -3073,7 +3005,7 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
   );
 }
 
-function PromotionViewer({ promotions, activeIndex, onChange, onClose, onViewCombos }) {
+function PromotionViewer({ promotions, activeIndex, onChange, onClose }) {
   const promotion = promotions[activeIndex] || null;
   const isFirstPromotion = activeIndex <= 0;
   const isLastPromotion = activeIndex >= promotions.length - 1;
@@ -3216,22 +3148,6 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose, onViewCom
             />
           </div>
 
-          <div className="store-story-copy">
-            <span className="store-story-eyebrow">Promocion activa</span>
-            <h3>{promotion.title}</h3>
-            <p>
-              Toca a la izquierda para regresar o a la derecha para ver la siguiente historia.
-            </p>
-          </div>
-
-          <div className="store-story-actions">
-            <button type="button" className="store-button" style={{ flex: 1 }} onClick={onViewCombos}>
-              Ver combos
-            </button>
-            <button type="button" className="store-button secondary" onClick={onClose}>
-              Cerrar
-            </button>
-          </div>
         </div>
       </div>
     </div>
