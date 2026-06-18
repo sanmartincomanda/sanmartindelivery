@@ -20,6 +20,7 @@ import {
 import { formatOrderNumber, formatWeight, STORE_CHANNEL } from '../services/orders';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
+const STORE_BACKGROUND_PATH = '/tienda/branding/fondo-combos-tortas.svg';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
@@ -478,8 +479,8 @@ export default function TiendaVirtualView({
           padding: 28px;
           color: #ffffff;
           background:
-            linear-gradient(135deg, rgba(17, 24, 39, 0.82), rgba(127, 29, 29, 0.74)),
-            url('/tienda/page/hero-table.jpg') center / cover;
+            linear-gradient(135deg, rgba(17, 24, 39, 0.16), rgba(127, 29, 29, 0.12)),
+            url('${STORE_BACKGROUND_PATH}') center / cover;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
