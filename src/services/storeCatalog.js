@@ -136,6 +136,39 @@ export const normalizeCatalogProduct = (product = {}, fallback = {}) =>
 export const isSicarManagedProduct = (product = {}) =>
   String(product?.sync?.source || '').trim().toLowerCase() === SICAR_SYNC_SOURCE;
 
+const getCatalogProductSoldQuantity = (product = {}) =>
+  Number(product?.sync?.quantitySold90d || 0);
+
+const getCatalogProductSortName = (product = {}) =>
+  String(product?.name || '')
+    .trim()
+    .toLocaleLowerCase('es-NI');
+
+export const compareCatalogProducts = (left = {}, right = {}) => {
+  const soldDifference = getCatalogProductSoldQuantity(right) - getCatalogProductSoldQuantity(left);
+  if (soldDifference !== 0) {
+    return soldDifference;
+  }
+
+  const priceDifference = roundPrice(right?.price || 0) - roundPrice(left?.price || 0);
+  if (priceDifference !== 0) {
+    return priceDifference;
+  }
+
+  const nameDifference = getCatalogProductSortName(left).localeCompare(getCatalogProductSortName(right), 'es-NI', {
+    sensitivity: 'base',
+    numeric: true,
+  });
+  if (nameDifference !== 0) {
+    return nameDifference;
+  }
+
+  return String(left?.code || '').localeCompare(String(right?.code || ''), 'es-NI', {
+    sensitivity: 'base',
+    numeric: true,
+  });
+};
+
 export const mergeCatalogProducts = (remoteCatalog = {}) => {
   const byCode = new Map();
 
@@ -154,9 +187,7 @@ export const mergeCatalogProducts = (remoteCatalog = {}) => {
     }
   });
 
-  return Array.from(byCode.values()).sort((left, right) =>
-    String(left.name || '').localeCompare(String(right.name || ''))
-  );
+  return Array.from(byCode.values()).sort(compareCatalogProducts);
 };
 
 export const getCatalogProductKey = (code) => String(code || '').trim().replace(/[.#$/[\]]/g, '_');
