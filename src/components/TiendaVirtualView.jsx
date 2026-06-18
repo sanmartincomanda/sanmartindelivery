@@ -56,7 +56,7 @@ const MAP_PICKER_TILE_SIZE = 256;
 const MAP_PICKER_WIDTH = 360;
 const MAP_PICKER_HEIGHT = 260;
 const QUANTITY_EPSILON = 0.00001;
-const STORE_STORY_DURATION_MS = 4500;
+const STORE_STORY_DURATION_MS = 10000;
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -1325,11 +1325,19 @@ export default function TiendaVirtualView({
           border-radius: inherit;
           background: #ffffff;
         }
+        .store-story-progress-fill.active {
+          animation: storeStoryProgress linear forwards;
+        }
         .store-story-progress-fill.done {
           width: 100%;
         }
-        .store-story-progress-fill.active {
-          animation: storeStoryProgress linear forwards;
+        @keyframes storeStoryProgress {
+          from {
+            width: 0;
+          }
+          to {
+            width: 100%;
+          }
         }
         .store-story-viewer-head {
           position: absolute;
@@ -1365,12 +1373,19 @@ export default function TiendaVirtualView({
           width: 42px;
           height: 42px;
           flex: 0 0 auto;
+          display: grid;
+          place-items: center;
           border-radius: 999px;
           background: rgba(15, 23, 42, 0.48);
           color: #ffffff;
-          font-size: 28px;
+          font-size: 0;
           line-height: 1;
           backdrop-filter: blur(12px);
+        }
+        .store-story-close::before {
+          content: 'x';
+          font-size: 28px;
+          line-height: 1;
         }
         .store-story-frame {
           position: relative;
@@ -1405,6 +1420,7 @@ export default function TiendaVirtualView({
           border: 0;
           background: transparent;
           cursor: pointer;
+          touch-action: manipulation;
         }
         .store-story-nav button:disabled {
           cursor: default;
@@ -1452,14 +1468,6 @@ export default function TiendaVirtualView({
           z-index: 4;
           display: flex;
           gap: 10px;
-        }
-        @keyframes storeStoryProgress {
-          from {
-            width: 0;
-          }
-          to {
-            width: 100%;
-          }
         }
         .store-product-head {
           display: flex;
@@ -3093,11 +3101,16 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose, onViewCom
     }
 
     const timeoutId = window.setTimeout(() => {
-      goToNext();
+      if (isLastPromotion) {
+        onClose();
+        return;
+      }
+
+      onChange(activeIndex + 1);
     }, STORE_STORY_DURATION_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [promotion, activeIndex]);
+  }, [promotion, activeIndex, isLastPromotion, onChange, onClose]);
 
   useEffect(() => {
     if (!promotion || typeof window === 'undefined') {
@@ -3126,6 +3139,22 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose, onViewCom
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [promotion, activeIndex]);
 
+  useEffect(() => {
+    if (!promotion || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [promotion]);
+
   if (!promotion) {
     return null;
   }
@@ -3145,8 +3174,8 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose, onViewCom
               <span
                 className={[
                   'store-story-progress-fill',
-                  index < activeIndex ? 'done' : '',
                   index === activeIndex ? 'active' : '',
+                  index < activeIndex ? 'done' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
