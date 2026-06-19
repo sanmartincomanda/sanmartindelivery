@@ -133,8 +133,14 @@ export default function KitchenView({ orders }) {
   }, []);
 
   const getBasePath = (tab) => (tab === 'ruta' ? 'rutaOrders' : 'orders');
+  const isKitchenBlockedStatusChange = (campo, valor) =>
+    campo === 'estado' && String(valor || '').trim() === 'Cancelado';
   
   const updateCampo = (firebaseKey, campo, valor, tab = kitchenTab) => {
+    if (isKitchenBlockedStatusChange(campo, valor)) {
+      return;
+    }
+
     const basePath = getBasePath(tab);
     const payload = { [campo]: valor };
 
@@ -1045,87 +1051,32 @@ export default function KitchenView({ orders }) {
                         </a>
                       )}
                       {status === 'En preparación' && (
-                        <>
-                          <button
-                            onClick={() => marcarPreparado(pedido.firebaseKey)}
-                            className="btn-hover"
-                            style={{
-                              flex: 1,
-                              padding: '18px 24px',
-                              borderRadius: '14px',
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                              color: 'white',
-                              fontWeight: 800,
-                              fontSize: '17px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px',
-                              boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
-                            }}
-                          >
-                            {Icons.check}
-                            Pedido Listo
-                          </button>
-                          <button
-                            onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
-                            className="btn-hover"
-                            style={{
-                              padding: '18px',
-                              borderRadius: '14px',
-                              border: 'none',
-                              background: '#fee2e2',
-                              color: '#dc2626',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {Icons.cancel}
-                          </button>
-                        </>
+                        <button
+                          onClick={() => marcarPreparado(pedido.firebaseKey)}
+                          className="btn-hover"
+                          style={{
+                            width: '100%',
+                            padding: '18px 24px',
+                            borderRadius: '14px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            color: 'white',
+                            fontWeight: 800,
+                            fontSize: '17px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            boxShadow: '0 8px 25px rgba(16, 185, 129, 0.4)'
+                          }}
+                        >
+                          {Icons.check}
+                          Pedido Listo
+                        </button>
                       )}
 
                       {status === 'Preparado' && (
-                        <>
-                          <button
-                            onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Pendiente')}
-                            className="btn-hover"
-                            style={{
-                              flex: 1,
-                              padding: '16px',
-                              borderRadius: '14px',
-                              border: '2px solid #e2e8f0',
-                              background: 'white',
-                              color: '#475569',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              fontSize: '15px'
-                            }}
-                          >
-                            {Icons.undo}
-                            Volver a Preparar
-                          </button>
-                          <button
-                            onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
-                            className="btn-hover"
-                            style={{
-                              padding: '16px 20px',
-                              borderRadius: '14px',
-                              border: 'none',
-                              background: '#fee2e2',
-                              color: '#dc2626',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {Icons.cancel}
-                          </button>
-                        </>
-                      )}
-
-                      {status === 'Cancelado' && (
                         <button
                           onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Pendiente')}
                           className="btn-hover"
@@ -1133,35 +1084,34 @@ export default function KitchenView({ orders }) {
                             width: '100%',
                             padding: '16px',
                             borderRadius: '14px',
-                            border: 'none',
-                            background: '#3b82f6',
-                            color: 'white',
+                            border: '2px solid #e2e8f0',
+                            background: 'white',
+                            color: '#475569',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            fontSize: '15px'
                           }}
                         >
                           {Icons.undo}
-                          Reactivar Pedido
+                          Volver a Preparar
                         </button>
                       )}
 
-                      {status === 'Pendiente' && (
-                        <button
-                          onClick={() => updateCampo(pedido.firebaseKey, 'estado', 'Cancelado')}
-                          className="btn-hover"
+                      {status === 'Cancelado' && (
+                        <div
                           style={{
                             width: '100%',
                             padding: '16px',
                             borderRadius: '14px',
-                            border: '2px solid #fee2e2',
-                            background: 'transparent',
-                            color: '#ef4444',
+                            border: '1px solid #fecaca',
+                            background: '#fff1f2',
+                            color: '#b91c1c',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            textAlign: 'center'
                           }}
                         >
-                          Cancelar Pedido
-                        </button>
+                          Pedido cancelado desde administracion
+                        </div>
                       )}
                     </div>
 
