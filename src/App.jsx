@@ -74,12 +74,15 @@ const getRouteFromLocation = () => {
     return 'dashboard';
   }
 
+  if (isStoreHost(window.location.hostname)) {
+    return 'tienda';
+  }
+
   const cleanedHash = window.location.hash.replace(/^#\/?/, '').trim().toLowerCase();
   if (cleanedHash.startsWith('tienda')) return 'tienda';
   if (cleanedHash.startsWith('cocina')) return 'cocina';
   if (cleanedHash.startsWith('driver')) return 'driver';
   if (cleanedHash.startsWith('admin') || cleanedHash.startsWith('administracion')) return 'dashboard';
-  if (isStoreHost(window.location.hostname)) return 'tienda';
   return 'dashboard';
 };
 

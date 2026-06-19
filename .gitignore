@@ -1,4 +1,5 @@
 node_modules/
 dist/
-sicar.local.json
+.netlify/
 *.log
+sicar.local.json
