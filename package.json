@@ -6,7 +6,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "sicar:bridge": "node scripts/sicarBridgeServer.mjs"
+    "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
+    "firebase:login": "npx firebase-tools login",
+    "firebase:use": "npx firebase-tools use comanda-digital-ac1ec",
+    "firebase:deploy:rules": "npx firebase-tools deploy --only database,storage",
+    "firebase:deploy:database": "npx firebase-tools deploy --only database",
+    "firebase:deploy:storage": "npx firebase-tools deploy --only storage"
   },
   "dependencies": {
     "firebase": "^11.9.0",

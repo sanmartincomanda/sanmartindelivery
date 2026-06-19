@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "orders": {
+      ".indexOn": ["fecha", "storeUserKey", "repartidorCodigo"]
+    },
+    "rutaOrders": {
+      ".indexOn": ["fecha"]
+    },
+    "clients": {
+      ".indexOn": ["codigo", "telefono"]
+    },
+    "storeCatalogMeta": {
+      ".read": true
+    }
+  }
+}
