@@ -220,6 +220,7 @@ async function resolveCatalogImagePayload(product = {}, fallback = {}) {
       image: '',
       imageStoragePath: existingPath,
       imageHash: existingHash,
+      storedInline: false,
     };
   }
 
@@ -228,6 +229,7 @@ async function resolveCatalogImagePayload(product = {}, fallback = {}) {
       image: rawImage,
       imageStoragePath: existingPath,
       imageHash: existingHash,
+      storedInline: false,
     };
   }
 
@@ -241,6 +243,7 @@ async function resolveCatalogImagePayload(product = {}, fallback = {}) {
     image: uploadedImage.url,
     imageStoragePath: uploadedImage.path,
     imageHash: uploadedImage.hash || existingHash,
+    storedInline: Boolean(uploadedImage.storedInline),
   };
 }
 
@@ -297,7 +300,10 @@ export async function saveCatalogProduct(product, existingProduct = null) {
 
   await set(ref(database, `${STORE_CATALOG_PATH}/${getCatalogProductKey(normalized.code)}`), normalized);
   await touchCatalogMeta();
-  return normalized;
+  return {
+    product: normalized,
+    storedInlineImage: Boolean(imagePayload.storedInline),
+  };
 }
 
 export async function updateCatalogProduct(code, patch) {

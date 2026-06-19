@@ -168,6 +168,94 @@ const chunkArray = (items = [], size = 1) => {
   return chunks;
 };
 
+const IMAGE_CROP_OUTPUT_SIZE = 960;
+const IMAGE_CROP_MIN_ZOOM = 1;
+const IMAGE_CROP_MAX_ZOOM = 3;
+
+const buildEmptyImageCrop = () => ({
+  open: false,
+  source: '',
+  fileName: '',
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
+  width: 0,
+  height: 0,
+});
+
+const clampCropValue = (value, minimum, maximum) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return minimum;
+  }
+
+  return Math.min(maximum, Math.max(minimum, numeric));
+};
+
+const loadCatalogImageElement = (source) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('No se pudo cargar la foto seleccionada.'));
+    image.src = source;
+  });
+
+const cropCatalogImage = async ({
+  source,
+  zoom,
+  offsetX,
+  offsetY,
+  outputSize = IMAGE_CROP_OUTPUT_SIZE,
+}) => {
+  if (!source || typeof document === 'undefined') {
+    throw new Error('No hay una imagen lista para recortar.');
+  }
+
+  const image = await loadCatalogImageElement(source);
+  const width = Math.max(1, Number(image.width || 1));
+  const height = Math.max(1, Number(image.height || 1));
+  const normalizedZoom = clampCropValue(zoom, IMAGE_CROP_MIN_ZOOM, IMAGE_CROP_MAX_ZOOM);
+  const cropSide = Math.max(1, Math.min(width, height) / normalizedZoom);
+  const maxOffsetX = Math.max(0, (width - cropSide) / 2);
+  const maxOffsetY = Math.max(0, (height - cropSide) / 2);
+  const normalizedOffsetX = clampCropValue(offsetX, -1, 1);
+  const normalizedOffsetY = clampCropValue(offsetY, -1, 1);
+  const sourceX = clampCropValue(
+    (width - cropSide) / 2 + maxOffsetX * normalizedOffsetX,
+    0,
+    width - cropSide
+  );
+  const sourceY = clampCropValue(
+    (height - cropSide) / 2 + maxOffsetY * normalizedOffsetY,
+    0,
+    height - cropSide
+  );
+  const canvas = document.createElement('canvas');
+  canvas.width = outputSize;
+  canvas.height = outputSize;
+  const context = canvas.getContext('2d');
+
+  if (!context) {
+    throw new Error('No se pudo preparar el recorte de la foto.');
+  }
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, outputSize, outputSize);
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    cropSide,
+    cropSide,
+    0,
+    0,
+    outputSize,
+    outputSize
+  );
+
+  return canvas.toDataURL('image/jpeg', 0.9);
+};
+
 export default function ConfiguracionView() {
   const [section, setSection] = useState('catalogo');
   const [usersTab, setUsersTab] = useState('administrativo');
@@ -202,6 +290,8 @@ export default function ConfiguracionView() {
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [imageCrop, setImageCrop] = useState(() => buildEmptyImageCrop());
+  const [applyingImageCrop, setApplyingImageCrop] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
@@ -339,6 +429,29 @@ export default function ConfiguracionView() {
 
   const formSubcategories = selectedFormCategory?.subcategories || [];
 
+  const imageCropPreview = useMemo(() => {
+    const width = Number(imageCrop.width || 0);
+    const height = Number(imageCrop.height || 0);
+    if (!imageCrop.open || width <= 0 || height <= 0) {
+      return null;
+    }
+
+    const minSide = Math.max(1, Math.min(width, height));
+    const zoom = clampCropValue(imageCrop.zoom, IMAGE_CROP_MIN_ZOOM, IMAGE_CROP_MAX_ZOOM);
+    const previewWidth = (width / minSide) * zoom * 100;
+    const previewHeight = (height / minSide) * zoom * 100;
+    const maxShiftX = Math.max(0, (previewWidth - 100) / 2);
+    const maxShiftY = Math.max(0, (previewHeight - 100) / 2);
+
+    return {
+      zoom,
+      previewWidth,
+      previewHeight,
+      previewLeft: 50 - maxShiftX * clampCropValue(imageCrop.offsetX, -1, 1),
+      previewTop: 50 - maxShiftY * clampCropValue(imageCrop.offsetY, -1, 1),
+    };
+  }, [imageCrop]);
+
   const updateForm = (field, value) => {
     setForm((current) => ({
       ...current,
@@ -427,6 +540,7 @@ export default function ConfiguracionView() {
   };
 
   const editProduct = (product) => {
+    setImageCrop(buildEmptyImageCrop());
     setForm({
       code: product.code || '',
       name: product.name || '',
@@ -481,15 +595,80 @@ export default function ConfiguracionView() {
 
   const handleImageFile = (event) => {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) {
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
-      updateForm('image', String(reader.result || ''));
+    reader.onload = async () => {
+      const source = String(reader.result || '');
+      if (!source) {
+        setMessage('No se pudo leer la foto seleccionada.');
+        return;
+      }
+
+      try {
+        const image = await loadCatalogImageElement(source);
+        setImageCrop({
+          open: true,
+          source,
+          fileName: file.name || 'Foto',
+          zoom: 1,
+          offsetX: 0,
+          offsetY: 0,
+          width: Number(image.width || 0),
+          height: Number(image.height || 0),
+        });
+      } catch (error) {
+        console.error('No se pudo abrir la foto para recortarla:', error);
+        updateForm('image', source);
+        setMessage('No se pudo abrir el recorte. La foto se cargo completa.');
+      }
+    };
+    reader.onerror = () => {
+      setMessage('No se pudo leer la foto seleccionada.');
     };
     reader.readAsDataURL(file);
+  };
+
+  const updateImageCrop = (field, value) => {
+    setImageCrop((current) => ({
+      ...current,
+      [field]: field === 'zoom'
+        ? clampCropValue(value, IMAGE_CROP_MIN_ZOOM, IMAGE_CROP_MAX_ZOOM)
+        : clampCropValue(value, -1, 1),
+    }));
+  };
+
+  const closeImageCrop = () => {
+    if (applyingImageCrop) {
+      return;
+    }
+
+    setImageCrop(buildEmptyImageCrop());
+  };
+
+  const applyImageCrop = async () => {
+    if (!imageCrop.source) {
+      return;
+    }
+
+    setApplyingImageCrop(true);
+    setMessage('');
+
+    try {
+      const croppedImage = await cropCatalogImage(imageCrop);
+      const optimizedImage = await compressImportedCatalogImage(croppedImage);
+      updateForm('image', optimizedImage || croppedImage);
+      setImageCrop(buildEmptyImageCrop());
+      setMessage('Foto recortada y lista para guardar.');
+    } catch (error) {
+      console.error('No se pudo recortar la foto del producto:', error);
+      setMessage('No se pudo aplicar el recorte de la foto.');
+    } finally {
+      setApplyingImageCrop(false);
+    }
   };
 
   const saveProduct = async (event) => {
@@ -499,7 +678,7 @@ export default function ConfiguracionView() {
 
     try {
       const existingProduct = products.find((product) => product.code === form.code) || null;
-      await saveCatalogProduct({
+      const result = await saveCatalogProduct({
         ...form,
         price: Number(form.price || 0),
         minQuantity: Number(form.minQuantity || getDefaultProductMinQuantity(form.unit)),
@@ -510,7 +689,11 @@ export default function ConfiguracionView() {
         minQuantity: String(Number(form.minQuantity || getDefaultProductMinQuantity(form.unit))),
         quantityStep: String(Number(form.quantityStep || getDefaultProductQuantityStep(form.unit))),
       }));
-      setMessage('Producto guardado con sus restricciones.');
+      setMessage(
+        result?.storedInlineImage
+          ? 'Producto guardado. La foto quedo guardada como respaldo en la base porque Firebase Storage rechazo la subida desde este dominio.'
+          : 'Producto guardado con sus restricciones.'
+      );
     } catch (error) {
       console.error('Error guardando producto:', error);
       setMessage('No se pudo guardar el producto.');
@@ -1730,7 +1913,14 @@ export default function ConfiguracionView() {
               <button type="submit" className="cfg-button" disabled={saving}>
                 {saving ? 'Guardando...' : 'Guardar producto'}
               </button>
-              <button type="button" className="cfg-button secondary" onClick={() => setForm(buildEmptyProduct())}>
+              <button
+                type="button"
+                className="cfg-button secondary"
+                onClick={() => {
+                  setImageCrop(buildEmptyImageCrop());
+                  setForm(buildEmptyProduct());
+                }}
+              >
                 Nuevo
               </button>
             </div>
@@ -1966,6 +2156,165 @@ export default function ConfiguracionView() {
                     </div>
                   </section>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {imageCrop.open && imageCropPreview && (
+          <div
+            className="cfg-driver-modal-overlay"
+            onClick={closeImageCrop}
+          >
+            <div
+              className="cfg-driver-modal"
+              style={{ width: 'min(760px, 100%)' }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+                    Foto del articulo
+                  </div>
+                  <h2 style={{ margin: '6px 0 0', fontSize: 28 }}>Recorta la imagen</h2>
+                  <p style={{ margin: '8px 0 0', color: '#475569', fontWeight: 700, lineHeight: 1.5 }}>
+                    Ajusta el encuadre para que el producto se vea limpio en la tienda. El recorte se guarda antes
+                    de subir la foto al sistema.
+                  </p>
+                </div>
+                <div style={{ color: '#94a3b8', fontWeight: 800 }}>
+                  {imageCrop.fileName || 'Foto nueva'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 20,
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 320px)',
+                  gap: 18,
+                  alignItems: 'start',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    justifyItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 'min(100%, 360px)',
+                      aspectRatio: '1 / 1',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      borderRadius: 24,
+                      background: 'linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%)',
+                      border: '1px solid #cbd5e1',
+                      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.5)',
+                    }}
+                  >
+                    <img
+                      src={imageCrop.source}
+                      alt="Recorte de producto"
+                      style={{
+                        position: 'absolute',
+                        width: `${imageCropPreview.previewWidth}%`,
+                        height: `${imageCropPreview.previewHeight}%`,
+                        left: `${imageCropPreview.previewLeft}%`,
+                        top: `${imageCropPreview.previewTop}%`,
+                        transform: 'translate(-50%, -50%)',
+                        objectFit: 'cover',
+                        userSelect: 'none',
+                        pointerEvents: 'none',
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: 24,
+                        boxShadow: 'inset 0 0 0 2px rgba(15, 23, 42, 0.08)',
+                      }}
+                    />
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>
+                    Vista previa cuadrada para la tienda virtual.
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gap: 14,
+                    padding: 16,
+                    borderRadius: 18,
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                  }}
+                >
+                  <label style={{ display: 'grid', gap: 8 }}>
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>
+                      Zoom: {imageCropPreview.zoom.toFixed(2)}x
+                    </span>
+                    <input
+                      type="range"
+                      min={IMAGE_CROP_MIN_ZOOM}
+                      max={IMAGE_CROP_MAX_ZOOM}
+                      step="0.01"
+                      value={imageCrop.zoom}
+                      onChange={(event) => updateImageCrop('zoom', event.target.value)}
+                    />
+                  </label>
+
+                  <label style={{ display: 'grid', gap: 8 }}>
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>Mover horizontal</span>
+                    <input
+                      type="range"
+                      min="-1"
+                      max="1"
+                      step="0.01"
+                      value={imageCrop.offsetX}
+                      onChange={(event) => updateImageCrop('offsetX', event.target.value)}
+                    />
+                  </label>
+
+                  <label style={{ display: 'grid', gap: 8 }}>
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>Mover vertical</span>
+                    <input
+                      type="range"
+                      min="-1"
+                      max="1"
+                      step="0.01"
+                      value={imageCrop.offsetY}
+                      onChange={(event) => updateImageCrop('offsetY', event.target.value)}
+                    />
+                  </label>
+
+                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.5, fontWeight: 700 }}>
+                    Consejo: acerca la foto si quieres resaltar el corte y mueve el encuadre hasta que quede centrado.
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="cfg-button secondary"
+                      onClick={closeImageCrop}
+                      disabled={applyingImageCrop}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="cfg-button"
+                      onClick={applyImageCrop}
+                      disabled={applyingImageCrop}
+                    >
+                      {applyingImageCrop ? 'Aplicando recorte...' : 'Usar recorte'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

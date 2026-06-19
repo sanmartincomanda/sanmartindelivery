@@ -2,6 +2,7 @@ import { getDownloadURL, ref as storageRef, uploadString } from 'firebase/storag
 import { storage } from '../firebase';
 
 const STORE_CATALOG_MEDIA_ROOT = 'store/catalog';
+const STORAGE_UPLOAD_TIMEOUT_MS = 20000;
 
 const cleanCatalogCode = (code) =>
   String(code || '')
@@ -40,6 +41,21 @@ const fallbackHashString = (value = '') => {
 
 export const isDataUrlImage = (value = '') => /^data:image\/[a-z0-9.+-]+;base64,/i.test(String(value || '').trim());
 
+const withTimeout = (promise, timeoutMs, message) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+
+    Promise.resolve(promise)
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+
 export async function createImageHash(value = '', hashHint = '') {
   const cleanHint = String(hashHint || '').trim();
   if (cleanHint) {
@@ -67,6 +83,7 @@ export async function uploadCatalogImage({ code, image, hashHint = '' }) {
       url: imageData,
       path: '',
       hash: String(hashHint || '').trim(),
+      storedInline: false,
     };
   }
 
@@ -76,11 +93,30 @@ export async function uploadCatalogImage({ code, image, hashHint = '' }) {
   const path = `${STORE_CATALOG_MEDIA_ROOT}/${cleanCode}/${hash || Date.now()}.${extension}`;
   const imageRef = storageRef(storage, path);
 
-  await uploadString(imageRef, imageData, 'data_url');
+  try {
+    await withTimeout(
+      uploadString(imageRef, imageData, 'data_url'),
+      STORAGE_UPLOAD_TIMEOUT_MS,
+      'La subida de la foto a Firebase Storage tardo demasiado.'
+    );
 
-  return {
-    url: await getDownloadURL(imageRef),
-    path,
-    hash,
-  };
+    return {
+      url: await withTimeout(
+        getDownloadURL(imageRef),
+        STORAGE_UPLOAD_TIMEOUT_MS,
+        'No se pudo obtener la URL publica de la foto en Firebase Storage.'
+      ),
+      path,
+      hash,
+      storedInline: false,
+    };
+  } catch (error) {
+    console.warn('No se pudo subir la foto a Firebase Storage. Se guardara en la base de datos como respaldo.', error);
+    return {
+      url: imageData,
+      path: '',
+      hash,
+      storedInline: true,
+    };
+  }
 }
