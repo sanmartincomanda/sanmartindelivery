@@ -1,4 +1,4 @@
-import { get, ref, runTransaction, set, update } from 'firebase/database';
+import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, set, startAt, update } from 'firebase/database';
 import { database } from '../firebase';
 import { hoyISO } from '../components/Utils';
 import { normalizeLocation } from './geo';
@@ -141,6 +141,87 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
 };
 
 const buildOrderKey = (date, number) => `${date}-${formatOrderNumber(number)}`;
+
+const mapOrdersSnapshot = (snapshot) =>
+  Object.entries(snapshot.val() || {}).map(([firebaseKey, value]) => ({
+    firebaseKey,
+    ...value,
+  }));
+
+export const sortOrdersByDateAndNumber = (orders = []) =>
+  [...orders].sort((left, right) => {
+    const dateDiff = String(right.fecha || '').localeCompare(String(left.fecha || ''));
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+
+    return Number(right.id || 0) - Number(left.id || 0);
+  });
+
+export const subscribeOrdersForDate = (date, onData, onError) =>
+  onValue(
+    query(ref(database, 'orders'), orderByChild('fecha'), equalTo(String(date || '').trim())),
+    (snapshot) => {
+      onData(sortOrdersByDateAndNumber(mapOrdersSnapshot(snapshot)));
+    },
+    onError
+  );
+
+export const subscribeOrdersForStoreUser = (userKey, onData, onError, limit = 10) => {
+  const cleanUserKey = String(userKey || '').trim();
+
+  if (!cleanUserKey) {
+    onData([]);
+    return () => {};
+  }
+
+  return onValue(
+    query(
+      ref(database, 'orders'),
+      orderByChild('storeUserKey'),
+      equalTo(cleanUserKey),
+      limitToLast(Math.max(1, Number(limit || 10)))
+    ),
+    (snapshot) => {
+      const orders = mapOrdersSnapshot(snapshot).sort((left, right) => Number(right.timestamp || 0) - Number(left.timestamp || 0));
+      onData(orders);
+    },
+    onError
+  );
+};
+
+export const subscribeOrdersForDriverCode = (driverCode, onData, onError) => {
+  const cleanDriverCode = String(driverCode || '').trim();
+
+  if (!cleanDriverCode) {
+    onData([]);
+    return () => {};
+  }
+
+  return onValue(
+    query(ref(database, 'orders'), orderByChild('repartidorCodigo'), equalTo(cleanDriverCode)),
+    (snapshot) => {
+      onData(sortOrdersByDateAndNumber(mapOrdersSnapshot(snapshot)));
+    },
+    onError
+  );
+};
+
+export async function fetchOrdersByDateRange(dateFrom, dateTo) {
+  const startDate = String(dateFrom || '').trim();
+  const endDate = String(dateTo || '').trim();
+
+  const snapshot = await get(
+    query(
+      ref(database, 'orders'),
+      orderByChild('fecha'),
+      startAt(startDate || ''),
+      endAt(endDate || '\uf8ff')
+    )
+  );
+
+  return sortOrdersByDateAndNumber(mapOrdersSnapshot(snapshot));
+}
 
 const createLimitError = () => {
   const error = new Error('Se alcanzo el limite diario de pedidos');

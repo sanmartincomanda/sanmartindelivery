@@ -6,9 +6,10 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { get, push, ref, remove, update } from 'firebase/database';
+import { push, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
+import { fetchOrdersByDateRange } from '../services/orders';
 import { hoyISO, normalizar } from './Utils';
 
 const Icons = {
@@ -340,6 +341,10 @@ export default function BaseDatosView({ clientes = [] }) {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySyncAt, setHistorySyncAt] = useState(null);
+  const [historyRange, setHistoryRange] = useState(() => ({
+    dateFrom: shiftIsoDate(hoyISO(), -7),
+    dateTo: hoyISO(),
+  }));
 
   useEffect(() => {
     if (!toast) {
@@ -354,21 +359,27 @@ export default function BaseDatosView({ clientes = [] }) {
     setToast({ id: Date.now(), message, type });
   };
 
-  const loadHistory = async (force = false) => {
-    if (historyLoading || (historyLoaded && !force)) {
+  const loadHistory = async (options = {}) => {
+    const force = Boolean(options.force);
+    const requestedRange = {
+      dateFrom: String(options.range?.dateFrom || historyRange.dateFrom || '').trim(),
+      dateTo: String(options.range?.dateTo || historyRange.dateTo || '').trim(),
+    };
+
+    const sameRange =
+      requestedRange.dateFrom === historyRange.dateFrom &&
+      requestedRange.dateTo === historyRange.dateTo;
+
+    if (historyLoading || (historyLoaded && !force && sameRange)) {
       return;
     }
 
     setHistoryLoading(true);
+    setHistoryRange(requestedRange);
 
     try {
-      const snapshot = await get(ref(database, 'orders'));
-      const rawOrders = snapshot.val() || {};
       const nextOrders = sortOrders(
-        Object.entries(rawOrders).map(([firebaseKey, value]) => ({
-          firebaseKey,
-          ...value,
-        })),
+        await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo)
       );
 
       setHistoryOrders(nextOrders);
@@ -388,9 +399,9 @@ export default function BaseDatosView({ clientes = [] }) {
 
   useEffect(() => {
     if (section === 'historial' && !historyLoaded) {
-      loadHistory();
+      loadHistory({ force: true, range: historyRange });
     }
-  }, [section, historyLoaded]);
+  }, [section, historyLoaded, historyRange]);
 
   const systemStats = useMemo(() => {
     const totalPedidos = historyLoaded ? historyOrders.length : '--';
@@ -697,7 +708,7 @@ export default function BaseDatosView({ clientes = [] }) {
               orders={historyOrders}
               loaded={historyLoaded}
               loading={historyLoading}
-              onRefresh={() => loadHistory(true)}
+              onRefresh={(range) => loadHistory({ force: true, range: range || historyRange })}
               onToast={showToast}
             />
           )}
@@ -1608,6 +1619,18 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
   }, [dateFrom, dateTo, deferredSearch, paymentFilter, statusFilter]);
 
   useEffect(() => {
+    if (!loaded) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      onRefresh({ dateFrom, dateTo });
+    }, 180);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [dateFrom, dateTo, loaded]);
+
+  useEffect(() => {
     if (!selectedOrder) {
       return;
     }
@@ -1665,7 +1688,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
         <div className="bd-actions-row" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
           <button
             type="button"
-            onClick={onRefresh}
+            onClick={() => onRefresh({ dateFrom, dateTo })}
             disabled={loading}
             className="bd-button"
             style={{

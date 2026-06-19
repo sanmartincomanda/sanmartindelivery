@@ -2,8 +2,10 @@ import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
 import { normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
+import { isDataUrlImage, uploadCatalogImage } from './storeMedia';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
+export const STORE_CATALOG_META_PATH = 'storeCatalogMeta';
 export const SICAR_SYNC_SOURCE = 'sicar';
 export const SICAR_CATALOG_SYNC_BATCH_SIZE = 25;
 
@@ -83,7 +85,7 @@ const normalizeSyncMetadata = (sync = {}, fallback = {}) => {
     sicarCategory: String(source.sicarCategory ?? backup.sicarCategory ?? '').trim(),
     sicarName: String(source.sicarName ?? backup.sicarName ?? '').trim(),
     sicarPrice: roundPrice(source.sicarPrice ?? backup.sicarPrice ?? 0),
-    sicarImage: String(source.sicarImage ?? backup.sicarImage ?? '').trim(),
+    sicarImageUrl: String(source.sicarImageUrl ?? source.sicarImage ?? backup.sicarImageUrl ?? backup.sicarImage ?? '').trim(),
     sicarImageHash: String(source.sicarImageHash ?? backup.sicarImageHash ?? '').trim(),
     quantitySold90d: Number(source.quantitySold90d ?? backup.quantitySold90d ?? 0),
     amountSold90d: roundPrice(source.amountSold90d ?? backup.amountSold90d ?? 0),
@@ -122,6 +124,7 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
     active: source.active ?? fallback.active ?? true,
     promo: Boolean(source.promo ?? fallback.promo),
     image: String(source.image ?? fallback.image ?? '').trim(),
+    imageStoragePath: String(source.imageStoragePath ?? fallback.imageStoragePath ?? '').trim(),
     description: String(source.description ?? fallback.description ?? '').trim(),
     ...(String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim()
       ? { categoryLabel: String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim() }
@@ -192,6 +195,55 @@ export const mergeCatalogProducts = (remoteCatalog = {}) => {
 
 export const getCatalogProductKey = (code) => String(code || '').trim().replace(/[.#$/[\]]/g, '_');
 
+const buildCatalogMetaPayload = () => ({
+  updatedAt: Date.now(),
+  updatedAtIso: new Date().toISOString(),
+});
+
+async function touchCatalogMeta() {
+  await update(ref(database, STORE_CATALOG_META_PATH), buildCatalogMetaPayload());
+}
+
+async function resolveCatalogImagePayload(product = {}, fallback = {}) {
+  const rawImage = String(product.image ?? fallback.image ?? '').trim();
+  const existingPath = String(product.imageStoragePath ?? fallback.imageStoragePath ?? '').trim();
+  const existingHash = String(
+    product?.sync?.sicarImageHash ??
+      fallback?.sync?.sicarImageHash ??
+      product.imageHash ??
+      fallback.imageHash ??
+      ''
+  ).trim();
+
+  if (!rawImage) {
+    return {
+      image: '',
+      imageStoragePath: existingPath,
+      imageHash: existingHash,
+    };
+  }
+
+  if (!isDataUrlImage(rawImage)) {
+    return {
+      image: rawImage,
+      imageStoragePath: existingPath,
+      imageHash: existingHash,
+    };
+  }
+
+  const uploadedImage = await uploadCatalogImage({
+    code: product.code ?? fallback.code,
+    image: rawImage,
+    hashHint: existingHash,
+  });
+
+  return {
+    image: uploadedImage.url,
+    imageStoragePath: uploadedImage.path,
+    imageHash: uploadedImage.hash || existingHash,
+  };
+}
+
 export async function getCurrentCatalogMap() {
   const snapshot = await get(ref(database, STORE_CATALOG_PATH));
   return snapshot.val() || {};
@@ -210,10 +262,11 @@ const buildEditableProductPayload = (product = {}, existingProduct = {}) => {
 
   const nextSync = {
     ...sync,
+    sicarImage: null,
     overrides: {
       name: String(normalized.name || '').trim() !== String(sync.sicarName || '').trim(),
       price: roundPrice(normalized.price) !== roundPrice(sync.sicarPrice),
-      image: String(normalized.image || '').trim() !== String(sync.sicarImage || '').trim(),
+      image: String(normalized.image || '').trim() !== String(sync.sicarImageUrl || '').trim(),
     },
   };
 
@@ -229,12 +282,21 @@ export async function saveCatalogProduct(product, existingProduct = null) {
     (product?.code
       ? normalizeCatalogProduct((await get(ref(database, `${STORE_CATALOG_PATH}/${getCatalogProductKey(product.code)}`))).val() || {})
       : null);
-  const normalized = buildEditableProductPayload(product, resolvedExisting || {});
+  const imagePayload = await resolveCatalogImagePayload(product, resolvedExisting || {});
+  const normalized = buildEditableProductPayload(
+    {
+      ...product,
+      image: imagePayload.image,
+      imageStoragePath: imagePayload.imageStoragePath,
+    },
+    resolvedExisting || {}
+  );
   if (!normalized.code || !normalized.name || !normalized.price) {
     throw new Error('Producto incompleto');
   }
 
   await set(ref(database, `${STORE_CATALOG_PATH}/${getCatalogProductKey(normalized.code)}`), normalized);
+  await touchCatalogMeta();
   return normalized;
 }
 
@@ -248,6 +310,7 @@ export async function updateCatalogProduct(code, patch) {
     code: String(code || '').trim(),
     ...patch,
   });
+  await touchCatalogMeta();
 }
 
 export async function seedDefaultCatalogIfEmpty() {
@@ -262,6 +325,7 @@ export async function seedDefaultCatalogIfEmpty() {
   });
 
   await set(ref(database, STORE_CATALOG_PATH), updates);
+  await touchCatalogMeta();
   return true;
 }
 
@@ -288,6 +352,7 @@ const buildSicarManagedProduct = (importedProduct = {}, existingProduct = {}) =>
 
   return {
     ...finalProduct,
+    imageStoragePath: String(importedProduct?.imageStoragePath || existing.imageStoragePath || '').trim(),
     sync: {
       source: SICAR_SYNC_SOURCE,
       managedAt: previousSync?.managedAt || new Date().toISOString(),
@@ -297,8 +362,9 @@ const buildSicarManagedProduct = (importedProduct = {}, existingProduct = {}) =>
       sicarCategory: String(importedProduct?.sicar?.category || previousSync?.sicarCategory || '').trim(),
       sicarName: importedName,
       sicarPrice: importedPrice,
-      sicarImage: importedImage,
-      sicarImageHash: String(importedProduct?.sicar?.imageHash || '').trim(),
+      sicarImage: null,
+      sicarImageUrl: importedImage || String(previousSync?.sicarImageUrl || '').trim(),
+      sicarImageHash: String(importedProduct?.sicar?.imageHash || previousSync?.sicarImageHash || '').trim(),
       quantitySold90d: Number(importedProduct?.sicar?.quantitySold90d || 0),
       amountSold90d: roundPrice(importedProduct?.sicar?.amountSold90d || 0),
       tickets90d: Number(importedProduct?.sicar?.tickets90d || 0),
@@ -336,7 +402,8 @@ const buildSicarPriceManagedProduct = (priceProduct = {}, existingProduct = {}) 
       sicarCategory: String(priceProduct?.sicar?.category || previousSync?.sicarCategory || '').trim(),
       sicarName: String(priceProduct?.name || previousSync?.sicarName || '').trim(),
       sicarPrice: finalPrice,
-      sicarImage: String(previousSync?.sicarImage || '').trim(),
+      sicarImage: null,
+      sicarImageUrl: String(previousSync?.sicarImageUrl || '').trim(),
       sicarImageHash: String(previousSync?.sicarImageHash || '').trim(),
       quantitySold90d: Number(previousSync?.quantitySold90d || 0),
       amountSold90d: roundPrice(previousSync?.amountSold90d || 0),
@@ -368,15 +435,27 @@ export async function applySicarCatalogProductsWithOptions(importedProducts = []
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   const updates = {};
 
-  catalog.forEach((product) => {
+  for (const product of catalog) {
     const code = String(product?.code || '').trim();
     if (!code) {
-      return;
+      continue;
     }
 
     const existing = currentMap[getCatalogProductKey(code)] || {};
-    updates[getCatalogProductKey(code)] = buildSicarManagedProduct(product, existing);
-  });
+    const imagePayload = await resolveCatalogImagePayload(product, existing);
+    updates[getCatalogProductKey(code)] = buildSicarManagedProduct(
+      {
+        ...product,
+        image: imagePayload.image,
+        imageStoragePath: imagePayload.imageStoragePath,
+        sicar: {
+          ...(product?.sicar || {}),
+          imageHash: imagePayload.imageHash || product?.sicar?.imageHash || '',
+        },
+      },
+      existing
+    );
+  }
 
   const entries = Object.entries(updates);
   const total = entries.length;
@@ -399,6 +478,8 @@ export async function applySicarCatalogProductsWithOptions(importedProducts = []
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
+
+  await touchCatalogMeta();
 
   return {
     appliedCount: total,
@@ -458,9 +539,102 @@ export async function applySicarPriceUpdatesWithOptions(priceProducts = [], opti
     }
   }
 
+  if (entries.length > 0) {
+    await touchCatalogMeta();
+  }
+
   return {
     appliedCount: total,
     appliedProducts: entries.map(([, product]) => product),
     missingCodes,
+  };
+}
+
+export async function migrateCatalogImagesToStorage(options = {}) {
+  const currentMap = options.currentMap || (await getCurrentCatalogMap());
+  const batchSize = Math.max(1, Number(options.batchSize || SICAR_CATALOG_SYNC_BATCH_SIZE));
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+  const updates = {};
+  let migratedCount = 0;
+  let cleanedMetadataCount = 0;
+
+  for (const [productKey, productValue] of Object.entries(currentMap || {})) {
+    const currentProduct = normalizeCatalogProduct(productValue || {});
+    const sync = normalizeSyncMetadata(productValue?.sync, productValue?.sync);
+    const legacySyncImage = String(sync?.sicarImageUrl || '').trim();
+    const legacyTopImage = String(currentProduct.image || '').trim();
+    const needsImageUpload = isDataUrlImage(legacyTopImage) || isDataUrlImage(legacySyncImage);
+    const needsMetadataCleanup = Boolean(productValue?.sync && 'sicarImage' in productValue.sync);
+
+    if (!needsImageUpload && !needsMetadataCleanup) {
+      continue;
+    }
+
+    let nextImage = legacyTopImage;
+    let nextImageStoragePath = String(currentProduct.imageStoragePath || '').trim();
+    let nextImageHash = String(sync?.sicarImageHash || '').trim();
+
+    if (needsImageUpload) {
+      const imageSource = isDataUrlImage(legacyTopImage) ? legacyTopImage : legacySyncImage;
+      const uploadedImage = await uploadCatalogImage({
+        code: currentProduct.code || productValue?.code || productKey,
+        image: imageSource,
+        hashHint: nextImageHash,
+      });
+
+      nextImage = uploadedImage.url || nextImage;
+      nextImageStoragePath = uploadedImage.path || nextImageStoragePath;
+      nextImageHash = uploadedImage.hash || nextImageHash;
+      migratedCount += 1;
+    }
+
+    const nextSync = sync
+      ? {
+          ...sync,
+          sicarImage: null,
+          sicarImageUrl: nextImage || String(sync.sicarImageUrl || '').trim(),
+          sicarImageHash: nextImageHash,
+        }
+      : null;
+
+    updates[productKey] = {
+      ...productValue,
+      image: nextImage,
+      imageStoragePath: nextImageStoragePath,
+      ...(nextSync ? { sync: nextSync } : {}),
+    };
+
+    if (needsMetadataCleanup) {
+      cleanedMetadataCount += 1;
+    }
+  }
+
+  const entries = Object.entries(updates);
+  const total = entries.length;
+
+  for (let index = 0; index < entries.length; index += batchSize) {
+    const chunkEntries = entries.slice(index, index + batchSize);
+    const chunkUpdates = Object.fromEntries(chunkEntries);
+    await update(ref(database, STORE_CATALOG_PATH), chunkUpdates);
+
+    if (onProgress) {
+      onProgress({
+        processed: Math.min(index + chunkEntries.length, total),
+        total,
+        batch: Math.floor(index / batchSize) + 1,
+        batches: Math.ceil(total / batchSize),
+      });
+    }
+  }
+
+  if (entries.length > 0) {
+    await touchCatalogMeta();
+  }
+
+  return {
+    migratedCount,
+    cleanedMetadataCount,
+    scannedCount: Object.keys(currentMap || {}).length,
+    updatedCount: total,
   };
 }

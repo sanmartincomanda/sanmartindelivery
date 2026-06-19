@@ -79,8 +79,10 @@ export default function OrderForm({
         {
           cliente: selectedClient.nombre,
           clienteCodigo: selectedClient.codigo || '-',
+          clienteFirebaseKey: selectedClient.firebaseKey || '',
           direccion: selectedClient.direccion || '-',
           ubicacion: selectedClient.ubicacion || null,
+          telefono: selectedClient.telefono || '',
           pedido: pedido.trim(),
           fecha: hoyISO(),
           metodoPago,

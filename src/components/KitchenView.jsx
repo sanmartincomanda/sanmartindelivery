@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ref, onValue, update } from 'firebase/database';
+import { equalTo, onValue, orderByChild, query, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
@@ -120,13 +120,12 @@ export default function KitchenView({ orders }) {
 
   useEffect(() => {
     const today = hoyISO();
-    const rutaRef = ref(database, 'rutaOrders');
+    const rutaRef = query(ref(database, 'rutaOrders'), orderByChild('fecha'), equalTo(today));
     return onValue(rutaRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) { setRutaOrders([]); return; }
       const arr = Object.entries(data)
         .map(([key, val]) => ({ firebaseKey: key, ...val }))
-        .filter((p) => p.fecha === today)
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
       setRutaOrders(arr);
     });

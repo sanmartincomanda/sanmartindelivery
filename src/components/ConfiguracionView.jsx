@@ -14,6 +14,7 @@ import {
   isSicarManagedProduct,
   isUnitMeasure,
   mergeCatalogProducts,
+  migrateCatalogImagesToStorage,
   saveCatalogProduct,
   SICAR_CATALOG_SYNC_BATCH_SIZE,
   seedDefaultCatalogIfEmpty,
@@ -51,6 +52,7 @@ import {
   saveKitchenUser,
   SYSTEM_USERS_PATH,
 } from '../services/systemUsers';
+import { cleanupExpiredStoreOrders } from '../services/orders';
 import {
   compressImportedCatalogImage,
   fetchSicarCatalogSelection,
@@ -191,6 +193,8 @@ export default function ConfiguracionView() {
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [syncingSicar, setSyncingSicar] = useState(false);
   const [syncingSicarPrices, setSyncingSicarPrices] = useState(false);
+  const [migratingCatalogImages, setMigratingCatalogImages] = useState(false);
+  const [cleaningExpiredOrders, setCleaningExpiredOrders] = useState(false);
   const [testingSicar, setTestingSicar] = useState(false);
   const [loadingSicarPreview, setLoadingSicarPreview] = useState(false);
   const [sicarHealth, setSicarHealth] = useState(null);
@@ -934,6 +938,52 @@ export default function ConfiguracionView() {
     }
   };
 
+  const migrateLegacyCatalogImages = async () => {
+    setMigratingCatalogImages(true);
+    setMessage('Migrando fotos legacy a Firebase Storage... esto puede tardar varios minutos.');
+
+    try {
+      const currentCatalogMap = await getCurrentCatalogMap();
+      const result = await migrateCatalogImagesToStorage({
+        currentMap: currentCatalogMap,
+        batchSize: Math.max(5, SICAR_CATALOG_SYNC_BATCH_SIZE),
+        onProgress: ({ processed, total }) => {
+          setMessage(`Migrando fotos a Storage... ${processed}/${total} SKUs actualizados.`);
+        },
+      });
+
+      setMessage(
+        `Migracion de fotos terminada. ${result.migratedCount} imagenes subidas a Storage, ${result.cleanedMetadataCount} registros legacy limpiados y ${result.updatedCount} SKUs actualizados.`
+      );
+    } catch (error) {
+      console.error('Error migrando fotos a Storage:', error);
+      setMessage(
+        `No se pudieron migrar las fotos a Storage. Revisa permisos de Firebase Storage y vuelve a intentar. ${error?.message || ''}`.trim()
+      );
+    } finally {
+      setMigratingCatalogImages(false);
+    }
+  };
+
+  const runExpiredOrdersCleanup = async () => {
+    setCleaningExpiredOrders(true);
+    setMessage('Limpiando pedidos virtuales vencidos...');
+
+    try {
+      const removedCount = await cleanupExpiredStoreOrders();
+      setMessage(
+        removedCount > 0
+          ? `Limpieza completa. ${removedCount} pedidos virtuales vencidos fueron eliminados.`
+          : 'Limpieza completa. No habia pedidos virtuales vencidos para eliminar.'
+      );
+    } catch (error) {
+      console.error('Error limpiando pedidos vencidos:', error);
+      setMessage('No se pudieron limpiar los pedidos virtuales vencidos.');
+    } finally {
+      setCleaningExpiredOrders(false);
+    }
+  };
+
   const sectionMeta = {
     catalogo: {
       path: 'Configuraciones / Tienda Virtual / Catalogo',
@@ -1178,15 +1228,31 @@ export default function ConfiguracionView() {
                 type="button"
                 className="cfg-button secondary"
                 onClick={updateSicarPrices}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
               >
                 {syncingSicarPrices ? 'Actualizando precios...' : 'Actualizar precios SICAR'}
               </button>
               <button
                 type="button"
+                className="cfg-button secondary"
+                onClick={migrateLegacyCatalogImages}
+                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
+              >
+                {migratingCatalogImages ? 'Migrando fotos...' : 'Migrar fotos a Storage'}
+              </button>
+              <button
+                type="button"
+                className="cfg-button secondary"
+                onClick={runExpiredOrdersCleanup}
+                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
+              >
+                {cleaningExpiredOrders ? 'Limpiando pedidos...' : 'Limpiar pedidos vencidos'}
+              </button>
+              <button
+                type="button"
                 className="cfg-button"
                 onClick={loadSicarPreview}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
+                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
               >
                 {loadingSicarPreview ? 'Cargando vista previa...' : 'Vista previa 90% SICAR'}
               </button>
@@ -1194,7 +1260,7 @@ export default function ConfiguracionView() {
                 type="button"
                 className="cfg-button"
                 onClick={() => applySicarCatalog(sicarPreview)}
-                disabled={!sicarPreview || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
+                disabled={!sicarPreview || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
               >
                 {syncingSicar ? 'Aplicando SICAR...' : 'Aplicar catalogo SICAR'}
               </button>

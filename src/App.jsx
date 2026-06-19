@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from './firebase';
 import logo from './logo.svg';
@@ -12,7 +12,7 @@ import TiendaVirtualView from './components/TiendaVirtualView';
 import ConfiguracionView from './components/ConfiguracionView';
 import DriverView from './components/DriverView';
 import BaseDatosView from './components/BaseDatosView';
-import { createOrder, ORDER_LIMIT_PER_DAY } from './services/orders';
+import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForDate } from './services/orders';
 import {
   KITCHEN_USER_KEY,
   loginKitchenUser,
@@ -159,12 +159,11 @@ function App() {
   }, [todayKey]);
 
   useEffect(() => {
-    if (isPublicStoreRoute) {
+    if (isPublicStoreRoute || isDriverRoute) {
       return undefined;
     }
 
     setLoading(true);
-    const ordersRef = ref(database, 'orders');
     let finishedFirstLoad = false;
     const safeUnlockTimer = window.setTimeout(() => {
       if (!finishedFirstLoad) {
@@ -172,33 +171,26 @@ function App() {
       }
     }, 1800);
 
-    const unsubscribe = onValue(
-      ordersRef,
-      (snapshot) => {
+    const unsubscribe = subscribeOrdersForDate(
+      todayKey,
+      (todayOrders) => {
         finishedFirstLoad = true;
         window.clearTimeout(safeUnlockTimer);
-        const data = snapshot.val();
-
-        if (!data) {
+        if (!Array.isArray(todayOrders) || todayOrders.length === 0) {
           setOrders([]);
           setStats({ total: 0, pendientes: 0, preparando: 0 });
           setLoading(false);
           return;
         }
 
-        const todayOrders = [];
         let pendientes = 0;
         let preparando = 0;
 
-        Object.entries(data).forEach(([key, value]) => {
-          if (value.fecha === todayKey) {
-            todayOrders.push({ firebaseKey: key, ...value });
-
-            if ((value.estado || 'Pendiente') === 'Pendiente') {
-              pendientes += 1;
-            } else if (value.estado === 'En preparación') {
-              preparando += 1;
-            }
+        todayOrders.forEach((value) => {
+          if ((value.estado || 'Pendiente') === 'Pendiente') {
+            pendientes += 1;
+          } else if (value.estado === 'En preparación' || value.estado === 'En preparacion') {
+            preparando += 1;
           }
         });
 
@@ -224,10 +216,16 @@ function App() {
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
     };
-  }, [isPublicStoreRoute, todayKey]);
+  }, [isDriverRoute, isPublicStoreRoute, todayKey]);
 
   useEffect(() => {
-    if (isPublicStoreRoute) {
+    const shouldLoadClients =
+      !isPublicStoreRoute &&
+      route === 'dashboard' &&
+      (view === 'ingreso' || view === 'basedatos');
+
+    if (!shouldLoadClients) {
+      setClientes([]);
       return undefined;
     }
 
@@ -252,7 +250,7 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [isPublicStoreRoute]);
+  }, [isPublicStoreRoute, route, view]);
 
   const nextOrderNumber = useMemo(
     () => Math.min(todayCounter + 1, ORDER_LIMIT_PER_DAY + 1),
@@ -343,7 +341,7 @@ function App() {
   }
 
   if (isDriverRoute) {
-    return <DriverView orders={orders} />;
+    return <DriverView />;
   }
 
   if (isKitchenRoute) {
@@ -640,7 +638,7 @@ function App() {
           }}
         >
           <span style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
-            ←
+            â†
           </span>
           {!sidebarCollapsed && <span>Colapsar</span>}
         </button>
@@ -863,3 +861,5 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
 }
 
 export default App;
+
+

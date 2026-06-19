@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { onValue, ref, update } from 'firebase/database';
+import { get, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
@@ -12,6 +12,7 @@ import {
   isUnitMeasure,
   mergeCatalogProducts,
   STORE_CATALOG_PATH,
+  STORE_CATALOG_META_PATH,
 } from '../services/storeCatalog';
 import {
   mergeStoreCategories,
@@ -39,7 +40,7 @@ import {
   updateStoreUserProfile,
 } from '../services/storeUsers';
 import {
-  cleanupExpiredStoreOrders,
+  subscribeOrdersForStoreUser,
   formatOrderNumber,
   formatWeight,
   STORE_CHANNEL,
@@ -48,6 +49,7 @@ import {
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_CATALOG_CACHE_KEY = 'sanmartin_store_catalog_cache_v1';
+const STORE_CATALOG_CACHE_VERSION = 2;
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
 const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
@@ -93,15 +95,40 @@ const writeStoreJsonCache = (key, value) => {
   }
 };
 
-const getInitialCatalogState = () => {
-  const cachedCatalog = readStoreJsonCache(STORE_CATALOG_CACHE_KEY);
-  const hasCachedCatalog =
-    Boolean(cachedCatalog) &&
-    typeof cachedCatalog === 'object' &&
-    Object.keys(cachedCatalog).length > 0;
+const unwrapCatalogCache = (cachedValue) => {
+  if (!cachedValue || typeof cachedValue !== 'object') {
+    return {
+      data: null,
+      updatedAt: 0,
+    };
+  }
+
+  if (
+    Number(cachedValue.version || 0) === STORE_CATALOG_CACHE_VERSION &&
+    cachedValue.data &&
+    typeof cachedValue.data === 'object'
+  ) {
+    return {
+      data: cachedValue.data,
+      updatedAt: Number(cachedValue.updatedAt || 0),
+    };
+  }
 
   return {
-    catalog: hasCachedCatalog ? mergeCatalogProducts(cachedCatalog) : [],
+    data: cachedValue,
+    updatedAt: 0,
+  };
+};
+
+const getInitialCatalogState = () => {
+  const cachedCatalog = unwrapCatalogCache(readStoreJsonCache(STORE_CATALOG_CACHE_KEY));
+  const hasCachedCatalog =
+    Boolean(cachedCatalog.data) &&
+    typeof cachedCatalog.data === 'object' &&
+    Object.keys(cachedCatalog.data).length > 0;
+
+  return {
+    catalog: hasCachedCatalog ? mergeCatalogProducts(cachedCatalog.data) : [],
     loading: !hasCachedCatalog,
   };
 };
@@ -452,47 +479,100 @@ export default function TiendaVirtualView({
   const isDashboard = mode === 'dashboard';
 
   useEffect(() => {
-    const unsubscribe = onValue(
-      ref(database, STORE_CATALOG_PATH),
-      (snapshot) => {
-        const remoteCatalog = snapshot.val();
-        writeStoreJsonCache(STORE_CATALOG_CACHE_KEY, remoteCatalog);
-        setCatalog(
-          remoteCatalog && typeof remoteCatalog === 'object'
-            ? mergeCatalogProducts(remoteCatalog)
-            : []
-        );
-        setCatalogLoading(false);
-      },
-      (error) => {
+    let cancelled = false;
+
+    const loadCatalog = async () => {
+      const cachedCatalog = unwrapCatalogCache(readStoreJsonCache(STORE_CATALOG_CACHE_KEY));
+
+      try {
+        const metaSnapshot = await get(ref(database, STORE_CATALOG_META_PATH));
+        const remoteUpdatedAt = Number(metaSnapshot.val()?.updatedAt || 0);
+        const canReuseCache =
+          Boolean(cachedCatalog.data) &&
+          cachedCatalog.updatedAt > 0 &&
+          remoteUpdatedAt > 0 &&
+          cachedCatalog.updatedAt >= remoteUpdatedAt;
+
+        if (canReuseCache) {
+          if (!cancelled) {
+            setCatalog(mergeCatalogProducts(cachedCatalog.data));
+            setCatalogLoading(false);
+          }
+          return;
+        }
+
+        const catalogSnapshot = await get(ref(database, STORE_CATALOG_PATH));
+        const remoteCatalog = catalogSnapshot.val() || {};
+
+        writeStoreJsonCache(STORE_CATALOG_CACHE_KEY, {
+          version: STORE_CATALOG_CACHE_VERSION,
+          updatedAt: remoteUpdatedAt || Date.now(),
+          data: remoteCatalog,
+        });
+
+        if (!cancelled) {
+          setCatalog(mergeCatalogProducts(remoteCatalog));
+          setCatalogLoading(false);
+        }
+      } catch (error) {
         console.error('No se pudo cargar el catalogo de tienda:', error);
-        setCatalogLoading(false);
+
+        if (!cancelled) {
+          if (cachedCatalog.data) {
+            setCatalog(mergeCatalogProducts(cachedCatalog.data));
+          }
+          setCatalogLoading(false);
+        }
       }
-    );
+    };
 
-    return () => unsubscribe();
+    loadCatalog();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
-      setCategories(mergeStoreCategories(snapshot.val()));
-    });
+    let cancelled = false;
 
-    return () => unsubscribe();
+    const loadCategories = async () => {
+      try {
+        const snapshot = await get(ref(database, STORE_CATEGORIES_PATH));
+        if (!cancelled) {
+          setCategories(mergeStoreCategories(snapshot.val()));
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar las categorias de tienda:', error);
+      }
+    };
+
+    loadCategories();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
-      setCoupons(mergeStoreCoupons(snapshot.val()));
-    });
+    let cancelled = false;
 
-    return () => unsubscribe();
-  }, []);
+    const loadCoupons = async () => {
+      try {
+        const snapshot = await get(ref(database, STORE_COUPONS_PATH));
+        if (!cancelled) {
+          setCoupons(mergeStoreCoupons(snapshot.val()));
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar los cupones de tienda:', error);
+      }
+    };
 
-  useEffect(() => {
-    cleanupExpiredStoreOrders().catch((error) => {
-      console.error('No se pudieron limpiar pedidos antiguos de tienda:', error);
-    });
+    loadCoupons();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -524,25 +604,22 @@ export default function TiendaVirtualView({
       return undefined;
     }
 
-    const cleanPhone = cleanStorePhone(currentUser.telefono);
-    if (!cleanPhone) {
+    const cleanUserKey = String(currentUser.key || '').trim();
+    if (!cleanUserKey) {
       setCustomerOrders([]);
       return undefined;
     }
 
-    const unsubscribe = onValue(ref(database, 'orders'), (snapshot) => {
-      const data = snapshot.val() || {};
-      const orders = Object.entries(data)
-        .map(([firebaseKey, order]) => ({ firebaseKey, ...order }))
-        .filter(
-          (order) =>
-            order.storeUserKey === currentUser.key || cleanStorePhone(order.telefono) === cleanPhone
-        )
-        .sort((left, right) => Number(right.timestamp || 0) - Number(left.timestamp || 0))
-        .slice(0, 10);
-
-      setCustomerOrders(orders);
-    });
+    const unsubscribe = subscribeOrdersForStoreUser(
+      cleanUserKey,
+      (orders) => {
+        setCustomerOrders(orders);
+      },
+      (error) => {
+        console.error('No se pudieron cargar los pedidos del cliente:', error);
+        setCustomerOrders([]);
+      }
+    );
 
     return () => unsubscribe();
   }, [currentUser]);

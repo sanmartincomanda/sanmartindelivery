@@ -12,7 +12,7 @@ import {
   optimizeStopsByNearest,
 } from '../services/geo';
 import { DRIVERS_PATH, loginDriver, mergeDrivers } from '../services/drivers';
-import { formatOrderNumber } from '../services/orders';
+import { formatOrderNumber, subscribeOrdersForDriverCode } from '../services/orders';
 
 const DRIVER_SESSION_KEY = 'sanmartin_driver_session';
 
@@ -291,7 +291,7 @@ const getStatusMeta = (order = {}) => {
   };
 };
 
-export default function DriverView({ orders = [] }) {
+export default function DriverView() {
   const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [driver, setDriver] = useState(() => {
     if (typeof window === 'undefined') {
@@ -306,7 +306,7 @@ export default function DriverView({ orders = [] }) {
   });
   const [loginForm, setLoginForm] = useState({ code: '', password: '' });
   const [loginError, setLoginError] = useState('');
-  const [clients, setClients] = useState([]);
+  const [driverOrders, setDriverOrders] = useState([]);
   const [routeOrders, setRouteOrders] = useState([]);
   const [optimizing, setOptimizing] = useState(false);
   const [deliveringOrderKey, setDeliveringOrderKey] = useState('');
@@ -327,18 +327,24 @@ export default function DriverView({ orders = [] }) {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, 'clients'), (snapshot) => {
-      const data = snapshot.val() || {};
-      setClients(
-        Object.entries(data).map(([firebaseKey, client]) => ({
-          firebaseKey,
-          ...client,
-        }))
-      );
-    });
+    if (!driver?.code) {
+      setDriverOrders([]);
+      return undefined;
+    }
+
+    const unsubscribe = subscribeOrdersForDriverCode(
+      driver.code,
+      (orders) => {
+        setDriverOrders(Array.isArray(orders) ? orders : []);
+      },
+      (error) => {
+        console.error('Error cargando pedidos del driver:', error);
+        setDriverOrders([]);
+      }
+    );
 
     return () => unsubscribe();
-  }, []);
+  }, [driver]);
 
   const assignedOrders = useMemo(() => {
     if (!driver) {
@@ -346,7 +352,7 @@ export default function DriverView({ orders = [] }) {
     }
 
     const driverName = normalizeName(driver.name);
-    return orders
+    return driverOrders
       .filter((order) => {
         if (order.estado === 'Cancelado') {
           return false;
@@ -362,7 +368,7 @@ export default function DriverView({ orders = [] }) {
 
         return getOrderCreatedAt(left) - getOrderCreatedAt(right);
       });
-  }, [driver, orders]);
+  }, [driver, driverOrders]);
 
   const activeAssignedOrders = useMemo(
     () => assignedOrders.filter((order) => !isDeliveredOrder(order)),
@@ -447,24 +453,7 @@ export default function DriverView({ orders = [] }) {
       return order.clienteFirebaseKey;
     }
 
-    const orderCode = String(order.clienteCodigo || '').trim();
-    const safeOrderCode = orderCode && orderCode !== '-' && orderCode.toUpperCase() !== 'TIENDA VIRTUAL' ? orderCode : '';
-    const orderPhone = cleanPhone(order.telefono);
-    const orderName = normalizeName(order.cliente);
-
-    const matchedClient = clients.find((client) => {
-      if (safeOrderCode && String(client.codigo || '').trim() === safeOrderCode) {
-        return true;
-      }
-
-      if (orderPhone && cleanPhone(client.telefono) === orderPhone) {
-        return true;
-      }
-
-      return orderName && normalizeName(client.nombre) === orderName;
-    });
-
-    return matchedClient?.firebaseKey || '';
+    return '';
   };
 
   const saveCustomerLocation = async (order) => {
