@@ -47,6 +47,7 @@ import {
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
+const STORE_CATALOG_CACHE_KEY = 'sanmartin_store_catalog_cache_v1';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
 const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
@@ -61,6 +62,49 @@ const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+
+const readStoreJsonCache = (key) => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return JSON.parse(window.localStorage.getItem(key) || 'null');
+  } catch (error) {
+    console.error(`No se pudo leer cache local de ${key}:`, error);
+    return null;
+  }
+};
+
+const writeStoreJsonCache = (key, value) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    if (!value || typeof value !== 'object' || Object.keys(value).length === 0) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`No se pudo guardar cache local de ${key}:`, error);
+  }
+};
+
+const getInitialCatalogState = () => {
+  const cachedCatalog = readStoreJsonCache(STORE_CATALOG_CACHE_KEY);
+  const hasCachedCatalog =
+    Boolean(cachedCatalog) &&
+    typeof cachedCatalog === 'object' &&
+    Object.keys(cachedCatalog).length > 0;
+
+  return {
+    catalog: hasCachedCatalog ? mergeCatalogProducts(cachedCatalog) : [],
+    loading: !hasCachedCatalog,
+  };
+};
 
 const isUnitProduct = (product) => isUnitMeasure(product?.unit);
 
@@ -340,7 +384,9 @@ export default function TiendaVirtualView({
   mode = 'public',
   publicStoreUrl = 'https://tienda.sanmartinsr.com',
 }) {
-  const [catalog, setCatalog] = useState(() => mergeCatalogProducts());
+  const [catalogState] = useState(() => getInitialCatalogState());
+  const [catalog, setCatalog] = useState(() => catalogState.catalog);
+  const [catalogLoading, setCatalogLoading] = useState(() => catalogState.loading);
   const [categories, setCategories] = useState(() => mergeStoreCategories());
   const [coupons, setCoupons] = useState([]);
   const [cart, setCart] = useState({});
@@ -406,9 +452,23 @@ export default function TiendaVirtualView({
   const isDashboard = mode === 'dashboard';
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
-      setCatalog(mergeCatalogProducts(snapshot.val()));
-    });
+    const unsubscribe = onValue(
+      ref(database, STORE_CATALOG_PATH),
+      (snapshot) => {
+        const remoteCatalog = snapshot.val();
+        writeStoreJsonCache(STORE_CATALOG_CACHE_KEY, remoteCatalog);
+        setCatalog(
+          remoteCatalog && typeof remoteCatalog === 'object'
+            ? mergeCatalogProducts(remoteCatalog)
+            : []
+        );
+        setCatalogLoading(false);
+      },
+      (error) => {
+        console.error('No se pudo cargar el catalogo de tienda:', error);
+        setCatalogLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, []);
@@ -663,6 +723,13 @@ export default function TiendaVirtualView({
   const cartCount = cartItems.length;
 
   const activeFilterSummary = useMemo(() => {
+    if (catalogLoading && catalog.length === 0) {
+      return {
+        title: 'Cargando catalogo',
+        subtitle: 'Estamos preparando los productos de la tienda.',
+      };
+    }
+
     const currentCategoryLabel = selectedCategory?.label || 'Todos';
     const currentSubcategoryLabel =
       activeSubcategory === 'todas' ? 'Todas las subcategorias' : activeSubcategory;
@@ -686,6 +753,8 @@ export default function TiendaVirtualView({
     selectedCategory,
     subcategoryProductCounts,
   ]);
+
+  const showCatalogSkeleton = catalogLoading && catalog.length === 0;
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -1733,9 +1802,16 @@ export default function TiendaVirtualView({
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 18px;
         }
+        .store-grid-skeleton {
+          pointer-events: none;
+        }
         .store-product {
           position: relative;
           min-width: 0;
+        }
+        .store-product-skeleton {
+          display: grid;
+          gap: 10px;
         }
         .store-product-image {
           width: 100%;
@@ -1753,6 +1829,33 @@ export default function TiendaVirtualView({
           width: 92%;
           height: 92%;
           object-fit: contain;
+        }
+        .store-skeleton-media,
+        .store-skeleton-line {
+          position: relative;
+          overflow: hidden;
+          background: linear-gradient(90deg, #f3f4f6 0%, #eceff3 50%, #f3f4f6 100%);
+          background-size: 200% 100%;
+          animation: storeSkeletonPulse 1.2s ease-in-out infinite;
+        }
+        .store-skeleton-media {
+          width: 100%;
+          aspect-ratio: 1 / 1;
+          border-radius: 8px;
+        }
+        .store-skeleton-line {
+          border-radius: 999px;
+          height: 14px;
+        }
+        .store-skeleton-line.title {
+          width: 88%;
+          height: 16px;
+        }
+        .store-skeleton-line.price {
+          width: 42%;
+        }
+        .store-skeleton-line.meta {
+          width: 58%;
         }
         .store-add {
           position: absolute;
@@ -1796,6 +1899,14 @@ export default function TiendaVirtualView({
           border-radius: 8px;
           color: #6b7280;
           text-align: center;
+        }
+        @keyframes storeSkeletonPulse {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
         }
         .store-floating-cart {
           position: fixed;
@@ -2938,7 +3049,9 @@ export default function TiendaVirtualView({
 
         <main>
           <div className="store-product-head">
-            <h2 className="store-count">{filteredProducts.length} productos</h2>
+            <h2 className="store-count">
+              {showCatalogSkeleton ? 'Cargando productos...' : `${filteredProducts.length} productos`}
+            </h2>
             <button
               type="button"
               className="store-button secondary"
@@ -2952,7 +3065,18 @@ export default function TiendaVirtualView({
             </button>
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {showCatalogSkeleton ? (
+            <div className="store-grid store-grid-skeleton" aria-label="Cargando catalogo">
+              {Array.from({ length: 8 }, (_, index) => (
+                <article key={`skeleton-${index}`} className="store-product store-product-skeleton">
+                  <div className="store-skeleton-media" />
+                  <div className="store-skeleton-line title" />
+                  <div className="store-skeleton-line price" />
+                  <div className="store-skeleton-line meta" />
+                </article>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
           ) : (
             <div className="store-grid">
