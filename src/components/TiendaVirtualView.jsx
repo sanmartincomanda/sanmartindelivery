@@ -29,6 +29,8 @@ import {
   getBrowserLocation,
   hasLocation,
   normalizeLocation,
+  reverseGeocodeLocation,
+  searchLocationCandidates,
 } from '../services/geo';
 import {
   cleanStorePhone,
@@ -170,6 +172,28 @@ const removeTextAccents = (value) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+
+const LOCATION_ADDRESS_PLACEHOLDERS = [
+  '',
+  'ubicacion guardada desde el mapa',
+  'ubicacion seleccionada en el mapa',
+  'punto seleccionado en mapa',
+];
+
+const shouldAutofillAddress = (value) =>
+  LOCATION_ADDRESS_PLACEHOLDERS.includes(removeTextAccents(value).trim());
+
+const createEmptyDeliveryDraft = () => ({
+  direccion: '',
+  referencia: '',
+  ubicacion: null,
+});
+
+const createUserDeliveryDraft = (user = {}) => ({
+  direccion: String(user?.direccion || '').trim(),
+  referencia: String(user?.referencia || '').trim(),
+  ubicacion: normalizeLocation(user?.ubicacion),
+});
 
 const normalizeCustomerOrderStatus = (status) => {
   const normalizedStatus = removeTextAccents(status || 'Pendiente');
@@ -314,7 +338,7 @@ const buildOrderWhatsAppLink = (order, currentUser) =>
 export default function TiendaVirtualView({
   onCreateOrder,
   mode = 'public',
-  publicStoreUrl = '#tienda',
+  publicStoreUrl = 'https://tienda.sanmartinsr.com',
 }) {
   const [catalog, setCatalog] = useState(() => mergeCatalogProducts());
   const [categories, setCategories] = useState(() => mergeStoreCategories());
@@ -325,13 +349,18 @@ export default function TiendaVirtualView({
   const [couponMessage, setCouponMessage] = useState('');
   const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const [activeCategory, setActiveCategory] = useState('todos');
   const [activeSubcategory, setActiveSubcategory] = useState('todas');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProductQuantity, setSelectedProductQuantity] = useState(0);
   const [selectedPromotionIndex, setSelectedPromotionIndex] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 1180 : false
+  );
   const [currentUser, setCurrentUser] = useState(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -365,6 +394,9 @@ export default function TiendaVirtualView({
     referencia: '',
     metodoPago: STORE_PAYMENT_OPTIONS[0],
   });
+  const [deliveryMode, setDeliveryMode] = useState('perfil');
+  const [alternateDelivery, setAlternateDelivery] = useState(() => createEmptyDeliveryDraft());
+  const [alternateLocating, setAlternateLocating] = useState(false);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
@@ -401,6 +433,20 @@ export default function TiendaVirtualView({
     cleanupExpiredStoreOrders().catch((error) => {
       console.error('No se pudieron limpiar pedidos antiguos de tienda:', error);
     });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleResize = () => {
+      setIsMobileLayout(window.innerWidth <= 1180);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(
@@ -453,6 +499,8 @@ export default function TiendaVirtualView({
       direccion: currentUser.direccion || '',
       referencia: currentUser.referencia || '',
     }));
+    setDeliveryMode('perfil');
+    setAlternateDelivery(createEmptyDeliveryDraft());
   }, [currentUser]);
 
   const activeProducts = useMemo(
@@ -499,6 +547,51 @@ export default function TiendaVirtualView({
 
     return Array.from(new Set([...officialSubcategories, ...productSubcategories]));
   }, [activeCategory, activeProducts, selectedCategory]);
+
+  const categoryProductCounts = useMemo(() => {
+    const counts = {};
+
+    categoryOptions.forEach((category) => {
+      if (category.id === 'todos') {
+        counts[category.id] = activeProducts.length;
+        return;
+      }
+
+      counts[category.id] = activeProducts.filter((product) => {
+        if (category.id === 'promociones') {
+          return product.promo || product.category === 'promociones';
+        }
+
+        return product.category === category.id;
+      }).length;
+    });
+
+    return counts;
+  }, [activeProducts, categoryOptions]);
+
+  const subcategoryProductCounts = useMemo(() => {
+    if (activeCategory === 'todos') {
+      return {};
+    }
+
+    const scopedProducts = activeProducts.filter((product) => {
+      if (activeCategory === 'promociones') {
+        return product.promo || product.category === 'promociones';
+      }
+
+      return product.category === activeCategory;
+    });
+
+    const counts = { todas: scopedProducts.length };
+
+    subcategoryOptions.forEach((subcategory) => {
+      counts[subcategory] = scopedProducts.filter(
+        (product) => String(product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+      ).length;
+    });
+
+    return counts;
+  }, [activeCategory, activeProducts, subcategoryOptions]);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
@@ -560,7 +653,45 @@ export default function TiendaVirtualView({
     [couponDiscount, totalAmount]
   );
 
+  const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
+  const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
+  const showPromotions =
+    deferredQuery.trim().length === 0 &&
+    activeCategory === 'todos' &&
+    activeSubcategory === 'todas';
+
   const cartCount = cartItems.length;
+
+  const activeFilterSummary = useMemo(() => {
+    const currentCategoryLabel = selectedCategory?.label || 'Todos';
+    const currentSubcategoryLabel =
+      activeSubcategory === 'todas' ? 'Todas las subcategorias' : activeSubcategory;
+    const categoryCount =
+      activeCategory === 'todos'
+        ? activeProducts.length
+        : Number(subcategoryProductCounts.todas || 0);
+
+    return {
+      title: currentCategoryLabel,
+      subtitle:
+        activeCategory === 'todos'
+          ? `${filteredProducts.length} productos en el catalogo`
+          : `${currentSubcategoryLabel} · ${categoryCount} productos en categoria`,
+    };
+  }, [
+    activeCategory,
+    activeProducts.length,
+    activeSubcategory,
+    filteredProducts.length,
+    selectedCategory,
+    subcategoryProductCounts,
+  ]);
+
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setCheckoutOpen(false);
+    }
+  }, [cartItems.length]);
 
   useEffect(() => {
     if (cartItems.length === 0 && appliedCoupon) {
@@ -686,21 +817,66 @@ export default function TiendaVirtualView({
     }));
   };
 
+  const fillAddressFromLocation = (currentAddress, location, fallback) => {
+    if (!shouldAutofillAddress(currentAddress)) {
+      return currentAddress;
+    }
+
+    return String(location?.label || fallback || 'Ubicacion guardada desde el mapa').trim();
+  };
+
+  const resolveLocationWithAddress = async (location) => {
+    const normalized = normalizeLocation(location);
+    if (!normalized) {
+      return null;
+    }
+
+    try {
+      return (await reverseGeocodeLocation(normalized)) || normalized;
+    } catch (error) {
+      console.error('No se pudo resolver la direccion del punto:', error);
+      return normalized;
+    }
+  };
+
   const captureAuthLocation = async () => {
     setAuthLocating(true);
     setAuthError('');
 
     try {
-      const location = await getBrowserLocation();
+      const location = await resolveLocationWithAddress(await getBrowserLocation());
       updateAuthForm('ubicacion', location);
-      if (!authForm.direccion.trim()) {
-        updateAuthForm('direccion', 'Ubicacion guardada desde el mapa');
-      }
+      updateAuthForm('direccion', fillAddressFromLocation(authForm.direccion, location));
     } catch (error) {
       console.error('No se pudo obtener ubicacion:', error);
-      setAuthError('No pudimos tomar tu ubicacion. Activa permisos o escribe tu direccion.');
+      setAuthError('No pudimos tomar tu ubicacion. Activa permisos o ajusta el punto manualmente.');
     } finally {
       setAuthLocating(false);
+    }
+  };
+
+  const updateAlternateDelivery = (field, value) => {
+    setAlternateDelivery((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const captureAlternateLocation = async () => {
+    setAlternateLocating(true);
+
+    try {
+      const location = await resolveLocationWithAddress(await getBrowserLocation());
+      setAlternateDelivery((current) => ({
+        ...current,
+        ubicacion: location,
+        direccion: fillAddressFromLocation(current.direccion, location),
+      }));
+    } catch (error) {
+      console.error('No se pudo obtener ubicacion alterna:', error);
+      alert('No pudimos tomar la ubicacion de entrega. Activa permisos o ajusta el punto manualmente.');
+    } finally {
+      setAlternateLocating(false);
     }
   };
 
@@ -717,6 +893,8 @@ export default function TiendaVirtualView({
     setCart({});
     setCreatedOrder(null);
     setCustomerOrders([]);
+    setDeliveryMode('perfil');
+    setAlternateDelivery(createEmptyDeliveryDraft());
     setOrdersOpen(false);
     setCheckoutOpen(false);
     setProfileOpen(false);
@@ -798,6 +976,12 @@ export default function TiendaVirtualView({
       return;
     }
 
+    if (!hasLocation(authForm.ubicacion)) {
+      setAuthLoading(false);
+      setAuthError('Debes guardar el punto exacto en el mapa antes de crear la cuenta.');
+      return;
+    }
+
     try {
       const user = await registerStoreUser(authForm);
       persistStoreSession(user);
@@ -815,8 +999,10 @@ export default function TiendaVirtualView({
       if (error.code === 'USER_EXISTS') {
         setAuthError('Ese telefono ya tiene cuenta. Inicia sesion.');
         setAuthMode('login');
+      } else if (error.code === 'LOCATION_REQUIRED') {
+        setAuthError('La ubicacion exacta en el mapa es obligatoria.');
       } else {
-        setAuthError('Completa nombre, telefono, contrasena y direccion.');
+        setAuthError('Completa nombre, telefono, contrasena, direccion y el punto exacto del mapa.');
       }
     } finally {
       setAuthLoading(false);
@@ -835,14 +1021,21 @@ export default function TiendaVirtualView({
       setProfileOpen(false);
     } catch (error) {
       console.error('Error actualizando perfil:', error);
-      alert('No se pudo actualizar tu perfil.');
+      alert(
+        error.code === 'LOCATION_REQUIRED'
+          ? 'Debes guardar la ubicacion exacta del mapa para actualizar tu perfil.'
+          : 'No se pudo actualizar tu perfil.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const openProduct = (product) => {
+  const openProduct = (product, options = {}) => {
+    const currentQuantity = Number(cart[product.code] || 0);
+    const shouldStartWithMinimum = options.prefillMinimum && currentQuantity <= 0;
     setSelectedProduct(product);
+    setSelectedProductQuantity(shouldStartWithMinimum ? getMinQuantity(product) : currentQuantity);
   };
 
   const copyPublicLink = async () => {
@@ -868,18 +1061,22 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (!currentUser.direccion) {
-      alert('Agrega tu direccion antes de enviar el pedido.');
-      setProfileOpen(true);
+    if (!activeDeliveryAddress.direccion.trim() || !hasLocation(activeDeliveryAddress.ubicacion)) {
+      if (deliveryMode === 'perfil') {
+        alert('Completa tu direccion y guarda el punto exacto del mapa antes de enviar el pedido.');
+        setProfileOpen(true);
+      } else {
+        alert('Completa la direccion alterna y guarda el punto exacto del mapa antes de enviar el pedido.');
+      }
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const fullAddress = currentUser.referencia
-        ? `${currentUser.direccion} | Ref: ${currentUser.referencia}`
-        : currentUser.direccion;
+      const fullAddress = activeDeliveryAddress.referencia
+        ? `${activeDeliveryAddress.direccion} | Ref: ${activeDeliveryAddress.referencia}`
+        : activeDeliveryAddress.direccion;
 
       const order = await onCreateOrder(
         {
@@ -889,8 +1086,8 @@ export default function TiendaVirtualView({
           storeUserKey: currentUser.key,
           direccion: fullAddress,
           telefono: currentUser.telefono,
-          referencia: currentUser.referencia,
-          ubicacion: currentUser.ubicacion,
+          referencia: activeDeliveryAddress.referencia,
+          ubicacion: activeDeliveryAddress.ubicacion,
           items: cartItems,
           subtotalEstimado: totalAmount,
           descuentoCupon: couponDiscount,
@@ -905,6 +1102,7 @@ export default function TiendaVirtualView({
           total: approximateTotalAmount,
           observaciones: notes.trim(),
           metodoPago: customer.metodoPago,
+          deliveryMode,
         },
         { channel: STORE_CHANNEL }
       );
@@ -916,6 +1114,8 @@ export default function TiendaVirtualView({
       setCouponMessage('');
       setNotes('');
       setCheckoutOpen(false);
+      setDeliveryMode('perfil');
+      setAlternateDelivery(createEmptyDeliveryDraft());
       setOrdersOpen(true);
     } catch (error) {
       console.error('Error creando pedido virtual:', error);
@@ -1183,41 +1383,131 @@ export default function TiendaVirtualView({
           font-size: 15px;
           background: transparent;
         }
+        .store-filter-strip {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 4px 0;
+        }
+        .store-filter-strip strong {
+          display: block;
+          color: #111827;
+          font-size: 16px;
+          font-weight: 950;
+        }
+        .store-filter-strip span {
+          display: block;
+          margin-top: 3px;
+          color: #7c5b5f;
+          font-size: 12px;
+          font-weight: 800;
+        }
         .store-tabs {
           display: flex;
           gap: 10px;
           overflow-x: auto;
-          padding: 12px 0 2px;
+          padding: 12px 2px 4px;
+          scrollbar-width: none;
         }
         .store-subtabs {
           display: flex;
           gap: 8px;
           overflow-x: auto;
-          padding: 8px 0 0;
+          padding: 6px 2px 2px;
+          scrollbar-width: none;
+        }
+        .store-tabs::-webkit-scrollbar,
+        .store-subtabs::-webkit-scrollbar {
+          display: none;
         }
         .store-chip {
           flex: 0 0 auto;
+          min-height: 42px;
           padding: 10px 16px;
           border-radius: 999px;
-          background: #ffffff;
-          color: #374151;
-          border: 1px solid #e5e7eb;
-          font-size: 14px;
-          font-weight: 800;
+          background: linear-gradient(180deg, #ffffff 0%, #fff7f4 100%);
+          color: #4b5563;
+          border: 1px solid #f1dfe0;
+          box-shadow: 0 10px 24px rgba(123, 16, 34, 0.06);
+          font-size: 13px;
+          font-weight: 900;
         }
         .store-chip.active {
-          background: #111827;
+          background: linear-gradient(135deg, #7b1022, #d94a3f);
           color: #ffffff;
-          border-color: #111827;
+          border-color: transparent;
+          box-shadow: 0 16px 28px rgba(123, 16, 34, 0.22);
+        }
+        .store-filter-chip {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: center;
+          min-width: 112px;
+          gap: 3px;
+          text-align: left;
+        }
+        .store-filter-chip.compact {
+          min-width: auto;
+          flex-direction: row;
+          align-items: center;
+          gap: 8px;
+          padding-right: 10px;
+        }
+        .store-filter-label,
+        .store-filter-pill-label {
+          display: block;
+          font-size: 13px;
+          font-weight: 950;
+          line-height: 1.08;
+        }
+        .store-filter-meta {
+          display: block;
+          color: #7c5b5f;
+          font-size: 11px;
+          font-weight: 800;
+        }
+        .store-filter-badge {
+          min-width: 26px;
+          height: 26px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          padding: 0 8px;
+          background: rgba(123, 16, 34, 0.08);
+          color: #7b1022;
+          font-size: 11px;
+          font-weight: 950;
+          line-height: 1;
+        }
+        .store-chip.active .store-filter-meta {
+          color: rgba(255, 250, 245, 0.8);
+        }
+        .store-chip.active .store-filter-badge {
+          background: rgba(255, 255, 255, 0.16);
+          color: #ffffff;
         }
         .store-subtabs .store-chip {
+          min-height: 38px;
           padding: 8px 13px;
           font-size: 13px;
-          background: #f3f4f6;
+          background: #ffffff;
+          color: #7b1022;
+          border-color: #ead8da;
+          box-shadow: none;
         }
         .store-subtabs .store-chip.active {
-          background: #ef4444;
-          border-color: #ef4444;
+          background: #111827;
+          border-color: #111827;
+          color: #ffffff;
+        }
+        .store-subtabs .store-filter-chip.compact {
+          padding-right: 12px;
+        }
+        .store-subtabs .store-chip.active .store-filter-badge {
+          background: rgba(255, 255, 255, 0.14);
           color: #ffffff;
         }
         .store-promo {
@@ -1468,12 +1758,14 @@ export default function TiendaVirtualView({
           position: absolute;
           top: calc(100% - 68px);
           right: 10px;
-          width: 42px;
+          min-width: 42px;
           height: 42px;
+          padding: 0 12px;
           border-radius: 999px;
           background: #ffffff;
           color: #111827;
-          font-size: 25px;
+          font-size: 14px;
+          font-weight: 950;
           line-height: 1;
           box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
           border: 1px solid #e5e7eb;
@@ -1669,6 +1961,11 @@ export default function TiendaVirtualView({
           background: #ffffff;
           color: #111827;
           border: 1px solid #e5e7eb;
+        }
+        .store-button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          transform: none;
         }
         .store-sheet-overlay {
           position: fixed;
@@ -1888,6 +2185,56 @@ export default function TiendaVirtualView({
           grid-template-columns: 1fr 1fr;
           gap: 8px;
         }
+        .store-location-feedback {
+          border-radius: 12px;
+          padding: 10px 12px;
+          background: #ffffff;
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .store-location-feedback.error {
+          background: #fff1f2;
+          color: #be123c;
+        }
+        .store-location-results {
+          display: grid;
+          gap: 8px;
+        }
+        .store-location-result {
+          width: 100%;
+          border: 1px solid #ead8da;
+          border-radius: 14px;
+          padding: 10px 12px;
+          background: #ffffff;
+          color: #111827;
+          text-align: left;
+          cursor: pointer;
+        }
+        .store-location-result strong {
+          display: block;
+          margin: 0;
+          color: #111827;
+          font-size: 13px;
+        }
+        .store-location-selected {
+          border: 1px solid #ead8da;
+          border-radius: 14px;
+          padding: 10px 12px;
+          background: rgba(255, 255, 255, 0.92);
+        }
+        .store-location-selected strong {
+          display: block;
+          color: #111827;
+          font-size: 13px;
+        }
+        .store-location-selected span {
+          display: block;
+          margin-top: 4px;
+          color: #7c5b5f;
+          font-size: 12px;
+          font-weight: 800;
+        }
         .store-map-picker {
           width: min(430px, calc(100vw - 32px));
           border-radius: 24px;
@@ -2002,12 +2349,104 @@ export default function TiendaVirtualView({
           padding: 10px 0;
           border-bottom: 1px solid #f1f2f4;
         }
+        .store-order-line-controls {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 8px;
+          flex-wrap: wrap;
+        }
+        .store-order-line-controls button {
+          min-height: 28px;
+          border: 1px solid #ead8da;
+          border-radius: 999px;
+          padding: 0 10px;
+          background: #ffffff;
+          color: #7b1022;
+          cursor: pointer;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 950;
+        }
+        .store-order-line-remove {
+          margin-left: auto;
+        }
         .store-order-line img {
           width: 52px;
           height: 52px;
           border-radius: 8px;
           object-fit: contain;
           background: #f7f7f8;
+        }
+        .store-delivery-mode {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+        .store-delivery-option {
+          min-height: 44px;
+          border: 1px solid #ead8da;
+          border-radius: 16px;
+          padding: 0 12px;
+          background: #ffffff;
+          color: #7b1022;
+          cursor: pointer;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 950;
+        }
+        .store-delivery-option.active {
+          background: linear-gradient(135deg, #7b1022, #d94a3f);
+          border-color: transparent;
+          color: #ffffff;
+          box-shadow: 0 16px 28px rgba(123, 16, 34, 0.18);
+        }
+        .store-mobile-cart {
+          position: fixed;
+          left: 14px;
+          right: 14px;
+          bottom: 14px;
+          z-index: 120;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          border: 0;
+          border-radius: 24px;
+          padding: 14px 16px;
+          background: linear-gradient(135deg, #111827, #7b1022);
+          color: #fffaf5;
+          box-shadow: 0 28px 60px rgba(17, 24, 39, 0.34);
+          cursor: pointer;
+          text-align: left;
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .store-mobile-cart.hidden {
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(120%);
+        }
+        .store-mobile-cart strong,
+        .store-mobile-cart span,
+        .store-mobile-cart em {
+          display: block;
+        }
+        .store-mobile-cart strong {
+          font-size: 15px;
+          font-weight: 950;
+        }
+        .store-mobile-cart span {
+          margin-top: 2px;
+          color: rgba(255, 250, 245, 0.78);
+          font-size: 12px;
+          font-style: normal;
+          font-weight: 800;
+        }
+        .store-mobile-cart em {
+          font-size: 13px;
+          font-style: normal;
+          font-weight: 950;
+          white-space: nowrap;
         }
         .store-status-card {
           border: 1px solid #e5e7eb;
@@ -2262,11 +2701,29 @@ export default function TiendaVirtualView({
           .store-detail-grid {
             grid-template-columns: 1fr;
           }
+          .store-sheet,
+          .store-sheet.full {
+            width: 100%;
+            max-height: 100vh;
+            border-radius: 24px 24px 0 0;
+            padding: 16px 14px 22px;
+          }
           .store-product-name {
             font-size: 14px;
           }
           .store-brand-row {
             align-items: flex-start;
+          }
+          .store-filter-strip {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+          }
+          .store-filter-chip {
+            min-width: 98px;
+          }
+          .store-filter-chip.compact {
+            min-width: auto;
           }
           .store-actions {
             flex-direction: column;
@@ -2291,7 +2748,8 @@ export default function TiendaVirtualView({
             grid-template-columns: 1fr;
           }
           .store-location-actions,
-          .store-map-fields {
+          .store-map-fields,
+          .store-delivery-mode {
             grid-template-columns: 1fr;
           }
           .store-progress-step {
@@ -2315,9 +2773,10 @@ export default function TiendaVirtualView({
           onCaptureLocation={captureAuthLocation}
           onManualLocation={(location) => {
             updateAuthForm('ubicacion', location);
-            if (!authForm.direccion.trim()) {
-              updateAuthForm('direccion', 'Ubicacion seleccionada en el mapa');
-            }
+            updateAuthForm(
+              'direccion',
+              fillAddressFromLocation(authForm.direccion, location, 'Ubicacion seleccionada en el mapa')
+            );
           }}
           onLogin={handleStoreLogin}
           onRegister={handleStoreRegister}
@@ -2391,6 +2850,8 @@ export default function TiendaVirtualView({
               className="store-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               placeholder="Buscar en Carnes San Martin Granada"
             />
           </label>
@@ -2400,58 +2861,80 @@ export default function TiendaVirtualView({
               <button
                 key={category.id}
                 type="button"
-                className={`store-chip ${activeCategory === category.id ? 'active' : ''}`}
+                className={`store-chip store-filter-chip ${activeCategory === category.id ? 'active' : ''}`}
                 onClick={() => {
                   setActiveCategory(category.id);
                   setActiveSubcategory('todas');
                 }}
               >
-                {category.label}
+                <span className="store-filter-label">{category.label}</span>
+                <span className="store-filter-meta">
+                  {Number(categoryProductCounts[category.id] || 0)} productos
+                </span>
               </button>
             ))}
           </nav>
+
+          <div className="store-filter-strip">
+            <div>
+              <strong>{activeFilterSummary.title}</strong>
+              <span>{activeFilterSummary.subtitle}</span>
+            </div>
+          </div>
 
           {subcategoryOptions.length > 0 && (
             <nav className="store-subtabs">
               <button
                 type="button"
-                className={`store-chip ${activeSubcategory === 'todas' ? 'active' : ''}`}
+                className={`store-chip store-filter-chip compact ${
+                  activeSubcategory === 'todas' ? 'active' : ''
+                }`}
                 onClick={() => setActiveSubcategory('todas')}
               >
-                Todas
+                <span className="store-filter-pill-label">Todas</span>
+                <span className="store-filter-badge">
+                  {Number(subcategoryProductCounts.todas || 0)}
+                </span>
               </button>
               {subcategoryOptions.map((subcategory) => (
                 <button
                   key={subcategory}
                   type="button"
-                  className={`store-chip ${activeSubcategory === subcategory ? 'active' : ''}`}
+                  className={`store-chip store-filter-chip compact ${
+                    activeSubcategory === subcategory ? 'active' : ''
+                  }`}
                   onClick={() => setActiveSubcategory(subcategory)}
                 >
-                  {subcategory}
+                  <span className="store-filter-pill-label">{subcategory}</span>
+                  <span className="store-filter-badge">
+                    {Number(subcategoryProductCounts[subcategory] || 0)}
+                  </span>
                 </button>
               ))}
             </nav>
           )}
         </header>
 
-        <section className="store-promo">
-          <h2 className="store-section-title">Promociones activas</h2>
-          <div className="store-stories">
-            {STORE_PROMOTIONS.map((promotion) => (
-              <button
-                key={promotion.id}
-                type="button"
-                className="store-story"
-                onClick={() => setSelectedPromotionIndex(STORE_PROMOTIONS.findIndex((item) => item.id === promotion.id))}
-              >
-                <span className="store-story-ring">
-                  <img src={promotion.image} alt={promotion.title} />
-                </span>
-                <span className="store-story-title">{promotion.title}</span>
-              </button>
-            ))}
-          </div>
-        </section>
+        {showPromotions && (
+          <section className="store-promo">
+            <h2 className="store-section-title">Promociones activas</h2>
+            <div className="store-stories">
+              {STORE_PROMOTIONS.map((promotion) => (
+                <button
+                  key={promotion.id}
+                  type="button"
+                  className="store-story"
+                  onClick={() => setSelectedPromotionIndex(STORE_PROMOTIONS.findIndex((item) => item.id === promotion.id))}
+                >
+                  <span className="store-story-ring">
+                    <img src={promotion.image} alt={promotion.title} />
+                  </span>
+                  <span className="store-story-title">{promotion.title}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <main>
           <div className="store-product-head">
@@ -2489,14 +2972,9 @@ export default function TiendaVirtualView({
                       type="button"
                       className="store-add"
                       title="Agregar"
-                      onClick={() =>
-                        updateQuantity(
-                          product.code,
-                          quantity > 0 ? quantity + getQuantityStep(product) : minQuantity
-                        )
-                      }
+                      onClick={() => openProduct(product, { prefillMinimum: true })}
                     >
-                      +
+                      {quantity > 0 ? formatStoreQuantity(quantity, product.unit) : '+'}
                     </button>
                     <h3 className="store-product-name" onClick={() => openProduct(product)}>
                       {product.name}
@@ -2515,15 +2993,24 @@ export default function TiendaVirtualView({
         </main>
       </div>
 
-      {cartItems.length > 0 && (
-        <FloatingCart
-          cartItems={cartItems}
-          cartCount={cartCount}
-          couponDiscount={couponDiscount}
-          approximateTotalAmount={approximateTotalAmount}
-          onCheckout={() => setCheckoutOpen(true)}
-          onQuantityChange={updateQuantity}
-        />
+      {cartItems.length > 0 && !selectedProduct && !checkoutOpen && !ordersOpen && !profileOpen && (
+        isMobileLayout ? (
+          <MobileCartBar
+            cartCount={cartCount}
+            approximateTotalAmount={approximateTotalAmount}
+            hidden={searchFocused}
+            onOpen={() => setCheckoutOpen(true)}
+          />
+        ) : (
+          <FloatingCart
+            cartItems={cartItems}
+            cartCount={cartCount}
+            couponDiscount={couponDiscount}
+            approximateTotalAmount={approximateTotalAmount}
+            onCheckout={() => setCheckoutOpen(true)}
+            onQuantityChange={updateQuantity}
+          />
+        )
       )}
 
       {quantityNotice && <div className="store-quantity-notice">{quantityNotice}</div>}
@@ -2531,9 +3018,20 @@ export default function TiendaVirtualView({
       {selectedProduct && (
         <ProductSheet
           product={selectedProduct}
-          quantity={Number(cart[selectedProduct.code] || 0)}
+          cartQuantity={Number(cart[selectedProduct.code] || 0)}
+          quantity={selectedProductQuantity}
           onClose={() => setSelectedProduct(null)}
-          onQuantityChange={(nextQuantity) => updateQuantity(selectedProduct.code, nextQuantity)}
+          onConfirm={() => {
+            updateQuantity(selectedProduct.code, selectedProductQuantity);
+            setSelectedProduct(null);
+          }}
+          onQuantityChange={(nextQuantity) => {
+            if (!isValidQuantityStep(nextQuantity, selectedProduct)) {
+              showQuantityNotice(getQuantityRuleMessage(selectedProduct));
+            }
+
+            setSelectedProductQuantity(clampQuantity(nextQuantity, selectedProduct));
+          }}
         />
       )}
 
@@ -2551,6 +3049,9 @@ export default function TiendaVirtualView({
           cartItems={cartItems}
           currentUser={currentUser}
           customer={customer}
+          deliveryMode={deliveryMode}
+          alternateDelivery={alternateDelivery}
+          alternateLocating={alternateLocating}
           notes={notes}
           submitting={submitting}
           appliedCoupon={appliedCoupon}
@@ -2561,6 +3062,10 @@ export default function TiendaVirtualView({
           totalAmount={totalAmount}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
+          onDeliveryModeChange={setDeliveryMode}
+          onQuantityChange={updateQuantity}
+          onAlternateDeliveryChange={updateAlternateDelivery}
+          onCaptureAlternateLocation={captureAlternateLocation}
           onApplyCoupon={applyCoupon}
           onCouponInputChange={setCouponInput}
           onEditProfile={() => setProfileOpen(true)}
@@ -2701,6 +3206,11 @@ function StoreAuthView({
                 locating={authLocating}
                 onCapture={onCaptureLocation}
                 onManualLocation={onManualLocation}
+                onAddressResolved={(value) => {
+                  if (shouldAutofillAddress(authForm.direccion)) {
+                    onFormChange('direccion', value);
+                  }
+                }}
               />
             </>
           )}
@@ -2713,19 +3223,83 @@ function StoreAuthView({
   );
 }
 
-function LocationCaptureBlock({ location, locating, onCapture, onManualLocation }) {
+function LocationCaptureBlock({ location, locating, onCapture, onManualLocation, onAddressResolved }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchError, setSearchError] = useState('');
   const mapUrl = buildGoogleMapsPlaceUrl(location);
   const embedUrl = buildGoogleMapsEmbedUrl(location);
+
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery.length < 3) {
+      setSearchResults([]);
+      setSearchError('');
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      setSearching(true);
+      setSearchError('');
+
+      try {
+        const results = await searchLocationCandidates(trimmedQuery, { countryCode: 'ni' });
+        setSearchResults(results);
+        if (results.length === 0) {
+          setSearchError('No encontramos coincidencias. Prueba con otra direccion o negocio.');
+        }
+      } catch (error) {
+        console.error('No se pudieron buscar direcciones:', error);
+        setSearchResults([]);
+        setSearchError('No pudimos buscar direcciones en este momento.');
+      } finally {
+        setSearching(false);
+      }
+    }, 320);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   return (
     <div className="store-location-card">
       <div>
         <strong>Ubicacion exacta</strong>
         <span>
-          Guarda el punto del mapa para que el entregador pueda llegar directo.
+          Busca tu direccion o negocio, elige un resultado y ajusta el pin si hace falta.
         </span>
       </div>
+      <input
+        className="store-field"
+        value={searchQuery}
+        onChange={(event) => setSearchQuery(event.target.value)}
+        placeholder="Buscar direccion, restaurante o negocio"
+      />
+      {searching && <div className="store-location-feedback">Buscando ubicaciones...</div>}
+      {searchError && <div className="store-location-feedback error">{searchError}</div>}
+      {searchResults.length > 0 && (
+        <div className="store-location-results">
+          {searchResults.map((result) => (
+            <button
+              key={`${result.placeId || result.label}-${result.lat}-${result.lng}`}
+              type="button"
+              className="store-location-result"
+              onClick={() => {
+                onManualLocation(result);
+                onAddressResolved?.(result.label || result.shortLabel || '');
+                setSearchQuery('');
+                setSearchResults([]);
+                setSearchError('');
+              }}
+            >
+              <strong>{result.shortLabel || 'Direccion encontrada'}</strong>
+              <span>{result.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="store-location-actions">
         <button type="button" className="store-button secondary" onClick={onCapture} disabled={locating}>
           {locating ? 'Tomando ubicacion...' : hasLocation(location) ? 'Usar mi ubicacion actual' : 'Ubicacion actual'}
@@ -2736,6 +3310,12 @@ function LocationCaptureBlock({ location, locating, onCapture, onManualLocation 
       </div>
       {hasLocation(location) && (
         <>
+          <div className="store-location-selected">
+            <strong>{location?.label || 'Punto guardado'}</strong>
+            <span>
+              {Number(location?.lat || 0).toFixed(6)}, {Number(location?.lng || 0).toFixed(6)}
+            </span>
+          </div>
           <div className="store-location-map">
             <iframe title="Ubicacion de entrega" src={embedUrl} loading="lazy" />
           </div>
@@ -2765,6 +3345,7 @@ function MapPointPicker({ location, onClose, onSave }) {
   const [zoom, setZoom] = useState(16);
   const [latDraft, setLatDraft] = useState(initialLocation.lat.toFixed(6));
   const [lngDraft, setLngDraft] = useState(initialLocation.lng.toFixed(6));
+  const [savingPoint, setSavingPoint] = useState(false);
 
   useEffect(() => {
     setLatDraft(selected.lat.toFixed(6));
@@ -2890,6 +3471,10 @@ function MapPointPicker({ location, onClose, onSave }) {
             placeholder="Longitud"
           />
         </div>
+        <div className="store-location-selected">
+          <strong>{selected?.label || 'Punto seleccionado'}</strong>
+          <span>{latDraft}, {lngDraft}</span>
+        </div>
         <div className="store-map-tools">
           <button type="button" className="store-mini-button" onClick={applyManualCoordinates}>
             Aplicar coordenadas
@@ -2903,8 +3488,25 @@ function MapPointPicker({ location, onClose, onSave }) {
           <button type="button" className="store-button secondary" style={{ flex: 1 }} onClick={onClose}>
             Cancelar
           </button>
-          <button type="button" className="store-button" style={{ flex: 2 }} onClick={() => onSave(selected)}>
-            Guardar este punto
+          <button
+            type="button"
+            className="store-button"
+            style={{ flex: 2 }}
+            disabled={savingPoint}
+            onClick={async () => {
+              setSavingPoint(true);
+              try {
+                const resolvedLocation = (await reverseGeocodeLocation(selected)) || selected;
+                onSave(resolvedLocation);
+              } catch (error) {
+                console.error('No se pudo resolver el punto seleccionado:', error);
+                onSave(selected);
+              } finally {
+                setSavingPoint(false);
+              }
+            }}
+          >
+            {savingPoint ? 'Guardando punto...' : 'Guardar este punto'}
           </button>
         </div>
       </div>
@@ -2931,8 +3533,8 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    if (!profile.nombre.trim() || !profile.direccion.trim()) {
-      alert('Nombre y direccion son obligatorios.');
+    if (!profile.nombre.trim() || !profile.direccion.trim() || !hasLocation(profile.ubicacion)) {
+      alert('Nombre, direccion y punto exacto en el mapa son obligatorios.');
       return;
     }
 
@@ -2942,10 +3544,11 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
   const captureProfileLocation = async () => {
     setLocating(true);
     try {
-      const location = await getBrowserLocation();
+      const currentLocation = await getBrowserLocation();
+      const location = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
       updateProfile('ubicacion', location);
-      if (!profile.direccion.trim()) {
-        updateProfile('direccion', 'Ubicacion guardada desde el mapa');
+      if (shouldAutofillAddress(profile.direccion)) {
+        updateProfile('direccion', location?.label || 'Ubicacion guardada desde el mapa');
       }
     } catch (error) {
       console.error('No se pudo obtener ubicacion:', error);
@@ -2991,8 +3594,13 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
             onCapture={captureProfileLocation}
             onManualLocation={(location) => {
               updateProfile('ubicacion', location);
-              if (!profile.direccion.trim()) {
-                updateProfile('direccion', 'Ubicacion seleccionada en el mapa');
+              if (shouldAutofillAddress(profile.direccion)) {
+                updateProfile('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
+              }
+            }}
+            onAddressResolved={(value) => {
+              if (shouldAutofillAddress(profile.direccion)) {
+                updateProfile('direccion', value);
               }
             }}
           />
@@ -3147,7 +3755,6 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose }) {
               aria-label={isLastPromotion ? 'Cerrar historias' : 'Siguiente promocion'}
             />
           </div>
-
         </div>
       </div>
     </div>
@@ -3271,7 +3878,24 @@ function FloatingCart({
   );
 }
 
-function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
+function MobileCartBar({ cartCount, approximateTotalAmount, hidden, onOpen }) {
+  return (
+    <button
+      type="button"
+      className={`store-mobile-cart ${hidden ? 'hidden' : ''}`}
+      onClick={onOpen}
+      aria-label="Abrir carrito"
+    >
+      <div>
+        <strong>{cartCount === 1 ? '1 producto' : `${cartCount} productos`}</strong>
+        <span>{formatCurrency(approximateTotalAmount)}</span>
+      </div>
+      <em>Ver carrito</em>
+    </button>
+  );
+}
+
+function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQuantityChange }) {
   const subtotal = Number(quantity || 0) * Number(product.price || 0);
   const step = getQuantityStep(product);
   const minQuantity = getMinQuantity(product);
@@ -3299,6 +3923,11 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
             <p className="store-unit" style={{ marginTop: 8 }}>
               {getQuantityRuleMessage(product)}
             </p>
+            {cartQuantity > 0 && (
+              <p className="store-unit" style={{ marginTop: 6 }}>
+                Actualmente tienes {formatStoreQuantity(cartQuantity, product.unit)} {product.unit} en carrito.
+              </p>
+            )}
 
             <div className="store-qty-row">
               {getQuickQuantities(product).map((weight) => (
@@ -3342,9 +3971,14 @@ function ProductSheet({ product, quantity, onClose, onQuantityChange }) {
               type="button"
               className="store-button"
               style={{ width: '100%' }}
-              onClick={onClose}
+              disabled={quantity <= 0 && cartQuantity <= 0}
+              onClick={onConfirm}
             >
-              {quantity > 0 ? `Agregar ${formatCurrency(subtotal)}` : 'Agregar al pedido'}
+              {quantity > 0
+                ? `Guardar ${formatCurrency(subtotal)}`
+                : cartQuantity > 0
+                  ? 'Quitar del carrito'
+                  : 'Selecciona cantidad para agregar'}
             </button>
           </div>
         </div>
@@ -3357,6 +3991,9 @@ function CheckoutSheet({
   cartItems,
   currentUser,
   customer,
+  deliveryMode,
+  alternateDelivery,
+  alternateLocating,
   notes,
   submitting,
   appliedCoupon,
@@ -3367,10 +4004,14 @@ function CheckoutSheet({
   totalAmount,
   onClose,
   onApplyCoupon,
+  onAlternateDeliveryChange,
+  onCaptureAlternateLocation,
   onCustomerChange,
   onCouponInputChange,
+  onDeliveryModeChange,
   onEditProfile,
   onNotesChange,
+  onQuantityChange,
   onRemoveCoupon,
   onSubmit,
 }) {
@@ -3392,6 +4033,37 @@ function CheckoutSheet({
               <div style={{ color: '#6b7280', fontSize: 13 }}>
                 {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} x{' '}
                 {formatCurrency(item.precioUnitario)}
+              </div>
+              <div className="store-order-line-controls">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onQuantityChange(
+                      item.codigo,
+                      Number(item.cantidad || 0) <= Number(item.minQuantity || 0) + QUANTITY_EPSILON
+                        ? 0
+                        : Number(item.cantidad || 0) - Number(item.quantityStep || 1)
+                    )
+                  }
+                >
+                  -
+                </button>
+                <QuantityInput
+                  className="store-floating-qty-input"
+                  step={item.quantityStep}
+                  value={Number(item.cantidad || 0)}
+                  ariaLabel={`Cantidad de ${item.nombre}`}
+                  onChange={(nextValue) => onQuantityChange(item.codigo, nextValue)}
+                />
+                <button
+                  type="button"
+                  onClick={() => onQuantityChange(item.codigo, Number(item.cantidad || 0) + Number(item.quantityStep || 1))}
+                >
+                  +
+                </button>
+                <button type="button" className="store-order-line-remove" onClick={() => onQuantityChange(item.codigo, 0)}>
+                  Quitar
+                </button>
               </div>
             </div>
             <strong>{formatCurrency(item.subtotal)}</strong>
@@ -3452,24 +4124,82 @@ function CheckoutSheet({
             </p>
           </div>
 
-          <div className="store-status-card" style={{ marginTop: 0 }}>
-            <div className="store-status-pill">Entrega</div>
-            <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
-            <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
-              {currentUser.telefono}
-              <br />
-              {currentUser.direccion}
-              {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
-            </div>
+          <div className="store-delivery-mode">
             <button
               type="button"
-              className="store-button secondary"
-              style={{ marginTop: 10 }}
-              onClick={onEditProfile}
+              className={`store-delivery-option ${deliveryMode === 'perfil' ? 'active' : ''}`}
+              onClick={() => onDeliveryModeChange('perfil')}
             >
-              Cambiar direccion
+              Mi direccion guardada
+            </button>
+            <button
+              type="button"
+              className={`store-delivery-option ${deliveryMode === 'otra' ? 'active' : ''}`}
+              onClick={() => onDeliveryModeChange('otra')}
+            >
+              Otra direccion
             </button>
           </div>
+
+          {deliveryMode === 'perfil' ? (
+            <div className="store-status-card" style={{ marginTop: 0 }}>
+              <div className="store-status-pill">Entrega</div>
+              <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+              <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+                {currentUser.telefono}
+                <br />
+                {currentUser.direccion}
+                {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+              </div>
+              {!hasLocation(currentUser.ubicacion) && (
+                <div className="store-location-feedback error" style={{ marginTop: 10 }}>
+                  Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
+                </div>
+              )}
+              <button
+                type="button"
+                className="store-button secondary"
+                style={{ marginTop: 10 }}
+                onClick={onEditProfile}
+              >
+                Editar mi direccion
+              </button>
+            </div>
+          ) : (
+            <div className="store-status-card" style={{ marginTop: 0 }}>
+              <div className="store-status-pill">Entrega alterna</div>
+              <div className="store-form" style={{ marginTop: 12 }}>
+                <input
+                  className="store-field"
+                  value={alternateDelivery.direccion}
+                  onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
+                  placeholder="Direccion de entrega"
+                />
+                <input
+                  className="store-field"
+                  value={alternateDelivery.referencia}
+                  onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
+                  placeholder="Referencia"
+                />
+                <LocationCaptureBlock
+                  location={alternateDelivery.ubicacion}
+                  locating={alternateLocating}
+                  onCapture={onCaptureAlternateLocation}
+                  onManualLocation={(location) => {
+                    onAlternateDeliveryChange('ubicacion', location);
+                    if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                      onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
+                    }
+                  }}
+                  onAddressResolved={(value) => {
+                    if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                      onAlternateDeliveryChange('direccion', value);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
           <select
             className="store-select"
             value={customer.metodoPago}

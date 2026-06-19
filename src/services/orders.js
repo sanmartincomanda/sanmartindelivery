@@ -152,6 +152,7 @@ export async function createOrder(payload, options = {}) {
   const channel = options.channel || MANUAL_CHANNEL;
   const fecha = payload.fecha || hoyISO();
   const counterRef = ref(database, `orderCounters/${fecha}`);
+  const createdAt = Date.now();
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
     const lastNumber = Number(currentValue || 0);
@@ -225,9 +226,11 @@ export async function createOrder(payload, options = {}) {
     id,
     canal: channel,
     canalLabel: channel === STORE_CHANNEL ? 'Tienda Virtual' : 'Ingreso Manual',
+    deliveryMode: String(payload.deliveryMode || 'perfil').trim() || 'perfil',
     timestampIngreso: buildTimeLabel(),
+    timestampIngresoMs: createdAt,
     justAdded: true,
-    timestamp: Date.now(),
+    timestamp: createdAt,
   };
 
   const orderKey = buildOrderKey(fecha, id);

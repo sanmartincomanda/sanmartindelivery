@@ -64,7 +64,12 @@ const Icons = {
   ),
 };
 
-const getRouteFromHash = () => {
+const STORE_CANONICAL_ORIGIN = 'https://tienda.sanmartinsr.com';
+const STORE_HOSTS = new Set(['tienda.sanmartinsr.com']);
+
+const isStoreHost = (hostname = '') => STORE_HOSTS.has(String(hostname || '').trim().toLowerCase());
+
+const getRouteFromLocation = () => {
   if (typeof window === 'undefined') {
     return 'dashboard';
   }
@@ -74,11 +79,12 @@ const getRouteFromHash = () => {
   if (cleanedHash.startsWith('cocina')) return 'cocina';
   if (cleanedHash.startsWith('driver')) return 'driver';
   if (cleanedHash.startsWith('admin') || cleanedHash.startsWith('administracion')) return 'dashboard';
+  if (isStoreHost(window.location.hostname)) return 'tienda';
   return 'dashboard';
 };
 
 function App() {
-  const [route, setRoute] = useState(() => getRouteFromHash());
+  const [route, setRoute] = useState(() => getRouteFromLocation());
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [inputUser, setInputUser] = useState('');
@@ -105,7 +111,7 @@ function App() {
   const todayKey = hoyISO();
 
   useEffect(() => {
-    const handleHashChange = () => setRoute(getRouteFromHash());
+    const handleHashChange = () => setRoute(getRouteFromLocation());
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
@@ -236,10 +242,14 @@ function App() {
 
   const publicStoreUrl = useMemo(() => {
     if (typeof window === 'undefined') {
-      return '#tienda';
+      return STORE_CANONICAL_ORIGIN;
     }
 
-    return `${window.location.origin}${window.location.pathname}#tienda`;
+    if (isStoreHost(window.location.hostname)) {
+      return `${window.location.origin}${window.location.pathname}`;
+    }
+
+    return STORE_CANONICAL_ORIGIN;
   }, []);
 
   const handleLogin = (event) => {

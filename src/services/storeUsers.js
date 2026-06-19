@@ -1,6 +1,6 @@
 import { get, push, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
-import { normalizeLocation } from './geo';
+import { hasLocation, normalizeLocation } from './geo';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
@@ -67,13 +67,20 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
   const userRef = ref(database, `${STORE_USERS_PATH}/${userKey}`);
   const userSnapshot = await get(userRef);
   const existingUser = userSnapshot.val();
+  const normalizedLocation = normalizeLocation(ubicacion) || normalizeLocation(existingUser?.ubicacion);
+
+  if (!hasLocation(normalizedLocation)) {
+    const error = new Error('Ubicacion exacta requerida');
+    error.code = 'LOCATION_REQUIRED';
+    throw error;
+  }
 
   const profile = {
     nombre: String(nombre || '').trim(),
     telefono: cleanPhone,
     direccion: String(direccion || '').trim(),
     referencia: String(referencia || '').trim(),
-    ubicacion: normalizeLocation(ubicacion) || normalizeLocation(existingUser?.ubicacion) || null,
+    ubicacion: normalizedLocation,
     codigo: existingUser?.codigo || buildClientCode(cleanPhone),
     updatedAt: now,
   };
@@ -127,7 +134,13 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
   const userKey = getStoreUserKey(cleanPhone);
   const cleanPassword = String(password || '').trim();
 
-  if (!userKey || !String(nombre || '').trim() || !String(direccion || '').trim() || cleanPassword.length < 4) {
+  if (
+    !userKey ||
+    !String(nombre || '').trim() ||
+    !String(direccion || '').trim() ||
+    cleanPassword.length < 4 ||
+    !hasLocation(ubicacion)
+  ) {
     const error = new Error('Datos de registro incompletos');
     error.code = 'REGISTER_INCOMPLETE';
     throw error;

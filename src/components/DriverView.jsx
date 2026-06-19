@@ -70,6 +70,13 @@ const Icons = {
       <path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" />
     </svg>
   ),
+  history: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 12a9 9 0 101.9-5.6" />
+      <path d="M3 4v4h4" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  ),
 };
 
 const normalizeName = (value) =>
@@ -123,6 +130,127 @@ const buildCustomerWhatsappLink = (order = {}) => {
   }
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(buildDriverCustomerMessage(order))}`;
+};
+
+const getOrderKey = (order = {}) => order.firebaseKey || order.id || `${order.cliente || 'pedido'}-${order.timestamp || 0}`;
+
+const getOrderItemLines = (order = {}) => {
+  if (!Array.isArray(order.items) || order.items.length === 0) {
+    return 0;
+  }
+
+  return order.items.length;
+};
+
+const getOrderItemSummary = (order = {}) => {
+  const lines = getOrderItemLines(order);
+  if (lines > 0) {
+    return `${lines} ${lines === 1 ? 'producto' : 'productos'}`;
+  }
+
+  if (String(order.pedido || '').trim()) {
+    return 'Detalle disponible';
+  }
+
+  return 'Sin detalle';
+};
+
+const getAddressPreview = (order = {}, maxLength = 72) => {
+  const address = getWrittenAddress(order) || 'Sin direccion escrita';
+  if (address.length <= maxLength) {
+    return address;
+  }
+
+  return `${address.slice(0, maxLength - 1).trim()}...`;
+};
+
+const parseOrderIngresoTimestamp = (order = {}) => {
+  const fecha = String(order.fecha || '').trim();
+  const timeLabel = String(order.timestampIngreso || '').trim();
+  if (!fecha || !timeLabel) {
+    return 0;
+  }
+
+  const compact = timeLabel.toLowerCase().replace(/[\s.\u00a0]/g, '');
+  const match = compact.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) {
+    return 0;
+  }
+
+  let hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  const meridiem = compact.includes('pm') ? 'pm' : compact.includes('am') ? 'am' : '';
+
+  if (meridiem) {
+    if (hours === 12) {
+      hours = 0;
+    }
+
+    if (meridiem === 'pm') {
+      hours += 12;
+    }
+  }
+
+  const baseDate = new Date(`${fecha}T00:00:00`);
+  if (Number.isNaN(baseDate.getTime())) {
+    return 0;
+  }
+
+  baseDate.setHours(hours, minutes, seconds, 0);
+  return baseDate.getTime();
+};
+
+const getOrderCreatedAt = (order = {}) =>
+  Number(order.timestampIngresoMs || order.timestampCreado || parseOrderIngresoTimestamp(order) || order.timestamp || 0);
+
+const getOrderDeliveredAt = (order = {}) =>
+  Number(order.timestampEntregadoMs || order.timestampFinalizado || order.timestamp || 0);
+
+const formatElapsedMinutes = (minutes) => {
+  const safeMinutes = Math.max(0, Number(minutes || 0));
+  if (safeMinutes < 60) {
+    return `${safeMinutes} min`;
+  }
+
+  const hours = Math.floor(safeMinutes / 60);
+  const remainder = safeMinutes % 60;
+  return remainder > 0 ? `${hours} h ${String(remainder).padStart(2, '0')} min` : `${hours} h`;
+};
+
+const getOrderAgeMeta = (order = {}, now = Date.now()) => {
+  const createdAt = getOrderCreatedAt(order);
+  const ageMinutes = createdAt ? Math.max(0, Math.floor((now - createdAt) / 60000)) : 0;
+
+  if (ageMinutes >= 60) {
+    return {
+      key: 'critical',
+      label: formatElapsedMinutes(ageMinutes),
+      tone: 'Mas de 1 hora',
+    };
+  }
+
+  if (ageMinutes >= 45) {
+    return {
+      key: 'alert',
+      label: formatElapsedMinutes(ageMinutes),
+      tone: '45 a 59 min',
+    };
+  }
+
+  if (ageMinutes >= 30) {
+    return {
+      key: 'warning',
+      label: formatElapsedMinutes(ageMinutes),
+      tone: '30 a 44 min',
+    };
+  }
+
+  return {
+    key: 'fresh',
+    label: formatElapsedMinutes(ageMinutes),
+    tone: 'Menos de 30 min',
+  };
 };
 
 const getOrderNavigationUrl = (order = {}) => {
@@ -185,8 +313,10 @@ export default function DriverView({ orders = [] }) {
   const [locatingOrderKey, setLocatingOrderKey] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [confirmDeliveryOrder, setConfirmDeliveryOrder] = useState(null);
-  const [routeFilter, setRouteFilter] = useState('activos');
+  const [driverSection, setDriverSection] = useState('ruta');
+  const [routeFilter, setRouteFilter] = useState('todos');
   const [notice, setNotice] = useState('');
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
@@ -230,13 +360,26 @@ export default function DriverView({ orders = [] }) {
           return deliveredDiff;
         }
 
-        return Number(left.timestamp || 0) - Number(right.timestamp || 0);
+        return getOrderCreatedAt(left) - getOrderCreatedAt(right);
       });
   }, [driver, orders]);
 
+  const activeAssignedOrders = useMemo(
+    () => assignedOrders.filter((order) => !isDeliveredOrder(order)),
+    [assignedOrders]
+  );
+
+  const deliveredOrders = useMemo(
+    () =>
+      assignedOrders
+        .filter((order) => isDeliveredOrder(order))
+        .sort((left, right) => getOrderDeliveredAt(right) - getOrderDeliveredAt(left)),
+    [assignedOrders]
+  );
+
   useEffect(() => {
-    setRouteOrders(assignedOrders);
-  }, [assignedOrders]);
+    setRouteOrders(activeAssignedOrders);
+  }, [activeAssignedOrders]);
 
   useEffect(() => {
     if (!notice) {
@@ -246,6 +389,11 @@ export default function DriverView({ orders = [] }) {
     const timer = window.setTimeout(() => setNotice(''), 2400);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTick(Date.now()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -268,7 +416,6 @@ export default function DriverView({ orders = [] }) {
   };
 
   const optimizeRoute = async () => {
-    const activeAssignedOrders = assignedOrders.filter((order) => !isDeliveredOrder(order));
     const locatedOrders = activeAssignedOrders.filter((order) => hasLocation(order.ubicacion));
     if (locatedOrders.length === 0) {
       alert('No hay pedidos con ubicacion para optimizar.');
@@ -285,8 +432,7 @@ export default function DriverView({ orders = [] }) {
       }
 
       const optimized = optimizeStopsByNearest(activeAssignedOrders, origin);
-      const deliveredOrders = assignedOrders.filter((order) => isDeliveredOrder(order));
-      setRouteOrders([...optimized, ...deliveredOrders]);
+      setRouteOrders(optimized);
       const routeUrl = buildGoogleMapsRouteUrl(optimized, origin);
       if (routeUrl) {
         window.open(routeUrl, '_blank', 'noopener,noreferrer');
@@ -434,23 +580,36 @@ export default function DriverView({ orders = [] }) {
     );
   }
 
-  const activeRouteOrders = routeOrders.filter((order) => !isDeliveredOrder(order));
+  const activeRouteOrders = routeOrders;
   const ordersWithLocation = activeRouteOrders.filter((order) => hasLocation(order.ubicacion));
-  const deliveredCount = assignedOrders.filter((order) => isDeliveredOrder(order)).length;
+  const ordersWithoutLocation = activeRouteOrders.filter((order) => !hasLocation(order.ubicacion));
+  const deliveredCount = deliveredOrders.length;
   const enCaminoCount = assignedOrders.filter((order) => order.estado === 'Enviado').length;
-  const nextOrder = activeRouteOrders[0] || null;
   const visibleRouteOrders = routeOrders.filter((order) => {
     if (routeFilter === 'todos') return true;
-    if (routeFilter === 'entregados') return isDeliveredOrder(order);
     if (routeFilter === 'en_camino') return order.estado === 'Enviado';
-    return !isDeliveredOrder(order);
+    if (routeFilter === 'sin_pin') return !hasLocation(order.ubicacion);
+    return true;
   });
   const routeFilters = [
-    { key: 'activos', label: 'Ruta activa', count: activeRouteOrders.length },
-    { key: 'en_camino', label: 'En camino', count: enCaminoCount },
-    { key: 'entregados', label: 'Entregados', count: deliveredCount },
-    { key: 'todos', label: 'Todos', count: assignedOrders.length },
+    { key: 'todos', label: 'Todos', count: activeRouteOrders.length },
+    { key: 'en_camino', label: 'En ruta', count: enCaminoCount },
+    { key: 'sin_pin', label: 'Sin pin', count: ordersWithoutLocation.length },
   ];
+  const featuredOrder = driverSection === 'ruta' ? visibleRouteOrders[0] || null : null;
+  const compactOrders = featuredOrder
+    ? visibleRouteOrders.filter((order) => getOrderKey(order) !== getOrderKey(featuredOrder))
+    : visibleRouteOrders;
+  const routeListTitle =
+    routeFilter === 'en_camino'
+      ? 'Pedidos en ruta'
+      : routeFilter === 'sin_pin'
+        ? 'Pedidos sin pin'
+        : 'Siguientes paradas';
+  const historySummary = deliveredOrders[0]?.timestampEntregado
+    ? `Ultima entrega ${deliveredOrders[0].timestampEntregado}`
+    : 'Revisa pedidos completados y sus detalles';
+  const featuredAge = featuredOrder ? getOrderAgeMeta(featuredOrder, nowTick) : null;
 
   const openOrderMap = (order) => {
     const navigationUrl = getOrderNavigationUrl(order);
@@ -472,80 +631,185 @@ export default function DriverView({ orders = [] }) {
         </div>
       )}
 
-      <section className="driver-hero">
+      <section className="driver-hero driver-hero-compact">
         <div className="driver-hero-copy">
           <span className="driver-kicker">Driver app</span>
-          <h1>Ruta de {driver.name}</h1>
-          <p>{driver.code} | {activeRouteOrders.length} pedidos pendientes para entregar</p>
-          <div className="driver-hero-actions">
-            <button type="button" className="driver-primary-action" onClick={optimizeRoute} disabled={optimizing || ordersWithLocation.length === 0}>
-              {Icons.route}
-              {optimizing ? 'Optimizando...' : 'Optimizar ruta'}
-            </button>
-            <button type="button" className="driver-ghost-action" onClick={logout}>
-              Salir
-            </button>
-          </div>
+          <h1>{driver.name}</h1>
+          <p>{driver.code} | {activeRouteOrders.length} pendientes | {enCaminoCount} en ruta</p>
         </div>
-        <DriverHeroVector />
+        <div className="driver-hero-actions">
+          <button
+            type="button"
+            className="driver-primary-action"
+            onClick={optimizeRoute}
+            disabled={optimizing || ordersWithLocation.length === 0}
+          >
+            {Icons.route}
+            {optimizing ? 'Optimizando...' : 'Optimizar'}
+          </button>
+          <button type="button" className="driver-ghost-action" onClick={logout}>
+            Salir
+          </button>
+        </div>
       </section>
 
       <section className="driver-summary">
         <DriverStatCard label="Pendientes" value={activeRouteOrders.length} tone="wine" />
-        <DriverStatCard label="Con mapa" value={ordersWithLocation.length} tone="blue" />
-        <DriverStatCard label="En camino" value={enCaminoCount} tone="orange" />
+        <DriverStatCard label="Sin pin" value={ordersWithoutLocation.length} tone="orange" />
+        <DriverStatCard label="En camino" value={enCaminoCount} tone="blue" />
         <DriverStatCard label="Entregados" value={deliveredCount} tone="green" />
       </section>
 
-      {nextOrder && (
-        <button type="button" className="driver-next-card" onClick={() => setSelectedOrder(nextOrder)}>
-          <span className="driver-next-icon">{Icons.spark}</span>
-          <span>
-            <small>Siguiente entrega</small>
-            <strong>#{formatOrderNumber(nextOrder.id)} {nextOrder.cliente}</strong>
-            <em>{getWrittenAddress(nextOrder) || 'Sin direccion escrita'}</em>
-          </span>
-          <b>{formatCurrency(nextOrder.total)}</b>
-        </button>
-      )}
+      {driverSection === 'ruta' ? (
+        <>
+          {featuredOrder && featuredAge && (
+            <section className={`driver-featured-card age-${featuredAge.key}`}>
+              <div className="driver-featured-head">
+                <span className="driver-next-icon">{Icons.spark}</span>
+                <div>
+                  <small>Entrega actual</small>
+                  <strong>#{formatOrderNumber(featuredOrder.id)} {featuredOrder.cliente}</strong>
+                  <em>{getAddressPreview(featuredOrder, 108)}</em>
+                </div>
+                <div className="driver-featured-side">
+                  <span className={`driver-age-chip ${featuredAge.key}`}>{featuredAge.label}</span>
+                  <b>{formatCurrency(featuredOrder.total)}</b>
+                </div>
+              </div>
+              <div className="driver-featured-meta">
+                <span>{getOrderItemSummary(featuredOrder)}</span>
+                <span>{hasLocation(featuredOrder.ubicacion) ? 'Con pin guardado' : 'Falta pin exacto'}</span>
+                <span>{featuredOrder.telefono || 'Sin telefono'}</span>
+                <span>{featuredAge.tone}</span>
+              </div>
+              <div className="driver-featured-actions">
+                <button type="button" onClick={() => openOrderMap(featuredOrder)}>
+                  {Icons.map}
+                  Ir al mapa
+                </button>
+                {buildCustomerWhatsappLink(featuredOrder) && (
+                  <a href={buildCustomerWhatsappLink(featuredOrder)} target="_blank" rel="noreferrer">
+                    {Icons.phone}
+                    WhatsApp
+                  </a>
+                )}
+                <button type="button" onClick={() => setSelectedOrder(featuredOrder)}>
+                  {Icons.receipt}
+                  Mostrar detalle
+                </button>
+                <button
+                  type="button"
+                  className="driver-deliver-action"
+                  onClick={() => setConfirmDeliveryOrder(featuredOrder)}
+                  disabled={deliveringOrderKey === featuredOrder.firebaseKey}
+                >
+                  {Icons.check}
+                  {deliveringOrderKey === featuredOrder.firebaseKey ? 'Guardando...' : 'Entregado'}
+                </button>
+              </div>
+              {!hasLocation(featuredOrder.ubicacion) && (
+                <div className="driver-inline-warning">
+                  <span>Este pedido no tiene punto exacto en mapa.</span>
+                  <button
+                    type="button"
+                    className="driver-location-action"
+                    onClick={() => saveCustomerLocation(featuredOrder)}
+                    disabled={locatingOrderKey === featuredOrder.firebaseKey}
+                  >
+                    {Icons.map}
+                    {locatingOrderKey === featuredOrder.firebaseKey ? 'Guardando pin...' : 'Guardar pin desde aqui'}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
 
-      <nav className="driver-filter-row" aria-label="Filtros de ruta">
-        {routeFilters.map((filter) => (
-          <button
-            key={filter.key}
-            type="button"
-            className={routeFilter === filter.key ? 'active' : ''}
-            onClick={() => setRouteFilter(filter.key)}
-          >
-            {filter.label}
-            <span>{filter.count}</span>
-          </button>
-        ))}
-      </nav>
+          <nav className="driver-filter-row" aria-label="Filtros de ruta">
+            {routeFilters.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                className={routeFilter === filter.key ? 'active' : ''}
+                onClick={() => setRouteFilter(filter.key)}
+              >
+                {filter.label}
+                <span>{filter.count}</span>
+              </button>
+            ))}
+          </nav>
 
-      {visibleRouteOrders.length === 0 ? (
-        <div className="driver-empty">
-          <DriverEmptyVector />
-          <strong>No hay pedidos en esta vista.</strong>
-          <span>Cuando administracion asigne pedidos, apareceran aqui listos para ruta.</span>
-        </div>
+          <section className="driver-section-head">
+            <div>
+              <strong>{routeListTitle}</strong>
+              <span>
+                {featuredOrder
+                  ? `${compactOrders.length} paradas despues de la actual`
+                  : `${visibleRouteOrders.length} pedidos en esta vista`}
+              </span>
+            </div>
+          </section>
+
+          {visibleRouteOrders.length === 0 ? (
+            <div className="driver-empty">
+              <DriverEmptyVector />
+              <strong>No hay pedidos en esta vista.</strong>
+              <span>Cuando administracion asigne pedidos, apareceran aqui listos para ruta.</span>
+            </div>
+          ) : (
+            <main className="driver-grid">
+              {compactOrders.map((order, index) => (
+                <DriverOrderCard
+                  key={getOrderKey(order)}
+                  order={order}
+                  index={featuredOrder ? index + 1 : index}
+                  nowMs={nowTick}
+                  delivering={deliveringOrderKey === order.firebaseKey}
+                  locating={locatingOrderKey === order.firebaseKey}
+                  onOpenDetails={setSelectedOrder}
+                  onOpenMap={openOrderMap}
+                  onAddLocation={saveCustomerLocation}
+                  onRequestDelivered={setConfirmDeliveryOrder}
+                />
+              ))}
+            </main>
+          )}
+        </>
       ) : (
-        <main className="driver-grid">
-          {visibleRouteOrders.map((order, index) => (
-            <DriverOrderCard
-              key={order.firebaseKey || order.id}
-              order={order}
-              index={index}
-              delivering={deliveringOrderKey === order.firebaseKey}
-              locating={locatingOrderKey === order.firebaseKey}
-              onOpenDetails={setSelectedOrder}
-              onOpenMap={openOrderMap}
-              onAddLocation={saveCustomerLocation}
-              onRequestDelivered={setConfirmDeliveryOrder}
-            />
-          ))}
-        </main>
+        <>
+          <section className="driver-section-head">
+            <div>
+              <strong>Historial de entregas</strong>
+              <span>{historySummary}</span>
+            </div>
+          </section>
+
+          {deliveredOrders.length === 0 ? (
+            <div className="driver-empty">
+              <DriverEmptyVector />
+              <strong>Aun no hay entregas completadas.</strong>
+              <span>Cuando cierres pedidos entregados apareceran aqui.</span>
+            </div>
+          ) : (
+            <main className="driver-grid history">
+              {deliveredOrders.map((order) => (
+                <DriverHistoryCard
+                  key={getOrderKey(order)}
+                  order={order}
+                  onOpenDetails={setSelectedOrder}
+                  onOpenMap={openOrderMap}
+                />
+              ))}
+            </main>
+          )}
+        </>
       )}
+
+      <DriverBottomNav
+        section={driverSection}
+        activeCount={activeRouteOrders.length}
+        deliveredCount={deliveredCount}
+        onChangeSection={setDriverSection}
+      />
 
       {selectedOrder && (
         <DriverDetailModal
@@ -594,48 +858,76 @@ function DriverProgress({ progress }) {
   );
 }
 
-function DriverOrderCard({ order, index, delivering, locating, onOpenDetails, onOpenMap, onAddLocation, onRequestDelivered }) {
+function DriverBottomNav({ section, activeCount, deliveredCount, onChangeSection }) {
+  return (
+    <nav className="driver-bottom-nav" aria-label="Menu principal driver">
+      <button
+        type="button"
+        className={section === 'ruta' ? 'active' : ''}
+        onClick={() => onChangeSection('ruta')}
+      >
+        {Icons.route}
+        <span>Ruta</span>
+        <b>{activeCount}</b>
+      </button>
+      <button
+        type="button"
+        className={section === 'historial' ? 'active' : ''}
+        onClick={() => onChangeSection('historial')}
+      >
+        {Icons.history}
+        <span>Historial</span>
+        <b>{deliveredCount}</b>
+      </button>
+    </nav>
+  );
+}
+
+function DriverOrderCard({ order, index, nowMs, delivering, locating, onOpenDetails, onOpenMap, onAddLocation, onRequestDelivered }) {
   const status = getStatusMeta(order);
   const delivered = isDeliveredOrder(order);
-  const address = getWrittenAddress(order);
   const navigationUrl = getOrderNavigationUrl(order);
   const whatsappLink = buildCustomerWhatsappLink(order);
   const hasMapPoint = hasLocation(order.ubicacion);
+  const ageMeta = getOrderAgeMeta(order, nowMs);
 
   return (
-    <article className={`driver-order-card ${status.tone}`}>
-      <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
+    <article className={`driver-order-card ${status.tone} age-${ageMeta.key}`}>
+      <div className="driver-order-main">
         <span className="driver-route-badge">{String(index + 1).padStart(2, '0')}</span>
-        <span className="driver-card-vector">{delivered ? Icons.check : Icons.package}</span>
         <span className="driver-order-info">
           <small>Pedido #{formatOrderNumber(order.id)}</small>
           <strong>{order.cliente}</strong>
-          <em>{address || 'Sin direccion escrita'}</em>
+          <em>{getAddressPreview(order)}</em>
         </span>
         <span className="driver-status-pill" style={{ color: status.accent }}>
           {status.label}
         </span>
-      </button>
-
-      <DriverProgress progress={status.progress} />
+      </div>
 
       <div className="driver-card-meta">
-        <span>{order.telefono || 'Sin telefono'}</span>
+        <span>{getOrderItemSummary(order)}</span>
+        <span className={`driver-age-chip ${ageMeta.key}`}>{ageMeta.label}</span>
+        <span>{hasMapPoint ? 'Con pin' : 'Sin pin'}</span>
         <b>{formatCurrency(order.total)}</b>
       </div>
 
-      <div className="driver-card-actions">
-        {!hasMapPoint && (
+      {!hasMapPoint && !delivered && (
+        <div className="driver-inline-warning compact">
+          <span>Falta ubicacion exacta del cliente.</span>
           <button
             type="button"
             className="driver-location-action"
             onClick={() => onAddLocation(order)}
-            disabled={locating || delivered}
+            disabled={locating}
           >
             {Icons.map}
-            {locating ? 'Guardando pin...' : 'Agregar ubicacion del cliente'}
+            {locating ? 'Guardando...' : 'Guardar pin'}
           </button>
-        )}
+        </div>
+      )}
+
+      <div className="driver-card-actions">
         <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
           {Icons.map}
           Mapa
@@ -646,6 +938,10 @@ function DriverOrderCard({ order, index, delivering, locating, onOpenDetails, on
             Cliente
           </a>
         )}
+        <button type="button" onClick={() => onOpenDetails(order)}>
+          {Icons.receipt}
+          Mostrar detalle
+        </button>
         {delivered ? (
           <span className="driver-done-chip">Entregado {order.timestampEntregado || ''}</span>
         ) : (
@@ -659,6 +955,50 @@ function DriverOrderCard({ order, index, delivering, locating, onOpenDetails, on
   );
 }
 
+function DriverHistoryCard({ order, onOpenDetails, onOpenMap }) {
+  const navigationUrl = getOrderNavigationUrl(order);
+  const whatsappLink = buildCustomerWhatsappLink(order);
+
+  return (
+    <article className="driver-order-card delivered history">
+      <div className="driver-order-main">
+        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-order-info">
+          <small>Pedido entregado</small>
+          <strong>{order.cliente}</strong>
+          <em>{getAddressPreview(order)}</em>
+        </span>
+        <span className="driver-status-pill delivered">Entregado</span>
+      </div>
+
+      <div className="driver-card-meta">
+        <span>{getOrderItemSummary(order)}</span>
+        <span>{hasLocation(order.ubicacion) ? 'Con pin' : 'Sin pin'}</span>
+        <span>{order.timestampEntregado || 'Sin hora'}</span>
+        <b>{formatCurrency(order.total)}</b>
+      </div>
+
+      <div className="driver-card-actions">
+        <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
+          {Icons.map}
+          Mapa
+        </button>
+        {whatsappLink && (
+          <a href={whatsappLink} target="_blank" rel="noreferrer">
+            {Icons.phone}
+            Cliente
+          </a>
+        )}
+        <button type="button" onClick={() => onOpenDetails(order)}>
+          {Icons.receipt}
+          Mostrar detalle
+        </button>
+        <span className="driver-done-chip">Entregado {order.timestampEntregado || ''}</span>
+      </div>
+    </article>
+  );
+}
+
 function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, onAddLocation, onRequestDelivered }) {
   const status = getStatusMeta(order);
   const delivered = isDeliveredOrder(order);
@@ -666,6 +1006,7 @@ function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, on
   const navigationUrl = getOrderNavigationUrl(order);
   const whatsappLink = buildCustomerWhatsappLink(order);
   const hasMapPoint = hasLocation(order.ubicacion);
+  const ageMeta = getOrderAgeMeta(order);
 
   return (
     <div
@@ -702,6 +1043,10 @@ function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, on
           <div>
             <span>Asignado</span>
             <strong>{order.timestampAsignado || order.timestampEnviado || '-'}</strong>
+          </div>
+          <div>
+            <span>Antiguedad</span>
+            <strong>{ageMeta.label}</strong>
           </div>
           <div>
             <span>Estado</span>
@@ -1885,6 +2230,468 @@ const driverStyles = `
     .driver-confirm-modal {
       border-radius: 28px;
       max-height: calc(100vh - 20px);
+    }
+  }
+  .driver-hero.driver-hero-compact {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: auto;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 28px;
+    background: linear-gradient(135deg, #111827, #7b1022 72%, #b83a33);
+    box-shadow: 0 18px 42px rgba(17, 24, 39, 0.18);
+  }
+  .driver-hero.driver-hero-compact::before {
+    display: none;
+  }
+  .driver-hero.driver-hero-compact .driver-hero-copy {
+    display: grid;
+    gap: 8px;
+  }
+  .driver-hero.driver-hero-compact h1 {
+    margin: 0;
+    font-size: clamp(32px, 8vw, 46px);
+    line-height: 0.94;
+    letter-spacing: -0.05em;
+  }
+  .driver-hero.driver-hero-compact p {
+    margin: 0;
+    font-size: 14px;
+  }
+  .driver-hero.driver-hero-compact .driver-hero-actions {
+    margin-top: 0;
+    align-self: center;
+    justify-content: flex-end;
+  }
+  .driver-summary {
+    gap: 10px;
+    margin: 14px 0 10px;
+  }
+  .driver-stat {
+    border-radius: 20px;
+    padding: 14px 12px;
+    box-shadow: 0 12px 28px rgba(17, 24, 39, 0.06);
+  }
+  .driver-stat span {
+    font-size: 11px;
+  }
+  .driver-stat strong {
+    font-size: 29px;
+  }
+  .driver-featured-card {
+    display: grid;
+    gap: 12px;
+    margin-top: 4px;
+    border: 1px solid #ead8da;
+    border-radius: 28px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 18px 42px rgba(17, 24, 39, 0.08);
+  }
+  .driver-featured-head {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+  }
+  .driver-featured-head small {
+    display: block;
+    color: #9f1239;
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .driver-featured-head strong {
+    display: block;
+    margin-top: 2px;
+    color: #111827;
+    font-size: 22px;
+    line-height: 1.05;
+  }
+  .driver-featured-head em {
+    display: block;
+    margin-top: 6px;
+    color: #6b7280;
+    font-size: 13px;
+    font-style: normal;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+  .driver-featured-head b {
+    color: #7b1022;
+    font-size: 18px;
+    white-space: nowrap;
+  }
+  .driver-featured-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .driver-featured-meta span {
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0 12px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 900;
+  }
+  .driver-featured-actions,
+  .driver-card-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .driver-featured-actions button,
+  .driver-featured-actions a,
+  .driver-card-actions button,
+  .driver-card-actions a,
+  .driver-detail-actions button,
+  .driver-detail-actions a {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 0;
+    border-radius: 16px;
+    padding: 0 12px;
+    background: #f8fafc;
+    color: #111827;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 950;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .driver-featured-actions .driver-deliver-action,
+  .driver-card-actions .driver-deliver-action,
+  .driver-detail-actions .driver-deliver-action {
+    background: #16a34a;
+    color: #ffffff;
+  }
+  .driver-featured-actions .driver-location-action,
+  .driver-card-actions .driver-location-action,
+  .driver-detail-actions .driver-location-action {
+    background: #f97316;
+    color: #ffffff;
+  }
+  .driver-inline-warning {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border: 1px solid #fed7aa;
+    border-radius: 18px;
+    padding: 12px;
+    background: #fff7ed;
+  }
+  .driver-inline-warning.compact {
+    padding: 10px 12px;
+  }
+  .driver-inline-warning span {
+    color: #9a3412;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.35;
+  }
+  .driver-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 10px 0 12px;
+  }
+  .driver-section-head strong {
+    display: block;
+    color: #111827;
+    font-size: 18px;
+    font-weight: 950;
+  }
+  .driver-section-head span {
+    display: block;
+    margin-top: 3px;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .driver-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .driver-order-card {
+    gap: 10px;
+    border-radius: 24px;
+    padding: 14px;
+    box-shadow: 0 14px 32px rgba(17, 24, 39, 0.07);
+  }
+  .driver-order-card::after {
+    display: none;
+  }
+  .driver-order-main {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: start;
+  }
+  .driver-route-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+  .driver-status-pill {
+    grid-column: auto;
+    padding: 6px 10px;
+    background: #f8fafc;
+    white-space: nowrap;
+  }
+  .driver-card-meta {
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .driver-card-meta span {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0 10px;
+    background: #f8fafc;
+    color: #6b7280;
+  }
+  .driver-card-meta b {
+    margin-left: auto;
+    color: #111827;
+    font-size: 15px;
+  }
+  .driver-card-actions .driver-deliver-action,
+  .driver-done-chip {
+    grid-column: 1 / -1;
+  }
+  .driver-done-chip {
+    min-height: 40px;
+    border-radius: 16px;
+    padding: 0 12px;
+  }
+  .driver-detail-modal {
+    width: min(680px, 100%);
+    border-radius: 28px;
+    padding: 16px;
+  }
+  .driver-detail-head {
+    border-radius: 22px;
+    padding: 18px;
+    background: linear-gradient(135deg, #111827, #7b1022);
+  }
+  .driver-detail-head h2 {
+    font-size: clamp(24px, 6vw, 40px);
+  }
+  .driver-detail-grid div,
+  .driver-detail-address,
+  .driver-detail-items {
+    border-radius: 16px;
+  }
+  @media (max-width: 860px) {
+    .driver-hero.driver-hero-compact {
+      grid-template-columns: 1fr;
+    }
+    .driver-hero.driver-hero-compact .driver-hero-actions {
+      justify-content: stretch;
+    }
+  }
+  @media (max-width: 560px) {
+    .driver-hero.driver-hero-compact {
+      padding: 16px;
+      border-radius: 24px;
+    }
+    .driver-summary {
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .driver-featured-head {
+      grid-template-columns: 48px minmax(0, 1fr);
+    }
+    .driver-featured-head b {
+      grid-column: 2;
+    }
+    .driver-featured-actions,
+    .driver-card-actions,
+    .driver-detail-actions {
+      grid-template-columns: 1fr 1fr;
+    }
+    .driver-featured-actions .driver-deliver-action,
+    .driver-inline-warning,
+    .driver-card-actions .driver-deliver-action,
+    .driver-done-chip {
+      grid-column: 1 / -1;
+    }
+    .driver-inline-warning {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .driver-section-head strong {
+      font-size: 16px;
+    }
+    .driver-order-main {
+      grid-template-columns: 36px minmax(0, 1fr);
+    }
+    .driver-status-pill {
+      grid-column: 2;
+      justify-self: start;
+    }
+    .driver-card-meta b {
+      margin-left: 0;
+    }
+    .driver-detail-modal,
+    .driver-confirm-modal {
+      width: 100%;
+      border-radius: 24px;
+    }
+  }
+  .driver-shell {
+    padding-bottom: 112px;
+  }
+  .driver-featured-side {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+  }
+  .driver-bottom-nav {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 1400;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    border-radius: 24px;
+    background: rgba(17, 24, 39, 0.94);
+    box-shadow: 0 22px 60px rgba(17, 24, 39, 0.24);
+    backdrop-filter: blur(16px);
+  }
+  .driver-bottom-nav button {
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: 20px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 18px;
+    padding: 0 14px;
+    background: transparent;
+    color: rgba(255, 250, 245, 0.72);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 950;
+    cursor: pointer;
+  }
+  .driver-bottom-nav button b {
+    min-width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    font-size: 11px;
+  }
+  .driver-bottom-nav button.active {
+    background: linear-gradient(135deg, #7b1022, #c2410c);
+    color: #fffaf5;
+    box-shadow: 0 14px 26px rgba(123, 16, 34, 0.24);
+  }
+  .driver-bottom-nav svg {
+    width: 18px;
+    height: 18px;
+  }
+  .driver-age-chip {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+  .driver-age-chip.fresh {
+    background: rgba(22, 163, 74, 0.14);
+    color: #15803d;
+  }
+  .driver-age-chip.warning {
+    background: rgba(245, 158, 11, 0.16);
+    color: #b45309;
+  }
+  .driver-age-chip.alert {
+    background: rgba(249, 115, 22, 0.16);
+    color: #c2410c;
+  }
+  .driver-age-chip.critical {
+    background: rgba(220, 38, 38, 0.14);
+    color: #b91c1c;
+  }
+  .driver-featured-card.age-fresh,
+  .driver-order-card.age-fresh {
+    border-color: rgba(34, 197, 94, 0.36);
+    box-shadow: 0 18px 42px rgba(34, 197, 94, 0.1);
+  }
+  .driver-featured-card.age-warning,
+  .driver-order-card.age-warning {
+    border-color: rgba(245, 158, 11, 0.4);
+    box-shadow: 0 18px 42px rgba(245, 158, 11, 0.12);
+  }
+  .driver-featured-card.age-alert,
+  .driver-order-card.age-alert {
+    border-color: rgba(249, 115, 22, 0.48);
+    box-shadow: 0 18px 42px rgba(249, 115, 22, 0.14);
+  }
+  .driver-featured-card.age-critical,
+  .driver-order-card.age-critical {
+    border-color: rgba(220, 38, 38, 0.5);
+    box-shadow: 0 20px 46px rgba(220, 38, 38, 0.16);
+    background: linear-gradient(145deg, rgba(255, 245, 245, 0.98), rgba(255, 255, 255, 0.96));
+  }
+  .driver-order-card.history {
+    border-color: rgba(34, 197, 94, 0.26);
+  }
+  .driver-status-pill.delivered {
+    color: #15803d;
+  }
+  .driver-grid.history {
+    padding-bottom: 8px;
+  }
+  @media (max-width: 560px) {
+    .driver-shell {
+      padding-bottom: 118px;
+    }
+    .driver-featured-side {
+      justify-items: start;
+    }
+    .driver-bottom-nav {
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      padding: 8px;
+      border-radius: 22px;
+    }
+    .driver-bottom-nav button {
+      min-height: 50px;
+      padding: 0 12px;
+      font-size: 12px;
+    }
+    .driver-featured-meta span:last-child {
+      width: 100%;
+      justify-content: center;
     }
   }
 `;

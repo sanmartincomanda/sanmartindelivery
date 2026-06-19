@@ -11,12 +11,22 @@ export const normalizeLocation = (location = {}) => {
     lat,
     lng,
     label: String(source.label || source.address || '').trim(),
+    placeId: String(source.placeId || source.place_id || '').trim(),
     mapsUrl: buildGoogleMapsPlaceUrlFromCoords(lat, lng),
     updatedAt: Number(source.updatedAt || Date.now()),
   };
 };
 
 export const hasLocation = (location) => Boolean(normalizeLocation(location));
+
+const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
+const DEFAULT_COUNTRY_CODE = 'ni';
+const SEARCH_LANGUAGE = 'es-NI,es;q=0.9,en;q=0.6';
+
+const buildGeoHeaders = () => ({
+  Accept: 'application/json',
+  'Accept-Language': SEARCH_LANGUAGE,
+});
 
 const buildGoogleMapsSearchUrl = (query) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
@@ -76,6 +86,95 @@ export const getBrowserLocation = () =>
       }
     );
   });
+
+const parseNominatimResult = (result = {}) => {
+  const normalized = normalizeLocation({
+    lat: result.lat,
+    lng: result.lon,
+    label: result.display_name || result.name || '',
+    placeId: result.place_id,
+    updatedAt: Date.now(),
+  });
+
+  if (!normalized) {
+    return null;
+  }
+
+  return {
+    ...normalized,
+    shortLabel: String(
+      result.name ||
+        result.display_name?.split(',').slice(0, 2).join(',') ||
+        normalized.label
+    ).trim(),
+    provider: 'nominatim',
+  };
+};
+
+export const searchLocationCandidates = async (query, options = {}) => {
+  const cleanQuery = String(query || '').trim();
+  if (cleanQuery.length < 3) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    q: cleanQuery,
+    format: 'jsonv2',
+    addressdetails: '1',
+    limit: String(Math.max(1, Math.min(Number(options.limit || 6), 8))),
+    dedupe: '1',
+    countrycodes: String(options.countryCode || DEFAULT_COUNTRY_CODE).toLowerCase(),
+  });
+
+  const response = await fetch(`${NOMINATIM_BASE_URL}/search?${params.toString()}`, {
+    headers: buildGeoHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('No se pudo buscar la direccion');
+  }
+
+  const payload = await response.json();
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map(parseNominatimResult).filter(Boolean);
+};
+
+export const reverseGeocodeLocation = async (location, options = {}) => {
+  const normalized = normalizeLocation(location);
+  if (!normalized) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    lat: String(normalized.lat),
+    lon: String(normalized.lng),
+    format: 'jsonv2',
+    addressdetails: '1',
+    zoom: String(Math.max(12, Math.min(Number(options.zoom || 18), 18))),
+  });
+
+  const response = await fetch(`${NOMINATIM_BASE_URL}/reverse?${params.toString()}`, {
+    headers: buildGeoHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('No se pudo resolver la direccion del punto');
+  }
+
+  const payload = await response.json();
+  const resolved = parseNominatimResult(payload);
+
+  return (
+    resolved || {
+      ...normalized,
+      label:
+        normalized.label || `${normalized.lat.toFixed(6)}, ${normalized.lng.toFixed(6)}`,
+    }
+  );
+};
 
 const toRadians = (value) => (Number(value) * Math.PI) / 180;
 
