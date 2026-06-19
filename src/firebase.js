@@ -7,7 +7,7 @@ const firebaseConfig = {
   authDomain: "comanda-digital-ac1ec.firebaseapp.com",
   databaseURL: "https://comanda-digital-ac1ec-default-rtdb.firebaseio.com",
   projectId: "comanda-digital-ac1ec",
-  storageBucket: "comanda-digital-ac1ec.appspot.com",
+  storageBucket: "comanda-digital-ac1ec.firebasestorage.app",
   messagingSenderId: "41323183250",
   appId: "1:41323183250:web:aa1d7ea9cbbc353a917a4b",
 };
