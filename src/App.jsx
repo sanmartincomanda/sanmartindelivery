@@ -86,6 +86,19 @@ const getRouteFromLocation = () => {
   return 'dashboard';
 };
 
+const getDocumentTitle = (route) => {
+  switch (route) {
+    case 'tienda':
+      return 'Carnes San Martin | Tienda en linea';
+    case 'cocina':
+      return 'Carnes San Martin | Cocina';
+    case 'driver':
+      return 'Carnes San Martin | Driver';
+    default:
+      return 'Carnes San Martin | Comanda Digital';
+  }
+};
+
 function App() {
   const [route, setRoute] = useState(() => getRouteFromLocation());
 
@@ -118,6 +131,14 @@ function App() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    document.title = getDocumentTitle(route);
+  }, [route]);
 
   useEffect(() => {
     const kitchenUserRef = ref(database, `${SYSTEM_USERS_PATH}/${KITCHEN_USER_KEY}`);
