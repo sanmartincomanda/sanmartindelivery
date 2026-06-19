@@ -40,6 +40,7 @@ import {
   updateStoreUserProfile,
 } from '../services/storeUsers';
 import {
+  buildStoreOrderText,
   subscribeOrdersForStoreUser,
   formatOrderNumber,
   formatWeight,
@@ -406,6 +407,42 @@ const buildOrderWhatsAppLink = (order, currentUser) =>
     buildOrderWhatsAppMessage(order, currentUser)
   )}`;
 
+const buildGuestCartWhatsAppMessage = ({
+  customer = {},
+  items = [],
+  notes = '',
+  coupon = null,
+  discount = 0,
+  total = 0,
+}) => {
+  const deliveryAddress = [customer.direccion, customer.referencia ? `Ref: ${customer.referencia}` : '']
+    .filter(Boolean)
+    .join(' | ');
+
+  const orderText = buildStoreOrderText(items, notes, {
+    couponCode: coupon?.code,
+    discount,
+    total,
+  });
+
+  return [
+    'Hola, quiero hacer este pedido desde la tienda virtual.',
+    '',
+    `Cliente: ${String(customer.nombre || 'Invitado').trim() || 'Invitado'}`,
+    customer.telefono ? `Telefono: ${String(customer.telefono).trim()}` : null,
+    deliveryAddress ? `Direccion: ${deliveryAddress}` : null,
+    customer.metodoPago ? `Pago: ${customer.metodoPago}` : null,
+    '',
+    'Pedido:',
+    orderText,
+    '',
+    'Lo envio como invitado para coordinarlo por WhatsApp.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+};
+
 export default function TiendaVirtualView({
   onCreateOrder,
   mode = 'public',
@@ -459,6 +496,8 @@ export default function TiendaVirtualView({
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authLocating, setAuthLocating] = useState(false);
+  const [authSheetOpen, setAuthSheetOpen] = useState(false);
+  const [pendingAuthIntent, setPendingAuthIntent] = useState('');
   const [customerOrders, setCustomerOrders] = useState([]);
   const [customer, setCustomer] = useState({
     nombre: '',
@@ -963,6 +1002,19 @@ export default function TiendaVirtualView({
     }));
   };
 
+  const openAuthSheet = (mode = 'login', intent = '') => {
+    setAuthMode(mode);
+    setAuthError('');
+    setPendingAuthIntent(intent);
+    setAuthSheetOpen(true);
+  };
+
+  const closeAuthSheet = () => {
+    setAuthSheetOpen(false);
+    setPendingAuthIntent('');
+    setAuthError('');
+  };
+
   const fillAddressFromLocation = (currentAddress, location, fallback) => {
     if (!shouldAutofillAddress(currentAddress)) {
       return currentAddress;
@@ -1036,7 +1088,6 @@ export default function TiendaVirtualView({
 
   const clearStoreSession = () => {
     setCurrentUser(null);
-    setCart({});
     setCreatedOrder(null);
     setCustomerOrders([]);
     setDeliveryMode('perfil');
@@ -1044,6 +1095,8 @@ export default function TiendaVirtualView({
     setOrdersOpen(false);
     setCheckoutOpen(false);
     setProfileOpen(false);
+    setAuthSheetOpen(false);
+    setPendingAuthIntent('');
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(STORE_SESSION_KEY);
     }
@@ -1098,6 +1151,11 @@ export default function TiendaVirtualView({
         password: authForm.password,
       });
       persistStoreSession(user);
+      const nextIntent = pendingAuthIntent;
+      closeAuthSheet();
+      if (nextIntent === 'orders') {
+        setOrdersOpen(true);
+      }
       setAuthForm((current) => ({
         ...current,
         password: '',
@@ -1131,6 +1189,11 @@ export default function TiendaVirtualView({
     try {
       const user = await registerStoreUser(authForm);
       persistStoreSession(user);
+      const nextIntent = pendingAuthIntent;
+      closeAuthSheet();
+      if (nextIntent === 'orders') {
+        setOrdersOpen(true);
+      }
       setAuthForm({
         nombre: '',
         telefono: '',
@@ -1194,11 +1257,62 @@ export default function TiendaVirtualView({
     }
   };
 
+  const openCustomerOrders = () => {
+    if (!currentUser) {
+      openAuthSheet('login', 'orders');
+      return;
+    }
+
+    setOrdersOpen(true);
+  };
+
+  const submitGuestOrderByWhatsApp = (event) => {
+    event.preventDefault();
+
+    if (cartItems.length === 0) {
+      alert('Agrega al menos un producto.');
+      return;
+    }
+
+    if (!String(customer.nombre || '').trim()) {
+      alert('Escribe tu nombre para enviar el pedido por WhatsApp.');
+      return;
+    }
+
+    if (!String(customer.telefono || '').trim()) {
+      alert('Escribe tu telefono o WhatsApp para enviar el pedido.');
+      return;
+    }
+
+    if (!String(customer.direccion || '').trim()) {
+      alert('Escribe la direccion de entrega para enviar el pedido.');
+      return;
+    }
+
+    const whatsappLink = `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+      buildGuestCartWhatsAppMessage({
+        customer,
+        items: cartItems,
+        notes: notes.trim(),
+        coupon: appliedCoupon,
+        discount: couponDiscount,
+        total: approximateTotalAmount,
+      })
+    )}`;
+
+    const popup = window.open(whatsappLink, '_blank', 'noopener,noreferrer');
+    if (!popup) {
+      window.location.href = whatsappLink;
+    }
+
+    setCheckoutOpen(false);
+  };
+
   const submitOrder = async (event) => {
     event.preventDefault();
 
     if (!currentUser) {
-      alert('Inicia sesion para crear tu pedido.');
+      openAuthSheet('login', 'checkout');
       return;
     }
 
@@ -1350,6 +1464,21 @@ export default function TiendaVirtualView({
           padding: 30px 32px 32px;
           box-shadow: 0 28px 80px rgba(38, 6, 12, 0.28);
         }
+        .store-auth-card.inline {
+          width: 100%;
+          padding: 6px 2px 2px;
+          background: transparent;
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        .store-auth-card.inline .store-auth-brand {
+          text-align: left;
+          margin-bottom: 18px;
+        }
+        .store-auth-card.inline .store-auth-brand .store-logo {
+          margin: 0 0 12px;
+        }
         .store-auth-brand {
           text-align: center;
           margin-bottom: 22px;
@@ -1426,6 +1555,23 @@ export default function TiendaVirtualView({
           color: #6b7280;
           font-size: 13px;
           font-weight: 700;
+        }
+        .store-account-card.guest {
+          border-color: rgba(123, 16, 34, 0.12);
+          background: linear-gradient(135deg, rgba(123, 16, 34, 0.08), rgba(217, 74, 63, 0.06));
+        }
+        .store-account-card.guest strong {
+          font-size: 15px;
+          color: #4a0d18;
+        }
+        .store-account-card.guest span {
+          color: #6f4a4f;
+        }
+        .store-inline-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
         }
         .store-admin-bar {
           display: flex;
@@ -1977,6 +2123,49 @@ export default function TiendaVirtualView({
           color: #6b7280;
           text-align: center;
         }
+        .store-auth-choice-card {
+          margin-top: 0;
+          border: 1px solid rgba(123, 16, 34, 0.12);
+          background: linear-gradient(180deg, #fffdfc 0%, #fff6f3 100%);
+        }
+        .store-auth-choice-card p {
+          margin: 10px 0 0;
+          color: #6b7280;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+        .store-auth-inline-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-top: 14px;
+        }
+        .store-auth-inline-actions .store-button {
+          flex: 1 1 180px;
+        }
+        .store-auth-inline-note {
+          margin-top: 12px;
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .store-auth-choice-divider {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 14px 0 10px;
+          color: #9f6b70;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .store-auth-choice-divider::before,
+        .store-auth-choice-divider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: rgba(123, 16, 34, 0.14);
+        }
         @keyframes storeSkeletonPulse {
           0% {
             background-position: 200% 0;
@@ -2163,6 +2352,11 @@ export default function TiendaVirtualView({
           display: flex;
           align-items: end;
           justify-content: center;
+        }
+        .store-auth-sheet {
+          width: min(560px, calc(100vw - 24px));
+          max-height: calc(100vh - 24px);
+          overflow: auto;
         }
         .store-sheet {
           width: min(720px, 100%);
@@ -2642,6 +2836,9 @@ export default function TiendaVirtualView({
           padding: 12px;
           margin-top: 10px;
         }
+        .store-status-card.guest-form-card {
+          margin-top: 12px;
+        }
         .store-friendly-status {
           position: relative;
           overflow: hidden;
@@ -2917,6 +3114,15 @@ export default function TiendaVirtualView({
             flex-direction: column;
             align-items: flex-end;
           }
+          .store-account-card {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+          .store-inline-actions,
+          .store-auth-inline-actions {
+            width: 100%;
+            justify-content: flex-start;
+          }
           .store-order-status-button {
             min-height: 38px;
             padding: 0 12px;
@@ -2927,6 +3133,9 @@ export default function TiendaVirtualView({
           }
           .store-auth-card {
             padding: 24px 18px;
+          }
+          .store-auth-card.inline {
+            padding: 4px 0 2px;
           }
           .store-auth-brand h1 {
             font-size: 22px;
@@ -2946,31 +3155,6 @@ export default function TiendaVirtualView({
         }
       `}</style>
 
-      {!currentUser ? (
-        <StoreAuthView
-          authMode={authMode}
-          authForm={authForm}
-          authError={authError}
-          authLoading={authLoading}
-          authLocating={authLocating}
-          onAuthModeChange={(mode) => {
-            setAuthMode(mode);
-            setAuthError('');
-          }}
-          onFormChange={updateAuthForm}
-          onCaptureLocation={captureAuthLocation}
-          onManualLocation={(location) => {
-            updateAuthForm('ubicacion', location);
-            updateAuthForm(
-              'direccion',
-              fillAddressFromLocation(authForm.direccion, location, 'Ubicacion seleccionada en el mapa')
-            );
-          }}
-          onLogin={handleStoreLogin}
-          onRegister={handleStoreRegister}
-        />
-      ) : (
-        <>
       <div className={`store-page ${cartItems.length > 0 ? 'with-floating-cart' : ''}`}>
         {isDashboard && (
           <div className="store-admin-bar">
@@ -2990,23 +3174,44 @@ export default function TiendaVirtualView({
           </div>
         )}
 
-        <div className="store-account-card">
-          <div>
-            <strong>{currentUser.nombre}</strong>
-            <span>
-              {currentUser.direccion}
-              {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
-            </span>
+        {currentUser ? (
+          <div className="store-account-card">
+            <div>
+              <strong>{currentUser.nombre}</strong>
+              <span>
+                {currentUser.direccion}
+                {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <button type="button" className="store-button secondary" onClick={() => setProfileOpen(true)}>
+                Perfil
+              </button>
+              <button type="button" className="store-button secondary" onClick={clearStoreSession}>
+                Salir
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <button type="button" className="store-button secondary" onClick={() => setProfileOpen(true)}>
-              Perfil
-            </button>
-            <button type="button" className="store-button secondary" onClick={clearStoreSession}>
-              Salir
-            </button>
+        ) : (
+          <div className="store-account-card guest">
+            <div>
+              <strong>Inicia sesion para enviar pedidos y ver el estado de tu pedido</strong>
+              <span>Continua como invitado. Nota: Puedes enviar pedido por WhatsApp como invitado.</span>
+            </div>
+            <div className="store-inline-actions">
+              <button type="button" className="store-button" onClick={() => openAuthSheet('login', 'guest')}>
+                Inicia sesion
+              </button>
+              <button
+                type="button"
+                className="store-button secondary"
+                onClick={() => openAuthSheet('register', 'guest')}
+              >
+                Crear cuenta
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <header className="store-top">
           <div className="store-brand-row">
@@ -3017,7 +3222,7 @@ export default function TiendaVirtualView({
                 type="button"
                 className="store-order-status-button"
                 title="Estado de mi pedido"
-                onClick={() => setOrdersOpen(true)}
+                onClick={openCustomerOrders}
               >
                 ESTADO DE MI PEDIDO
               </button>
@@ -3271,12 +3476,15 @@ export default function TiendaVirtualView({
           onCouponInputChange={setCouponInput}
           onEditProfile={() => setProfileOpen(true)}
           onNotesChange={setNotes}
+          onOpenLogin={() => openAuthSheet('login', 'checkout')}
+          onOpenRegister={() => openAuthSheet('register', 'checkout')}
           onRemoveCoupon={removeCoupon}
+          onGuestSubmit={submitGuestOrderByWhatsApp}
           onSubmit={submitOrder}
         />
       )}
 
-      {ordersOpen && (
+      {ordersOpen && currentUser && (
         <OrdersSheet
           currentUser={currentUser}
           orders={customerOrders}
@@ -3286,7 +3494,7 @@ export default function TiendaVirtualView({
         />
       )}
 
-      {profileOpen && (
+      {profileOpen && currentUser && (
         <ProfileSheet
           user={currentUser}
           saving={submitting}
@@ -3294,7 +3502,31 @@ export default function TiendaVirtualView({
           onSave={handleProfileSave}
         />
       )}
-        </>
+
+      {authSheetOpen && (
+        <StoreAuthSheet
+          authMode={authMode}
+          authForm={authForm}
+          authError={authError}
+          authLoading={authLoading}
+          authLocating={authLocating}
+          onClose={closeAuthSheet}
+          onAuthModeChange={(mode) => {
+            setAuthMode(mode);
+            setAuthError('');
+          }}
+          onFormChange={updateAuthForm}
+          onCaptureLocation={captureAuthLocation}
+          onManualLocation={(location) => {
+            updateAuthForm('ubicacion', location);
+            updateAuthForm(
+              'direccion',
+              fillAddressFromLocation(authForm.direccion, location, 'Ubicacion seleccionada en el mapa')
+            );
+          }}
+          onLogin={handleStoreLogin}
+          onRegister={handleStoreRegister}
+        />
       )}
     </div>
   );
@@ -3306,6 +3538,7 @@ function StoreAuthView({
   authError,
   authLoading,
   authLocating,
+  embedded = false,
   onAuthModeChange,
   onCaptureLocation,
   onManualLocation,
@@ -3315,111 +3548,127 @@ function StoreAuthView({
 }) {
   const isRegister = authMode === 'register';
 
-  return (
-    <div className="store-auth-page">
-      <section className="store-auth-card">
-        <div className="store-auth-brand">
-          <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
-          <h1>Tienda Virtual Carnes San Martin Granada</h1>
-          <p>
-            Ingresa o crea tu cuenta para pedir en linea.
-          </p>
-        </div>
+  const content = (
+    <section className={`store-auth-card ${embedded ? 'inline' : ''}`}>
+      <div className="store-auth-brand">
+        <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
+        <h1>Tienda Virtual Carnes San Martin Granada</h1>
+        <p>Ingresa o crea tu cuenta para pedir en linea.</p>
+      </div>
 
-        <div className="store-auth-toggle">
-          <button
-            type="button"
-            className={!isRegister ? 'active' : ''}
-            onClick={() => onAuthModeChange('login')}
-          >
-            Ingresar
-          </button>
-          <button
-            type="button"
-            className={isRegister ? 'active' : ''}
-            onClick={() => onAuthModeChange('register')}
-          >
-            Crear cuenta
-          </button>
-        </div>
+      <div className="store-auth-toggle">
+        <button
+          type="button"
+          className={!isRegister ? 'active' : ''}
+          onClick={() => onAuthModeChange('login')}
+        >
+          Ingresar
+        </button>
+        <button
+          type="button"
+          className={isRegister ? 'active' : ''}
+          onClick={() => onAuthModeChange('register')}
+        >
+          Crear cuenta
+        </button>
+      </div>
 
-        <h2 style={{ margin: '0 0 4px', fontSize: 26 }}>
-          {isRegister ? 'Crea tu usuario' : 'Bienvenido'}
-        </h2>
-        <p style={{ margin: '0 0 16px', color: '#6b7280', fontWeight: 700 }}>
-          {isRegister
-            ? 'Usaremos estos datos para tus pedidos delivery.'
-            : 'Ingresa con tu telefono y contrasena.'}
-        </p>
+      <h2 style={{ margin: '0 0 4px', fontSize: 26 }}>{isRegister ? 'Crea tu usuario' : 'Bienvenido'}</h2>
+      <p style={{ margin: '0 0 16px', color: '#6b7280', fontWeight: 700 }}>
+        {isRegister
+          ? 'Usaremos estos datos para tus pedidos delivery.'
+          : 'Ingresa con tu telefono y contrasena.'}
+      </p>
 
-        {authError && <div className="store-auth-error">{authError}</div>}
+      {authError && <div className="store-auth-error">{authError}</div>}
 
-        <form className="store-form" onSubmit={isRegister ? onRegister : onLogin}>
-          {isRegister && (
+      <form className="store-form" onSubmit={isRegister ? onRegister : onLogin}>
+        {isRegister && (
+          <input
+            className="store-field"
+            value={authForm.nombre}
+            onChange={(event) => onFormChange('nombre', event.target.value)}
+            placeholder="Nombre completo"
+            required
+          />
+        )}
+        <input
+          className="store-field"
+          value={authForm.telefono}
+          onChange={(event) => onFormChange('telefono', event.target.value)}
+          placeholder="Telefono o WhatsApp"
+          required
+        />
+        <input
+          className="store-field"
+          type="password"
+          value={authForm.password}
+          onChange={(event) => onFormChange('password', event.target.value)}
+          placeholder="Contrasena"
+          required
+        />
+        {isRegister && (
+          <>
             <input
               className="store-field"
-              value={authForm.nombre}
-              onChange={(event) => onFormChange('nombre', event.target.value)}
-              placeholder="Nombre completo"
+              type="password"
+              value={authForm.confirmPassword}
+              onChange={(event) => onFormChange('confirmPassword', event.target.value)}
+              placeholder="Confirmar contrasena"
               required
             />
-          )}
-          <input
-            className="store-field"
-            value={authForm.telefono}
-            onChange={(event) => onFormChange('telefono', event.target.value)}
-            placeholder="Telefono o WhatsApp"
-            required
-          />
-          <input
-            className="store-field"
-            type="password"
-            value={authForm.password}
-            onChange={(event) => onFormChange('password', event.target.value)}
-            placeholder="Contrasena"
-            required
-          />
-          {isRegister && (
-            <>
-              <input
-                className="store-field"
-                type="password"
-                value={authForm.confirmPassword}
-                onChange={(event) => onFormChange('confirmPassword', event.target.value)}
-                placeholder="Confirmar contrasena"
-                required
-              />
-              <input
-                className="store-field"
-                value={authForm.direccion}
-                onChange={(event) => onFormChange('direccion', event.target.value)}
-                placeholder="Direccion de entrega"
-                required
-              />
-              <input
-                className="store-field"
-                value={authForm.referencia}
-                onChange={(event) => onFormChange('referencia', event.target.value)}
-                placeholder="Referencia"
-              />
-              <LocationCaptureBlock
-                location={authForm.ubicacion}
-                locating={authLocating}
-                onCapture={onCaptureLocation}
-                onManualLocation={onManualLocation}
-                onAddressResolved={(value) => {
-                  if (shouldAutofillAddress(authForm.direccion)) {
-                    onFormChange('direccion', value);
-                  }
-                }}
-              />
-            </>
-          )}
-          <button type="submit" className="store-button" disabled={authLoading}>
-            {authLoading ? 'Procesando...' : isRegister ? 'Crear cuenta y entrar' : 'Entrar a la tienda'}
+            <input
+              className="store-field"
+              value={authForm.direccion}
+              onChange={(event) => onFormChange('direccion', event.target.value)}
+              placeholder="Direccion de entrega"
+              required
+            />
+            <input
+              className="store-field"
+              value={authForm.referencia}
+              onChange={(event) => onFormChange('referencia', event.target.value)}
+              placeholder="Referencia"
+            />
+            <LocationCaptureBlock
+              location={authForm.ubicacion}
+              locating={authLocating}
+              onCapture={onCaptureLocation}
+              onManualLocation={onManualLocation}
+              onAddressResolved={(value) => {
+                if (shouldAutofillAddress(authForm.direccion)) {
+                  onFormChange('direccion', value);
+                }
+              }}
+            />
+          </>
+        )}
+        <button type="submit" className="store-button" disabled={authLoading}>
+          {authLoading ? 'Procesando...' : isRegister ? 'Crear cuenta y entrar' : 'Entrar a la tienda'}
+        </button>
+      </form>
+    </section>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
+  return <div className="store-auth-page">{content}</div>;
+}
+
+function StoreAuthSheet({ onClose, ...props }) {
+  return (
+    <div className="store-sheet-overlay">
+      <div className="store-sheet store-auth-sheet">
+        <div className="store-sheet-head">
+          <button type="button" className="store-back" onClick={onClose}>
+            &lt;
           </button>
-        </form>
-      </section>
+          <strong>Inicia sesion</strong>
+        </div>
+        <StoreAuthView {...props} embedded />
+      </div>
     </div>
   );
 }
@@ -4211,11 +4460,16 @@ function CheckoutSheet({
   onCouponInputChange,
   onDeliveryModeChange,
   onEditProfile,
+  onGuestSubmit,
   onNotesChange,
+  onOpenLogin,
+  onOpenRegister,
   onQuantityChange,
   onRemoveCoupon,
   onSubmit,
 }) {
+  const isGuestCheckout = !currentUser;
+
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet">
@@ -4276,7 +4530,7 @@ function CheckoutSheet({
           <strong>{formatCurrency(totalAmount)}</strong>
         </div>
 
-        <form className="store-form" onSubmit={onSubmit}>
+        <form className="store-form" onSubmit={isGuestCheckout ? onGuestSubmit : onSubmit}>
           <div className="store-coupon-card">
             <div>
               <strong>Cupon</strong>
@@ -4325,81 +4579,142 @@ function CheckoutSheet({
             </p>
           </div>
 
-          <div className="store-delivery-mode">
-            <button
-              type="button"
-              className={`store-delivery-option ${deliveryMode === 'perfil' ? 'active' : ''}`}
-              onClick={() => onDeliveryModeChange('perfil')}
-            >
-              Mi direccion guardada
-            </button>
-            <button
-              type="button"
-              className={`store-delivery-option ${deliveryMode === 'otra' ? 'active' : ''}`}
-              onClick={() => onDeliveryModeChange('otra')}
-            >
-              Otra direccion
-            </button>
-          </div>
-
-          {deliveryMode === 'perfil' ? (
-            <div className="store-status-card" style={{ marginTop: 0 }}>
-              <div className="store-status-pill">Entrega</div>
-              <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
-              <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
-                {currentUser.telefono}
-                <br />
-                {currentUser.direccion}
-                {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+          {isGuestCheckout ? (
+            <>
+              <div className="store-status-card store-auth-choice-card">
+                <div className="store-status-pill">Pedido por la app</div>
+                <h3 style={{ margin: '10px 0 4px' }}>
+                  Inicia sesion para enviar pedidos y ver el estado de tu pedido
+                </h3>
+                <div className="store-auth-inline-actions">
+                  <button type="button" className="store-button" onClick={onOpenLogin}>
+                    Inicia sesion
+                  </button>
+                  <button type="button" className="store-button secondary" onClick={onOpenRegister}>
+                    Crear cuenta
+                  </button>
+                </div>
+                <div className="store-auth-choice-divider">o</div>
+                <strong>Continua como invitado</strong>
+                <p>Nota: Puedes enviar pedido por WhatsApp como invitado.</p>
               </div>
-              {!hasLocation(currentUser.ubicacion) && (
-                <div className="store-location-feedback error" style={{ marginTop: 10 }}>
-                  Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
+
+              <div className="store-status-card guest-form-card">
+                <div className="store-status-pill">Invitado</div>
+                <h3 style={{ margin: '10px 0 4px' }}>Datos para enviar por WhatsApp</h3>
+                <div className="store-form" style={{ marginTop: 12 }}>
+                  <input
+                    className="store-field"
+                    value={customer.nombre}
+                    onChange={(event) => onCustomerChange('nombre', event.target.value)}
+                    placeholder="Nombre completo"
+                    required
+                  />
+                  <input
+                    className="store-field"
+                    value={customer.telefono}
+                    onChange={(event) => onCustomerChange('telefono', event.target.value)}
+                    placeholder="Telefono o WhatsApp"
+                    required
+                  />
+                  <input
+                    className="store-field"
+                    value={customer.direccion}
+                    onChange={(event) => onCustomerChange('direccion', event.target.value)}
+                    placeholder="Direccion de entrega"
+                    required
+                  />
+                  <input
+                    className="store-field"
+                    value={customer.referencia}
+                    onChange={(event) => onCustomerChange('referencia', event.target.value)}
+                    placeholder="Referencia"
+                  />
+                </div>
+                <div className="store-auth-inline-note">
+                  Tu pedido se abrira listo para enviar al WhatsApp de la tienda.
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="store-delivery-mode">
+                <button
+                  type="button"
+                  className={`store-delivery-option ${deliveryMode === 'perfil' ? 'active' : ''}`}
+                  onClick={() => onDeliveryModeChange('perfil')}
+                >
+                  Mi direccion guardada
+                </button>
+                <button
+                  type="button"
+                  className={`store-delivery-option ${deliveryMode === 'otra' ? 'active' : ''}`}
+                  onClick={() => onDeliveryModeChange('otra')}
+                >
+                  Otra direccion
+                </button>
+              </div>
+
+              {deliveryMode === 'perfil' ? (
+                <div className="store-status-card" style={{ marginTop: 0 }}>
+                  <div className="store-status-pill">Entrega</div>
+                  <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+                  <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+                    {currentUser.telefono}
+                    <br />
+                    {currentUser.direccion}
+                    {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+                  </div>
+                  {!hasLocation(currentUser.ubicacion) && (
+                    <div className="store-location-feedback error" style={{ marginTop: 10 }}>
+                      Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="store-button secondary"
+                    style={{ marginTop: 10 }}
+                    onClick={onEditProfile}
+                  >
+                    Editar mi direccion
+                  </button>
+                </div>
+              ) : (
+                <div className="store-status-card" style={{ marginTop: 0 }}>
+                  <div className="store-status-pill">Entrega alterna</div>
+                  <div className="store-form" style={{ marginTop: 12 }}>
+                    <input
+                      className="store-field"
+                      value={alternateDelivery.direccion}
+                      onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
+                      placeholder="Direccion de entrega"
+                    />
+                    <input
+                      className="store-field"
+                      value={alternateDelivery.referencia}
+                      onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
+                      placeholder="Referencia"
+                    />
+                    <LocationCaptureBlock
+                      location={alternateDelivery.ubicacion}
+                      locating={alternateLocating}
+                      onCapture={onCaptureAlternateLocation}
+                      onManualLocation={(location) => {
+                        onAlternateDeliveryChange('ubicacion', location);
+                        if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                          onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
+                        }
+                      }}
+                      onAddressResolved={(value) => {
+                        if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                          onAlternateDeliveryChange('direccion', value);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               )}
-              <button
-                type="button"
-                className="store-button secondary"
-                style={{ marginTop: 10 }}
-                onClick={onEditProfile}
-              >
-                Editar mi direccion
-              </button>
-            </div>
-          ) : (
-            <div className="store-status-card" style={{ marginTop: 0 }}>
-              <div className="store-status-pill">Entrega alterna</div>
-              <div className="store-form" style={{ marginTop: 12 }}>
-                <input
-                  className="store-field"
-                  value={alternateDelivery.direccion}
-                  onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
-                  placeholder="Direccion de entrega"
-                />
-                <input
-                  className="store-field"
-                  value={alternateDelivery.referencia}
-                  onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
-                  placeholder="Referencia"
-                />
-                <LocationCaptureBlock
-                  location={alternateDelivery.ubicacion}
-                  locating={alternateLocating}
-                  onCapture={onCaptureAlternateLocation}
-                  onManualLocation={(location) => {
-                    onAlternateDeliveryChange('ubicacion', location);
-                    if (shouldAutofillAddress(alternateDelivery.direccion)) {
-                      onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
-                    }
-                  }}
-                  onAddressResolved={(value) => {
-                    if (shouldAutofillAddress(alternateDelivery.direccion)) {
-                      onAlternateDeliveryChange('direccion', value);
-                    }
-                  }}
-                />
-              </div>
-            </div>
+            </>
           )}
           <select
             className="store-select"
@@ -4419,7 +4734,11 @@ function CheckoutSheet({
             placeholder="Observaciones"
           />
           <button type="submit" className="store-button" disabled={submitting}>
-            {submitting ? 'Enviando...' : 'Enviar pedido'}
+            {submitting
+              ? 'Enviando...'
+              : isGuestCheckout
+                ? 'Enviar pedido por WhatsApp'
+                : 'Enviar pedido por la app'}
           </button>
         </form>
       </div>
