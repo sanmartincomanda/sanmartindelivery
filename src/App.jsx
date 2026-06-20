@@ -1,17 +1,11 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref, update } from 'firebase/database';
+import { Suspense, lazy } from 'react';
 import { database } from './firebase';
 import logo from './logo.svg';
 import './App.css';
 
 import { hoyISO } from './components/Utils';
-import OrderForm from './components/OrderForm';
-import KitchenView from './components/KitchenView';
-import ListaPedidos from './components/ListaPedidos';
-import TiendaVirtualView from './components/TiendaVirtualView';
-import ConfiguracionView from './components/ConfiguracionView';
-import DriverView from './components/DriverView';
-import BaseDatosView from './components/BaseDatosView';
 import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForDate } from './services/orders';
 import {
   KITCHEN_USER_KEY,
@@ -19,6 +13,14 @@ import {
   normalizeKitchenUser,
   SYSTEM_USERS_PATH,
 } from './services/systemUsers';
+
+const OrderForm = lazy(() => import('./components/OrderForm'));
+const KitchenView = lazy(() => import('./components/KitchenView'));
+const ListaPedidos = lazy(() => import('./components/ListaPedidos'));
+const TiendaVirtualView = lazy(() => import('./components/TiendaVirtualView'));
+const ConfiguracionView = lazy(() => import('./components/ConfiguracionView'));
+const DriverView = lazy(() => import('./components/DriverView'));
+const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
 
 const Icons = {
   plus: (
@@ -98,6 +100,42 @@ const getDocumentTitle = (route) => {
       return 'Carnes San Martin | Comanda Digital';
   }
 };
+
+function LazyViewFallback({ label = 'Cargando modulo...' }) {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f8fafc',
+        flexDirection: 'column',
+        gap: '18px',
+      }}
+    >
+      <div
+        style={{
+          width: '60px',
+          height: '60px',
+          borderRadius: '18px',
+          background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 16px 36px rgba(220, 38, 38, 0.2)',
+        }}
+      >
+        <img
+          src={logo}
+          alt="Logo"
+          style={{ width: '36px', height: '36px', filter: 'brightness(0) invert(1)' }}
+        />
+      </div>
+      <div style={{ fontSize: '17px', fontWeight: 700, color: '#64748b' }}>{label}</div>
+    </div>
+  );
+}
 
 function App() {
   const [route, setRoute] = useState(() => getRouteFromLocation());
@@ -330,18 +368,24 @@ function App() {
 
   if (isPublicStoreRoute) {
     return (
-      <TiendaVirtualView
-        onCreateOrder={addOrder}
-        nextOrderNumber={nextOrderNumber}
-        remainingOrders={remainingOrders}
-        publicStoreUrl={publicStoreUrl}
-        mode="public"
-      />
+      <Suspense fallback={<LazyViewFallback label="Cargando tienda..." />}>
+        <TiendaVirtualView
+          onCreateOrder={addOrder}
+          nextOrderNumber={nextOrderNumber}
+          remainingOrders={remainingOrders}
+          publicStoreUrl={publicStoreUrl}
+          mode="public"
+        />
+      </Suspense>
     );
   }
 
   if (isDriverRoute) {
-    return <DriverView />;
+    return (
+      <Suspense fallback={<LazyViewFallback label="Cargando driver..." />}>
+        <DriverView />
+      </Suspense>
+    );
   }
 
   if (isKitchenRoute) {
@@ -357,7 +401,11 @@ function App() {
       );
     }
 
-    return <KitchenView orders={orders} />;
+    return (
+      <Suspense fallback={<LazyViewFallback label="Cargando cocina..." />}>
+        <KitchenView orders={orders} />
+      </Suspense>
+    );
   }
 
   if (!isAuthenticated) {
@@ -732,22 +780,24 @@ function App() {
         </header>
 
         <div className="animate-fadeIn" style={{ flex: 1 }}>
-          {view === 'ingreso' && (
-            <OrderForm
-              onAddOrder={addOrder}
-              clientes={clientes}
-              nextOrderNumber={nextOrderNumber}
-              remainingOrders={remainingOrders}
-            />
-          )}
+          <Suspense fallback={<LazyViewFallback label="Cargando modulo..." />}>
+            {view === 'ingreso' && (
+              <OrderForm
+                onAddOrder={addOrder}
+                clientes={clientes}
+                nextOrderNumber={nextOrderNumber}
+                remainingOrders={remainingOrders}
+              />
+            )}
 
-          {view === 'cocina' && <KitchenView orders={orders} />}
+            {view === 'cocina' && <KitchenView orders={orders} />}
 
-          {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
+            {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
 
-          {view === 'configuracion' && <ConfiguracionView />}
+            {view === 'configuracion' && <ConfiguracionView />}
 
-          {view === 'basedatos' && <BaseDatosView clientes={clientes} />}
+            {view === 'basedatos' && <BaseDatosView clientes={clientes} />}
+          </Suspense>
         </div>
       </main>
     </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { onValue, ref } from 'firebase/database';
 import { database } from '../firebase';
 import {
@@ -60,6 +60,17 @@ import {
   fetchSicarProductImage,
   getSicarBridgeHealth,
 } from '../services/sicarCatalog';
+import {
+  readStoreJsonCache,
+  STORE_CATALOG_CACHE_KEY,
+  STORE_CATALOG_CACHE_VERSION,
+  STORE_CATEGORIES_CACHE_KEY,
+  STORE_CATEGORIES_CACHE_VERSION,
+  STORE_COUPONS_CACHE_KEY,
+  STORE_COUPONS_CACHE_VERSION,
+  unwrapStoreCache,
+  writeStoreVersionedCache,
+} from '../services/storeCache';
 
 const COUPONS_PIN = '210397';
 
@@ -168,6 +179,20 @@ const chunkArray = (items = [], size = 1) => {
   return chunks;
 };
 
+const getInitialConfigCollection = (cacheKey, cacheVersion, mergeCollection, fallbackValue) => {
+  const cachedCollection = unwrapStoreCache(readStoreJsonCache(cacheKey), cacheVersion);
+  const hasCachedCollection =
+    Boolean(cachedCollection.data) &&
+    typeof cachedCollection.data === 'object' &&
+    Object.keys(cachedCollection.data).length > 0;
+
+  if (hasCachedCollection) {
+    return mergeCollection(cachedCollection.data);
+  }
+
+  return fallbackValue;
+};
+
 const IMAGE_CROP_OUTPUT_SIZE = 960;
 const IMAGE_CROP_MIN_ZOOM = 1;
 const IMAGE_CROP_MAX_ZOOM = 3;
@@ -259,12 +284,34 @@ const cropCatalogImage = async ({
 export default function ConfiguracionView() {
   const [section, setSection] = useState('catalogo');
   const [usersTab, setUsersTab] = useState('administrativo');
-  const [products, setProducts] = useState(() => mergeCatalogProducts());
-  const [categories, setCategories] = useState(() => mergeStoreCategories());
-  const [coupons, setCoupons] = useState(() => mergeStoreCoupons());
+  const [products, setProducts] = useState(() =>
+    getInitialConfigCollection(
+      STORE_CATALOG_CACHE_KEY,
+      STORE_CATALOG_CACHE_VERSION,
+      mergeCatalogProducts,
+      []
+    )
+  );
+  const [categories, setCategories] = useState(() =>
+    getInitialConfigCollection(
+      STORE_CATEGORIES_CACHE_KEY,
+      STORE_CATEGORIES_CACHE_VERSION,
+      mergeStoreCategories,
+      mergeStoreCategories()
+    )
+  );
+  const [coupons, setCoupons] = useState(() =>
+    getInitialConfigCollection(
+      STORE_COUPONS_CACHE_KEY,
+      STORE_COUPONS_CACHE_VERSION,
+      mergeStoreCoupons,
+      []
+    )
+  );
   const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
   const [storeUsers, setStoreUsers] = useState([]);
+  const [catalogHydrated, setCatalogHydrated] = useState(() => products.length > 0);
   const [form, setForm] = useState(emptyProduct);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [couponForm, setCouponForm] = useState(emptyCoupon);
@@ -294,41 +341,85 @@ export default function ConfiguracionView() {
   const [applyingImageCrop, setApplyingImageCrop] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
-      setProducts(mergeCatalogProducts(snapshot.val()));
+    if (section !== 'catalogo') {
+      return undefined;
+    }
+
+    const unsubscribeCatalog = onValue(ref(database, STORE_CATALOG_PATH), (snapshot) => {
+      const remoteCatalog = snapshot.val() || {};
+      writeStoreVersionedCache(
+        STORE_CATALOG_CACHE_KEY,
+        STORE_CATALOG_CACHE_VERSION,
+        remoteCatalog
+      );
+      startTransition(() => {
+        setProducts(mergeCatalogProducts(remoteCatalog));
+        setCatalogHydrated(true);
+      });
     });
 
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
-      setCategories(mergeStoreCategories(snapshot.val()));
+    const unsubscribeCategories = onValue(ref(database, STORE_CATEGORIES_PATH), (snapshot) => {
+      const remoteCategories = snapshot.val() || {};
+      writeStoreVersionedCache(
+        STORE_CATEGORIES_CACHE_KEY,
+        STORE_CATEGORIES_CACHE_VERSION,
+        remoteCategories
+      );
+      startTransition(() => {
+        setCategories(mergeStoreCategories(remoteCategories));
+      });
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribeCatalog();
+      unsubscribeCategories();
+    };
+  }, [section]);
 
   useEffect(() => {
+    if (section !== 'cupones') {
+      return undefined;
+    }
+
     const unsubscribe = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
-      setCoupons(mergeStoreCoupons(snapshot.val()));
+      const remoteCoupons = snapshot.val() || {};
+      writeStoreVersionedCache(
+        STORE_COUPONS_CACHE_KEY,
+        STORE_COUPONS_CACHE_VERSION,
+        remoteCoupons
+      );
+      startTransition(() => {
+        setCoupons(mergeStoreCoupons(remoteCoupons));
+      });
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [section]);
 
   useEffect(() => {
+    if (section !== 'entregadores') {
+      return undefined;
+    }
+
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
-      setDrivers(mergeDrivers(snapshot.val()));
+      startTransition(() => {
+        setDrivers(mergeDrivers(snapshot.val()));
+      });
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [section]);
 
   useEffect(() => {
+    if (section !== 'usuarios') {
+      return undefined;
+    }
+
     const unsubscribe = onValue(ref(database, `${SYSTEM_USERS_PATH}/${KITCHEN_USER_KEY}`), (snapshot) => {
       const nextUser = normalizeKitchenUser(snapshot.val());
-      setKitchenUser(nextUser);
+      startTransition(() => {
+        setKitchenUser(nextUser);
+      });
       setKitchenForm((current) => ({
         ...current,
         username: nextUser.username || 'cocina',
@@ -338,9 +429,13 @@ export default function ConfiguracionView() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [section]);
 
   useEffect(() => {
+    if (section !== 'usuarios' || usersTab !== 'clientes') {
+      return undefined;
+    }
+
     const unsubscribe = onValue(ref(database, STORE_USERS_PATH), (snapshot) => {
       const data = snapshot.val() || {};
       const users = Object.entries(data).map(([key, value]) => ({
@@ -353,11 +448,13 @@ export default function ConfiguracionView() {
         String(left.nombre || '').localeCompare(String(right.nombre || ''))
       );
 
-      setStoreUsers(users);
+      startTransition(() => {
+        setStoreUsers(users);
+      });
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [section, usersTab]);
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1685,7 +1782,7 @@ export default function ConfiguracionView() {
                 placeholder="Buscar producto"
                 style={{ maxWidth: 360 }}
               />
-              <strong>{filteredProducts.length} productos</strong>
+              <strong>{catalogHydrated ? `${filteredProducts.length} productos` : 'Cargando catalogo...'}</strong>
             </div>
 
             <table className="cfg-table">
@@ -1700,10 +1797,23 @@ export default function ConfiguracionView() {
                 </tr>
               </thead>
               <tbody>
+                {!catalogHydrated && filteredProducts.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ color: '#64748b', fontWeight: 800 }}>
+                      Cargando catalogo real desde Firebase...
+                    </td>
+                  </tr>
+                )}
                 {filteredProducts.map((product) => (
                   <tr key={product.code}>
                     <td>
-                      <img className="cfg-photo" src={product.image || '/tienda/branding/logo.png'} alt="" />
+                      <img
+                        className="cfg-photo"
+                        src={product.image || '/tienda/branding/logo.png'}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </td>
                     <td>
                       <strong>{product.name}</strong>

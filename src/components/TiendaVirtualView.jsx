@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { get, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import {
@@ -25,6 +25,17 @@ import {
   STORE_COUPONS_PATH,
 } from '../services/storeCoupons';
 import {
+  readStoreJsonCache,
+  STORE_CATALOG_CACHE_KEY,
+  STORE_CATALOG_CACHE_VERSION,
+  STORE_CATEGORIES_CACHE_KEY,
+  STORE_CATEGORIES_CACHE_VERSION,
+  STORE_COUPONS_CACHE_KEY,
+  STORE_COUPONS_CACHE_VERSION,
+  unwrapStoreCache,
+  writeStoreVersionedCache,
+} from '../services/storeCache';
+import {
   buildGoogleMapsEmbedUrl,
   buildGoogleMapsPlaceUrl,
   getBrowserLocation,
@@ -49,8 +60,6 @@ import {
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
-const STORE_CATALOG_CACHE_KEY = 'sanmartin_store_catalog_cache_v1';
-const STORE_CATALOG_CACHE_VERSION = 2;
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
 const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
@@ -66,63 +75,11 @@ const STORE_STORY_DURATION_MS = 10000;
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
-const readStoreJsonCache = (key) => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    return JSON.parse(window.localStorage.getItem(key) || 'null');
-  } catch (error) {
-    console.error(`No se pudo leer cache local de ${key}:`, error);
-    return null;
-  }
-};
-
-const writeStoreJsonCache = (key, value) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    if (!value || typeof value !== 'object' || Object.keys(value).length === 0) {
-      window.localStorage.removeItem(key);
-      return;
-    }
-
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`No se pudo guardar cache local de ${key}:`, error);
-  }
-};
-
-const unwrapCatalogCache = (cachedValue) => {
-  if (!cachedValue || typeof cachedValue !== 'object') {
-    return {
-      data: null,
-      updatedAt: 0,
-    };
-  }
-
-  if (
-    Number(cachedValue.version || 0) === STORE_CATALOG_CACHE_VERSION &&
-    cachedValue.data &&
-    typeof cachedValue.data === 'object'
-  ) {
-    return {
-      data: cachedValue.data,
-      updatedAt: Number(cachedValue.updatedAt || 0),
-    };
-  }
-
-  return {
-    data: cachedValue,
-    updatedAt: 0,
-  };
-};
-
 const getInitialCatalogState = () => {
-  const cachedCatalog = unwrapCatalogCache(readStoreJsonCache(STORE_CATALOG_CACHE_KEY));
+  const cachedCatalog = unwrapStoreCache(
+    readStoreJsonCache(STORE_CATALOG_CACHE_KEY),
+    STORE_CATALOG_CACHE_VERSION
+  );
   const hasCachedCatalog =
     Boolean(cachedCatalog.data) &&
     typeof cachedCatalog.data === 'object' &&
@@ -132,6 +89,20 @@ const getInitialCatalogState = () => {
     catalog: hasCachedCatalog ? mergeCatalogProducts(cachedCatalog.data) : [],
     loading: !hasCachedCatalog,
   };
+};
+
+const getInitialStoreCollection = (cacheKey, cacheVersion, mergeCollection, fallbackValue) => {
+  const cachedCollection = unwrapStoreCache(readStoreJsonCache(cacheKey), cacheVersion);
+  const hasCachedCollection =
+    Boolean(cachedCollection.data) &&
+    typeof cachedCollection.data === 'object' &&
+    Object.keys(cachedCollection.data).length > 0;
+
+  if (hasCachedCollection) {
+    return mergeCollection(cachedCollection.data);
+  }
+
+  return fallbackValue;
 };
 
 const isUnitProduct = (product) => isUnitMeasure(product?.unit);
@@ -451,8 +422,22 @@ export default function TiendaVirtualView({
   const [catalogState] = useState(() => getInitialCatalogState());
   const [catalog, setCatalog] = useState(() => catalogState.catalog);
   const [catalogLoading, setCatalogLoading] = useState(() => catalogState.loading);
-  const [categories, setCategories] = useState(() => mergeStoreCategories());
-  const [coupons, setCoupons] = useState([]);
+  const [categories, setCategories] = useState(() =>
+    getInitialStoreCollection(
+      STORE_CATEGORIES_CACHE_KEY,
+      STORE_CATEGORIES_CACHE_VERSION,
+      mergeStoreCategories,
+      mergeStoreCategories()
+    )
+  );
+  const [coupons, setCoupons] = useState(() =>
+    getInitialStoreCollection(
+      STORE_COUPONS_CACHE_KEY,
+      STORE_COUPONS_CACHE_VERSION,
+      mergeStoreCoupons,
+      []
+    )
+  );
   const [cart, setCart] = useState({});
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -521,21 +506,30 @@ export default function TiendaVirtualView({
     let cancelled = false;
 
     const loadCatalog = async () => {
-      const cachedCatalog = unwrapCatalogCache(readStoreJsonCache(STORE_CATALOG_CACHE_KEY));
+      const cachedCatalog = unwrapStoreCache(
+        readStoreJsonCache(STORE_CATALOG_CACHE_KEY),
+        STORE_CATALOG_CACHE_VERSION
+      );
 
       try {
-        const metaSnapshot = await get(ref(database, STORE_CATALOG_META_PATH));
-        const remoteUpdatedAt = Number(metaSnapshot.val()?.updatedAt || 0);
-        const canReuseCache =
-          Boolean(cachedCatalog.data) &&
-          cachedCatalog.updatedAt > 0 &&
-          remoteUpdatedAt > 0 &&
-          cachedCatalog.updatedAt >= remoteUpdatedAt;
+        let remoteUpdatedAt = 0;
+        let canReuseCache = false;
+
+        if (cachedCatalog.data) {
+          const metaSnapshot = await get(ref(database, STORE_CATALOG_META_PATH));
+          remoteUpdatedAt = Number(metaSnapshot.val()?.updatedAt || 0);
+          canReuseCache =
+            cachedCatalog.updatedAt > 0 &&
+            remoteUpdatedAt > 0 &&
+            cachedCatalog.updatedAt >= remoteUpdatedAt;
+        }
 
         if (canReuseCache) {
           if (!cancelled) {
-            setCatalog(mergeCatalogProducts(cachedCatalog.data));
-            setCatalogLoading(false);
+            startTransition(() => {
+              setCatalog(mergeCatalogProducts(cachedCatalog.data));
+              setCatalogLoading(false);
+            });
           }
           return;
         }
@@ -543,22 +537,27 @@ export default function TiendaVirtualView({
         const catalogSnapshot = await get(ref(database, STORE_CATALOG_PATH));
         const remoteCatalog = catalogSnapshot.val() || {};
 
-        writeStoreJsonCache(STORE_CATALOG_CACHE_KEY, {
-          version: STORE_CATALOG_CACHE_VERSION,
-          updatedAt: remoteUpdatedAt || Date.now(),
-          data: remoteCatalog,
-        });
+        writeStoreVersionedCache(
+          STORE_CATALOG_CACHE_KEY,
+          STORE_CATALOG_CACHE_VERSION,
+          remoteCatalog,
+          remoteUpdatedAt || Date.now()
+        );
 
         if (!cancelled) {
-          setCatalog(mergeCatalogProducts(remoteCatalog));
-          setCatalogLoading(false);
+          startTransition(() => {
+            setCatalog(mergeCatalogProducts(remoteCatalog));
+            setCatalogLoading(false);
+          });
         }
       } catch (error) {
         console.error('No se pudo cargar el catalogo de tienda:', error);
 
         if (!cancelled) {
           if (cachedCatalog.data) {
-            setCatalog(mergeCatalogProducts(cachedCatalog.data));
+            startTransition(() => {
+              setCatalog(mergeCatalogProducts(cachedCatalog.data));
+            });
           }
           setCatalogLoading(false);
         }
@@ -578,8 +577,16 @@ export default function TiendaVirtualView({
     const loadCategories = async () => {
       try {
         const snapshot = await get(ref(database, STORE_CATEGORIES_PATH));
+        const remoteCategories = snapshot.val() || {};
+        writeStoreVersionedCache(
+          STORE_CATEGORIES_CACHE_KEY,
+          STORE_CATEGORIES_CACHE_VERSION,
+          remoteCategories
+        );
         if (!cancelled) {
-          setCategories(mergeStoreCategories(snapshot.val()));
+          startTransition(() => {
+            setCategories(mergeStoreCategories(remoteCategories));
+          });
         }
       } catch (error) {
         console.error('No se pudieron cargar las categorias de tienda:', error);
@@ -599,8 +606,16 @@ export default function TiendaVirtualView({
     const loadCoupons = async () => {
       try {
         const snapshot = await get(ref(database, STORE_COUPONS_PATH));
+        const remoteCoupons = snapshot.val() || {};
+        writeStoreVersionedCache(
+          STORE_COUPONS_CACHE_KEY,
+          STORE_COUPONS_CACHE_VERSION,
+          remoteCoupons
+        );
         if (!cancelled) {
-          setCoupons(mergeStoreCoupons(snapshot.val()));
+          startTransition(() => {
+            setCoupons(mergeStoreCoupons(remoteCoupons));
+          });
         }
       } catch (error) {
         console.error('No se pudieron cargar los cupones de tienda:', error);
@@ -1591,12 +1606,13 @@ export default function TiendaVirtualView({
           background: rgba(255, 250, 250, 0.9);
           backdrop-filter: blur(12px);
           padding: 10px 0 14px;
+          display: grid;
+          gap: 14px;
         }
         .store-brand-row {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin-bottom: 10px;
         }
         .store-logo {
           width: 42px;
@@ -1660,51 +1676,91 @@ export default function TiendaVirtualView({
         .store-search-wrap {
           display: flex;
           align-items: center;
-          gap: 10px;
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
-          border-radius: 999px;
-          padding: 0 14px;
-          height: 48px;
-          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+          gap: 12px;
+          background: linear-gradient(180deg, #ffffff 0%, #fff8f6 100%);
+          border: 1px solid rgba(123, 16, 34, 0.12);
+          border-radius: 26px;
+          padding: 0 18px;
+          min-height: 58px;
+          box-shadow: 0 18px 34px rgba(15, 23, 42, 0.06);
         }
         .store-search {
           width: 100%;
           border: 0;
           outline: 0;
-          font-size: 15px;
+          font-size: 16px;
+          font-weight: 800;
           background: transparent;
+        }
+        .store-search-tag {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 34px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: rgba(123, 16, 34, 0.08);
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          white-space: nowrap;
+        }
+        .store-filters-panel {
+          border: 1px solid rgba(123, 16, 34, 0.12);
+          border-radius: 28px;
+          padding: 16px 16px 14px;
+          background:
+            radial-gradient(circle at top right, rgba(255, 220, 209, 0.55), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 248, 246, 0.98) 100%);
+          box-shadow: 0 20px 44px rgba(123, 16, 34, 0.08);
         }
         .store-filter-strip {
           display: flex;
-          align-items: flex-end;
+          align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          padding: 12px 4px 0;
+          gap: 16px;
+          padding: 0 4px 10px;
         }
         .store-filter-strip strong {
           display: block;
           color: #111827;
-          font-size: 16px;
+          font-size: 19px;
           font-weight: 950;
+          letter-spacing: -0.02em;
         }
         .store-filter-strip span {
           display: block;
-          margin-top: 3px;
+          margin-top: 4px;
           color: #7c5b5f;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 800;
+        }
+        .store-filter-kicker {
+          display: inline-flex;
+          align-items: center;
+          min-height: 32px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: rgba(123, 16, 34, 0.08);
+          color: #7b1022;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          white-space: nowrap;
         }
         .store-tabs {
           display: flex;
-          gap: 10px;
+          gap: 14px;
           overflow-x: auto;
-          padding: 12px 2px 4px;
+          padding: 6px 2px 10px;
           scrollbar-width: none;
         }
         .store-subtabs {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           overflow-x: auto;
           padding: 6px 2px 2px;
           scrollbar-width: none;
@@ -1715,15 +1771,33 @@ export default function TiendaVirtualView({
         }
         .store-chip {
           flex: 0 0 auto;
-          min-height: 42px;
-          padding: 10px 16px;
+          min-height: 54px;
+          padding: 14px 20px;
           border-radius: 999px;
           background: linear-gradient(180deg, #ffffff 0%, #fff7f4 100%);
           color: #4b5563;
           border: 1px solid #f1dfe0;
-          box-shadow: 0 10px 24px rgba(123, 16, 34, 0.06);
-          font-size: 13px;
+          box-shadow: 0 12px 24px rgba(123, 16, 34, 0.08);
+          font-size: 14px;
           font-weight: 900;
+          position: relative;
+          overflow: hidden;
+        }
+        .store-chip::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.45), transparent 58%);
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          pointer-events: none;
+        }
+        .store-chip:hover::before,
+        .store-chip.active::before {
+          opacity: 1;
+        }
+        .store-chip:hover {
+          box-shadow: 0 16px 30px rgba(123, 16, 34, 0.12);
         }
         .store-chip.active {
           background: linear-gradient(135deg, #7b1022, #d94a3f);
@@ -1736,41 +1810,41 @@ export default function TiendaVirtualView({
           flex-direction: column;
           align-items: flex-start;
           justify-content: center;
-          min-width: 112px;
-          gap: 3px;
+          min-width: 150px;
+          gap: 5px;
           text-align: left;
         }
         .store-filter-chip.compact {
           min-width: auto;
           flex-direction: row;
           align-items: center;
-          gap: 8px;
-          padding-right: 10px;
+          gap: 10px;
+          padding-right: 14px;
         }
         .store-filter-label,
         .store-filter-pill-label {
           display: block;
-          font-size: 13px;
+          font-size: 15px;
           font-weight: 950;
           line-height: 1.08;
         }
         .store-filter-meta {
           display: block;
           color: #7c5b5f;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 800;
         }
         .store-filter-badge {
-          min-width: 26px;
-          height: 26px;
+          min-width: 30px;
+          height: 30px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           border-radius: 999px;
-          padding: 0 8px;
+          padding: 0 10px;
           background: rgba(123, 16, 34, 0.08);
           color: #7b1022;
-          font-size: 11px;
+          font-size: 12px;
           font-weight: 950;
           line-height: 1;
         }
@@ -1782,42 +1856,54 @@ export default function TiendaVirtualView({
           color: #ffffff;
         }
         .store-subtabs .store-chip {
-          min-height: 38px;
-          padding: 8px 13px;
-          font-size: 13px;
-          background: #ffffff;
+          min-height: 46px;
+          padding: 10px 16px;
+          font-size: 14px;
+          background: rgba(255, 255, 255, 0.96);
           color: #7b1022;
           border-color: #ead8da;
-          box-shadow: none;
+          box-shadow: 0 10px 20px rgba(123, 16, 34, 0.06);
         }
         .store-subtabs .store-chip.active {
           background: #111827;
           border-color: #111827;
           color: #ffffff;
+          box-shadow: 0 14px 28px rgba(17, 24, 39, 0.2);
         }
         .store-subtabs .store-filter-chip.compact {
-          padding-right: 12px;
+          padding-right: 16px;
         }
         .store-subtabs .store-chip.active .store-filter-badge {
           background: rgba(255, 255, 255, 0.14);
           color: #ffffff;
         }
         .store-promo {
-          margin: 12px 0 18px;
+          margin: 0;
+          padding: 14px 16px 12px;
+          border: 1px solid rgba(123, 16, 34, 0.12);
+          border-radius: 28px;
+          background:
+            radial-gradient(circle at top right, rgba(255, 227, 214, 0.5), transparent 34%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 243, 0.98) 100%);
+          box-shadow: 0 20px 44px rgba(123, 16, 34, 0.08);
         }
         .store-section-title {
-          font-size: 18px;
+          font-size: 20px;
           font-weight: 900;
-          margin: 0 0 10px;
+          margin: 0 0 12px;
+          letter-spacing: -0.02em;
         }
         .store-stories {
           display: flex;
           gap: 12px;
           overflow-x: auto;
-          padding-bottom: 4px;
+          padding: 4px 2px 8px;
+          align-items: flex-start;
+          scroll-snap-type: x proximity;
         }
         .store-story {
-          flex: 0 0 82px;
+          flex: 0 0 86px;
+          min-height: 122px;
           border: 0;
           background: transparent;
           color: #111827;
@@ -1828,11 +1914,17 @@ export default function TiendaVirtualView({
           cursor: pointer;
           padding: 0;
           text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-start;
+          gap: 8px;
+          scroll-snap-align: start;
         }
         .store-story-ring {
           width: 74px;
           height: 74px;
-          margin: 0 auto 7px;
+          margin: 0;
           border-radius: 999px;
           padding: 3px;
           background: conic-gradient(from 160deg, #fbbf24, #ef4444, #991b1b, #fbbf24);
@@ -1840,6 +1932,8 @@ export default function TiendaVirtualView({
           align-items: center;
           justify-content: center;
           box-shadow: 0 10px 24px rgba(153, 27, 27, 0.16);
+          flex: 0 0 auto;
+          transition: transform 0.24s ease, box-shadow 0.24s ease;
         }
         .store-story-ring img {
           width: 100%;
@@ -1855,6 +1949,10 @@ export default function TiendaVirtualView({
         .store-story-title {
           display: block;
           white-space: normal;
+          width: 100%;
+          min-height: 30px;
+          text-wrap: balance;
+          overflow: hidden;
         }
         .store-story-viewer-overlay {
           position: fixed;
@@ -2012,7 +2110,7 @@ export default function TiendaVirtualView({
           align-items: end;
           justify-content: space-between;
           gap: 12px;
-          margin-bottom: 14px;
+          margin: 18px 0 14px;
         }
         .store-count {
           margin: 0;
@@ -2031,27 +2129,96 @@ export default function TiendaVirtualView({
         .store-product {
           position: relative;
           min-width: 0;
+          display: flex;
         }
         .store-product-skeleton {
           display: grid;
           gap: 10px;
         }
-        .store-product-image {
+        .store-product-card {
+          position: relative;
+          width: 100%;
+          min-width: 0;
+          border: 0;
+          background: transparent;
+          padding: 10px 10px 14px;
+          color: inherit;
+          text-align: left;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          cursor: pointer;
+          transform: translateZ(0);
+          transition: transform 0.28s ease, filter 0.28s ease;
+        }
+        .store-product-card::before,
+        .store-product-card::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          clip-path: polygon(12% 0%, 88% 0%, 100% 16%, 100% 84%, 88% 100%, 12% 100%, 0% 84%, 0% 16%);
+          pointer-events: none;
+        }
+        .store-product-card::before {
+          background: linear-gradient(165deg, rgba(123, 16, 34, 0.16), rgba(255, 233, 223, 0.92));
+          box-shadow: 0 20px 38px rgba(123, 16, 34, 0.14);
+        }
+        .store-product-card::after {
+          inset: 1px;
+          background:
+            radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), rgba(255, 248, 244, 0.92) 54%, rgba(255, 236, 226, 0.88) 100%);
+        }
+        .store-product-card > * {
+          position: relative;
+          z-index: 1;
+        }
+        .store-product:hover .store-product-card {
+          transform: translateY(-7px) rotate(-1deg);
+          filter: saturate(1.04);
+        }
+        .store-product:nth-child(2n):hover .store-product-card {
+          transform: translateY(-7px) rotate(1deg);
+        }
+        .store-product:active .store-product-card,
+        .store-product-card:focus-visible {
+          transform: translateY(-2px) scale(0.98);
+        }
+        .store-product-card:focus-visible {
+          outline: 3px solid rgba(123, 16, 34, 0.3);
+          outline-offset: 4px;
+        }
+        .store-product-hex {
+          width: 100%;
+          display: block;
+          padding: 12px;
+          clip-path: polygon(13% 0%, 87% 0%, 100% 18%, 100% 82%, 87% 100%, 13% 100%, 0% 82%, 0% 18%);
+          background: linear-gradient(140deg, rgba(123, 16, 34, 0.14), rgba(255, 227, 214, 0.95));
+        }
+        .store-product-image-shell {
+          display: block;
           width: 100%;
           aspect-ratio: 1 / 1;
-          border-radius: 8px;
-          background: #ffffff;
-          border: 1px solid #eef0f3;
+          clip-path: polygon(13% 0%, 87% 0%, 100% 18%, 100% 82%, 87% 100%, 13% 100%, 0% 82%, 0% 18%);
+          background: linear-gradient(180deg, #ffffff 0%, #fff5ef 100%);
+          border: 1px solid rgba(255, 255, 255, 0.65);
+          overflow: hidden;
+        }
+        .store-product-image {
+          width: 100%;
+          height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
           overflow: hidden;
-          cursor: pointer;
         }
         .store-product-image img {
-          width: 92%;
-          height: 92%;
+          width: 84%;
+          height: 84%;
           object-fit: contain;
+          transition: transform 0.32s ease;
+        }
+        .store-product:hover .store-product-image img {
+          transform: scale(1.06) rotate(-2deg);
         }
         .store-skeleton-media,
         .store-skeleton-line {
@@ -2082,39 +2249,66 @@ export default function TiendaVirtualView({
         }
         .store-add {
           position: absolute;
-          top: calc(100% - 68px);
-          right: 10px;
-          min-width: 42px;
-          height: 42px;
+          top: 18px;
+          right: 18px;
+          min-width: 48px;
+          height: 48px;
           padding: 0 12px;
           border-radius: 999px;
-          background: #ffffff;
-          color: #111827;
+          background: linear-gradient(135deg, #b91c1c, #ef4444);
+          color: #ffffff;
           font-size: 14px;
           font-weight: 950;
           line-height: 1;
-          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
-          border: 1px solid #e5e7eb;
+          box-shadow: 0 16px 32px rgba(185, 28, 28, 0.24);
+          border: 0;
+          z-index: 3;
+        }
+        .store-add:hover {
+          transform: translateY(-2px) scale(1.02);
+        }
+        .store-product-code {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 24px;
+          align-self: flex-start;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: rgba(123, 16, 34, 0.08);
+          color: #7b1022;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
         .store-product-name {
-          margin: 10px 0 4px;
+          display: block;
+          margin: 0;
           min-height: 42px;
-          color: #6b7280;
-          font-size: 15px;
-          line-height: 1.35;
-          cursor: pointer;
+          color: #111827;
+          font-size: 16px;
+          line-height: 1.24;
+          font-weight: 900;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
         }
         .store-price {
+          display: block;
           margin: 0;
-          font-size: 17px;
-          font-weight: 900;
-          color: #111827;
+          font-size: 22px;
+          font-weight: 950;
+          color: #7b1022;
         }
         .store-unit {
-          margin: 3px 0 0;
-          color: #9ca3af;
+          display: block;
+          margin: 0;
+          color: #6b7280;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 800;
+          line-height: 1.38;
         }
         .store-empty {
           padding: 34px;
@@ -2353,6 +2547,12 @@ export default function TiendaVirtualView({
           align-items: end;
           justify-content: center;
         }
+        .store-sheet-overlay.product-overlay {
+          padding: 20px;
+          align-items: center;
+          background: rgba(17, 24, 39, 0.58);
+          backdrop-filter: blur(14px);
+        }
         .store-auth-sheet {
           width: min(560px, calc(100vw - 24px));
           max-height: calc(100vh - 24px);
@@ -2370,13 +2570,34 @@ export default function TiendaVirtualView({
         .store-sheet.full {
           width: min(980px, 100%);
         }
+        .store-product-sheet {
+          width: min(980px, calc(100vw - 40px));
+          max-height: calc(100vh - 40px);
+          border-radius: 32px;
+          padding: 22px;
+          box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+        }
         .store-back {
-          width: 40px;
-          height: 40px;
+          min-width: 56px;
+          height: 46px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 16px 0 12px;
           border-radius: 999px;
-          background: #f3f4f6;
+          background: linear-gradient(180deg, #ffffff 0%, #fff1f2 100%);
           color: #111827;
-          font-size: 22px;
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+          border: 1px solid rgba(123, 16, 34, 0.12);
+        }
+        .store-back-icon {
+          font-size: 28px;
+          line-height: 1;
+        }
+        .store-back-label {
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: 0.02em;
         }
         .store-sheet-head {
           display: flex;
@@ -2384,6 +2605,37 @@ export default function TiendaVirtualView({
           justify-content: space-between;
           gap: 12px;
           margin-bottom: 14px;
+        }
+        .store-sheet-head.product {
+          position: sticky;
+          top: -22px;
+          z-index: 6;
+          margin: -22px -22px 18px;
+          padding: 18px 22px 12px;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.86) 78%, rgba(255, 255, 255, 0) 100%);
+          backdrop-filter: blur(10px);
+        }
+        .store-product-sheet-heading {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 2px;
+          text-align: right;
+        }
+        .store-product-sheet-heading span {
+          color: #7b1022;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .store-product-sheet-heading strong {
+          max-width: min(460px, 52vw);
+          color: #111827;
+          font-size: 18px;
+          line-height: 1.08;
+          text-wrap: balance;
         }
         .store-detail-grid {
           display: grid;
@@ -2394,16 +2646,17 @@ export default function TiendaVirtualView({
         .store-detail-image {
           width: 100%;
           aspect-ratio: 1 / 1;
-          border-radius: 8px;
-          background: #f7f7f8;
+          border-radius: 28px;
+          background: linear-gradient(180deg, #fff8f5 0%, #ffffff 100%);
           display: flex;
           align-items: center;
           justify-content: center;
-          border: 1px solid #e5e7eb;
+          border: 1px solid #ead8da;
+          padding: 16px;
         }
         .store-detail-image img {
-          width: 94%;
-          height: 94%;
+          width: 100%;
+          height: 100%;
           object-fit: contain;
         }
         .store-qty-row {
@@ -3063,7 +3316,8 @@ export default function TiendaVirtualView({
             gap: 18px 14px;
           }
           .store-story {
-            flex-basis: 76px;
+            flex-basis: 82px;
+            min-height: 116px;
           }
           .store-story-ring {
             width: 68px;
@@ -3093,8 +3347,53 @@ export default function TiendaVirtualView({
             border-radius: 24px 24px 0 0;
             padding: 16px 14px 22px;
           }
+          .store-sheet-overlay.product-overlay {
+            padding: 0;
+            align-items: stretch;
+          }
+          .store-product-sheet {
+            width: 100%;
+            min-height: 100vh;
+            max-height: 100vh;
+            border-radius: 0;
+            padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 26px;
+          }
+          .store-sheet-head.product {
+            top: 0;
+            margin: 0 0 14px;
+            padding: 0 0 10px;
+            background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.9) 72%, rgba(255, 255, 255, 0) 100%);
+          }
+          .store-product-sheet-heading {
+            align-items: flex-start;
+            text-align: left;
+          }
+          .store-product-sheet-heading strong {
+            max-width: none;
+            font-size: 17px;
+          }
+          .store-back {
+            min-width: 50px;
+            padding: 0 14px 0 10px;
+          }
+          .store-back-icon {
+            font-size: 30px;
+          }
+          .store-back-label {
+            display: none;
+          }
+          .store-product-card {
+            padding: 8px 8px 12px;
+          }
+          .store-add {
+            top: 14px;
+            right: 14px;
+            min-width: 44px;
+            height: 44px;
+          }
           .store-product-name {
             font-size: 14px;
+            min-height: 36px;
           }
           .store-brand-row {
             align-items: flex-start;
@@ -3102,10 +3401,29 @@ export default function TiendaVirtualView({
           .store-filter-strip {
             flex-direction: column;
             align-items: flex-start;
-            gap: 4px;
+            gap: 8px;
+            padding-bottom: 12px;
+          }
+          .store-filters-panel {
+            padding: 14px 14px 12px;
+            border-radius: 24px;
+          }
+          .store-search-wrap {
+            min-height: 54px;
+            padding: 0 14px;
+            border-radius: 22px;
+          }
+          .store-search-tag {
+            min-height: 30px;
+            padding: 0 10px;
+            font-size: 11px;
+          }
+          .store-chip {
+            min-height: 50px;
+            padding: 12px 16px;
           }
           .store-filter-chip {
-            min-width: 98px;
+            min-width: 132px;
           }
           .store-filter-chip.compact {
             min-width: auto;
@@ -3237,8 +3555,29 @@ export default function TiendaVirtualView({
             </div>
           </div>
 
+          {showPromotions && (
+            <section className="store-promo">
+              <h2 className="store-section-title">Promociones activas</h2>
+              <div className="store-stories">
+                {STORE_PROMOTIONS.map((promotion) => (
+                  <button
+                    key={promotion.id}
+                    type="button"
+                    className="store-story"
+                    onClick={() => setSelectedPromotionIndex(STORE_PROMOTIONS.findIndex((item) => item.id === promotion.id))}
+                  >
+                    <span className="store-story-ring">
+                      <img src={promotion.image} alt={promotion.title} loading="lazy" decoding="async" />
+                    </span>
+                    <span className="store-story-title">{promotion.title}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <label className="store-search-wrap">
-            <span style={{ fontWeight: 900 }}>Buscar</span>
+            <span className="store-search-tag">Buscar</span>
             <input
               className="store-search"
               value={query}
@@ -3248,88 +3587,70 @@ export default function TiendaVirtualView({
               placeholder="Buscar en Carnes San Martin Granada"
             />
           </label>
+        </header>
 
-          <nav className="store-tabs">
-            {categoryOptions.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={`store-chip store-filter-chip ${activeCategory === category.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveCategory(category.id);
-                  setActiveSubcategory('todas');
-                }}
-              >
-                <span className="store-filter-label">{category.label}</span>
-                <span className="store-filter-meta">
-                  {Number(categoryProductCounts[category.id] || 0)} productos
-                </span>
-              </button>
-            ))}
-          </nav>
-
-          <div className="store-filter-strip">
-            <div>
-              <strong>{activeFilterSummary.title}</strong>
-              <span>{activeFilterSummary.subtitle}</span>
+        <main>
+          <section className="store-filters-panel">
+            <div className="store-filter-strip">
+              <div>
+                <strong>{activeFilterSummary.title}</strong>
+                <span>{activeFilterSummary.subtitle}</span>
+              </div>
+              <span className="store-filter-kicker">Categorias</span>
             </div>
-          </div>
 
-          {subcategoryOptions.length > 0 && (
-            <nav className="store-subtabs">
-              <button
-                type="button"
-                className={`store-chip store-filter-chip compact ${
-                  activeSubcategory === 'todas' ? 'active' : ''
-                }`}
-                onClick={() => setActiveSubcategory('todas')}
-              >
-                <span className="store-filter-pill-label">Todas</span>
-                <span className="store-filter-badge">
-                  {Number(subcategoryProductCounts.todas || 0)}
-                </span>
-              </button>
-              {subcategoryOptions.map((subcategory) => (
+            <nav className="store-tabs">
+              {categoryOptions.map((category) => (
                 <button
-                  key={subcategory}
+                  key={category.id}
                   type="button"
-                  className={`store-chip store-filter-chip compact ${
-                    activeSubcategory === subcategory ? 'active' : ''
-                  }`}
-                  onClick={() => setActiveSubcategory(subcategory)}
+                  className={`store-chip store-filter-chip ${activeCategory === category.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveCategory(category.id);
+                    setActiveSubcategory('todas');
+                  }}
                 >
-                  <span className="store-filter-pill-label">{subcategory}</span>
-                  <span className="store-filter-badge">
-                    {Number(subcategoryProductCounts[subcategory] || 0)}
+                  <span className="store-filter-label">{category.label}</span>
+                  <span className="store-filter-meta">
+                    {Number(categoryProductCounts[category.id] || 0)} productos
                   </span>
                 </button>
               ))}
             </nav>
-          )}
-        </header>
 
-        {showPromotions && (
-          <section className="store-promo">
-            <h2 className="store-section-title">Promociones activas</h2>
-            <div className="store-stories">
-              {STORE_PROMOTIONS.map((promotion) => (
+            {subcategoryOptions.length > 0 && (
+              <nav className="store-subtabs">
                 <button
-                  key={promotion.id}
                   type="button"
-                  className="store-story"
-                  onClick={() => setSelectedPromotionIndex(STORE_PROMOTIONS.findIndex((item) => item.id === promotion.id))}
+                  className={`store-chip store-filter-chip compact ${
+                    activeSubcategory === 'todas' ? 'active' : ''
+                  }`}
+                  onClick={() => setActiveSubcategory('todas')}
                 >
-                  <span className="store-story-ring">
-                    <img src={promotion.image} alt={promotion.title} />
+                  <span className="store-filter-pill-label">Todas</span>
+                  <span className="store-filter-badge">
+                    {Number(subcategoryProductCounts.todas || 0)}
                   </span>
-                  <span className="store-story-title">{promotion.title}</span>
                 </button>
-              ))}
-            </div>
+                {subcategoryOptions.map((subcategory) => (
+                  <button
+                    key={subcategory}
+                    type="button"
+                    className={`store-chip store-filter-chip compact ${
+                      activeSubcategory === subcategory ? 'active' : ''
+                    }`}
+                    onClick={() => setActiveSubcategory(subcategory)}
+                  >
+                    <span className="store-filter-pill-label">{subcategory}</span>
+                    <span className="store-filter-badge">
+                      {Number(subcategoryProductCounts[subcategory] || 0)}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            )}
           </section>
-        )}
 
-        <main>
           <div className="store-product-head">
             <h2 className="store-count">
               {showCatalogSkeleton ? 'Cargando productos...' : `${filteredProducts.length} productos`}
@@ -3364,15 +3685,34 @@ export default function TiendaVirtualView({
             <div className="store-grid">
               {filteredProducts.map((product) => {
                 const quantity = Number(cart[product.code] || 0);
-                const minQuantity = getMinQuantity(product);
                 return (
                   <article key={product.code} className="store-product">
                     <button
                       type="button"
-                      className="store-product-image"
+                      className="store-product-card"
+                      aria-label={`Ver ${product.name}`}
                       onClick={() => openProduct(product)}
                     >
-                      <img src={product.image || LOGO_PATH} alt={product.name} />
+                      <span className="store-product-hex">
+                        <span className="store-product-image-shell">
+                          <span className="store-product-image">
+                            <img
+                              src={product.image || LOGO_PATH}
+                              alt={product.name}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          </span>
+                        </span>
+                      </span>
+                      <span className="store-product-code">{product.code}</span>
+                      <span className="store-product-name">{product.name}</span>
+                      <span className="store-price">{formatCurrency(product.price)}</span>
+                      <span className="store-unit">
+                        {quantity > 0
+                          ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} en carrito`
+                          : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -3382,15 +3722,6 @@ export default function TiendaVirtualView({
                     >
                       {quantity > 0 ? formatStoreQuantity(quantity, product.unit) : '+'}
                     </button>
-                    <h3 className="store-product-name" onClick={() => openProduct(product)}>
-                      {product.name}
-                    </h3>
-                    <p className="store-price">{formatCurrency(product.price)}</p>
-                    <p className="store-unit">
-                      {quantity > 0
-                        ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} en carrito`
-                        : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
-                    </p>
                   </article>
                 );
               })}
@@ -3657,14 +3988,23 @@ function StoreAuthView({
   return <div className="store-auth-page">{content}</div>;
 }
 
+function StoreBackButton({ onClick, label = 'Volver' }) {
+  return (
+    <button type="button" className="store-back" onClick={onClick}>
+      <span className="store-back-icon" aria-hidden="true">
+        ←
+      </span>
+      <span className="store-back-label">{label}</span>
+    </button>
+  );
+}
+
 function StoreAuthSheet({ onClose, ...props }) {
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet store-auth-sheet">
         <div className="store-sheet-head">
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
-          </button>
+          <StoreBackButton onClick={onClose} />
           <strong>Inicia sesion</strong>
         </div>
         <StoreAuthView {...props} embedded />
@@ -3875,9 +4215,7 @@ function MapPointPicker({ location, onClose, onSave }) {
             <strong>Ubicar punto de entrega</strong>
             <span>Toca el mapa donde debe llegar el entregador y guarda el punto.</span>
           </div>
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
-          </button>
+          <StoreBackButton onClick={onClose} />
         </div>
 
         <div className="store-map-canvas" onClick={handleMapClick}>
@@ -4012,9 +4350,7 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
     <div className="store-sheet-overlay">
       <div className="store-sheet">
         <div className="store-sheet-head">
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
-          </button>
+          <StoreBackButton onClick={onClose} />
           <strong>Mi perfil</strong>
         </div>
 
@@ -4351,13 +4687,14 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
   const minQuantity = getMinQuantity(product);
 
   return (
-    <div className="store-sheet-overlay">
-      <div className="store-sheet full">
-        <div className="store-sheet-head">
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
-          </button>
-          <strong>{product.code}</strong>
+    <div className="store-sheet-overlay product-overlay">
+      <div className="store-sheet full store-product-sheet">
+        <div className="store-sheet-head product">
+          <StoreBackButton onClick={onClose} />
+          <div className="store-product-sheet-heading">
+            <span>{product.code}</span>
+            <strong>Detalle del producto</strong>
+          </div>
         </div>
 
         <div className="store-detail-grid">
@@ -4365,7 +4702,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
             <img src={product.image || LOGO_PATH} alt={product.name} />
           </div>
           <div>
-            <h2 style={{ margin: '0 0 8px', fontSize: 28, lineHeight: 1.08 }}>{product.name}</h2>
+            <h2 style={{ margin: '0 0 8px', fontSize: 30, lineHeight: 1.04 }}>{product.name}</h2>
             <p className="store-price" style={{ fontSize: 24 }}>
               {formatCurrency(product.price)}
             </p>
@@ -4474,9 +4811,7 @@ function CheckoutSheet({
     <div className="store-sheet-overlay">
       <div className="store-sheet">
         <div className="store-sheet-head">
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
-          </button>
+          <StoreBackButton onClick={onClose} />
           <strong>Tu pedido</strong>
         </div>
 
@@ -4776,9 +5111,7 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
     <div className="store-sheet-overlay">
       <div className="store-sheet">
         <div className="store-sheet-head">
-          <button type="button" className="store-back" onClick={onClose}>
-            &lt;
-          </button>
+          <StoreBackButton onClick={onClose} />
           <strong>ESTADO DE MI PEDIDO</strong>
         </div>
 
