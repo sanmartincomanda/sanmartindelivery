@@ -839,7 +839,23 @@ export default function ConfiguracionView() {
       sortOrder: driver.sortOrder ?? current.sortOrder,
       password: current.code === driver.code ? current.password : '',
     }));
-    setMessage(`Usuario Driver vinculado a ${driver.name || driver.code}. Define la contrasena y guarda.`);
+    setMessage(
+      `Entregador ${driver.name || driver.code} cargado. Si defines una contrasena y guardas, tambien quedara listo para entrar al modulo Driver.`
+    );
+  };
+
+  const startNewDriverForm = () => {
+    const nextSuffix = drivers.reduce((max, driver) => {
+      const match = String(driver?.code || '').match(/(\d+)$/);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1;
+
+    setDriverForm({
+      ...emptyDriver,
+      code: `E-${String(nextSuffix).padStart(3, '0')}`,
+      sortOrder: String((drivers.length + 1) * 10),
+      active: true,
+    });
   };
 
   const handleImageFile = (event) => {
@@ -1088,7 +1104,7 @@ export default function ConfiguracionView() {
         sortOrder: driverForm.sortOrder === '' ? drivers.length * 10 : Number(driverForm.sortOrder || 0),
       });
       setDriverForm(emptyDriver);
-      setMessage('Entregador guardado.');
+      setMessage('Entregador y acceso Driver guardados.');
     } catch (error) {
       console.error('Error guardando entregador:', error);
       setMessage('No se pudo guardar el entregador.');
@@ -2346,6 +2362,7 @@ export default function ConfiguracionView() {
             linkDriverToUser={linkDriverToUser}
             toggleDriver={toggleDriver}
             resetDriverForm={() => setDriverForm(emptyDriver)}
+            startNewDriverForm={startNewDriverForm}
           />
         ) : (
           <CouponsManager
@@ -2724,6 +2741,7 @@ function DriversManager({
   linkDriverToUser,
   toggleDriver,
   resetDriverForm,
+  startNewDriverForm,
 }) {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectedDriverCode, setSelectedDriverCode] = useState(driverForm.code || '');
@@ -2731,6 +2749,25 @@ function DriversManager({
   useEffect(() => {
     setSelectedDriverCode(driverForm.code || '');
   }, [driverForm.code]);
+
+  const nextDriverCode = useMemo(() => {
+    const nextSuffix = drivers.reduce((max, driver) => {
+      const match = String(driver?.code || '').match(/(\d+)$/);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1;
+
+    return `E-${String(nextSuffix).padStart(3, '0')}`;
+  }, [drivers]);
+
+  const activeDriversCount = useMemo(
+    () => drivers.filter((driver) => driver.active !== false).length,
+    [drivers]
+  );
+  const inactiveDriversCount = Math.max(drivers.length - activeDriversCount, 0);
+  const isEditingExistingDriver = useMemo(
+    () => drivers.some((driver) => driver.code === driverForm.code),
+    [drivers, driverForm.code]
+  );
 
   const chooseDriver = (driver) => {
     setSelectedDriverCode(driver.code);
@@ -2773,6 +2810,13 @@ function DriversManager({
             </p>
           </div>
           <strong>{drivers.length} entregadores</strong>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+          <span className="cfg-badge">{activeDriversCount} activos</span>
+          <span className={`cfg-badge ${inactiveDriversCount ? 'off' : ''}`}>
+            {inactiveDriversCount} inactivos
+          </span>
         </div>
 
         <div style={{ display: 'grid', gap: 10 }}>
@@ -2829,24 +2873,48 @@ function DriversManager({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 22 }}>Usuario Driver</h2>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Crear o editar entregador</h2>
             <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.45 }}>
-              Vincula el usuario con el mismo entregador que se selecciona en Lista de Pedidos.
+              Aqui no se crean dos cosas por separado: al guardar este formulario se crea o actualiza el
+              entregador y tambien su acceso al modulo Driver.
             </p>
           </div>
-          <button type="button" className="cfg-button secondary" onClick={() => setSelectorOpen(true)}>
-            Elegir entregador
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button type="button" className="cfg-button secondary" onClick={startNewDriverForm}>
+              Nuevo entregador
+            </button>
+            <button type="button" className="cfg-button secondary" onClick={() => setSelectorOpen(true)}>
+              Elegir existente
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid #e2e8f0',
+            borderRadius: 12,
+            padding: 12,
+            background: '#f8fafc',
+            display: 'grid',
+            gap: 6,
+            color: '#334155',
+            fontWeight: 700,
+            lineHeight: 1.45,
+          }}
+        >
+          <div>1. Crea un codigo nuevo para el entregador o carga uno existente.</div>
+          <div>2. Define nombre, telefono y, si quieres, una contrasena para entrar al Driver.</div>
+          <div>3. Ese mismo codigo aparecera luego para asignarlo en Lista de Pedidos.</div>
         </div>
 
         {driverForm.code && (
           <div
             style={{
-              border: '1px solid #dbeafe',
+              border: `1px solid ${isEditingExistingDriver ? '#dbeafe' : '#dcfce7'}`,
               borderRadius: 12,
               padding: 12,
-              background: '#eff6ff',
-              color: '#1d4ed8',
+              background: isEditingExistingDriver ? '#eff6ff' : '#f0fdf4',
+              color: isEditingExistingDriver ? '#1d4ed8' : '#166534',
               fontWeight: 900,
               display: 'flex',
               justifyContent: 'space-between',
@@ -2854,7 +2922,9 @@ function DriversManager({
               flexWrap: 'wrap',
             }}
           >
-            <span>Vinculado a: {driverForm.name || 'Sin nombre'}</span>
+            <span>
+              {isEditingExistingDriver ? 'Editando entregador:' : 'Nuevo entregador:'} {driverForm.name || 'Sin nombre'}
+            </span>
             <span>{driverForm.code}</span>
           </div>
         )}
@@ -2862,8 +2932,10 @@ function DriversManager({
         <input
           className="cfg-input"
           value={driverForm.code}
-          onChange={(event) => updateDriverForm('code', event.target.value.toUpperCase())}
-          placeholder="Codigo. Ej: E-001"
+          onChange={(event) =>
+            updateDriverForm('code', event.target.value.toUpperCase().replace(/\s+/g, ''))
+          }
+          placeholder={`Codigo. Ej: ${nextDriverCode}`}
         />
         <input
           className="cfg-input"
@@ -2899,18 +2971,23 @@ function DriversManager({
           type="password"
           value={driverForm.password}
           onChange={(event) => updateDriverForm('password', event.target.value)}
-          placeholder="Nueva contrasena para Driver"
+          placeholder="Contrasena para entrar al Driver"
         />
         <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
-          Si dejas la contrasena vacia se mantiene la actual. Para los entregadores base sin
-          contrasena, la clave inicial es su mismo codigo.
+          Si guardas con una contrasena, el entregador ya queda listo para iniciar sesion en Driver.
+          Si la dejas vacia, se mantiene la actual. Para los entregadores base sin contrasena, la
+          clave inicial es su mismo codigo.
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="submit" className="cfg-button" disabled={savingDriver}>
-            {savingDriver ? 'Guardando...' : 'Guardar entregador'}
+            {savingDriver
+              ? 'Guardando...'
+              : isEditingExistingDriver
+                ? 'Actualizar entregador y acceso'
+                : 'Crear entregador y acceso'}
           </button>
           <button type="button" className="cfg-button secondary" onClick={resetDriverForm}>
-            Nuevo
+            Limpiar
           </button>
         </div>
       </form>
