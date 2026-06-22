@@ -786,14 +786,10 @@ export default function ConfiguracionView() {
         minQuantity: String(Number(form.minQuantity || getDefaultProductMinQuantity(form.unit))),
         quantityStep: String(Number(form.quantityStep || getDefaultProductQuantityStep(form.unit))),
       }));
-      setMessage(
-        result?.storedInlineImage
-          ? 'Producto guardado. La foto quedo guardada como respaldo en la base porque Firebase Storage rechazo la subida desde este dominio.'
-          : 'Producto guardado con sus restricciones.'
-      );
+      setMessage('Producto guardado con sus restricciones.');
     } catch (error) {
       console.error('Error guardando producto:', error);
-      setMessage('No se pudo guardar el producto.');
+      setMessage(error?.message || 'No se pudo guardar el producto.');
     } finally {
       setSaving(false);
     }

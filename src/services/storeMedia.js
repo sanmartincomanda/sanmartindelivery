@@ -76,7 +76,12 @@ export async function createImageHash(value = '', hashHint = '') {
   return fallbackHashString(cleanValue);
 }
 
-export async function uploadCatalogImage({ code, image, hashHint = '' }) {
+export async function uploadCatalogImage({
+  code,
+  image,
+  hashHint = '',
+  allowInlineFallback = false,
+}) {
   const imageData = String(image || '').trim();
   if (!isDataUrlImage(imageData)) {
     return {
@@ -111,7 +116,14 @@ export async function uploadCatalogImage({ code, image, hashHint = '' }) {
       storedInline: false,
     };
   } catch (error) {
-    console.warn('No se pudo subir la foto a Firebase Storage. Se guardara en la base de datos como respaldo.', error);
+    console.warn('No se pudo subir la foto a Firebase Storage.', error);
+
+    if (!allowInlineFallback) {
+      throw new Error(
+        'No se pudo subir la foto a Firebase Storage. Intenta nuevamente cuando la conexion este estable.'
+      );
+    }
+
     return {
       url: imageData,
       path: '',

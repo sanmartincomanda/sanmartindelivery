@@ -1,5 +1,5 @@
 export const STORE_CATALOG_CACHE_KEY = 'sanmartin_store_catalog_cache_v1';
-export const STORE_CATALOG_CACHE_VERSION = 2;
+export const STORE_CATALOG_CACHE_VERSION = 3;
 export const STORE_CATEGORIES_CACHE_KEY = 'sanmartin_store_categories_cache_v1';
 export const STORE_CATEGORIES_CACHE_VERSION = 1;
 export const STORE_COUPONS_CACHE_KEY = 'sanmartin_store_coupons_cache_v1';
