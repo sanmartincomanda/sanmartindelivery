@@ -10,8 +10,43 @@ const parseJsonResponse = async (response) => {
 
 export const getSicarBridgeUrl = () => DEFAULT_SICAR_BRIDGE_URL.replace(/\/+$/, '');
 
+const isHttpsPageUsingHttpBridge = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    const bridgeUrl = new URL(getSicarBridgeUrl());
+    return window.location.protocol === 'https:' && bridgeUrl.protocol === 'http:';
+  } catch (error) {
+    return false;
+  }
+};
+
+const buildSicarBridgeFetchError = (error) => {
+  const bridgeUrl = getSicarBridgeUrl();
+
+  if (isHttpsPageUsingHttpBridge()) {
+    return new Error(
+      `El navegador esta bloqueando el puente local ${bridgeUrl} porque esta app fue abierta en HTTPS. Para usar SICAR abre el administrador local en http://127.0.0.1:5173 y deja activo "npm run sicar:bridge".`
+    );
+  }
+
+  return new Error(
+    `No se pudo conectar al puente local ${bridgeUrl}. Verifica que siga activo con "npm run sicar:bridge".`
+  );
+};
+
+const fetchSicarBridge = async (path, options = {}) => {
+  try {
+    return await fetch(`${getSicarBridgeUrl()}${path}`, options);
+  } catch (error) {
+    throw buildSicarBridgeFetchError(error);
+  }
+};
+
 export async function getSicarBridgeHealth() {
-  const response = await fetch(`${getSicarBridgeUrl()}/api/sicar/health`, {
+  const response = await fetchSicarBridge('/api/sicar/health', {
     headers: {
       Accept: 'application/json',
     },
@@ -21,7 +56,7 @@ export async function getSicarBridgeHealth() {
 }
 
 export async function fetchSicarCatalogSelection() {
-  const response = await fetch(`${getSicarBridgeUrl()}/api/sicar/catalog`, {
+  const response = await fetchSicarBridge('/api/sicar/catalog', {
     headers: {
       Accept: 'application/json',
     },
@@ -37,7 +72,7 @@ export async function fetchSicarCatalogSelection() {
 
 export async function fetchSicarProductImage(code) {
   const safeCode = encodeURIComponent(String(code || '').trim());
-  const response = await fetch(`${getSicarBridgeUrl()}/api/sicar/image?code=${safeCode}`, {
+  const response = await fetchSicarBridge(`/api/sicar/image?code=${safeCode}`, {
     headers: {
       Accept: 'application/json',
     },
@@ -64,7 +99,7 @@ export async function fetchSicarPricesByCodes(codes = []) {
     };
   }
 
-  const response = await fetch(`${getSicarBridgeUrl()}/api/sicar/prices`, {
+  const response = await fetchSicarBridge('/api/sicar/prices', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -78,6 +113,32 @@ export async function fetchSicarPricesByCodes(codes = []) {
   const payload = await parseJsonResponse(response);
   if (!Array.isArray(payload?.products)) {
     throw new Error('La respuesta de SICAR no trae precios.');
+  }
+
+  return payload;
+}
+
+export async function syncSicarQuoteForOrder(orderKey, options = {}) {
+  const cleanOrderKey = String(orderKey || '').trim();
+  if (!cleanOrderKey) {
+    throw new Error('Falta el identificador del pedido.');
+  }
+
+  const response = await fetchSicarBridge('/api/sicar/quote', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      orderKey: cleanOrderKey,
+      applyToFirebase: options.applyToFirebase === true,
+    }),
+  });
+
+  const payload = await parseJsonResponse(response);
+  if (!payload?.quote || !Array.isArray(payload.quote.items)) {
+    throw new Error('La respuesta de la cotizacion SICAR no trae detalle valido.');
   }
 
   return payload;

@@ -3,6 +3,7 @@ import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
 import { DRIVERS_PATH, mergeDrivers } from '../services/drivers';
+import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 
 // Iconos SVG (mismos que en KitchenView)
 const Icons = {
@@ -92,6 +93,24 @@ const REPARTIDORES = [
   { nombre: 'Otros', icono: '📦' }
 ];
 
+const cleanWhatsappPhone = (phone) => String(phone || '').replace(/\D/g, '');
+
+const buildCustomerWhatsappPhone = (phone) => {
+  const cleanPhone = cleanWhatsappPhone(phone);
+
+  if (!cleanPhone) {
+    return '';
+  }
+
+  if (cleanPhone.startsWith('505') && cleanPhone.length >= 11) {
+    return cleanPhone;
+  }
+
+  return `505${cleanPhone.slice(-8)}`;
+};
+
+const formatCurrency = (value) => `C$${Number(value || 0).toFixed(2)}`;
+
 // Alias para cocineros
 const COCINEROS_ALIAS = {
   'Noel Hernandez': 'CHIMI',
@@ -111,6 +130,7 @@ export default function ListaPedidos({ pedidos = [] }) {
   const [repartidorSeleccionado, setRepartidorSeleccionado] = useState(null);
   const [animatingCards, setAnimatingCards] = useState(new Set());
   const [repartidores, setRepartidores] = useState(() => mergeDrivers().filter((driver) => driver.active !== false));
+  const [quoteActions, setQuoteActions] = useState({});
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
@@ -139,6 +159,24 @@ export default function ListaPedidos({ pedidos = [] }) {
   };
 
   const getBasePath = () => 'orders';
+
+  const setQuoteActionBusy = (orderKey, action, busy) => {
+    const stateKey = `${orderKey}:${action}`;
+    setQuoteActions((current) => {
+      if (busy) {
+        return {
+          ...current,
+          [stateKey]: true,
+        };
+      }
+
+      const next = { ...current };
+      delete next[stateKey];
+      return next;
+    });
+  };
+
+  const isQuoteActionBusy = (orderKey, action) => Boolean(quoteActions[`${orderKey}:${action}`]);
 
   const updateCampo = (firebaseKey, campo, valor) => {
     update(ref(database, `${getBasePath()}/${firebaseKey}`), { [campo]: valor });
@@ -186,8 +224,96 @@ export default function ListaPedidos({ pedidos = [] }) {
     });
   };
 
+  const handleCancelarPedido = (pedido) => {
+    if (!pedido?.firebaseKey) return;
+
+    const confirmCancel = window.confirm(`Quieres anular el pedido #${pedido.id}?`);
+    if (!confirmCancel) return;
+
+    const nowMs = Date.now();
+    const now = new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' });
+
+    setAnimatingCards(prev => new Set([...prev, pedido.firebaseKey]));
+    setTimeout(() => setAnimatingCards(prev => {
+      const next = new Set(prev);
+      next.delete(pedido.firebaseKey);
+      return next;
+    }), 300);
+
+    update(ref(database, `${getBasePath()}/${pedido.firebaseKey}`), {
+      estado: 'Cancelado',
+      canceladoPor: 'Administracion - lista de pedidos',
+      repartidor: null,
+      repartidorCodigo: null,
+      timestampAsignado: null,
+      timestampCancelado: now,
+      timestampCanceladoMs: nowMs,
+      timestampFinalizado: nowMs,
+      timestamp: nowMs
+    });
+  };
+
   const mostrarNombreCocinero = (nombre) => {
     return COCINEROS_ALIAS[nombre] || nombre;
+  };
+
+  const handleActualizarTotalApp = async (pedido) => {
+    if (!pedido?.firebaseKey) {
+      return;
+    }
+
+    setQuoteActionBusy(pedido.firebaseKey, 'app', true);
+
+    try {
+      const payload = await syncSicarQuoteForOrder(pedido.firebaseKey, {
+        applyToFirebase: true,
+      });
+      const quoteId = Number(payload?.quote?.cotId || 0);
+      const quoteTotal = Number(payload?.quote?.total || 0);
+      alert(
+        `Pedido actualizado en la app desde SICAR. Cotizacion #${quoteId || 'N/D'} con total ${formatCurrency(quoteTotal)}.`
+      );
+    } catch (error) {
+      console.error('Error actualizando total por app desde SICAR:', error);
+      alert(error?.message || 'No se pudo actualizar el total desde SICAR.');
+    } finally {
+      setQuoteActionBusy(pedido.firebaseKey, 'app', false);
+    }
+  };
+
+  const handleActualizarTotalWhatsapp = async (pedido) => {
+    if (!pedido?.firebaseKey) {
+      return;
+    }
+
+    const whatsappPhone = buildCustomerWhatsappPhone(pedido.telefono);
+    if (!whatsappPhone) {
+      alert('Este pedido no tiene telefono valido para WhatsApp.');
+      return;
+    }
+
+    setQuoteActionBusy(pedido.firebaseKey, 'whatsapp', true);
+
+    try {
+      const payload = await syncSicarQuoteForOrder(pedido.firebaseKey, {
+        applyToFirebase: false,
+      });
+      const message = String(payload?.whatsappMessage || '').trim();
+      if (!message) {
+        throw new Error('SICAR no devolvio el mensaje para WhatsApp.');
+      }
+
+      const whatsappLink = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
+      const popup = window.open(whatsappLink, '_blank', 'noopener,noreferrer');
+      if (!popup) {
+        window.location.href = whatsappLink;
+      }
+    } catch (error) {
+      console.error('Error preparando WhatsApp con total SICAR:', error);
+      alert(error?.message || 'No se pudo preparar el mensaje de WhatsApp desde SICAR.');
+    } finally {
+      setQuoteActionBusy(pedido.firebaseKey, 'whatsapp', false);
+    }
   };
 
   const getTimeElapsed = (timestamp) => {
@@ -818,6 +944,26 @@ export default function ListaPedidos({ pedidos = [] }) {
                           TIENDA VIRTUAL
                         </div>
                       )}
+                      {pedido.canal === 'tienda_virtual' && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(79, 70, 229, 0.12)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(79, 70, 229, 0.22)',
+                          color: '#4f46e5',
+                          fontSize: '14px',
+                          fontWeight: 800
+                        }}>
+                          {pedido?.sicarQuote?.cotId
+                            ? `Cotizacion SICAR #${pedido.sicarQuote.cotId}`
+                            : pedido?.sicarQuote?.status === 'pending'
+                              ? 'Cotizacion SICAR en cola'
+                              : 'Pendiente cotizacion SICAR'}
+                        </div>
+                      )}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -976,6 +1122,58 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </pre>
                     </div>
 
+                    {pedido.canal === 'tienda_virtual' && status !== 'Cancelado' && (
+                      <div style={{
+                        marginBottom: '24px',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                        gap: '12px'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => handleActualizarTotalApp(pedido)}
+                          className="btn-hover"
+                          disabled={isQuoteActionBusy(pedido.firebaseKey, 'app')}
+                          style={{
+                            padding: '16px 18px',
+                            borderRadius: '14px',
+                            border: '2px solid rgba(37, 99, 235, 0.22)',
+                            background: 'rgba(37, 99, 235, 0.1)',
+                            color: '#1d4ed8',
+                            fontWeight: 800,
+                            fontSize: '14px',
+                            cursor: isQuoteActionBusy(pedido.firebaseKey, 'app') ? 'wait' : 'pointer',
+                            opacity: isQuoteActionBusy(pedido.firebaseKey, 'app') ? 0.7 : 1
+                          }}
+                        >
+                          {isQuoteActionBusy(pedido.firebaseKey, 'app')
+                            ? 'Actualizando app desde SICAR...'
+                            : 'Actualizar total por app'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleActualizarTotalWhatsapp(pedido)}
+                          className="btn-hover"
+                          disabled={isQuoteActionBusy(pedido.firebaseKey, 'whatsapp')}
+                          style={{
+                            padding: '16px 18px',
+                            borderRadius: '14px',
+                            border: '2px solid rgba(22, 163, 74, 0.22)',
+                            background: 'rgba(22, 163, 74, 0.1)',
+                            color: '#15803d',
+                            fontWeight: 800,
+                            fontSize: '14px',
+                            cursor: isQuoteActionBusy(pedido.firebaseKey, 'whatsapp') ? 'wait' : 'pointer',
+                            opacity: isQuoteActionBusy(pedido.firebaseKey, 'whatsapp') ? 0.7 : 1
+                          }}
+                        >
+                          {isQuoteActionBusy(pedido.firebaseKey, 'whatsapp')
+                            ? 'Preparando WhatsApp desde SICAR...'
+                            : 'Actualizar total por WhatsApp'}
+                        </button>
+                      </div>
+                    )}
+
                     {status === 'Preparado' && (
                       <div style={{ marginBottom: '20px' }}>
                         <button
@@ -1002,6 +1200,28 @@ export default function ListaPedidos({ pedidos = [] }) {
                         >
                           <span style={{ fontSize: '24px' }}>🛵</span>
                           Enviar Pedido
+                        </button>
+                      </div>
+                    )}
+
+                    {status !== 'Entregado' && status !== 'Cancelado' && (
+                      <div style={{ marginBottom: status === 'Enviado' ? '20px' : '24px' }}>
+                        <button
+                          onClick={() => handleCancelarPedido(pedido)}
+                          className="btn-hover"
+                          style={{
+                            width: '100%',
+                            padding: '14px 24px',
+                            borderRadius: '14px',
+                            border: '2px solid #fecaca',
+                            background: 'rgba(255, 255, 255, 0.72)',
+                            color: '#dc2626',
+                            fontWeight: 800,
+                            fontSize: '15px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Anular Pedido
                         </button>
                       </div>
                     )}

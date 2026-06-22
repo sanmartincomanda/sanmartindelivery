@@ -1,4 +1,4 @@
-import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, set, startAt, update } from 'firebase/database';
+import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, startAt, update } from 'firebase/database';
 import { database } from '../firebase';
 import { hoyISO } from '../components/Utils';
 import { normalizeLocation } from './geo';
@@ -7,6 +7,8 @@ export const ORDER_LIMIT_PER_DAY = 125;
 export const MANUAL_CHANNEL = 'manual';
 export const STORE_CHANNEL = 'tienda_virtual';
 export const STORE_ORDER_RETENTION_DAYS = 3;
+export const SICAR_QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
+export const SICAR_QUOTE_SERIE = 'APP';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -102,6 +104,7 @@ const normalizeStoreItems = (items = []) =>
       return {
         codigo: String(item.codigo ?? item.code ?? '').trim(),
         nombre: String(item.nombre ?? item.name ?? '').trim(),
+        descripcion: String(item.descripcion ?? item.description ?? '').trim(),
         unidad: String(item.unidad ?? item.unit ?? 'lb').trim() || 'lb',
         cantidad,
         precioUnitario,
@@ -112,10 +115,19 @@ const normalizeStoreItems = (items = []) =>
 
 export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
   const normalizedItems = normalizeStoreItems(items);
-  const lines = normalizedItems.map(
-    (item) =>
+  const totalLabel = String(summary.totalLabel || 'Total aproximado de pedido').trim();
+  const subtotalLabel = String(summary.subtotalLabel || 'Subtotal estimado').trim();
+  const lines = [];
+
+  normalizedItems.forEach((item) => {
+    lines.push(
       `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre} [${item.codigo}] | C$${formatAmount(item.subtotal)}`
-  );
+    );
+
+    if (item.descripcion) {
+      lines.push(`  Descripcion: ${item.descripcion}`);
+    }
+  });
 
   const cleanNotes = String(notes || '').trim();
   if (cleanNotes) {
@@ -129,12 +141,12 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
 
   if (subtotal > 0) {
     lines.push('');
-    lines.push(`Subtotal estimado: C$${formatAmount(subtotal)}`);
+    lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
     if (discount > 0) {
       const discountLabel = summary.couponCode ? `Cupon ${summary.couponCode}` : 'Descuento cupon';
       lines.push(`${discountLabel}: -C$${formatAmount(discount)}`);
     }
-    lines.push(`Total aproximado: C$${formatAmount(total)}`);
+    lines.push(`${totalLabel}: C$${formatAmount(total)}`);
   }
 
   return lines.join('\n').trim();
@@ -314,8 +326,38 @@ export async function createOrder(payload, options = {}) {
     timestamp: createdAt,
   };
 
+  if (channel === STORE_CHANNEL) {
+    orderRecord.sicarQuote = {
+      status: 'pending',
+      folioMovil: id,
+      serieMovil: SICAR_QUOTE_SERIE,
+      orderDate: fecha,
+      orderNumber: id,
+      queuedAt: new Date(createdAt).toISOString(),
+    };
+  }
+
   const orderKey = buildOrderKey(fecha, id);
-  await set(ref(database, `orders/${orderKey}`), orderRecord);
+  const updates = {
+    [`orders/${orderKey}`]: orderRecord,
+  };
+
+  if (channel === STORE_CHANNEL) {
+    updates[`${SICAR_QUOTE_QUEUE_PATH}/${orderKey}`] = {
+      orderKey,
+      fecha,
+      id,
+      canal: STORE_CHANNEL,
+      status: 'pending',
+      requestedAt: createdAt,
+      requestedAtIso: new Date(createdAt).toISOString(),
+      attempts: 0,
+      serieMovil: SICAR_QUOTE_SERIE,
+      folioMovil: id,
+    };
+  }
+
+  await update(ref(database), updates);
 
   return {
     firebaseKey: orderKey,

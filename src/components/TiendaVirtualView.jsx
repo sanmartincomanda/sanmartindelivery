@@ -396,7 +396,27 @@ const buildOrderItemsMessage = (order = {}) => {
   return order.items
     .map((item) => {
       const quantity = formatStoreQuantity(item.cantidad, item.unidad);
-      return `* ${quantity} ${item.unidad || ''} ${item.nombre || ''}`.trim();
+      const nameLine = [
+        '*',
+        quantity,
+        item.unidad || '',
+        item.nombre || '',
+        item.codigo ? `[${item.codigo}]` : '',
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      const lines = [nameLine];
+
+      if (item.descripcion) {
+        lines.push(`  Descripcion: ${item.descripcion}`);
+      }
+
+      if (Number(item.subtotal || 0) > 0) {
+        lines.push(`  Subtotal: ${formatCurrency(item.subtotal)}`);
+      }
+
+      return lines.join('\n');
     })
     .join('\n');
 };
@@ -405,6 +425,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
   const customerName = currentUser?.nombre || order.cliente || 'Cliente';
   const customerPhone = currentUser?.telefono || order.telefono || '';
   const orderNumber = formatOrderNumber(order.id);
+  const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
 
   return [
     'Hola Carnes San Martin Granada.',
@@ -413,9 +434,12 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
     `Cliente: ${customerName}`,
     customerPhone ? `Telefono: ${customerPhone}` : '',
     `Estado actual: ${order.estado || 'Pendiente'}`,
-    `Total aproximado: ${formatCurrency(order.total)}`,
+    `${totalLabel}: ${formatCurrency(order.total)}`,
     'Productos:',
     buildOrderItemsMessage(order),
+    order?.totalAproximado === false
+      ? ''
+      : 'Nota: El total puede *variar* por el peso exacto de cada producto.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -454,6 +478,8 @@ const buildGuestCartWhatsAppMessage = ({
     '',
     'Pedido:',
     orderText,
+    '',
+    'Nota: El total puede *variar* por el peso exacto de cada producto.',
     '',
     'Lo envio como invitado para coordinarlo por WhatsApp.',
   ]
@@ -961,6 +987,7 @@ export default function TiendaVirtualView({
           return {
             codigo: product.code,
             nombre: product.name,
+            descripcion: product.description,
             unidad: product.unit,
             cantidad,
             precioUnitario: product.price,
@@ -5419,6 +5446,7 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
 function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder }) {
   const meta = getCustomerStatusMeta(order);
   const orderNumber = formatOrderNumber(order.id);
+  const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const cookName = order.cocinero ? getShortPersonName(order.cocinero, order.cocinero) : 'Por asignar';
   const riderName = order.repartidor
     ? getShortPersonName(order.repartidor, order.repartidor)
@@ -5482,7 +5510,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           </strong>
         </div>
         <div>
-          <span>Total aproximado</span>
+          <span>{totalLabel}</span>
           <strong>{formatCurrency(order.total)}</strong>
         </div>
         <div>
@@ -5509,7 +5537,12 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
         <div className="store-status-items">
           {order.items.map((item) => (
             <div key={`${order.firebaseKey || order.id}-${item.codigo || item.nombre}`}>
-              {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
+              <div>
+                {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
+                {item.codigo ? ` [${item.codigo}]` : ''}
+              </div>
+              {item.descripcion && <small>{item.descripcion}</small>}
+              {Number(item.subtotal || 0) > 0 && <small>{formatCurrency(item.subtotal)}</small>}
             </div>
           ))}
         </div>

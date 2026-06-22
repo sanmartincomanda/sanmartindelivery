@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
   SICAR_SPECIAL_SKU_OVERRIDES,
@@ -188,6 +189,11 @@ const runMysqlQuery = (query) =>
       );
     });
   });
+
+const sicarQuoteSync = createSicarQuoteSyncManager({
+  runMysqlQuery,
+  sqlEscape,
+});
 
 const getOverallQuantityTotal = async (startDate, endExclusiveDate) => {
   const rows = await runMysqlQuery(`
@@ -599,6 +605,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       database: bridgeConfig.database,
       host: bridgeConfig.host,
       departments: SICAR_SYNC_DEPARTMENTS.map((entry) => entry.sicarDepartment),
+      quoteSync: sicarQuoteSync.state,
     });
   }
 
@@ -646,6 +653,37 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
           taxRatePct: Number(row.taxRatePct.toFixed(4)),
         },
       })),
+    });
+  }
+
+  if (requestUrl.pathname === '/api/sicar/quote') {
+    if (String(request.method || '').toUpperCase() !== 'POST') {
+      return json(405, { ok: false, error: 'Metodo no permitido.' });
+    }
+
+    const orderKey = String(requestBody?.orderKey || '').trim();
+    if (!orderKey) {
+      return json(400, { ok: false, error: 'Falta el orderKey del pedido.' });
+    }
+
+    const applyToFirebase =
+      requestBody?.applyToFirebase === true ||
+      String(requestBody?.applyToFirebase || '').trim().toLowerCase() === 'true';
+
+    const payload = await sicarQuoteSync.syncOrderQuote(orderKey, {
+      applyToFirebase,
+    });
+
+    return json(200, {
+      ok: true,
+      orderKey: payload.orderKey,
+      applyToFirebase,
+      createdQuote: payload.createdQuote,
+      missingCodes: payload.missingCodes,
+      customerPhone: payload.customerPhone,
+      customerName: payload.customerName,
+      whatsappMessage: payload.whatsappMessage,
+      quote: payload.quote,
     });
   }
 
@@ -715,4 +753,5 @@ const server = createServer(async (request, response) => {
 
 server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
+  sicarQuoteSync.initAutoSync();
 });
