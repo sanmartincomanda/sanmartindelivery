@@ -198,9 +198,20 @@ export const getDistanceKm = (from, to) => {
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const compareRouteOrderPriority = (left = {}, right = {}) => {
+  const dateDiff = String(left.fecha || '').localeCompare(String(right.fecha || ''));
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  return Number(left.id || 0) - Number(right.id || 0);
+};
+
 export const optimizeStopsByNearest = (orders = [], origin = null) => {
   const withLocation = orders.filter((order) => normalizeLocation(order.ubicacion));
-  const withoutLocation = orders.filter((order) => !normalizeLocation(order.ubicacion));
+  const withoutLocation = orders
+    .filter((order) => !normalizeLocation(order.ubicacion))
+    .sort(compareRouteOrderPriority);
   const remaining = [...withLocation];
   const optimized = [];
   let currentLocation = normalizeLocation(origin) || normalizeLocation(remaining[0]?.ubicacion);
@@ -211,7 +222,13 @@ export const optimizeStopsByNearest = (orders = [], origin = null) => {
 
     remaining.forEach((order, index) => {
       const distance = getDistanceKm(currentLocation, order.ubicacion);
-      if (distance < bestDistance) {
+      const currentBest = remaining[bestIndex];
+      const shouldReplace =
+        distance < bestDistance - 0.05 ||
+        (Math.abs(distance - bestDistance) <= 0.05 &&
+          compareRouteOrderPriority(order, currentBest) < 0);
+
+      if (shouldReplace) {
         bestDistance = distance;
         bestIndex = index;
       }

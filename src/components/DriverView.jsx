@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
+import { hoyISO } from './Utils';
 import {
   buildGoogleMapsAddressUrl,
   buildGoogleMapsPlaceUrl,
@@ -207,6 +208,20 @@ const getOrderCreatedAt = (order = {}) =>
 const getOrderDeliveredAt = (order = {}) =>
   Number(order.timestampEntregadoMs || order.timestampFinalizado || order.timestamp || 0);
 
+const compareDriverActiveOrders = (left = {}, right = {}) => {
+  const dateDiff = String(left.fecha || '').localeCompare(String(right.fecha || ''));
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  const idDiff = Number(left.id || 0) - Number(right.id || 0);
+  if (idDiff !== 0) {
+    return idDiff;
+  }
+
+  return getOrderCreatedAt(left) - getOrderCreatedAt(right);
+};
+
 const formatElapsedMinutes = (minutes) => {
   const safeMinutes = Math.max(0, Number(minutes || 0));
   if (safeMinutes < 60) {
@@ -292,6 +307,7 @@ const getStatusMeta = (order = {}) => {
 };
 
 export default function DriverView() {
+  const todayKey = hoyISO();
   const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [driver, setDriver] = useState(() => {
     if (typeof window === 'undefined') {
@@ -375,6 +391,22 @@ export default function DriverView() {
     [assignedOrders]
   );
 
+  const currentAssignedOrders = useMemo(
+    () =>
+      activeAssignedOrders
+        .filter((order) => String(order.fecha || '') === todayKey)
+        .sort(compareDriverActiveOrders),
+    [activeAssignedOrders, todayKey]
+  );
+
+  const hiddenLegacyAssignedOrders = useMemo(
+    () =>
+      activeAssignedOrders
+        .filter((order) => String(order.fecha || '') !== todayKey)
+        .sort(compareDriverActiveOrders),
+    [activeAssignedOrders, todayKey]
+  );
+
   const deliveredOrders = useMemo(
     () =>
       assignedOrders
@@ -384,8 +416,8 @@ export default function DriverView() {
   );
 
   useEffect(() => {
-    setRouteOrders(activeAssignedOrders);
-  }, [activeAssignedOrders]);
+    setRouteOrders(currentAssignedOrders);
+  }, [currentAssignedOrders]);
 
   useEffect(() => {
     if (!notice) {
@@ -422,7 +454,7 @@ export default function DriverView() {
   };
 
   const optimizeRoute = async () => {
-    const locatedOrders = activeAssignedOrders.filter((order) => hasLocation(order.ubicacion));
+    const locatedOrders = currentAssignedOrders.filter((order) => hasLocation(order.ubicacion));
     if (locatedOrders.length === 0) {
       alert('No hay pedidos con ubicacion para optimizar.');
       return;
@@ -437,11 +469,11 @@ export default function DriverView() {
         origin = null;
       }
 
-      const optimized = optimizeStopsByNearest(activeAssignedOrders, origin);
-      setRouteOrders(optimized);
+      const optimized = optimizeStopsByNearest(currentAssignedOrders, origin);
       const routeUrl = buildGoogleMapsRouteUrl(optimized, origin);
       if (routeUrl) {
         window.open(routeUrl, '_blank', 'noopener,noreferrer');
+        setNotice(`Ruta optimizada abierta en Google Maps con ${optimized.length} paradas.`);
       }
     } finally {
       setOptimizing(false);
@@ -573,7 +605,7 @@ export default function DriverView() {
   const ordersWithLocation = activeRouteOrders.filter((order) => hasLocation(order.ubicacion));
   const ordersWithoutLocation = activeRouteOrders.filter((order) => !hasLocation(order.ubicacion));
   const deliveredCount = deliveredOrders.length;
-  const enCaminoCount = assignedOrders.filter((order) => order.estado === 'Enviado').length;
+  const enCaminoCount = activeRouteOrders.filter((order) => order.estado === 'Enviado').length;
   const visibleRouteOrders = routeOrders.filter((order) => {
     if (routeFilter === 'todos') return true;
     if (routeFilter === 'en_camino') return order.estado === 'Enviado';
@@ -585,20 +617,15 @@ export default function DriverView() {
     { key: 'en_camino', label: 'En ruta', count: enCaminoCount },
     { key: 'sin_pin', label: 'Sin pin', count: ordersWithoutLocation.length },
   ];
-  const featuredOrder = driverSection === 'ruta' ? visibleRouteOrders[0] || null : null;
-  const compactOrders = featuredOrder
-    ? visibleRouteOrders.filter((order) => getOrderKey(order) !== getOrderKey(featuredOrder))
-    : visibleRouteOrders;
   const routeListTitle =
     routeFilter === 'en_camino'
       ? 'Pedidos en ruta'
       : routeFilter === 'sin_pin'
         ? 'Pedidos sin pin'
-        : 'Siguientes paradas';
+        : 'Pedidos por entregar';
   const historySummary = deliveredOrders[0]?.timestampEntregado
     ? `Ultima entrega ${deliveredOrders[0].timestampEntregado}`
     : 'Revisa pedidos completados y sus detalles';
-  const featuredAge = featuredOrder ? getOrderAgeMeta(featuredOrder, nowTick) : null;
 
   const openOrderMap = (order) => {
     const navigationUrl = getOrderNavigationUrl(order);
@@ -624,7 +651,7 @@ export default function DriverView() {
         <div className="driver-hero-copy">
           <span className="driver-kicker">Driver app</span>
           <h1>{driver.name}</h1>
-          <p>{driver.code} | {activeRouteOrders.length} pendientes | {enCaminoCount} en ruta</p>
+          <p>{driver.code} | {activeRouteOrders.length} por entregar hoy | {enCaminoCount} en ruta</p>
         </div>
         <div className="driver-hero-actions">
           <button
@@ -651,68 +678,6 @@ export default function DriverView() {
 
       {driverSection === 'ruta' ? (
         <>
-          {featuredOrder && featuredAge && (
-            <section className={`driver-featured-card age-${featuredAge.key}`}>
-              <div className="driver-featured-head">
-                <span className="driver-next-icon">{Icons.spark}</span>
-                <div>
-                  <small>Entrega actual</small>
-                  <strong>#{formatOrderNumber(featuredOrder.id)} {featuredOrder.cliente}</strong>
-                  <em>{getAddressPreview(featuredOrder, 108)}</em>
-                </div>
-                <div className="driver-featured-side">
-                  <span className={`driver-age-chip ${featuredAge.key}`}>{featuredAge.label}</span>
-                  <b>{formatCurrency(featuredOrder.total)}</b>
-                </div>
-              </div>
-              <div className="driver-featured-meta">
-                <span>{getOrderItemSummary(featuredOrder)}</span>
-                <span>{hasLocation(featuredOrder.ubicacion) ? 'Con pin guardado' : 'Falta pin exacto'}</span>
-                <span>{featuredOrder.telefono || 'Sin telefono'}</span>
-                <span>{featuredAge.tone}</span>
-              </div>
-              <div className="driver-featured-actions">
-                <button type="button" onClick={() => openOrderMap(featuredOrder)}>
-                  {Icons.map}
-                  Ir al mapa
-                </button>
-                {buildCustomerWhatsappLink(featuredOrder) && (
-                  <a href={buildCustomerWhatsappLink(featuredOrder)} target="_blank" rel="noreferrer">
-                    {Icons.phone}
-                    WhatsApp
-                  </a>
-                )}
-                <button type="button" onClick={() => setSelectedOrder(featuredOrder)}>
-                  {Icons.receipt}
-                  Mostrar detalle
-                </button>
-                <button
-                  type="button"
-                  className="driver-deliver-action"
-                  onClick={() => setConfirmDeliveryOrder(featuredOrder)}
-                  disabled={deliveringOrderKey === featuredOrder.firebaseKey}
-                >
-                  {Icons.check}
-                  {deliveringOrderKey === featuredOrder.firebaseKey ? 'Guardando...' : 'Entregado'}
-                </button>
-              </div>
-              {!hasLocation(featuredOrder.ubicacion) && (
-                <div className="driver-inline-warning">
-                  <span>Este pedido no tiene punto exacto en mapa.</span>
-                  <button
-                    type="button"
-                    className="driver-location-action"
-                    onClick={() => saveCustomerLocation(featuredOrder)}
-                    disabled={locatingOrderKey === featuredOrder.firebaseKey}
-                  >
-                    {Icons.map}
-                    {locatingOrderKey === featuredOrder.firebaseKey ? 'Guardando pin...' : 'Guardar pin desde aqui'}
-                  </button>
-                </div>
-              )}
-            </section>
-          )}
-
           <nav className="driver-filter-row" aria-label="Filtros de ruta">
             {routeFilters.map((filter) => (
               <button
@@ -730,27 +695,31 @@ export default function DriverView() {
           <section className="driver-section-head">
             <div>
               <strong>{routeListTitle}</strong>
-              <span>
-                {featuredOrder
-                  ? `${compactOrders.length} paradas despues de la actual`
-                  : `${visibleRouteOrders.length} pedidos en esta vista`}
-              </span>
+              <span>{`${visibleRouteOrders.length} pedidos en esta vista, ordenados del mas viejo al mas nuevo`}</span>
             </div>
           </section>
+
+          {hiddenLegacyAssignedOrders.length > 0 && (
+            <div className="driver-inline-warning driver-inline-warning-legacy">
+              <span>
+                Se ocultaron {hiddenLegacyAssignedOrders.length} pedidos viejos de dias anteriores que siguen abiertos.
+                La ruta activa ahora solo muestra pedidos de hoy.
+              </span>
+            </div>
+          )}
 
           {visibleRouteOrders.length === 0 ? (
             <div className="driver-empty">
               <DriverEmptyVector />
               <strong>No hay pedidos en esta vista.</strong>
-              <span>Cuando administracion asigne pedidos, apareceran aqui listos para ruta.</span>
+              <span>Cuando administracion asigne pedidos de hoy, apareceran aqui listos para ruta.</span>
             </div>
           ) : (
             <main className="driver-grid">
-              {compactOrders.map((order, index) => (
+              {visibleRouteOrders.map((order) => (
                 <DriverOrderCard
                   key={getOrderKey(order)}
                   order={order}
-                  index={featuredOrder ? index + 1 : index}
                   nowMs={nowTick}
                   delivering={deliveringOrderKey === order.firebaseKey}
                   locating={locatingOrderKey === order.firebaseKey}
@@ -872,7 +841,7 @@ function DriverBottomNav({ section, activeCount, deliveredCount, onChangeSection
   );
 }
 
-function DriverOrderCard({ order, index, nowMs, delivering, locating, onOpenDetails, onOpenMap, onAddLocation, onRequestDelivered }) {
+function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, onOpenMap, onAddLocation, onRequestDelivered }) {
   const status = getStatusMeta(order);
   const delivered = isDeliveredOrder(order);
   const navigationUrl = getOrderNavigationUrl(order);
@@ -883,7 +852,7 @@ function DriverOrderCard({ order, index, nowMs, delivering, locating, onOpenDeta
   return (
     <article className={`driver-order-card ${status.tone} age-${ageMeta.key}`}>
       <div className="driver-order-main">
-        <span className="driver-route-badge">{String(index + 1).padStart(2, '0')}</span>
+        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
         <span className="driver-order-info">
           <small>Pedido #{formatOrderNumber(order.id)}</small>
           <strong>{order.cliente}</strong>
@@ -906,7 +875,7 @@ function DriverOrderCard({ order, index, nowMs, delivering, locating, onOpenDeta
           <span>Falta ubicacion exacta del cliente.</span>
           <button
             type="button"
-            className="driver-location-action"
+            className="driver-location-action driver-location-action-compact"
             onClick={() => onAddLocation(order)}
             disabled={locating}
           >
@@ -2368,6 +2337,16 @@ const driverStyles = `
     background: #f97316;
     color: #ffffff;
   }
+  .driver-location-action.driver-location-action-compact {
+    min-height: 34px;
+    gap: 6px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+  .driver-location-action.driver-location-action-compact svg {
+    width: 14px;
+    height: 14px;
+  }
   .driver-inline-warning {
     display: flex;
     align-items: center;
@@ -2380,6 +2359,9 @@ const driverStyles = `
   }
   .driver-inline-warning.compact {
     padding: 10px 12px;
+  }
+  .driver-inline-warning-legacy {
+    margin-bottom: 12px;
   }
   .driver-inline-warning span {
     color: #9a3412;
