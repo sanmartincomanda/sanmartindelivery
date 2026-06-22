@@ -3,7 +3,7 @@ import { equalTo, onValue, orderByChild, query, ref, update } from 'firebase/dat
 import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
-import { buildStoreKitchenOrderText } from '../services/orders';
+import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
 
 // Iconos SVG
 const Icons = {
@@ -124,6 +124,20 @@ const getKitchenOrderText = (pedido = {}) => {
   }
 
   return String(pedido.pedido || '').trim();
+};
+
+const getKitchenStatusConfig = (pedido = {}) => {
+  const status = pedido.estado || 'Pendiente';
+  const baseConfig = STATUS_CONFIG[status] || STATUS_CONFIG.Pendiente;
+
+  if (status === 'Preparado') {
+    return {
+      ...baseConfig,
+      label: isPickupOrder(pedido) ? 'Listo para Recoger' : 'Listo para Entregar',
+    };
+  }
+
+  return baseConfig;
 };
 
 export default function KitchenView({ orders }) {
@@ -645,7 +659,7 @@ export default function KitchenView({ orders }) {
         }}>
           {pedidosFiltrados.map((pedido, index) => {
             const status = pedido.estado || 'Pendiente';
-            const config = STATUS_CONFIG[status];
+            const config = getKitchenStatusConfig(pedido);
             const isEditing = editingId === pedido.firebaseKey;
             const isAnimating = animatingCards.has(pedido.firebaseKey);
             const customerWhatsappLink = buildKitchenWhatsappLink(pedido);
@@ -820,6 +834,22 @@ export default function KitchenView({ orders }) {
                           border: '1px solid rgba(249, 115, 22, 0.28)'
                         }}>
                           TIENDA VIRTUAL
+                        </div>
+                      )}
+                      {isPickupOrder(pedido) && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(34, 197, 94, 0.14)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 800,
+                          color: '#16a34a',
+                          border: '1px solid rgba(34, 197, 94, 0.24)'
+                        }}>
+                          PEDIDO PICKUP
                         </div>
                       )}
                       <div style={{
@@ -1089,7 +1119,7 @@ export default function KitchenView({ orders }) {
                           }}
                         >
                           {Icons.check}
-                          Pedido Listo
+                          {isPickupOrder(pedido) ? 'Listo para Recoger' : 'Pedido Listo'}
                         </button>
                       )}
 

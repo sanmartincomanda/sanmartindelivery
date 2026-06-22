@@ -8,6 +8,8 @@ export const MANUAL_CHANNEL = 'manual';
 export const STORE_CHANNEL = 'tienda_virtual';
 export const STORE_ORDER_RETENTION_DAYS = 3;
 export const SICAR_QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
+export const ORDER_FULFILLMENT_DELIVERY = 'delivery';
+export const ORDER_FULFILLMENT_PICKUP = 'pickup';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -22,6 +24,25 @@ const removeTextAccents = (value) =>
     .toLowerCase();
 
 const normalizeOrderStatus = (status) => removeTextAccents(status || 'Pendiente');
+
+export const normalizeOrderFulfillmentType = (value = '') => {
+  const normalized = removeTextAccents(value || '');
+
+  if (
+    normalized.includes('pickup') ||
+    normalized.includes('retiro') ||
+    normalized.includes('recoger')
+  ) {
+    return ORDER_FULFILLMENT_PICKUP;
+  }
+
+  return ORDER_FULFILLMENT_DELIVERY;
+};
+
+export const isPickupOrder = (order = {}) =>
+  normalizeOrderFulfillmentType(
+    order?.fulfillmentType || order?.fulfillmentLabel || order?.tipoEntrega || ''
+  ) === ORDER_FULFILLMENT_PICKUP;
 
 const isFinalStoreStatus = (status) => {
   const normalizedStatus = normalizeOrderStatus(status);
@@ -268,6 +289,8 @@ export async function createOrder(payload, options = {}) {
   const fecha = payload.fecha || hoyISO();
   const counterRef = ref(database, `orderCounters/${fecha}`);
   const createdAt = Date.now();
+  const fulfillmentType = normalizeOrderFulfillmentType(payload.fulfillmentType || payload.tipoEntrega);
+  const pickupOrder = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
     const lastNumber = Number(currentValue || 0);
@@ -326,10 +349,10 @@ export async function createOrder(payload, options = {}) {
       String(payload.clienteCodigo || '').trim() || (channel === STORE_CHANNEL ? 'TIENDA VIRTUAL' : '-'),
     clienteFirebaseKey: String(payload.clienteFirebaseKey || '').trim(),
     storeUserKey: String(payload.storeUserKey || '').trim(),
-    direccion: String(payload.direccion || '').trim() || '-',
+    direccion: pickupOrder ? 'Pickup en tienda' : String(payload.direccion || '').trim() || '-',
     telefono: String(payload.telefono || '').trim(),
-    referencia: String(payload.referencia || '').trim(),
-    ubicacion: normalizeLocation(payload.ubicacion || payload.location),
+    referencia: pickupOrder ? '' : String(payload.referencia || '').trim(),
+    ubicacion: pickupOrder ? null : normalizeLocation(payload.ubicacion || payload.location),
     pedido: pedidoTexto,
     observaciones: String(payload.observaciones || '').trim(),
     items: normalizedItems,
@@ -344,7 +367,9 @@ export async function createOrder(payload, options = {}) {
     id,
     canal: channel,
     canalLabel: channel === STORE_CHANNEL ? 'Tienda Virtual' : 'Ingreso Manual',
-    deliveryMode: String(payload.deliveryMode || 'perfil').trim() || 'perfil',
+    deliveryMode: pickupOrder ? 'pickup' : String(payload.deliveryMode || 'perfil').trim() || 'perfil',
+    fulfillmentType,
+    fulfillmentLabel: pickupOrder ? 'Pickup' : 'Delivery',
     timestampIngreso: buildTimeLabel(),
     timestampIngresoMs: createdAt,
     justAdded: true,

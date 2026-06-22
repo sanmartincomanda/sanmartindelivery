@@ -60,6 +60,9 @@ import {
 } from '../services/storeUsers';
 import {
   buildStoreOrderText,
+  isPickupOrder,
+  ORDER_FULFILLMENT_DELIVERY,
+  ORDER_FULFILLMENT_PICKUP,
   subscribeOrdersForStoreUser,
   formatOrderNumber,
   formatWeight,
@@ -72,6 +75,7 @@ const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
+const PICKUP_ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo para recoger', 'Recogido'];
 const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
   lat: 11.9299,
   lng: -85.956,
@@ -341,6 +345,12 @@ const normalizeCustomerOrderStatus = (status) => {
 const isFinalCustomerOrder = (order = {}) =>
   ['cancelado', 'entregado'].includes(normalizeCustomerOrderStatus(order.estado));
 
+const getFulfillmentTypeLabel = (fulfillmentType) =>
+  fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Pickup en tienda' : 'Entrega a domicilio';
+
+const getOrderProgressSteps = (order = {}) =>
+  isPickupOrder(order) ? PICKUP_ORDER_PROGRESS_STEPS : ORDER_PROGRESS_STEPS;
+
 const getShortPersonName = (name, fallback) => {
   const cleanName = String(name || '').trim();
   if (!cleanName) {
@@ -355,6 +365,7 @@ const getCustomerStatusMeta = (order = {}) => {
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const cookName = getShortPersonName(order.cocinero, 'Harvey');
   const riderName = getShortPersonName(order.repartidor, 'Jordin');
+  const pickupOrder = isPickupOrder(order);
 
   const statusMeta = {
     pendiente: {
@@ -377,8 +388,10 @@ const getCustomerStatusMeta = (order = {}) => {
       accent: '#10b981',
       soft: '#ecfdf5',
       emoji: '✅',
-      label: 'Pedido listo',
-      message: 'Tu pedido ya esta listo. Estamos coordinando la salida para entregarlo con cuidado.',
+      label: pickupOrder ? 'Listo para recoger' : 'Pedido listo',
+      message: pickupOrder
+        ? 'Tu pedido ya esta listo para recoger en tienda.'
+        : 'Tu pedido ya esta listo. Estamos coordinando la salida para entregarlo con cuidado.',
       progress: 3,
     },
     enviado: {
@@ -393,9 +406,11 @@ const getCustomerStatusMeta = (order = {}) => {
       accent: '#16a34a',
       soft: '#f0fdf4',
       emoji: 'OK',
-      label: 'Pedido entregado',
-      message: 'Tu pedido fue entregado. Gracias por comprar en Carnes San Martin Granada.',
-      progress: 5,
+      label: pickupOrder ? 'Pedido recogido' : 'Pedido entregado',
+      message: pickupOrder
+        ? 'Tu pedido ya fue recogido. Gracias por comprar en Carnes San Martin Granada.'
+        : 'Tu pedido fue entregado. Gracias por comprar en Carnes San Martin Granada.',
+      progress: pickupOrder ? 4 : 5,
     },
     cancelado: {
       accent: '#64748b',
@@ -448,6 +463,9 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
   const customerPhone = currentUser?.telefono || order.telefono || '';
   const orderNumber = formatOrderNumber(order.id);
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
+  const fulfillmentLabel = getFulfillmentTypeLabel(
+    isPickupOrder(order) ? ORDER_FULFILLMENT_PICKUP : ORDER_FULFILLMENT_DELIVERY
+  );
 
   return [
     'Hola Carnes San Martin Granada.',
@@ -455,6 +473,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
     `Pedido #${orderNumber}`,
     `Cliente: ${customerName}`,
     customerPhone ? `Telefono: ${customerPhone}` : '',
+    `Tipo: ${fulfillmentLabel}`,
     `Estado actual: ${order.estado || 'Pendiente'}`,
     `${totalLabel}: ${formatCurrency(order.total)}`,
     'Productos:',
@@ -479,10 +498,12 @@ const buildGuestCartWhatsAppMessage = ({
   coupon = null,
   discount = 0,
   total = 0,
+  fulfillmentType = ORDER_FULFILLMENT_DELIVERY,
 }) => {
   const deliveryAddress = [customer.direccion, customer.referencia ? `Ref: ${customer.referencia}` : '']
     .filter(Boolean)
     .join(' | ');
+  const pickupOrder = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
 
   const orderText = buildStoreOrderText(items, notes, {
     couponCode: coupon?.code,
@@ -495,7 +516,9 @@ const buildGuestCartWhatsAppMessage = ({
     '',
     `Cliente: ${String(customer.nombre || 'Invitado').trim() || 'Invitado'}`,
     customer.telefono ? `Telefono: ${String(customer.telefono).trim()}` : null,
-    deliveryAddress ? `Direccion: ${deliveryAddress}` : null,
+    `Tipo: ${getFulfillmentTypeLabel(fulfillmentType)}`,
+    pickupOrder ? 'Recogere el pedido directamente en tienda.' : null,
+    !pickupOrder && deliveryAddress ? `Direccion: ${deliveryAddress}` : null,
     customer.metodoPago ? `Pago: ${customer.metodoPago}` : null,
     '',
     'Pedido:',
@@ -600,6 +623,7 @@ export default function TiendaVirtualView({
     referencia: '',
     metodoPago: STORE_PAYMENT_OPTIONS[0],
   });
+  const [fulfillmentType, setFulfillmentType] = useState(ORDER_FULFILLMENT_DELIVERY);
   const [deliveryMode, setDeliveryMode] = useState('perfil');
   const [alternateDelivery, setAlternateDelivery] = useState(() => createEmptyDeliveryDraft());
   const [alternateLocating, setAlternateLocating] = useState(false);
@@ -611,6 +635,7 @@ export default function TiendaVirtualView({
 
   const deferredQuery = useDeferredValue(query);
   const isDashboard = mode === 'dashboard';
+  const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
 
   useEffect(() => {
     let cancelled = false;
@@ -1724,7 +1749,7 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (!String(customer.direccion || '').trim()) {
+    if (!pickupFlow && !String(customer.direccion || '').trim()) {
       alert('Escribe la direccion de entrega para enviar el pedido.');
       return;
     }
@@ -1747,6 +1772,7 @@ export default function TiendaVirtualView({
         coupon: appliedCoupon,
         discount: couponDiscount,
         total: approximateTotalAmount,
+        fulfillmentType,
       })
     )}`;
 
@@ -1771,7 +1797,7 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (!activeDeliveryAddress.direccion.trim() || !hasLocation(activeDeliveryAddress.ubicacion)) {
+    if (!pickupFlow && (!activeDeliveryAddress.direccion.trim() || !hasLocation(activeDeliveryAddress.ubicacion))) {
       if (deliveryMode === 'perfil') {
         alert('Completa tu direccion y guarda el punto exacto del mapa antes de enviar el pedido.');
         setProfileOpen(true);
@@ -1804,10 +1830,10 @@ export default function TiendaVirtualView({
           clienteCodigo: currentUser.codigo,
           clienteFirebaseKey: currentUser.clientKey,
           storeUserKey: currentUser.key,
-          direccion: fullAddress,
+          direccion: pickupFlow ? 'Pickup en tienda' : fullAddress,
           telefono: currentUser.telefono,
-          referencia: activeDeliveryAddress.referencia,
-          ubicacion: activeDeliveryAddress.ubicacion,
+          referencia: pickupFlow ? '' : activeDeliveryAddress.referencia,
+          ubicacion: pickupFlow ? null : activeDeliveryAddress.ubicacion,
           items: cartItems,
           subtotalEstimado: totalAmount,
           descuentoCupon: couponDiscount,
@@ -1824,6 +1850,7 @@ export default function TiendaVirtualView({
           observaciones: notes.trim(),
           metodoPago: customer.metodoPago,
           deliveryMode,
+          fulfillmentType,
         },
         { channel: STORE_CHANNEL }
       );
@@ -1835,6 +1862,7 @@ export default function TiendaVirtualView({
       setCouponMessage('');
       setNotes('');
       setCheckoutOpen(false);
+      setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
       setDeliveryMode('perfil');
       setAlternateDelivery(createEmptyDeliveryDraft());
       setOrdersOpen(true);
@@ -4371,6 +4399,7 @@ export default function TiendaVirtualView({
           cartItems={cartItems}
           currentUser={currentUser}
           customer={customer}
+          fulfillmentType={fulfillmentType}
           deliveryMode={deliveryMode}
           alternateDelivery={alternateDelivery}
           alternateLocating={alternateLocating}
@@ -4384,6 +4413,7 @@ export default function TiendaVirtualView({
           totalAmount={totalAmount}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
+          onFulfillmentTypeChange={setFulfillmentType}
           onDeliveryModeChange={setDeliveryMode}
           onQuantityChange={updateQuantity}
           onAlternateDeliveryChange={updateAlternateDelivery}
@@ -5379,6 +5409,7 @@ function CheckoutSheet({
   cartItems,
   currentUser,
   customer,
+  fulfillmentType,
   deliveryMode,
   alternateDelivery,
   alternateLocating,
@@ -5396,6 +5427,7 @@ function CheckoutSheet({
   onCaptureAlternateLocation,
   onCustomerChange,
   onCouponInputChange,
+  onFulfillmentTypeChange,
   onDeliveryModeChange,
   onEditProfile,
   onGuestSubmit,
@@ -5407,6 +5439,7 @@ function CheckoutSheet({
   onSubmit,
 }) {
   const isGuestCheckout = !currentUser;
+  const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
 
   return (
     <div className="store-sheet-overlay">
@@ -5515,6 +5548,23 @@ function CheckoutSheet({
             </p>
           </div>
 
+          <div className="store-delivery-mode">
+            <button
+              type="button"
+              className={`store-delivery-option ${fulfillmentType === ORDER_FULFILLMENT_DELIVERY ? 'active' : ''}`}
+              onClick={() => onFulfillmentTypeChange(ORDER_FULFILLMENT_DELIVERY)}
+            >
+              Entrega a domicilio
+            </button>
+            <button
+              type="button"
+              className={`store-delivery-option ${fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'active' : ''}`}
+              onClick={() => onFulfillmentTypeChange(ORDER_FULFILLMENT_PICKUP)}
+            >
+              Pickup en tienda
+            </button>
+          </div>
+
           {isGuestCheckout ? (
             <>
               <div className="store-status-card store-auth-choice-card">
@@ -5553,19 +5603,27 @@ function CheckoutSheet({
                     placeholder="Telefono o WhatsApp"
                     required
                   />
-                  <input
-                    className="store-field"
-                    value={customer.direccion}
-                    onChange={(event) => onCustomerChange('direccion', event.target.value)}
-                    placeholder="Direccion de entrega"
-                    required
-                  />
-                  <input
-                    className="store-field"
-                    value={customer.referencia}
-                    onChange={(event) => onCustomerChange('referencia', event.target.value)}
-                    placeholder="Referencia"
-                  />
+                  {pickupFlow ? (
+                    <div className="store-auth-inline-note">
+                      Este pedido quedara como <strong>pickup</strong>. Te lo prepararemos para recoger en tienda.
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        className="store-field"
+                        value={customer.direccion}
+                        onChange={(event) => onCustomerChange('direccion', event.target.value)}
+                        placeholder="Direccion de entrega"
+                        required
+                      />
+                      <input
+                        className="store-field"
+                        value={customer.referencia}
+                        onChange={(event) => onCustomerChange('referencia', event.target.value)}
+                        placeholder="Referencia"
+                      />
+                    </>
+                  )}
                 </div>
                 <div className="store-auth-inline-note">
                   Tu pedido se abrira listo para enviar al WhatsApp de la tienda.
@@ -5574,81 +5632,95 @@ function CheckoutSheet({
             </>
           ) : (
             <>
-              <div className="store-delivery-mode">
-                <button
-                  type="button"
-                  className={`store-delivery-option ${deliveryMode === 'perfil' ? 'active' : ''}`}
-                  onClick={() => onDeliveryModeChange('perfil')}
-                >
-                  Mi direccion guardada
-                </button>
-                <button
-                  type="button"
-                  className={`store-delivery-option ${deliveryMode === 'otra' ? 'active' : ''}`}
-                  onClick={() => onDeliveryModeChange('otra')}
-                >
-                  Otra direccion
-                </button>
-              </div>
-
-              {deliveryMode === 'perfil' ? (
+              {pickupFlow ? (
                 <div className="store-status-card" style={{ marginTop: 0 }}>
-                  <div className="store-status-pill">Entrega</div>
+                  <div className="store-status-pill">Pickup</div>
                   <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
                   <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
                     {currentUser.telefono}
                     <br />
-                    {currentUser.direccion}
-                    {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+                    Recogeras este pedido directamente en tienda.
                   </div>
-                  {!hasLocation(currentUser.ubicacion) && (
-                    <div className="store-location-feedback error" style={{ marginTop: 10 }}>
-                      Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    className="store-button secondary"
-                    style={{ marginTop: 10 }}
-                    onClick={onEditProfile}
-                  >
-                    Editar mi direccion
-                  </button>
                 </div>
               ) : (
-                <div className="store-status-card" style={{ marginTop: 0 }}>
-                  <div className="store-status-pill">Entrega alterna</div>
-                  <div className="store-form" style={{ marginTop: 12 }}>
-                    <input
-                      className="store-field"
-                      value={alternateDelivery.direccion}
-                      onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
-                      placeholder="Direccion de entrega"
-                    />
-                    <input
-                      className="store-field"
-                      value={alternateDelivery.referencia}
-                      onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
-                      placeholder="Referencia"
-                    />
-                    <LocationCaptureBlock
-                      location={alternateDelivery.ubicacion}
-                      locating={alternateLocating}
-                      onCapture={onCaptureAlternateLocation}
-                      onManualLocation={(location) => {
-                        onAlternateDeliveryChange('ubicacion', location);
-                        if (shouldAutofillAddress(alternateDelivery.direccion)) {
-                          onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
-                        }
-                      }}
-                      onAddressResolved={(value) => {
-                        if (shouldAutofillAddress(alternateDelivery.direccion)) {
-                          onAlternateDeliveryChange('direccion', value);
-                        }
-                      }}
-                    />
+                <>
+                  <div className="store-delivery-mode">
+                    <button
+                      type="button"
+                      className={`store-delivery-option ${deliveryMode === 'perfil' ? 'active' : ''}`}
+                      onClick={() => onDeliveryModeChange('perfil')}
+                    >
+                      Mi direccion guardada
+                    </button>
+                    <button
+                      type="button"
+                      className={`store-delivery-option ${deliveryMode === 'otra' ? 'active' : ''}`}
+                      onClick={() => onDeliveryModeChange('otra')}
+                    >
+                      Otra direccion
+                    </button>
                   </div>
-                </div>
+
+                  {deliveryMode === 'perfil' ? (
+                    <div className="store-status-card" style={{ marginTop: 0 }}>
+                      <div className="store-status-pill">Entrega</div>
+                      <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+                      <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+                        {currentUser.telefono}
+                        <br />
+                        {currentUser.direccion}
+                        {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+                      </div>
+                      {!hasLocation(currentUser.ubicacion) && (
+                        <div className="store-location-feedback error" style={{ marginTop: 10 }}>
+                          Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className="store-button secondary"
+                        style={{ marginTop: 10 }}
+                        onClick={onEditProfile}
+                      >
+                        Editar mi direccion
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="store-status-card" style={{ marginTop: 0 }}>
+                      <div className="store-status-pill">Entrega alterna</div>
+                      <div className="store-form" style={{ marginTop: 12 }}>
+                        <input
+                          className="store-field"
+                          value={alternateDelivery.direccion}
+                          onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
+                          placeholder="Direccion de entrega"
+                        />
+                        <input
+                          className="store-field"
+                          value={alternateDelivery.referencia}
+                          onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
+                          placeholder="Referencia"
+                        />
+                        <LocationCaptureBlock
+                          location={alternateDelivery.ubicacion}
+                          locating={alternateLocating}
+                          onCapture={onCaptureAlternateLocation}
+                          onManualLocation={(location) => {
+                            onAlternateDeliveryChange('ubicacion', location);
+                            if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                              onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
+                            }
+                          }}
+                          onAddressResolved={(value) => {
+                            if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                              onAlternateDeliveryChange('direccion', value);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -5772,9 +5844,12 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
   const orderNumber = formatOrderNumber(order.id);
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const cookName = order.cocinero ? getShortPersonName(order.cocinero, order.cocinero) : 'Por asignar';
+  const pickupOrder = isPickupOrder(order);
   const riderName = order.repartidor
     ? getShortPersonName(order.repartidor, order.repartidor)
-    : 'Por asignar';
+    : pickupOrder
+      ? 'No aplica'
+      : 'Por asignar';
   const whatsappLink = buildOrderWhatsAppLink(order, currentUser);
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const canCancelOrder =
@@ -5812,7 +5887,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
       <p className="store-status-message">{meta.message}</p>
 
       <div className="store-progress" aria-label="Progreso del pedido">
-        {ORDER_PROGRESS_STEPS.map((step, index) => {
+        {getOrderProgressSteps(order).map((step, index) => {
           const isDone = meta.progress >= index + 1;
           return (
             <span
@@ -5845,11 +5920,11 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           </strong>
         </div>
         <div>
-          <span>Entrega</span>
+          <span>{pickupOrder ? 'Retiro' : 'Entrega'}</span>
           <strong>
             {riderName}
             {order.timestampEntregado
-              ? ` - Entregado ${order.timestampEntregado}`
+              ? ` - ${pickupOrder ? 'Recogido' : 'Entregado'} ${order.timestampEntregado}`
               : order.timestampEnviado
                 ? ` - ${order.timestampEnviado}`
                 : ''}

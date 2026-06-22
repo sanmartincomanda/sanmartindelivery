@@ -3,6 +3,7 @@ import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
 import { DRIVERS_PATH, mergeDrivers } from '../services/drivers';
+import { isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 
 // Iconos SVG (mismos que en KitchenView)
@@ -124,6 +125,27 @@ const COCINEROS_ALIAS = {
   'Encargado Logistica': 'Logística'
 };
 
+const getListStatusConfig = (pedido = {}) => {
+  const status = pedido.estado || 'Pendiente';
+  const baseConfig = STATUS_CONFIG[status] || STATUS_CONFIG.Pendiente;
+
+  if (status === 'Preparado') {
+    return {
+      ...baseConfig,
+      label: isPickupOrder(pedido) ? 'Listo para Recoger' : 'Listo para Entregar',
+    };
+  }
+
+  if (status === 'Entregado' && isPickupOrder(pedido)) {
+    return {
+      ...baseConfig,
+      label: 'Recogido',
+    };
+  }
+
+  return baseConfig;
+};
+
 export default function ListaPedidos({ pedidos = [] }) {
   const [filtro, setFiltro] = useState('por_enviar');
   const [modalRepartidor, setModalRepartidor] = useState(null);
@@ -221,6 +243,32 @@ export default function ListaPedidos({ pedidos = [] }) {
       timestampEnviado: null,
       timestampAsignado: null,
       timestamp: Date.now()
+    });
+  };
+
+  const handleMarcarRecogido = (pedido) => {
+    if (!pedido?.firebaseKey) return;
+
+    const nowMs = Date.now();
+    const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    setAnimatingCards(prev => new Set([...prev, pedido.firebaseKey]));
+    setTimeout(() => setAnimatingCards(prev => {
+      const next = new Set(prev);
+      next.delete(pedido.firebaseKey);
+      return next;
+    }), 300);
+
+    update(ref(database, `${getBasePath()}/${pedido.firebaseKey}`), {
+      estado: 'Entregado',
+      repartidor: null,
+      repartidorCodigo: null,
+      entregadoPor: 'Pickup en tienda',
+      entregadoPorCodigo: 'pickup',
+      timestampEntregado: now,
+      timestampEntregadoMs: nowMs,
+      timestampFinalizado: nowMs,
+      timestamp: nowMs
     });
   };
 
@@ -745,9 +793,10 @@ export default function ListaPedidos({ pedidos = [] }) {
         }}>
           {pedidosOrdenados.map((pedido, index) => {
             const status = pedido.estado || 'Pendiente';
-            const config = STATUS_CONFIG[status];
+            const config = getListStatusConfig(pedido);
             const isAnimating = animatingCards.has(pedido.firebaseKey);
             const metodoPagoColor = getMetodoPagoColor(pedido.metodoPago);
+            const pickupOrder = isPickupOrder(pedido);
             
             return (
               <div
@@ -837,7 +886,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                           gap: '8px'
                         }}>
                           <span style={{ fontSize: '18px' }}>⏱️</span>
-                          {getTimeElapsed(pedido.timestamp)} {status === 'Entregado' ? 'entregado' : status === 'Enviado' ? 'enviado' : 'en cola'}
+                          {getTimeElapsed(pedido.timestamp)} {status === 'Entregado' ? (pickupOrder ? 'recogido' : 'entregado') : status === 'Enviado' ? 'enviado' : 'en cola'}
                         </div>
                       </div>
                     </div>
@@ -918,6 +967,22 @@ export default function ListaPedidos({ pedidos = [] }) {
                           fontWeight: 800
                         }}>
                           TIENDA VIRTUAL
+                        </div>
+                      )}
+                      {pickupOrder && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(34, 197, 94, 0.14)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(34, 197, 94, 0.24)',
+                          color: '#16a34a',
+                          fontSize: '14px',
+                          fontWeight: 800
+                        }}>
+                          PEDIDO PICKUP
                         </div>
                       )}
                       {pedido.canal === 'tienda_virtual' && (
@@ -1140,7 +1205,34 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     )}
 
-                    {status === 'Preparado' && (
+                    {status === 'Preparado' && pickupOrder && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <button
+                          onClick={() => handleMarcarRecogido(pedido)}
+                          className="btn-hover"
+                          style={{
+                            width: '100%',
+                            padding: '18px 24px',
+                            borderRadius: '14px',
+                            border: '2px dashed #16a34a',
+                            background: 'rgba(22, 163, 74, 0.1)',
+                            color: '#15803d',
+                            fontWeight: 800,
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '12px'
+                          }}
+                        >
+                          <span style={{ fontSize: '24px' }}>OK</span>
+                          Marcar como Recogido
+                        </button>
+                      </div>
+                    )}
+
+                    {status === 'Preparado' && !pickupOrder && (
                       <div style={{ marginBottom: '20px' }}>
                         <button
                           onClick={() => {
@@ -1304,7 +1396,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                           color: '#16a34a'
                         }}>
                           <span>OK</span>
-                          <span>Entregado: {pedido.timestampEntregado}</span>
+                          <span>{pickupOrder ? 'Recogido' : 'Entregado'}: {pedido.timestampEntregado}</span>
                         </div>
                       )}
                     </div>

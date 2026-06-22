@@ -2,7 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { push, ref, set } from 'firebase/database';
 import { database } from '../firebase';
 import { hoyISO, normalizar } from './Utils';
-import { MANUAL_CHANNEL, formatOrderNumber } from '../services/orders';
+import {
+  MANUAL_CHANNEL,
+  ORDER_FULFILLMENT_DELIVERY,
+  ORDER_FULFILLMENT_PICKUP,
+  formatOrderNumber,
+} from '../services/orders';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation } from '../services/geo';
 
 const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
@@ -31,6 +36,7 @@ export default function OrderForm({
   const [savingClient, setSavingClient] = useState(false);
   const [locatingClient, setLocatingClient] = useState(false);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
+  const [fulfillmentType, setFulfillmentType] = useState(ORDER_FULFILLMENT_DELIVERY);
   const [hoverIdx, setHoverIdx] = useState(-1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successNumber, setSuccessNumber] = useState(null);
@@ -87,6 +93,7 @@ export default function OrderForm({
           pedido: pedido.trim(),
           fecha: hoyISO(),
           metodoPago,
+          fulfillmentType,
         },
         { channel: MANUAL_CHANNEL }
       );
@@ -98,6 +105,7 @@ export default function OrderForm({
       setSelectedClient(null);
       setPedido('');
       setMetodoPago('Efectivo');
+      setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
     } catch (error) {
       console.error('Error agregando pedido manual:', error);
       if (error.code === 'ORDER_LIMIT_REACHED') {
@@ -383,6 +391,77 @@ export default function OrderForm({
               </div>
               <div style={{ fontSize: '12px', opacity: 0.55, marginTop: '8px' }}>
                 Quedan {remainingOrders} pedidos disponibles hoy
+              </div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: 'rgba(255,255,255,0.6)',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Tipo de Entrega
+              </label>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '8px',
+                  marginBottom: '18px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setFulfillmentType(ORDER_FULFILLMENT_DELIVERY)}
+                  className="btn-hover"
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    border: '2px solid',
+                    borderColor:
+                      fulfillmentType === ORDER_FULFILLMENT_DELIVERY ? '#38bdf8' : 'rgba(255,255,255,0.1)',
+                    background:
+                      fulfillmentType === ORDER_FULFILLMENT_DELIVERY
+                        ? 'rgba(56, 189, 248, 0.18)'
+                        : 'rgba(255,255,255,0.05)',
+                    color:
+                      fulfillmentType === ORDER_FULFILLMENT_DELIVERY ? '#38bdf8' : 'rgba(255,255,255,0.7)',
+                    fontWeight: fulfillmentType === ORDER_FULFILLMENT_DELIVERY ? 800 : 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Delivery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFulfillmentType(ORDER_FULFILLMENT_PICKUP)}
+                  className="btn-hover"
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    border: '2px solid',
+                    borderColor:
+                      fulfillmentType === ORDER_FULFILLMENT_PICKUP ? '#22c55e' : 'rgba(255,255,255,0.1)',
+                    background:
+                      fulfillmentType === ORDER_FULFILLMENT_PICKUP
+                        ? 'rgba(34, 197, 94, 0.18)'
+                        : 'rgba(255,255,255,0.05)',
+                    color:
+                      fulfillmentType === ORDER_FULFILLMENT_PICKUP ? '#22c55e' : 'rgba(255,255,255,0.7)',
+                    fontWeight: fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 800 : 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Pickup
+                </button>
               </div>
             </div>
 
