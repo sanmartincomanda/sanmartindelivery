@@ -47,15 +47,68 @@ const ENABLE_SICAR_QUOTE_SYNC = true;
 
 const sqlEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
+const isLocalBridgeHostname = (hostname = '') => {
+  const cleanHost = String(hostname || '').trim().toLowerCase();
+
+  if (!cleanHost) {
+    return false;
+  }
+
+  if (cleanHost === 'localhost' || cleanHost === '127.0.0.1' || cleanHost === '::1') {
+    return true;
+  }
+
+  if (/^10\.\d+\.\d+\.\d+$/.test(cleanHost)) {
+    return true;
+  }
+
+  if (/^192\.168\.\d+\.\d+$/.test(cleanHost)) {
+    return true;
+  }
+
+  const match = cleanHost.match(/^172\.(\d+)\.\d+\.\d+$/);
+  if (match) {
+    const secondOctet = Number(match[1] || 0);
+    return secondOctet >= 16 && secondOctet <= 31;
+  }
+
+  return false;
+};
+
+const resolveCorsHeaders = (request) => {
+  const origin = String(request?.headers?.origin || '').trim();
+
+  if (!origin) {
+    return {};
+  }
+
+  try {
+    const originUrl = new URL(origin);
+    if (!['http:', 'https:'].includes(originUrl.protocol)) {
+      return null;
+    }
+
+    if (!isLocalBridgeHostname(originUrl.hostname)) {
+      return null;
+    }
+
+    return {
+      'Access-Control-Allow-Origin': origin,
+      Vary: 'Origin',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    };
+  } catch (error) {
+    return null;
+  }
+};
+
 const json = (statusCode, payload) => ({
   statusCode,
   body: JSON.stringify(payload, null, 2),
   headers: {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   },
 });
 
@@ -65,14 +118,34 @@ const text = (statusCode, payload) => ({
   headers: {
     'Content-Type': 'text/plain; charset=utf-8',
     'Cache-Control': 'no-store',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   },
 });
 
-const writeResponse = (response, result) => {
-  response.writeHead(result.statusCode, result.headers);
+const writeResponse = (request, response, result) => {
+  const corsHeaders = resolveCorsHeaders(request);
+
+  if (corsHeaders === null) {
+    response.writeHead(403, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+    });
+    response.end(
+      JSON.stringify(
+        {
+          ok: false,
+          error: 'Origen no permitido para usar el puente local de SICAR.',
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  response.writeHead(result.statusCode, {
+    ...result.headers,
+    ...corsHeaders,
+  });
   response.end(result.body);
 };
 
@@ -784,17 +857,17 @@ const readJsonBody = (request) =>
 
 const server = createServer(async (request, response) => {
   if (!request.url) {
-    writeResponse(response, json(400, { ok: false, error: 'Solicitud invalida.' }));
+    writeResponse(request, response, json(400, { ok: false, error: 'Solicitud invalida.' }));
     return;
   }
 
   if (request.method === 'OPTIONS') {
-    writeResponse(response, json(204, {}));
+    writeResponse(request, response, json(204, {}));
     return;
   }
 
   if (!['GET', 'POST'].includes(String(request.method || '').toUpperCase())) {
-    writeResponse(response, json(405, { ok: false, error: 'Metodo no permitido.' }));
+    writeResponse(request, response, json(405, { ok: false, error: 'Metodo no permitido.' }));
     return;
   }
 
@@ -802,9 +875,10 @@ const server = createServer(async (request, response) => {
     const requestUrl = new URL(request.url, `http://127.0.0.1:${bridgeConfig.bridgePort}`);
     const requestBody = request.method === 'POST' ? await readJsonBody(request) : null;
     const result = await routeRequest(request, requestUrl, requestBody);
-    writeResponse(response, result);
+    writeResponse(request, response, result);
   } catch (error) {
     writeResponse(
+      request,
       response,
       json(500, {
         ok: false,
