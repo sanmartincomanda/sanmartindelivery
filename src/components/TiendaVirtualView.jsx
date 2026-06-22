@@ -564,6 +564,7 @@ export default function TiendaVirtualView({
   const [authLoading, setAuthLoading] = useState(false);
   const [authLocating, setAuthLocating] = useState(false);
   const [authSheetOpen, setAuthSheetOpen] = useState(false);
+  const [authPromptDismissed, setAuthPromptDismissed] = useState(() => Boolean(currentUser));
   const [pendingAuthIntent, setPendingAuthIntent] = useState('');
   const [customerOrders, setCustomerOrders] = useState([]);
   const [customer, setCustomer] = useState({
@@ -1222,6 +1223,11 @@ export default function TiendaVirtualView({
     setAuthError('');
   };
 
+  const continueAsGuest = () => {
+    setAuthPromptDismissed(true);
+    closeAuthSheet();
+  };
+
   const fillAddressFromLocation = (currentAddress, location, fallback) => {
     if (!shouldAutofillAddress(currentAddress)) {
       return currentAddress;
@@ -1288,6 +1294,7 @@ export default function TiendaVirtualView({
   const persistStoreSession = (user) => {
     setCurrentUser(user);
     setCreatedOrder(null);
+    setAuthPromptDismissed(true);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORE_SESSION_KEY, JSON.stringify(user));
     }
@@ -1303,11 +1310,37 @@ export default function TiendaVirtualView({
     setCheckoutOpen(false);
     setProfileOpen(false);
     setAuthSheetOpen(false);
+    setAuthPromptDismissed(false);
     setPendingAuthIntent('');
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(STORE_SESSION_KEY);
     }
   };
+
+  useEffect(() => {
+    if (isDashboard) {
+      return undefined;
+    }
+
+    if (currentUser) {
+      if (!authPromptDismissed) {
+        setAuthPromptDismissed(true);
+      }
+      return undefined;
+    }
+
+    if (authPromptDismissed || authSheetOpen) {
+      return undefined;
+    }
+
+    const openTimer = window.setTimeout(() => {
+      openAuthSheet('login', 'welcome');
+    }, 280);
+
+    return () => {
+      window.clearTimeout(openTimer);
+    };
+  }, [authPromptDismissed, authSheetOpen, currentUser, isDashboard]);
 
   const cancelCustomerOrder = async (order) => {
     if (!order?.firebaseKey) {
@@ -1729,6 +1762,20 @@ export default function TiendaVirtualView({
         }
         .store-auth-card.inline .store-auth-brand .store-logo {
           margin: 0 0 12px;
+        }
+        .store-auth-guest-card {
+          margin-top: 14px;
+        }
+        .store-auth-guest-button {
+          width: 100%;
+        }
+        .store-auth-guest-card p {
+          margin: 10px 0 0;
+          color: #6b7280;
+          font-size: 13px;
+          line-height: 1.5;
+          text-align: center;
+          font-weight: 700;
         }
         .store-auth-brand {
           text-align: center;
@@ -3815,7 +3862,7 @@ export default function TiendaVirtualView({
           <div className="store-account-card guest">
             <div>
               <strong>Inicia sesion para enviar pedidos y ver el estado de tu pedido</strong>
-              <span>Continua como invitado. Nota: Puedes enviar pedido por WhatsApp como invitado.</span>
+              <span>Continuar como invitado. Como invitado podras enviar pedidos directo a nuestro WhatsApp.</span>
             </div>
             <div className="store-inline-actions">
               <button type="button" className="store-button" onClick={() => openAuthSheet('login', 'guest')}>
@@ -4119,6 +4166,7 @@ export default function TiendaVirtualView({
           authLoading={authLoading}
           authLocating={authLocating}
           onClose={closeAuthSheet}
+          onContinueAsGuest={continueAsGuest}
           onAuthModeChange={(mode) => {
             setAuthMode(mode);
             setAuthError('');
@@ -4147,6 +4195,7 @@ function StoreAuthView({
   authLoading,
   authLocating,
   embedded = false,
+  onContinueAsGuest,
   onAuthModeChange,
   onCaptureLocation,
   onManualLocation,
@@ -4161,7 +4210,7 @@ function StoreAuthView({
       <div className="store-auth-brand">
         <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
         <h1>{STORE_BRAND_TITLE}</h1>
-        <p>Ingresa o crea tu cuenta para pedir en linea.</p>
+        <p>Inicia sesion para enviar pedidos y ver el estado de tu pedido.</p>
       </div>
 
       <div className="store-auth-toggle">
@@ -4255,6 +4304,20 @@ function StoreAuthView({
           {authLoading ? 'Procesando...' : isRegister ? 'Crear cuenta y entrar' : 'Entrar a la tienda'}
         </button>
       </form>
+
+      {typeof onContinueAsGuest === 'function' && (
+        <div className="store-auth-guest-card">
+          <div className="store-auth-choice-divider">o</div>
+          <button
+            type="button"
+            className="store-button secondary store-auth-guest-button"
+            onClick={onContinueAsGuest}
+          >
+            Continuar como invitado
+          </button>
+          <p>Como invitado podras enviar pedidos directo a nuestro WhatsApp.</p>
+        </div>
+      )}
     </section>
   );
 
@@ -4276,7 +4339,7 @@ function StoreBackButton({ onClick, label = 'Volver' }) {
   );
 }
 
-function StoreAuthSheet({ onClose, ...props }) {
+function StoreAuthSheet({ onClose, onContinueAsGuest, ...props }) {
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet store-auth-sheet">
@@ -4284,7 +4347,7 @@ function StoreAuthSheet({ onClose, ...props }) {
           <StoreBackButton onClick={onClose} />
           <strong>Inicia sesion</strong>
         </div>
-        <StoreAuthView {...props} embedded />
+        <StoreAuthView {...props} embedded onContinueAsGuest={onContinueAsGuest} />
       </div>
     </div>
   );
@@ -5207,8 +5270,8 @@ function CheckoutSheet({
                   </button>
                 </div>
                 <div className="store-auth-choice-divider">o</div>
-                <strong>Continua como invitado</strong>
-                <p>Nota: Puedes enviar pedido por WhatsApp como invitado.</p>
+                <strong>Continuar como invitado</strong>
+                <p>Como invitado podras enviar pedidos directo a nuestro WhatsApp.</p>
               </div>
 
               <div className="store-status-card guest-form-card">
