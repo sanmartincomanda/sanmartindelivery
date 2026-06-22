@@ -82,18 +82,24 @@ const normalizeStorePriorityText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
 
+const STORE_ALL_PRODUCTS_PRIORITY_GROUPS = [
+  { category: 'res', subcategory: 'linea diaria', title: 'Res · Linea Diaria' },
+  { category: 'res', subcategory: 'linea gold', title: 'Res · Linea Gold' },
+  { category: 'res', subcategory: 'linea parrillera', title: 'Res · Linea Parrillera' },
+  {
+    category: 'res',
+    subcategory: 'linea practica y tortas hamburguesa',
+    title: 'Res · Linea Practica',
+  },
+  { category: 'pollo', subcategory: 'pollo', title: 'Pollo · Pollo' },
+  { category: 'cerdo', subcategory: 'cerdo', title: 'Cerdo · Cerdo' },
+  { category: 'abarroteria', subcategory: 'basicos', title: 'Abarroteria · Basicos' },
+  { category: 'congelados', subcategory: 'mariscos', title: 'Congelados · Mariscos' },
+  { category: 'refrigerados', subcategory: 'embutidos', title: 'Refrigerados · Embutidos' },
+];
+
 const STORE_ALL_PRODUCTS_PRIORITY_INDEX = new Map(
-  [
-    ['res', 'linea diaria'],
-    ['res', 'linea gold'],
-    ['res', 'linea parrillera'],
-    ['res', 'linea practica y tortas hamburguesa'],
-    ['pollo', 'pollo'],
-    ['cerdo', 'cerdo'],
-    ['abarroteria', 'basicos'],
-    ['congelados', 'mariscos'],
-    ['refrigerados', 'embutidos'],
-  ].map(([category, subcategory], index) => [
+  STORE_ALL_PRODUCTS_PRIORITY_GROUPS.map(({ category, subcategory }, index) => [
     `${normalizeStorePriorityText(category)}::${normalizeStorePriorityText(subcategory)}`,
     index,
   ])
@@ -858,6 +864,50 @@ export default function TiendaVirtualView({
     });
   }, [activeCategory, activeProducts, activeSubcategory, deferredQuery]);
 
+  const groupedAllProductsSections = useMemo(() => {
+    if (activeCategory !== 'todos') {
+      return [];
+    }
+
+    const groupedProducts = STORE_ALL_PRODUCTS_PRIORITY_GROUPS.map((group) => ({
+      ...group,
+      products: [],
+    }));
+    const remainingProducts = [];
+
+    filteredProducts.forEach((product) => {
+      const priorityIndex = getStoreAllProductsPriority(product);
+      if (priorityIndex < groupedProducts.length) {
+        groupedProducts[priorityIndex].products.push(product);
+        return;
+      }
+
+      remainingProducts.push(product);
+    });
+
+    const sections = groupedProducts
+      .filter((group) => group.products.length > 0)
+      .map((group) => ({
+        id: `${group.category}-${group.subcategory}`,
+        title: group.title,
+        kicker: 'Prioridad tienda',
+        subtitle: `${group.products.length} productos`,
+        products: group.products,
+      }));
+
+    if (remainingProducts.length > 0) {
+      sections.push({
+        id: 'otros-productos',
+        title: 'Todo lo demas',
+        kicker: 'Catalogo general',
+        subtitle: `${remainingProducts.length} productos`,
+        products: remainingProducts,
+      });
+    }
+
+    return sections;
+  }, [activeCategory, filteredProducts]);
+
   const cartItems = useMemo(
     () =>
       activeProducts
@@ -1452,6 +1502,50 @@ export default function TiendaVirtualView({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const renderStoreProductTile = (product) => {
+    const quantity = Number(cart[product.code] || 0);
+
+    return (
+      <article key={product.code} className="store-product">
+        <button
+          type="button"
+          className="store-product-card"
+          aria-label={`Ver ${product.name}`}
+          onClick={() => openProduct(product)}
+        >
+          <span className="store-product-media">
+            <span className="store-product-image-shell">
+              <span className="store-product-image">
+                <img
+                  src={product.image || LOGO_PATH}
+                  alt={product.name}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </span>
+            </span>
+          </span>
+          <span className="store-product-code">{product.code}</span>
+          <span className="store-product-name">{product.name}</span>
+          <span className="store-price">{formatCurrency(product.price)}</span>
+          <span className="store-unit">
+            {quantity > 0
+              ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} en carrito`
+              : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="store-add"
+          title="Agregar"
+          onClick={() => openProduct(product, { prefillMinimum: true })}
+        >
+          {quantity > 0 ? formatStoreQuantity(quantity, product.unit) : '+'}
+        </button>
+      </article>
+    );
   };
 
   return (
@@ -2161,6 +2255,52 @@ export default function TiendaVirtualView({
           justify-content: space-between;
           gap: 12px;
           margin: 18px 0 14px;
+        }
+        .store-grouped-sections {
+          display: grid;
+          gap: 20px;
+        }
+        .store-product-group {
+          padding: 16px 16px 18px;
+          border-radius: 28px;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 247, 243, 0.92));
+          border: 1px solid rgba(123, 16, 34, 0.08);
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+        }
+        .store-product-group-head {
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+        .store-product-group-kicker {
+          display: inline-flex;
+          align-items: center;
+          min-height: 26px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: rgba(123, 16, 34, 0.08);
+          color: #7b1022;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .store-product-group-title {
+          margin: 6px 0 0;
+          color: #111827;
+          font-size: 24px;
+          line-height: 1.05;
+          font-weight: 950;
+        }
+        .store-product-group-meta {
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          white-space: nowrap;
         }
         .store-count {
           margin: 0;
@@ -3425,6 +3565,22 @@ export default function TiendaVirtualView({
           .store-product-card {
             padding: 4px 2px 8px;
           }
+          .store-product-group {
+            padding: 14px 12px 16px;
+            border-radius: 24px;
+          }
+          .store-product-group-head {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .store-product-group-title {
+            font-size: 20px;
+          }
+          .store-product-group-meta {
+            font-size: 11px;
+            white-space: normal;
+          }
           .store-add {
             top: 10px;
             right: 6px;
@@ -3734,50 +3890,26 @@ export default function TiendaVirtualView({
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
+          ) : activeCategory === 'todos' ? (
+            <div className="store-grouped-sections">
+              {groupedAllProductsSections.map((section) => (
+                <section key={section.id} className="store-product-group">
+                  <div className="store-product-group-head">
+                    <div>
+                      <span className="store-product-group-kicker">{section.kicker}</span>
+                      <h3 className="store-product-group-title">{section.title}</h3>
+                    </div>
+                    <span className="store-product-group-meta">{section.subtitle}</span>
+                  </div>
+                  <div className="store-grid">
+                    {section.products.map((product) => renderStoreProductTile(product))}
+                  </div>
+                </section>
+              ))}
+            </div>
           ) : (
             <div className="store-grid">
-              {filteredProducts.map((product) => {
-                const quantity = Number(cart[product.code] || 0);
-                return (
-                  <article key={product.code} className="store-product">
-                    <button
-                      type="button"
-                      className="store-product-card"
-                      aria-label={`Ver ${product.name}`}
-                      onClick={() => openProduct(product)}
-                    >
-                      <span className="store-product-media">
-                        <span className="store-product-image-shell">
-                          <span className="store-product-image">
-                            <img
-                              src={product.image || LOGO_PATH}
-                              alt={product.name}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          </span>
-                        </span>
-                      </span>
-                      <span className="store-product-code">{product.code}</span>
-                      <span className="store-product-name">{product.name}</span>
-                      <span className="store-price">{formatCurrency(product.price)}</span>
-                      <span className="store-unit">
-                        {quantity > 0
-                          ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} en carrito`
-                          : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="store-add"
-                      title="Agregar"
-                      onClick={() => openProduct(product, { prefillMinimum: true })}
-                    >
-                      {quantity > 0 ? formatStoreQuantity(quantity, product.unit) : '+'}
-                    </button>
-                  </article>
-                );
-              })}
+              {filteredProducts.map((product) => renderStoreProductTile(product))}
             </div>
           )}
         </main>
