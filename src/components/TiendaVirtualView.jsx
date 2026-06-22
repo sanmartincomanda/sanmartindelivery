@@ -4,7 +4,6 @@ import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
   STORE_PAYMENT_OPTIONS,
-  STORE_PROMOTIONS,
 } from '../data/tiendaVirtual';
 import {
   compareCatalogProducts,
@@ -26,6 +25,11 @@ import {
   STORE_COUPONS_PATH,
 } from '../services/storeCoupons';
 import {
+  isStorePromotionVisible,
+  mergeStorePromotions,
+  STORE_PROMOTIONS_PATH,
+} from '../services/storePromotions';
+import {
   readStoreJsonCache,
   STORE_CATALOG_CACHE_KEY,
   STORE_CATALOG_CACHE_VERSION,
@@ -33,6 +37,8 @@ import {
   STORE_CATEGORIES_CACHE_VERSION,
   STORE_COUPONS_CACHE_KEY,
   STORE_COUPONS_CACHE_VERSION,
+  STORE_PROMOTIONS_CACHE_KEY,
+  STORE_PROMOTIONS_CACHE_VERSION,
   unwrapStoreCache,
   writeStoreVersionedCache,
 } from '../services/storeCache';
@@ -480,6 +486,14 @@ export default function TiendaVirtualView({
       []
     )
   );
+  const [promotions, setPromotions] = useState(() =>
+    getInitialStoreCollection(
+      STORE_PROMOTIONS_CACHE_KEY,
+      STORE_PROMOTIONS_CACHE_VERSION,
+      mergeStorePromotions,
+      mergeStorePromotions()
+    )
+  );
   const [cart, setCart] = useState({});
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -672,6 +686,35 @@ export default function TiendaVirtualView({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadPromotions = async () => {
+      try {
+        const snapshot = await get(ref(database, STORE_PROMOTIONS_PATH));
+        const remotePromotions = snapshot.val() || {};
+        writeStoreVersionedCache(
+          STORE_PROMOTIONS_CACHE_KEY,
+          STORE_PROMOTIONS_CACHE_VERSION,
+          remotePromotions
+        );
+        if (!cancelled) {
+          startTransition(() => {
+            setPromotions(mergeStorePromotions(remotePromotions));
+          });
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar las historias de tienda:', error);
+      }
+    };
+
+    loadPromotions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return undefined;
     }
@@ -693,6 +736,21 @@ export default function TiendaVirtualView({
     },
     []
   );
+
+  useEffect(() => {
+    if (selectedPromotionIndex === null) {
+      return;
+    }
+
+    if (activePromotions.length === 0) {
+      setSelectedPromotionIndex(null);
+      return;
+    }
+
+    if (selectedPromotionIndex >= activePromotions.length) {
+      setSelectedPromotionIndex(activePromotions.length - 1);
+    }
+  }, [activePromotions.length, selectedPromotionIndex]);
 
   useEffect(() => {
     if (!currentUser || !ordersOpen) {
@@ -945,12 +1003,18 @@ export default function TiendaVirtualView({
     [couponDiscount, totalAmount]
   );
 
+  const activePromotions = useMemo(
+    () => promotions.filter((promotion) => isStorePromotionVisible(promotion)),
+    [promotions]
+  );
+
   const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
   const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
   const showPromotions =
     deferredQuery.trim().length === 0 &&
     activeCategory === 'todos' &&
-    activeSubcategory === 'todas';
+    activeSubcategory === 'todas' &&
+    activePromotions.length > 0;
 
   const cartCount = cartItems.length;
 
@@ -3769,12 +3833,12 @@ export default function TiendaVirtualView({
             <section className="store-promo">
               <h2 className="store-section-title">Promociones activas</h2>
               <div className="store-stories">
-                {STORE_PROMOTIONS.map((promotion) => (
+                {activePromotions.map((promotion, index) => (
                   <button
                     key={promotion.id}
                     type="button"
                     className="store-story"
-                    onClick={() => setSelectedPromotionIndex(STORE_PROMOTIONS.findIndex((item) => item.id === promotion.id))}
+                    onClick={() => setSelectedPromotionIndex(index)}
                   >
                     <span className="store-story-ring">
                       <img src={promotion.image} alt={promotion.title} loading="lazy" decoding="async" />
@@ -3960,7 +4024,7 @@ export default function TiendaVirtualView({
 
       {selectedPromotionIndex !== null && (
         <PromotionViewer
-          promotions={STORE_PROMOTIONS}
+          promotions={activePromotions}
           activeIndex={selectedPromotionIndex}
           onChange={setSelectedPromotionIndex}
           onClose={() => setSelectedPromotionIndex(null)}

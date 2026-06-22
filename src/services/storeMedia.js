@@ -1,11 +1,13 @@
 import { getDownloadURL, ref as storageRef, uploadString } from 'firebase/storage';
 import { storage } from '../firebase';
 
-const STORE_CATALOG_MEDIA_ROOT = 'store/catalog';
+const STORE_MEDIA_ROOT = 'store';
+const STORE_CATALOG_MEDIA_ROOT = `${STORE_MEDIA_ROOT}/catalog`;
+const STORE_PROMOTION_MEDIA_ROOT = `${STORE_MEDIA_ROOT}/promotions`;
 const STORAGE_UPLOAD_TIMEOUT_MS = 20000;
 
-const cleanCatalogCode = (code) =>
-  String(code || '')
+const cleanStorageSegment = (value) =>
+  String(value || '')
     .trim()
     .replace(/[^a-zA-Z0-9_-]/g, '_');
 
@@ -76,8 +78,9 @@ export async function createImageHash(value = '', hashHint = '') {
   return fallbackHashString(cleanValue);
 }
 
-export async function uploadCatalogImage({
-  code,
+export async function uploadStoreImage({
+  root = STORE_CATALOG_MEDIA_ROOT,
+  entityId,
   image,
   hashHint = '',
   allowInlineFallback = false,
@@ -92,10 +95,10 @@ export async function uploadCatalogImage({
     };
   }
 
-  const cleanCode = cleanCatalogCode(code) || 'sku';
+  const cleanId = cleanStorageSegment(entityId) || 'item';
   const hash = await createImageHash(imageData, hashHint);
   const extension = inferImageExtension(imageData);
-  const path = `${STORE_CATALOG_MEDIA_ROOT}/${cleanCode}/${hash || Date.now()}.${extension}`;
+  const path = `${String(root || STORE_CATALOG_MEDIA_ROOT).replace(/\/+$/, '')}/${cleanId}/${hash || Date.now()}.${extension}`;
   const imageRef = storageRef(storage, path);
 
   try {
@@ -131,4 +134,34 @@ export async function uploadCatalogImage({
       storedInline: true,
     };
   }
+}
+
+export async function uploadCatalogImage({
+  code,
+  image,
+  hashHint = '',
+  allowInlineFallback = false,
+}) {
+  return uploadStoreImage({
+    root: STORE_CATALOG_MEDIA_ROOT,
+    entityId: code,
+    image,
+    hashHint,
+    allowInlineFallback,
+  });
+}
+
+export async function uploadPromotionImage({
+  id,
+  image,
+  hashHint = '',
+  allowInlineFallback = false,
+}) {
+  return uploadStoreImage({
+    root: STORE_PROMOTION_MEDIA_ROOT,
+    entityId: id,
+    image,
+    hashHint,
+    allowInlineFallback,
+  });
 }

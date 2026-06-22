@@ -36,6 +36,16 @@ import {
   updateStoreCoupon,
 } from '../services/storeCoupons';
 import {
+  cleanupExpiredStorePromotions,
+  deleteStorePromotion,
+  getStorePromotionStatus,
+  mergeStorePromotions,
+  saveStorePromotion,
+  seedDefaultStorePromotionsIfEmpty,
+  STORE_PROMOTIONS_PATH,
+  updateStorePromotion,
+} from '../services/storePromotions';
+import {
   STORE_USERS_PATH,
   updateStoreUserPassword,
 } from '../services/storeUsers';
@@ -68,6 +78,8 @@ import {
   STORE_CATEGORIES_CACHE_VERSION,
   STORE_COUPONS_CACHE_KEY,
   STORE_COUPONS_CACHE_VERSION,
+  STORE_PROMOTIONS_CACHE_KEY,
+  STORE_PROMOTIONS_CACHE_VERSION,
   unwrapStoreCache,
   writeStoreVersionedCache,
 } from '../services/storeCache';
@@ -109,6 +121,16 @@ const emptyCoupon = {
   notes: '',
 };
 
+const emptyPromotion = {
+  id: '',
+  title: '',
+  image: '',
+  active: true,
+  sortOrder: '',
+  startsAt: '',
+  endsAt: '',
+};
+
 const emptyDriver = {
   code: '',
   name: '',
@@ -145,6 +167,63 @@ const formatSicarDate = (value) => {
   return new Intl.DateTimeFormat('es-NI', {
     dateStyle: 'medium',
   }).format(parsed);
+};
+
+const formatAdminDateTime = (value) => {
+  if (!value) {
+    return 'Sin fecha';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat('es-NI', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsed);
+};
+
+const toDateTimeInputValue = (value) => {
+  if (!value) {
+    return '';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  const localTime = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60000);
+  return localTime.toISOString().slice(0, 16);
+};
+
+const normalizeDateTimeInputValue = (value) => {
+  const cleanValue = String(value || '').trim();
+  if (!cleanValue) {
+    return '';
+  }
+
+  const parsed = new Date(cleanValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return parsed.toISOString();
+};
+
+const getPromotionStatusLabel = (promotion) => {
+  switch (getStorePromotionStatus(promotion)) {
+    case 'scheduled':
+      return 'Programada';
+    case 'expired':
+      return 'Vencida';
+    case 'inactive':
+      return 'Inactiva';
+    default:
+      return 'Activa';
+  }
 };
 
 const formatRestrictionValue = (value, unit) => {
@@ -308,6 +387,14 @@ export default function ConfiguracionView() {
       []
     )
   );
+  const [promotions, setPromotions] = useState(() =>
+    getInitialConfigCollection(
+      STORE_PROMOTIONS_CACHE_KEY,
+      STORE_PROMOTIONS_CACHE_VERSION,
+      mergeStorePromotions,
+      mergeStorePromotions()
+    )
+  );
   const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
   const [storeUsers, setStoreUsers] = useState([]);
@@ -315,6 +402,7 @@ export default function ConfiguracionView() {
   const [form, setForm] = useState(emptyProduct);
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [couponForm, setCouponForm] = useState(emptyCoupon);
+  const [promotionForm, setPromotionForm] = useState(emptyPromotion);
   const [driverForm, setDriverForm] = useState(emptyDriver);
   const [kitchenForm, setKitchenForm] = useState(emptyKitchenForm);
   const [couponsUnlocked, setCouponsUnlocked] = useState(false);
@@ -323,9 +411,11 @@ export default function ConfiguracionView() {
   const [saving, setSaving] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
+  const [savingPromotion, setSavingPromotion] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
   const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
+  const [cleaningPromotions, setCleaningPromotions] = useState(false);
   const [syncingSicar, setSyncingSicar] = useState(false);
   const [syncingSicarPrices, setSyncingSicarPrices] = useState(false);
   const [migratingCatalogImages, setMigratingCatalogImages] = useState(false);
@@ -391,6 +481,34 @@ export default function ConfiguracionView() {
       startTransition(() => {
         setCoupons(mergeStoreCoupons(remoteCoupons));
       });
+    });
+
+    return () => unsubscribe();
+  }, [section]);
+
+  useEffect(() => {
+    if (section !== 'promociones') {
+      return undefined;
+    }
+
+    const unsubscribe = onValue(ref(database, STORE_PROMOTIONS_PATH), (snapshot) => {
+      const remotePromotions = snapshot.val() || {};
+      writeStoreVersionedCache(
+        STORE_PROMOTIONS_CACHE_KEY,
+        STORE_PROMOTIONS_CACHE_VERSION,
+        remotePromotions
+      );
+      startTransition(() => {
+        setPromotions(mergeStorePromotions(remotePromotions));
+      });
+    });
+
+    seedDefaultStorePromotionsIfEmpty().catch((error) => {
+      console.error('No se pudieron inicializar las historias base:', error);
+    });
+
+    cleanupExpiredStorePromotions().catch((error) => {
+      console.error('No se pudieron limpiar las historias vencidas:', error);
     });
 
     return () => unsubscribe();
@@ -570,6 +688,13 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const updatePromotionForm = (field, value) => {
+    setPromotionForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const updateDriverForm = (field, value) => {
     setDriverForm((current) => ({
       ...current,
@@ -666,6 +791,18 @@ export default function ConfiguracionView() {
     });
   };
 
+  const editPromotion = (promotion) => {
+    setPromotionForm({
+      id: promotion.id || '',
+      title: promotion.title || '',
+      image: promotion.image || '',
+      active: promotion.active !== false,
+      sortOrder: promotion.sortOrder ?? '',
+      startsAt: toDateTimeInputValue(promotion.startsAt),
+      endsAt: toDateTimeInputValue(promotion.endsAt),
+    });
+  };
+
   const editDriver = (driver) => {
     setDriverForm({
       code: driver.code || '',
@@ -725,6 +862,30 @@ export default function ConfiguracionView() {
     };
     reader.onerror = () => {
       setMessage('No se pudo leer la foto seleccionada.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePromotionImageFile = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const source = String(reader.result || '');
+      if (!source) {
+        setMessage('No se pudo leer la historia seleccionada.');
+        return;
+      }
+
+      updatePromotionForm('image', source);
+      setMessage('Historia cargada. Guarda para publicarla.');
+    };
+    reader.onerror = () => {
+      setMessage('No se pudo leer la historia seleccionada.');
     };
     reader.readAsDataURL(file);
   };
@@ -851,6 +1012,53 @@ export default function ConfiguracionView() {
     }
   };
 
+  const savePromotion = async (event) => {
+    event.preventDefault();
+    const startsAt = normalizeDateTimeInputValue(promotionForm.startsAt);
+    const endsAt = normalizeDateTimeInputValue(promotionForm.endsAt);
+
+    if (promotionForm.startsAt && !startsAt) {
+      setMessage('La fecha inicial de la historia no es valida.');
+      return;
+    }
+
+    if (promotionForm.endsAt && !endsAt) {
+      setMessage('La fecha final de la historia no es valida.');
+      return;
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      setMessage('La vigencia final debe ser posterior a la inicial.');
+      return;
+    }
+
+    setSavingPromotion(true);
+    setMessage('');
+
+    try {
+      const existingPromotion = promotions.find((promotion) => promotion.id === promotionForm.id) || null;
+      await saveStorePromotion(
+        {
+          id: promotionForm.id,
+          title: promotionForm.title,
+          image: promotionForm.image,
+          active: promotionForm.active,
+          sortOrder: promotionForm.sortOrder === '' ? promotions.length * 10 : Number(promotionForm.sortOrder || 0),
+          startsAt,
+          endsAt,
+        },
+        existingPromotion
+      );
+      setPromotionForm(emptyPromotion);
+      setMessage('Historia guardada.');
+    } catch (error) {
+      console.error('Error guardando historia:', error);
+      setMessage(error?.message || 'No se pudo guardar la historia.');
+    } finally {
+      setSavingPromotion(false);
+    }
+  };
+
   const saveDeliveryDriver = async (event) => {
     event.preventDefault();
     setSavingDriver(true);
@@ -945,6 +1153,52 @@ export default function ConfiguracionView() {
     } catch (error) {
       console.error('Error actualizando cupon:', error);
       setMessage('No se pudo actualizar el cupon.');
+    }
+  };
+
+  const togglePromotion = async (promotion) => {
+    try {
+      await updateStorePromotion(promotion.id, { active: promotion.active === false });
+    } catch (error) {
+      console.error('Error actualizando historia:', error);
+      setMessage('No se pudo actualizar la historia.');
+    }
+  };
+
+  const removePromotion = async (promotion) => {
+    const confirmed =
+      typeof window === 'undefined' ||
+      window.confirm(`Se borrara la historia "${promotion.title || promotion.id}". Continuar?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteStorePromotion(promotion.id);
+      setMessage('Historia eliminada.');
+    } catch (error) {
+      console.error('Error eliminando historia:', error);
+      setMessage('No se pudo eliminar la historia.');
+    }
+  };
+
+  const clearExpiredPromotions = async () => {
+    setCleaningPromotions(true);
+    setMessage('');
+
+    try {
+      const removedCount = await cleanupExpiredStorePromotions();
+      setMessage(
+        removedCount > 0
+          ? `Se eliminaron ${removedCount} historias vencidas.`
+          : 'No habia historias vencidas para eliminar.'
+      );
+    } catch (error) {
+      console.error('Error limpiando historias vencidas:', error);
+      setMessage('No se pudieron limpiar las historias vencidas.');
+    } finally {
+      setCleaningPromotions(false);
     }
   };
 
@@ -1615,6 +1869,13 @@ export default function ConfiguracionView() {
           </button>
           <button
             type="button"
+            className={`cfg-tab ${section === 'promociones' ? 'active' : ''}`}
+            onClick={() => setSection('promociones')}
+          >
+            Historias
+          </button>
+          <button
+            type="button"
             className={`cfg-tab ${section === 'usuarios' ? 'active' : ''}`}
             onClick={() => setSection('usuarios')}
           >
@@ -2033,6 +2294,21 @@ export default function ConfiguracionView() {
           </form>
         </div>
           </>
+        ) : section === 'promociones' ? (
+          <PromotionsManager
+            promotions={promotions}
+            promotionForm={promotionForm}
+            savingPromotion={savingPromotion}
+            cleaningPromotions={cleaningPromotions}
+            updatePromotionForm={updatePromotionForm}
+            savePromotion={savePromotion}
+            editPromotion={editPromotion}
+            togglePromotion={togglePromotion}
+            removePromotion={removePromotion}
+            handlePromotionImageFile={handlePromotionImageFile}
+            clearExpiredPromotions={clearExpiredPromotions}
+            resetPromotionForm={() => setPromotionForm(emptyPromotion)}
+          />
         ) : section === 'usuarios' ? (
           <UsersManager
             usersTab={usersTab}
@@ -2680,6 +2956,232 @@ function DriversManager({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PromotionsManager({
+  promotions,
+  promotionForm,
+  savingPromotion,
+  cleaningPromotions,
+  updatePromotionForm,
+  savePromotion,
+  editPromotion,
+  togglePromotion,
+  removePromotion,
+  handlePromotionImageFile,
+  clearExpiredPromotions,
+  resetPromotionForm,
+}) {
+  const activeCount = promotions.filter((promotion) => getStorePromotionStatus(promotion) === 'active').length;
+  const expiredCount = promotions.filter((promotion) => getStorePromotionStatus(promotion) === 'expired').length;
+
+  return (
+    <div
+      className="cfg-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.2fr) minmax(360px, 0.8fr)',
+        gap: 18,
+        marginTop: 18,
+        alignItems: 'start',
+      }}
+    >
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Historias de promociones</h2>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+              Cambia las historias que salen en la tienda y define desde cuando se publican y cuando vencen.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'start' }}>
+            <span className="cfg-badge">{activeCount} activas</span>
+            <span className={`cfg-badge ${expiredCount > 0 ? 'off' : ''}`}>{expiredCount} vencidas</span>
+            <button
+              type="button"
+              className="cfg-button secondary"
+              onClick={clearExpiredPromotions}
+              disabled={cleaningPromotions}
+            >
+              {cleaningPromotions ? 'Limpiando...' : 'Borrar vencidas'}
+            </button>
+          </div>
+        </div>
+
+        {promotions.length === 0 ? (
+          <div
+            style={{
+              padding: 28,
+              border: '1px dashed #cbd5e1',
+              borderRadius: 8,
+              color: '#64748b',
+              textAlign: 'center',
+              fontWeight: 800,
+            }}
+          >
+            No hay historias cargadas todavia.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {promotions.map((promotion) => {
+              const status = getStorePromotionStatus(promotion);
+              const statusClass = status === 'active' ? '' : 'off';
+
+              return (
+                <div
+                  key={promotion.id}
+                  style={{
+                    border: '1px solid #edf2f7',
+                    borderRadius: 12,
+                    padding: 12,
+                    display: 'grid',
+                    gridTemplateColumns: '120px minmax(0, 1fr) auto',
+                    gap: 12,
+                    alignItems: 'center',
+                  }}
+                >
+                  <img
+                    src={promotion.image || '/tienda/branding/logo.png'}
+                    alt={promotion.title}
+                    style={{
+                      width: '120px',
+                      height: '120px',
+                      objectFit: 'cover',
+                      borderRadius: 16,
+                      border: '1px solid #e2e8f0',
+                      background: '#f8fafc',
+                    }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: 18 }}>{promotion.title}</strong>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      <span className={`cfg-badge ${statusClass}`}>{getPromotionStatusLabel(promotion)}</span>
+                      <span className={`cfg-badge ${promotion.active === false ? 'off' : ''}`}>
+                        {promotion.active === false ? 'Oculta' : 'Visible'}
+                      </span>
+                    </div>
+                    <div style={{ color: '#64748b', marginTop: 8, fontSize: 13, lineHeight: 1.6 }}>
+                      <div>Inicio: {promotion.startsAt ? formatAdminDateTime(promotion.startsAt) : 'Inmediato'}</div>
+                      <div>Finaliza: {promotion.endsAt ? formatAdminDateTime(promotion.endsAt) : 'Sin vencimiento'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className="cfg-button secondary" onClick={() => editPromotion(promotion)}>
+                      Editar
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => togglePromotion(promotion)}>
+                      {promotion.active === false ? 'Activar' : 'Desactivar'}
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => removePromotion(promotion)}>
+                      Borrar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <form
+        onSubmit={savePromotion}
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+          display: 'grid',
+          gap: 10,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 22 }}>Historia</h2>
+        <input
+          className="cfg-input"
+          value={promotionForm.title}
+          onChange={(event) => updatePromotionForm('title', event.target.value)}
+          placeholder="Titulo corto de la historia"
+        />
+        <input
+          className="cfg-input"
+          value={promotionForm.image}
+          onChange={(event) => updatePromotionForm('image', event.target.value)}
+          placeholder="URL de la imagen o imagen cargada"
+        />
+        <input className="cfg-input" type="file" accept="image/*" onChange={handlePromotionImageFile} />
+        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
+          La historia se ocultara sola al vencer. Puedes subir una imagen nueva o pegar una URL publica.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <select
+            className="cfg-select"
+            value={promotionForm.active ? 'activo' : 'inactivo'}
+            onChange={(event) => updatePromotionForm('active', event.target.value === 'activo')}
+          >
+            <option value="activo">Visible</option>
+            <option value="inactivo">Oculta</option>
+          </select>
+          <input
+            className="cfg-input"
+            type="number"
+            min="0"
+            step="1"
+            value={promotionForm.sortOrder}
+            onChange={(event) => updatePromotionForm('sortOrder', event.target.value)}
+            placeholder="Orden"
+          />
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Inicio de vigencia</span>
+            <input
+              className="cfg-input"
+              type="datetime-local"
+              value={promotionForm.startsAt}
+              onChange={(event) => updatePromotionForm('startsAt', event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Final de vigencia</span>
+            <input
+              className="cfg-input"
+              type="datetime-local"
+              value={promotionForm.endsAt}
+              onChange={(event) => updatePromotionForm('endsAt', event.target.value)}
+            />
+          </label>
+        </div>
+        {promotionForm.image && (
+          <img
+            src={promotionForm.image}
+            alt="Vista previa de historia"
+            style={{
+              width: '100%',
+              maxHeight: 320,
+              objectFit: 'cover',
+              background: '#f1f5f9',
+              borderRadius: 14,
+              border: '1px solid #e2e8f0',
+            }}
+          />
+        )}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="submit" className="cfg-button" disabled={savingPromotion}>
+            {savingPromotion ? 'Guardando...' : 'Guardar historia'}
+          </button>
+          <button type="button" className="cfg-button secondary" onClick={resetPromotionForm}>
+            Nueva
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
