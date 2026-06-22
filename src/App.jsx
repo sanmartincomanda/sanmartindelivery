@@ -67,9 +67,17 @@ const Icons = {
 
 const STORE_CANONICAL_ORIGIN = 'https://tienda.sanmartinsr.com';
 const STORE_HOSTS = new Set(['tienda.sanmartinsr.com']);
+const PUBLIC_HOST_ROUTE_MAP = new Map([
+  ['tienda.sanmartinsr.com', 'tienda'],
+  ['admintv.sanmartinsr.com', 'dashboard'],
+  ['cocina.sanmartinsr.com', 'cocina'],
+  ['driver.sanmartinsr.com', 'driver'],
+]);
 const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
 
 const isStoreHost = (hostname = '') => STORE_HOSTS.has(String(hostname || '').trim().toLowerCase());
+const getPublicHostRoute = (hostname = '') =>
+  PUBLIC_HOST_ROUTE_MAP.get(String(hostname || '').trim().toLowerCase()) || '';
 
 const isLocalHostname = (hostname = '') => {
   const cleanHost = String(hostname || '').trim().toLowerCase();
@@ -105,8 +113,9 @@ const getRouteFromLocation = () => {
   }
 
   const hostname = window.location.hostname;
-  if (isStoreHost(hostname)) {
-    return 'tienda';
+  const publicHostRoute = getPublicHostRoute(hostname);
+  if (publicHostRoute) {
+    return publicHostRoute;
   }
 
   if (!isLocalHostname(hostname)) {
