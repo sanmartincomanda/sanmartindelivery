@@ -60,6 +60,7 @@ import {
 } from '../services/orders';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
+const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
@@ -438,7 +439,7 @@ const buildGuestCartWhatsAppMessage = ({
   });
 
   return [
-    'Hola, quiero hacer este pedido desde la tienda virtual.',
+    `Hola, quiero hacer este pedido desde ${STORE_BRAND_TITLE}.`,
     '',
     `Cliente: ${String(customer.nombre || 'Invitado').trim() || 'Invitado'}`,
     customer.telefono ? `Telefono: ${String(customer.telefono).trim()}` : null,
@@ -3685,7 +3686,7 @@ export default function TiendaVirtualView({
       <div className={`store-page ${cartItems.length > 0 ? 'with-floating-cart' : ''}`}>
         {isDashboard && (
           <div className="store-admin-bar">
-            <strong>Tienda Virtual Carnes San Martin Granada</strong>
+            <strong>{STORE_BRAND_TITLE}</strong>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" className="store-button secondary" onClick={copyPublicLink}>
                 Copiar enlace
@@ -3743,7 +3744,7 @@ export default function TiendaVirtualView({
         <header className="store-top">
           <div className="store-brand-row">
             <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
-            <div className="store-title">Tienda Virtual Carnes San Martin Granada</div>
+            <div className="store-title">{STORE_BRAND_TITLE}</div>
             <div className="store-actions">
               <button
                 type="button"
@@ -4068,7 +4069,7 @@ function StoreAuthView({
     <section className={`store-auth-card ${embedded ? 'inline' : ''}`}>
       <div className="store-auth-brand">
         <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
-        <h1>Tienda Virtual Carnes San Martin Granada</h1>
+        <h1>{STORE_BRAND_TITLE}</h1>
         <p>Ingresa o crea tu cuenta para pedir en linea.</p>
       </div>
 

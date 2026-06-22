@@ -2,7 +2,6 @@
 import { get, onValue, ref, update } from 'firebase/database';
 import { Suspense, lazy } from 'react';
 import { database } from './firebase';
-import logo from './logo.svg';
 import './App.css';
 
 import { hoyISO } from './components/Utils';
@@ -68,6 +67,7 @@ const Icons = {
 
 const STORE_CANONICAL_ORIGIN = 'https://tienda.sanmartinsr.com';
 const STORE_HOSTS = new Set(['tienda.sanmartinsr.com']);
+const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
 
 const isStoreHost = (hostname = '') => STORE_HOSTS.has(String(hostname || '').trim().toLowerCase());
 
@@ -91,7 +91,7 @@ const getRouteFromLocation = () => {
 const getDocumentTitle = (route) => {
   switch (route) {
     case 'tienda':
-      return 'Carnes San Martin | Tienda en linea';
+      return 'Delivery Carnes San Martin Granada';
     case 'cocina':
       return 'Carnes San Martin | Cocina';
     case 'driver':
@@ -127,9 +127,9 @@ function LazyViewFallback({ label = 'Cargando modulo...' }) {
         }}
       >
         <img
-          src={logo}
+          src={BRAND_LOGO_PATH}
           alt="Logo"
-          style={{ width: '36px', height: '36px', filter: 'brightness(0) invert(1)' }}
+          style={{ width: '36px', height: '36px', objectFit: 'contain' }}
         />
       </div>
       <div style={{ fontSize: '17px', fontWeight: 700, color: '#64748b' }}>{label}</div>
@@ -484,9 +484,9 @@ function App() {
             }}
           >
             <img
-              src={logo}
+              src={BRAND_LOGO_PATH}
               alt="Logo"
-              style={{ width: '40px', height: '40px', filter: 'brightness(0) invert(1)' }}
+              style={{ width: '40px', height: '40px', objectFit: 'contain' }}
             />
           </div>
 
@@ -584,9 +584,9 @@ function App() {
           }}
         >
           <img
-            src={logo}
+            src={BRAND_LOGO_PATH}
             alt="Logo"
-            style={{ width: '40px', height: '40px', filter: 'brightness(0) invert(1)' }}
+            style={{ width: '40px', height: '40px', objectFit: 'contain' }}
           />
         </div>
         <div style={{ fontSize: '18px', fontWeight: 600, color: '#64748b' }}>Cargando sistema...</div>
@@ -654,9 +654,9 @@ function App() {
             }}
           >
             <img
-              src={logo}
+              src={BRAND_LOGO_PATH}
               alt="Logo"
-              style={{ width: '28px', height: '28px', filter: 'brightness(0) invert(1)' }}
+              style={{ width: '28px', height: '28px', objectFit: 'contain' }}
             />
           </div>
           {!sidebarCollapsed && (
@@ -884,7 +884,7 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
           boxShadow: '0 28px 80px rgba(38, 6, 12, 0.28)',
         }}
       >
-        <img src={logo} alt="Logo" style={{ width: 70, height: 70, margin: '0 auto' }} />
+        <img src={BRAND_LOGO_PATH} alt="Logo" style={{ width: 70, height: 70, margin: '0 auto', objectFit: 'contain' }} />
         <h1 style={{ margin: 0, color: '#111827', fontSize: 30 }}>{title}</h1>
         <p style={{ margin: 0, color: '#64748b', fontWeight: 800 }}>{subtitle}</p>
         {error && (

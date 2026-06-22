@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
-import logo from '../logo.svg';
 import {
   buildGoogleMapsAddressUrl,
   buildGoogleMapsPlaceUrl,
@@ -15,6 +14,7 @@ import { DRIVERS_PATH, loginDriver, mergeDrivers } from '../services/drivers';
 import { formatOrderNumber, subscribeOrdersForDriverCode } from '../services/orders';
 
 const DRIVER_SESSION_KEY = 'sanmartin_driver_session';
+const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
 
 const Icons = {
   route: (
@@ -546,7 +546,7 @@ export default function DriverView() {
       <div className="driver-login-page">
         <style>{driverStyles}</style>
         <form className="driver-login-card" onSubmit={handleLogin}>
-          <img src={logo} alt="Carnes San Martin" />
+          <img src={BRAND_LOGO_PATH} alt="Carnes San Martin" />
           <h1>Driver</h1>
           <p>Ingresa con tu codigo de entregador.</p>
           {loginError && <div className="driver-error">{loginError}</div>}

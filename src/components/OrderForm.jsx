@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { push, ref, set } from 'firebase/database';
 import { database } from '../firebase';
-import logo from '../logo.svg';
 import { hoyISO, normalizar } from './Utils';
 import { MANUAL_CHANNEL, formatOrderNumber } from '../services/orders';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation } from '../services/geo';
+
+const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
 
 const PAYMENT_OPTIONS = [
   'Efectivo',
@@ -209,15 +210,15 @@ export default function OrderForm({
             }}
           >
             <img
-              src={logo}
+              src={BRAND_LOGO_PATH}
               alt="Logo"
-              style={{ width: '44px', height: '44px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+              style={{ width: '44px', height: '44px', objectFit: 'contain' }}
             />
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 800 }}>Nuevo Pedido</h1>
             <p style={{ margin: '4px 0 0 0', opacity: 0.6, fontSize: '15px', fontWeight: 500 }}>
-              Flujo manual conectado al mismo contador que la tienda virtual
+              Flujo manual conectado al mismo contador que el delivery
             </p>
           </div>
         </div>
