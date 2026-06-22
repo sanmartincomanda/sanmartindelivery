@@ -738,21 +738,6 @@ export default function TiendaVirtualView({
   );
 
   useEffect(() => {
-    if (selectedPromotionIndex === null) {
-      return;
-    }
-
-    if (activePromotions.length === 0) {
-      setSelectedPromotionIndex(null);
-      return;
-    }
-
-    if (selectedPromotionIndex >= activePromotions.length) {
-      setSelectedPromotionIndex(activePromotions.length - 1);
-    }
-  }, [activePromotions.length, selectedPromotionIndex]);
-
-  useEffect(() => {
     if (!currentUser || !ordersOpen) {
       setCustomerOrders([]);
       return undefined;
@@ -1015,6 +1000,21 @@ export default function TiendaVirtualView({
     activeCategory === 'todos' &&
     activeSubcategory === 'todas' &&
     activePromotions.length > 0;
+
+  useEffect(() => {
+    if (selectedPromotionIndex === null) {
+      return;
+    }
+
+    if (activePromotions.length === 0) {
+      setSelectedPromotionIndex(null);
+      return;
+    }
+
+    if (selectedPromotionIndex >= activePromotions.length) {
+      setSelectedPromotionIndex(activePromotions.length - 1);
+    }
+  }, [activePromotions.length, selectedPromotionIndex]);
 
   const cartCount = cartItems.length;
 
