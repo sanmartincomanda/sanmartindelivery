@@ -2121,7 +2121,7 @@ export default function TiendaVirtualView({
         .store-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 18px;
+          gap: 14px;
         }
         .store-grid-skeleton {
           pointer-events: none;
@@ -2141,66 +2141,51 @@ export default function TiendaVirtualView({
           min-width: 0;
           border: 0;
           background: transparent;
-          padding: 10px 10px 14px;
+          padding: 6px 4px 10px;
           color: inherit;
           text-align: left;
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 5px;
           cursor: pointer;
           transform: translateZ(0);
-          transition: transform 0.28s ease, filter 0.28s ease;
+          transition: transform 0.24s ease, filter 0.24s ease;
         }
         .store-product-card::before,
         .store-product-card::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          clip-path: polygon(12% 0%, 88% 0%, 100% 16%, 100% 84%, 88% 100%, 12% 100%, 0% 84%, 0% 16%);
-          pointer-events: none;
-        }
-        .store-product-card::before {
-          background: linear-gradient(165deg, rgba(123, 16, 34, 0.16), rgba(255, 233, 223, 0.92));
-          box-shadow: 0 20px 38px rgba(123, 16, 34, 0.14);
-        }
-        .store-product-card::after {
-          inset: 1px;
-          background:
-            radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), rgba(255, 248, 244, 0.92) 54%, rgba(255, 236, 226, 0.88) 100%);
+          content: none;
         }
         .store-product-card > * {
           position: relative;
           z-index: 1;
         }
         .store-product:hover .store-product-card {
-          transform: translateY(-7px) rotate(-1deg);
-          filter: saturate(1.04);
-        }
-        .store-product:nth-child(2n):hover .store-product-card {
-          transform: translateY(-7px) rotate(1deg);
+          transform: translateY(-4px);
+          filter: saturate(1.03);
         }
         .store-product:active .store-product-card,
         .store-product-card:focus-visible {
-          transform: translateY(-2px) scale(0.98);
+          transform: translateY(-1px) scale(0.985);
         }
         .store-product-card:focus-visible {
           outline: 3px solid rgba(123, 16, 34, 0.3);
           outline-offset: 4px;
         }
-        .store-product-hex {
+        .store-product-media {
           width: 100%;
           display: block;
-          padding: 12px;
-          clip-path: polygon(13% 0%, 87% 0%, 100% 18%, 100% 82%, 87% 100%, 13% 100%, 0% 82%, 0% 18%);
-          background: linear-gradient(140deg, rgba(123, 16, 34, 0.14), rgba(255, 227, 214, 0.95));
+          padding: 7px;
+          border-radius: 28px;
+          background: linear-gradient(145deg, rgba(123, 16, 34, 0.12), rgba(255, 227, 214, 0.88));
+          box-shadow: 0 14px 26px rgba(123, 16, 34, 0.1);
         }
         .store-product-image-shell {
           display: block;
           width: 100%;
           aspect-ratio: 1 / 1;
-          clip-path: polygon(13% 0%, 87% 0%, 100% 18%, 100% 82%, 87% 100%, 13% 100%, 0% 82%, 0% 18%);
+          border-radius: 24px;
           background: linear-gradient(180deg, #ffffff 0%, #fff5ef 100%);
-          border: 1px solid rgba(255, 255, 255, 0.65);
+          border: 1px solid rgba(255, 255, 255, 0.72);
           overflow: hidden;
         }
         .store-product-image {
@@ -2212,13 +2197,13 @@ export default function TiendaVirtualView({
           overflow: hidden;
         }
         .store-product-image img {
-          width: 84%;
-          height: 84%;
+          width: 88%;
+          height: 88%;
           object-fit: contain;
-          transition: transform 0.32s ease;
+          transition: transform 0.28s ease;
         }
         .store-product:hover .store-product-image img {
-          transform: scale(1.06) rotate(-2deg);
+          transform: scale(1.04);
         }
         .store-skeleton-media,
         .store-skeleton-line {
@@ -2249,15 +2234,15 @@ export default function TiendaVirtualView({
         }
         .store-add {
           position: absolute;
-          top: 18px;
-          right: 18px;
-          min-width: 48px;
-          height: 48px;
-          padding: 0 12px;
+          top: 12px;
+          right: 8px;
+          min-width: 42px;
+          height: 42px;
+          padding: 0 10px;
           border-radius: 999px;
           background: linear-gradient(135deg, #b91c1c, #ef4444);
           color: #ffffff;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 950;
           line-height: 1;
           box-shadow: 0 16px 32px rgba(185, 28, 28, 0.24);
@@ -2271,25 +2256,25 @@ export default function TiendaVirtualView({
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-height: 24px;
+          min-height: 20px;
           align-self: flex-start;
-          padding: 0 10px;
+          padding: 0 8px;
           border-radius: 999px;
           background: rgba(123, 16, 34, 0.08);
           color: #7b1022;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 950;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.06em;
           text-transform: uppercase;
         }
         .store-product-name {
           display: block;
           margin: 0;
-          min-height: 42px;
+          min-height: 34px;
           color: #111827;
-          font-size: 16px;
-          line-height: 1.24;
-          font-weight: 900;
+          font-size: 13px;
+          line-height: 1.2;
+          font-weight: 850;
           overflow: hidden;
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -2298,7 +2283,7 @@ export default function TiendaVirtualView({
         .store-price {
           display: block;
           margin: 0;
-          font-size: 22px;
+          font-size: 17px;
           font-weight: 950;
           color: #7b1022;
         }
@@ -2306,9 +2291,9 @@ export default function TiendaVirtualView({
           display: block;
           margin: 0;
           color: #6b7280;
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 800;
-          line-height: 1.38;
+          line-height: 1.32;
         }
         .store-empty {
           padding: 34px;
@@ -3300,6 +3285,11 @@ export default function TiendaVirtualView({
             bottom: 116px;
           }
         }
+        @media (min-width: 1400px) {
+          .store-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+          }
+        }
         @media (max-width: 980px) {
           .store-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3313,7 +3303,7 @@ export default function TiendaVirtualView({
           }
           .store-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 18px 14px;
+            gap: 14px 12px;
           }
           .store-story {
             flex-basis: 82px;
@@ -3383,17 +3373,30 @@ export default function TiendaVirtualView({
             display: none;
           }
           .store-product-card {
-            padding: 8px 8px 12px;
+            padding: 4px 2px 8px;
           }
           .store-add {
-            top: 14px;
-            right: 14px;
-            min-width: 44px;
-            height: 44px;
+            top: 10px;
+            right: 6px;
+            min-width: 38px;
+            height: 38px;
           }
           .store-product-name {
-            font-size: 14px;
-            min-height: 36px;
+            font-size: 12px;
+            min-height: 30px;
+          }
+          .store-price {
+            font-size: 15px;
+          }
+          .store-unit {
+            font-size: 10px;
+          }
+          .store-product-media {
+            padding: 6px;
+            border-radius: 24px;
+          }
+          .store-product-image-shell {
+            border-radius: 20px;
           }
           .store-brand-row {
             align-items: flex-start;
@@ -3693,7 +3696,7 @@ export default function TiendaVirtualView({
                       aria-label={`Ver ${product.name}`}
                       onClick={() => openProduct(product)}
                     >
-                      <span className="store-product-hex">
+                      <span className="store-product-media">
                         <span className="store-product-image-shell">
                           <span className="store-product-image">
                             <img
