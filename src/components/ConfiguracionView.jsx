@@ -86,6 +86,19 @@ import {
 
 const COUPONS_PIN = '210397';
 
+const buildSicarFailureMessage = (prefix, error) => {
+  const detail = String(error?.message || '').trim();
+  if (!detail) {
+    return `${prefix} Verifica que el puente local este activo con "npm run sicar:bridge".`;
+  }
+
+  if (detail.includes('puente local') || detail.includes('administrador local en http://127.0.0.1:5173')) {
+    return `${prefix} ${detail}`.trim();
+  }
+
+  return `${prefix} Verifica que el puente local este activo con "npm run sicar:bridge". ${detail}`.trim();
+};
+
 const buildEmptyProduct = (unit = 'lb') => ({
   code: '',
   name: '',
@@ -1299,9 +1312,7 @@ export default function ConfiguracionView() {
       );
     } catch (error) {
       console.error('Error probando conexion SICAR:', error);
-      setMessage(
-        `No se pudo conectar con SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
-      );
+      setMessage(buildSicarFailureMessage('No se pudo conectar con SICAR.', error));
     } finally {
       setTestingSicar(false);
     }
@@ -1321,9 +1332,7 @@ export default function ConfiguracionView() {
       );
     } catch (error) {
       console.error('Error cargando vista previa SICAR:', error);
-      setMessage(
-        `No se pudo cargar la vista previa SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
-      );
+      setMessage(buildSicarFailureMessage('No se pudo cargar la vista previa SICAR.', error));
     } finally {
       setLoadingSicarPreview(false);
     }
@@ -1407,9 +1416,7 @@ export default function ConfiguracionView() {
       );
     } catch (error) {
       console.error('Error aplicando catalogo SICAR:', error);
-      setMessage(
-        `No se pudo aplicar el catalogo SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
-      );
+      setMessage(buildSicarFailureMessage('No se pudo aplicar el catalogo SICAR.', error));
     } finally {
       setSyncingSicar(false);
     }
@@ -1460,9 +1467,7 @@ export default function ConfiguracionView() {
       );
     } catch (error) {
       console.error('Error actualizando precios SICAR:', error);
-      setMessage(
-        `No se pudieron actualizar los precios SICAR. Verifica que el puente local este activo con "npm run sicar:bridge". ${error?.message || ''}`.trim()
-      );
+      setMessage(buildSicarFailureMessage('No se pudieron actualizar los precios SICAR.', error));
     } finally {
       setSyncingSicarPrices(false);
     }

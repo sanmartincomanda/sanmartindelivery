@@ -257,30 +257,6 @@ export default function ListaPedidos({ pedidos = [] }) {
     return COCINEROS_ALIAS[nombre] || nombre;
   };
 
-  const handleActualizarTotalApp = async (pedido) => {
-    if (!pedido?.firebaseKey) {
-      return;
-    }
-
-    setQuoteActionBusy(pedido.firebaseKey, 'app', true);
-
-    try {
-      const payload = await syncSicarQuoteForOrder(pedido.firebaseKey, {
-        applyToFirebase: true,
-      });
-      const quoteId = Number(payload?.quote?.cotId || 0);
-      const quoteTotal = Number(payload?.quote?.total || 0);
-      alert(
-        `Pedido actualizado en la app desde SICAR. Cotizacion #${quoteId || 'N/D'} con total ${formatCurrency(quoteTotal)}.`
-      );
-    } catch (error) {
-      console.error('Error actualizando total por app desde SICAR:', error);
-      alert(error?.message || 'No se pudo actualizar el total desde SICAR.');
-    } finally {
-      setQuoteActionBusy(pedido.firebaseKey, 'app', false);
-    }
-  };
-
   const handleActualizarTotalWhatsapp = async (pedido) => {
     if (!pedido?.firebaseKey) {
       return;
@@ -1126,30 +1102,20 @@ export default function ListaPedidos({ pedidos = [] }) {
                       <div style={{
                         marginBottom: '24px',
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
                         gap: '12px'
                       }}>
-                        <button
-                          type="button"
-                          onClick={() => handleActualizarTotalApp(pedido)}
-                          className="btn-hover"
-                          disabled={isQuoteActionBusy(pedido.firebaseKey, 'app')}
-                          style={{
-                            padding: '16px 18px',
-                            borderRadius: '14px',
-                            border: '2px solid rgba(37, 99, 235, 0.22)',
-                            background: 'rgba(37, 99, 235, 0.1)',
-                            color: '#1d4ed8',
-                            fontWeight: 800,
-                            fontSize: '14px',
-                            cursor: isQuoteActionBusy(pedido.firebaseKey, 'app') ? 'wait' : 'pointer',
-                            opacity: isQuoteActionBusy(pedido.firebaseKey, 'app') ? 0.7 : 1
-                          }}
-                        >
-                          {isQuoteActionBusy(pedido.firebaseKey, 'app')
-                            ? 'Actualizando app desde SICAR...'
-                            : 'Actualizar total por app'}
-                        </button>
+                        <div style={{
+                          padding: '14px 16px',
+                          borderRadius: '14px',
+                          border: '1px solid rgba(37, 99, 235, 0.18)',
+                          background: 'rgba(37, 99, 235, 0.08)',
+                          color: '#1e3a8a',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          lineHeight: 1.5
+                        }}>
+                          La app se actualiza automaticamente cuando guardas cambios en la cotizacion de SICAR.
+                        </div>
                         <button
                           type="button"
                           onClick={() => handleActualizarTotalWhatsapp(pedido)}

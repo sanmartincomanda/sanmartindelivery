@@ -3,6 +3,7 @@ import { equalTo, onValue, orderByChild, query, ref, update } from 'firebase/dat
 import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
+import { buildStoreKitchenOrderText } from '../services/orders';
 
 // Iconos SVG
 const Icons = {
@@ -106,6 +107,23 @@ const buildKitchenWhatsappLink = (pedido = {}) => {
   return `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(
     buildKitchenWhatsappMessage(pedido)
   )}`;
+};
+
+const getKitchenOrderText = (pedido = {}) => {
+  if (Array.isArray(pedido.items) && pedido.items.length > 0) {
+    return buildStoreKitchenOrderText(pedido.items, {
+      subtotal: pedido.subtotalEstimado,
+      total: pedido.total,
+      totalLabel:
+        pedido?.totalAproximado === false
+          ? 'Total actualizado de pedido'
+          : 'Total aproximado de pedido',
+      subtotalLabel:
+        pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado',
+    });
+  }
+
+  return String(pedido.pedido || '').trim();
 };
 
 export default function KitchenView({ orders }) {
@@ -958,12 +976,12 @@ export default function KitchenView({ orders }) {
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-word'
                           }}>
-                            {pedido.pedido}
+                            {getKitchenOrderText(pedido) || 'Sin detalle'}
                           </pre>
                           <button
                             onClick={() => {
                               setEditingId(pedido.firebaseKey);
-                              setEditText(pedido.pedido || '');
+                              setEditText(getKitchenOrderText(pedido) || '');
                             }}
                             className="btn-hover"
                             style={{

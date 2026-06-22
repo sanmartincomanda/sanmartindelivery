@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
+    "sicar:update:prices": "node scripts/updateSicarPrices.mjs",
     "catalog:migrate:images": "node scripts/migrateCatalogImagesToStorage.mjs",
     "firebase:login": "npx firebase-tools login",
     "firebase:use": "npx firebase-tools use comanda-digital-ac1ec",

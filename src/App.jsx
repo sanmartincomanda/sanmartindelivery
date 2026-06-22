@@ -208,8 +208,8 @@ function App() {
     const shouldSubscribeOrders =
       !isPublicStoreRoute &&
       !isDriverRoute &&
-      route === 'dashboard' &&
-      (view === 'ingreso' || view === 'lista' || view === 'cocina');
+      ((route === 'dashboard' && (view === 'ingreso' || view === 'lista' || view === 'cocina')) ||
+        isKitchenRoute);
 
     if (!shouldSubscribeOrders) {
       return undefined;

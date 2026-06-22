@@ -8,7 +8,6 @@ export const MANUAL_CHANNEL = 'manual';
 export const STORE_CHANNEL = 'tienda_virtual';
 export const STORE_ORDER_RETENTION_DAYS = 3;
 export const SICAR_QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
-export const SICAR_QUOTE_SERIE = 'APP';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -152,6 +151,27 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
   return lines.join('\n').trim();
 };
 
+export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
+  const normalizedItems = normalizeStoreItems(items);
+  const totalLabel = String(summary.totalLabel || 'Total aproximado de pedido').trim();
+  const subtotalLabel = String(summary.subtotalLabel || 'Subtotal estimado').trim();
+  const subtotal = Number(
+    summary.subtotal ?? normalizedItems.reduce((sum, item) => sum + item.subtotal, 0)
+  );
+  const total = Number(summary.total ?? subtotal);
+  const lines = normalizedItems.map(
+    (item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim()
+  );
+
+  if (subtotal > 0) {
+    lines.push('');
+    lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
+    lines.push(`${totalLabel}: C$${formatAmount(total)}`);
+  }
+
+  return lines.join('\n').trim();
+};
+
 const buildOrderKey = (date, number) => `${date}-${formatOrderNumber(number)}`;
 
 const mapOrdersSnapshot = (snapshot) =>
@@ -287,13 +307,15 @@ export async function createOrder(payload, options = {}) {
       }
     : null;
 
+  const rawPedidoTexto = String(payload.pedido || '').trim();
+  const generatedKitchenPedidoTexto = buildStoreKitchenOrderText(normalizedItems, {
+    couponCode: coupon?.code,
+    total,
+  });
   const pedidoTexto =
-    String(payload.pedido || '').trim() ||
-    buildStoreOrderText(normalizedItems, payload.observaciones, {
-      discount: couponDiscount,
-      couponCode: coupon?.code,
-      total,
-    });
+    channel === STORE_CHANNEL
+      ? generatedKitchenPedidoTexto || rawPedidoTexto
+      : rawPedidoTexto || generatedKitchenPedidoTexto;
 
   const orderRecord = {
     cliente: String(payload.cliente || '').trim() || 'Cliente sin nombre',
@@ -329,8 +351,7 @@ export async function createOrder(payload, options = {}) {
   if (channel === STORE_CHANNEL) {
     orderRecord.sicarQuote = {
       status: 'pending',
-      folioMovil: id,
-      serieMovil: SICAR_QUOTE_SERIE,
+      appOrderNumber: id,
       orderDate: fecha,
       orderNumber: id,
       queuedAt: new Date(createdAt).toISOString(),
@@ -352,8 +373,7 @@ export async function createOrder(payload, options = {}) {
       requestedAt: createdAt,
       requestedAtIso: new Date(createdAt).toISOString(),
       attempts: 0,
-      serieMovil: SICAR_QUOTE_SERIE,
-      folioMovil: id,
+      appOrderNumber: id,
     };
   }
 

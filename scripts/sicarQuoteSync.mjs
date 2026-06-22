@@ -14,7 +14,8 @@ const FIREBASE_CONFIG = {
 const STORE_CHANNEL = 'tienda_virtual';
 const STORE_ORDERS_PATH = 'orders';
 const QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
-const QUOTE_SERIE = 'APP';
+const LINKED_QUOTES_PATH = 'sicarLinkedQuotes';
+const LINKED_QUOTES_REFRESH_MS = 5000;
 const DEFAULT_CLIENT_ID = 1;
 const DEFAULT_USER_ID = 1;
 const DEFAULT_VENDOR_ID = 7;
@@ -26,6 +27,7 @@ const DEFAULT_ZERO_TAX_IMP_ID = 4;
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 const roundQuantity = (value) => Number(Number(value || 0).toFixed(3));
 const roundRate = (value) => Number(Number(value || 0).toFixed(6));
+const truncateMoney = (value) => Math.trunc(Number(value || 0) * 100) / 100;
 const formatMoney = (value) => roundMoney(value).toFixed(2);
 const formatQuantity = (value) => roundQuantity(value).toFixed(3);
 const formatRate = (value) => roundRate(value).toFixed(6);
@@ -51,6 +53,23 @@ const formatStoreQuantityLabel = (quantity, unit) =>
   String(unit || '').trim().toLowerCase() === 'unidad'
     ? String(Number(quantity || 0))
     : formatWeightLabel(quantity);
+
+const removeTextAccents = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const normalizeOrderStatus = (status) => removeTextAccents(status || 'pendiente');
+
+const isFinalStoreStatus = (status) => {
+  const normalizedStatus = normalizeOrderStatus(status);
+  return (
+    normalizedStatus.includes('entregado') ||
+    normalizedStatus.includes('cancel') ||
+    normalizedStatus.includes('anulad')
+  );
+};
 
 const escapeSqlText = (value, sqlEscape) => `'${sqlEscape(String(value || ''))}'`;
 
@@ -78,34 +97,16 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   const subtotal = roundMoney(
     summary.subtotal ?? normalizedItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
   );
-  const discount = roundMoney(summary.discount || 0);
-  const total = roundMoney(summary.total ?? Math.max(subtotal - discount, 0));
+  const total = roundMoney(summary.total ?? subtotal);
   const totalLabel = String(summary.totalLabel || 'Total aproximado de pedido').trim();
   const subtotalLabel = String(summary.subtotalLabel || 'Subtotal estimado').trim();
-  const lines = [];
-
-  normalizedItems.forEach((item) => {
-    lines.push(
-      `- ${formatStoreQuantityLabel(item.quantity, item.unit)} ${item.unit} ${item.name} [${item.code}] | C$${formatMoney(item.subtotal)}`
-    );
-
-    if (item.description) {
-      lines.push(`  Descripcion: ${item.description}`);
-    }
-  });
-
-  const cleanNotes = String(notes || '').trim();
-  if (cleanNotes) {
-    lines.push('');
-    lines.push(`Observaciones: ${cleanNotes}`);
-  }
+  const lines = normalizedItems.map(
+    (item) => `- ${formatStoreQuantityLabel(item.quantity, item.unit)} ${item.unit} ${item.name}`.trim()
+  );
 
   if (subtotal > 0) {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatMoney(subtotal)}`);
-    if (discount > 0) {
-      lines.push(`Descuento: -C$${formatMoney(discount)}`);
-    }
     lines.push(`${totalLabel}: C$${formatMoney(total)}`);
   }
 
@@ -145,14 +146,33 @@ const getFirebaseDatabase = () => {
   return getDatabase(app);
 };
 
+const buildQuoteFingerprint = (quote = {}) =>
+  JSON.stringify({
+    cotId: Number(quote?.cotId || 0),
+    subtotal: roundMoney(quote?.subtotal || 0),
+    discount: roundMoney(quote?.discount || 0),
+    total: roundMoney(quote?.total || 0),
+    items: (Array.isArray(quote?.items) ? quote.items : []).map((item) => ({
+      code: String(item?.code || '').trim(),
+      quantity: roundQuantity(item?.quantity || 0),
+      unit: String(item?.storeUnit || item?.unit || '').trim().toLowerCase(),
+      price: roundMoney(item?.price || 0),
+      total: roundMoney(item?.total || 0),
+    })),
+  });
+
 export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   const database = getFirebaseDatabase();
   const state = {
     listening: false,
     processing: false,
+    refreshingLinkedQuotes: false,
     pendingCount: 0,
     syncedCount: 0,
+    watchedQuotesCount: 0,
     lastRunAt: '',
+    lastLinkedRefreshAt: '',
+    lastAutoApplyAt: '',
     lastSuccessAt: '',
     lastError: '',
     lastProcessedOrderKey: '',
@@ -163,6 +183,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   let queueListenerStarted = false;
   let queueUnsubscribe = null;
   let processRequested = false;
+  let linkedQuotesRefreshTimer = null;
+  let linkedQuotesRefreshing = false;
 
   const updateOrderQuoteStatus = async (orderKey, patch = {}) => {
     if (!orderKey || !patch || typeof patch !== 'object') {
@@ -170,6 +192,79 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     }
 
     await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), patch);
+  };
+
+  const syncLinkedQuoteWatch = async (orderKey, order = {}, quote = {}, options = {}) => {
+    if (!orderKey || !quote?.cotId) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const fingerprint = buildQuoteFingerprint(quote);
+    const watchRef = ref(database, `${LINKED_QUOTES_PATH}/${orderKey}`);
+    const existingSnapshot = await get(watchRef);
+    const existingWatch = existingSnapshot.val() || {};
+    const hasObservedFingerprint = Boolean(String(existingWatch?.lastObservedFingerprint || '').trim());
+    const patch = {
+      cotId: Number(quote.cotId || 0),
+      appOrderNumber: Number(order.id || 0),
+      orderDate: String(quote.orderDate || order.fecha || '').trim(),
+      customerName: String(order.cliente || '').trim(),
+      orderStatus: String(order.estado || 'Pendiente').trim(),
+      subtotal: roundMoney(quote.subtotal || 0),
+      discount: roundMoney(quote.discount || 0),
+      total: roundMoney(quote.total || 0),
+      autoApply: true,
+      updatedAt: nowIso,
+    };
+
+    if (options.applyToFirebase === true) {
+      patch.lastObservedFingerprint = fingerprint;
+      patch.lastObservedAt = nowIso;
+      patch.lastAppliedFingerprint = fingerprint;
+      patch.lastAppliedAt = nowIso;
+    } else if (!hasObservedFingerprint) {
+      patch.lastObservedFingerprint = fingerprint;
+      patch.lastObservedAt = nowIso;
+
+      if (order?.totalAproximado === false) {
+        patch.lastAppliedFingerprint = fingerprint;
+        patch.lastAppliedAt = nowIso;
+      }
+    }
+
+    await update(watchRef, patch);
+  };
+
+  const seedLinkedQuoteWatchesFromOrders = async () => {
+    const snapshot = await get(ref(database, STORE_ORDERS_PATH));
+    const orders = snapshot.val() || {};
+    const updates = {};
+    const nowIso = new Date().toISOString();
+
+    Object.entries(orders).forEach(([orderKey, order]) => {
+      const cotId = Number(order?.sicarQuote?.cotId || 0);
+      if (String(order?.canal || '').trim() !== STORE_CHANNEL || cotId <= 0) {
+        return;
+      }
+
+      if (isFinalStoreStatus(order?.estado)) {
+        updates[`${LINKED_QUOTES_PATH}/${orderKey}`] = null;
+        return;
+      }
+
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/cotId`] = cotId;
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/appOrderNumber`] = Number(order?.id || 0);
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/orderDate`] = String(order?.fecha || '').trim();
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/customerName`] = String(order?.cliente || '').trim();
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/orderStatus`] = String(order?.estado || 'Pendiente').trim();
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/autoApply`] = true;
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/updatedAt`] = nowIso;
+    });
+
+    if (Object.keys(updates).length > 0) {
+      await update(ref(database), updates);
+    }
   };
 
   const markQueueAsError = async (orderKey, queueEntry = {}, error) => {
@@ -208,19 +303,17 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     const explicitQuoteId = Number(order?.sicarQuote?.cotId || 0);
     if (explicitQuoteId > 0) {
       const rows = await runMysqlQuery(`
-        SELECT cot_id, fecha, folioMovil, serieMovil, subtotal, descuento, total
+        SELECT cot_id, fecha, subtotal, descuento, total
         FROM cotizacion
         WHERE cot_id = ${explicitQuoteId}
         LIMIT 1;
       `);
 
       if (rows.length > 0) {
-        const [cotId, fecha, folioMovil, serieMovil, subtotal, descuento, total] = rows[0].split('\t');
+        const [cotId, fecha, subtotal, descuento, total] = rows[0].split('\t');
         return {
           cotId: Number(cotId || 0),
           fecha: String(fecha || '').trim(),
-          folioMovil: Number(folioMovil || 0),
-          serieMovil: String(serieMovil || '').trim(),
           subtotal: roundMoney(subtotal),
           discount: roundMoney(descuento),
           total: roundMoney(total),
@@ -228,36 +321,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       }
     }
 
-    const orderDate = String(order?.fecha || '').trim();
-    const orderNumber = Number(order?.id || 0);
-    if (!orderDate || orderNumber <= 0) {
-      return null;
-    }
-
-    const rows = await runMysqlQuery(`
-      SELECT cot_id, fecha, folioMovil, serieMovil, subtotal, descuento, total
-      FROM cotizacion
-      WHERE fecha = ${escapeSqlText(orderDate, sqlEscape)}
-        AND folioMovil = ${orderNumber}
-        AND serieMovil = ${escapeSqlText(QUOTE_SERIE, sqlEscape)}
-      ORDER BY cot_id DESC
-      LIMIT 1;
-    `);
-
-    if (rows.length === 0) {
-      return null;
-    }
-
-    const [cotId, fecha, folioMovil, serieMovil, subtotal, descuento, total] = rows[0].split('\t');
-    return {
-      cotId: Number(cotId || 0),
-      fecha: String(fecha || '').trim(),
-      folioMovil: Number(folioMovil || 0),
-      serieMovil: String(serieMovil || '').trim(),
-      subtotal: roundMoney(subtotal),
-      discount: roundMoney(descuento),
-      total: roundMoney(total),
-    };
+    return null;
   };
 
   const getSicarArticlesByCodes = async (codes = []) => {
@@ -281,12 +345,14 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         a.descripcion,
         UPPER(TRIM(COALESCE(u.nombre, 'PZA'))),
         ROUND(a.precioCompra, 6),
+        ROUND(a.preCompraProm, 6),
         ROUND(a.precio1, 6),
         ROUND(a.precio1 * (1 + COALESCE(tax.taxRatePct, 0) / 100), 6),
         COALESCE(tax.taxRatePct, 0),
         COALESCE(tax.impIds, ''),
         COALESCE(d.nombre, ''),
-        COALESCE(c.nombre, '')
+        COALESCE(c.nombre, ''),
+        COALESCE(a.caracteristicas, '')
       FROM articulo a
       LEFT JOIN unidad u ON u.uni_id = a.unidadVenta
       LEFT JOIN categoria c ON c.cat_id = a.cat_id
@@ -329,12 +395,14 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         description: String(parts[2] || '').trim(),
         unit: String(parts[3] || '').trim() || 'PZA',
         purchasePrice: roundRate(parts[4]),
-        basePrice: roundRate(parts[5]),
-        priceWithTax: roundRate(parts[6]),
-        taxRatePct: roundRate(parts[7]),
-        impIds: parseImpIds(parts[8]),
-        department: String(parts[9] || '').trim(),
-        category: String(parts[10] || '').trim(),
+        purchaseAveragePrice: roundRate(parts[5]),
+        basePrice: roundRate(parts[6]),
+        priceWithTax: roundRate(parts[7]),
+        taxRatePct: roundRate(parts[8]),
+        impIds: parseImpIds(parts[9]),
+        department: String(parts[10] || '').trim(),
+        category: String(parts[11] || '').trim(),
+        characteristics: String(parts[12] || '').trim(),
       });
     });
 
@@ -355,16 +423,26 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       }
 
       const quantity = roundQuantity(item.quantity);
-      const priceSin = roundMoney(article.basePrice);
-      const priceCon = roundMoney(article.priceWithTax || article.basePrice);
-      const priceNorSin = priceSin;
-      const priceNorCon = priceCon;
-      const purchasePrice = roundMoney(article.purchasePrice);
+      const taxRatePct = roundRate(article.taxRatePct || 0);
+      const hasTransferredTax = taxRatePct > 0;
+      const priceNorSin = roundMoney(article.basePrice);
+      const priceSin = truncateMoney(article.basePrice);
+      const priceNorCon = roundMoney(
+        hasTransferredTax ? article.basePrice * (1 + taxRatePct / 100) : article.basePrice
+      );
+      const priceCon = priceNorCon;
+      const purchaseBase = roundRate(article.purchaseAveragePrice || article.purchasePrice || 0);
+      const purchasePrice = roundMoney(
+        hasTransferredTax ? purchaseBase * (1 + taxRatePct / 100) : purchaseBase
+      );
       const importeCompra = roundMoney(purchasePrice * quantity);
+      const importeNorSin = roundMoney(priceNorSin * quantity);
+      const importeNorCon = roundMoney(priceNorCon * quantity);
       const importeSin = roundMoney(priceSin * quantity);
       const importeCon = roundMoney(priceCon * quantity);
       const diferencia = roundMoney(importeCon - importeCompra);
       const utilidad = importeCon > 0 ? roundRate((diferencia / importeCon) * 100) : 0;
+      const taxImpIds = (Array.isArray(article.impIds) ? article.impIds : []).filter((impId) => Number(impId) === 1);
 
       detailItems.push({
         order: index,
@@ -376,28 +454,21 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         quantity,
         storeUnit: normalizeStoreUnitLabel(item.unit),
         unit: article.unit || (normalizeStoreUnitLabel(item.unit) === 'unidad' ? 'PZA' : 'LB'),
+        characteristics: article.characteristics || '',
         purchasePrice,
         priceNorSin,
         priceNorCon,
         priceSin,
         priceCon,
         importeCompra,
-        importeNorSin: importeSin,
-        importeNorCon: importeCon,
+        importeNorSin,
+        importeNorCon,
         importeSin,
         importeCon,
-        monPriceNorSin: priceNorSin,
-        monPriceNorCon: priceNorCon,
-        monPriceSin: priceSin,
-        monPriceCon: priceCon,
-        monImporteNorSin: importeSin,
-        monImporteNorCon: importeCon,
-        monImporteSin: importeSin,
-        monImporteCon: importeCon,
         diferencia,
         utilidad,
-        taxRatePct: article.taxRatePct,
-        impIds: article.impIds,
+        taxRatePct,
+        impIds: taxImpIds,
         department: article.department,
         category: article.category,
       });
@@ -409,41 +480,12 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
     const subtotal = roundMoney(detailItems.reduce((sum, item) => sum + item.importeSin, 0));
     const total = roundMoney(detailItems.reduce((sum, item) => sum + item.importeCon, 0));
-    const totalWeight = roundRate(
-      detailItems.reduce(
-        (sum, item) => sum + (String(item.unit || '').toUpperCase().includes('LB') ? item.quantity : 0),
-        0
-      )
+    const taxableSubtotal = roundMoney(
+      detailItems.reduce((sum, item) => sum + (item.impIds.length > 0 ? item.importeSin : 0), 0)
     );
-    const taxesByImp = new Map();
-
-    detailItems.forEach((item) => {
-      if (!Array.isArray(item.impIds) || item.impIds.length === 0) {
-        return;
-      }
-
-      item.impIds.forEach((impId) => {
-        if (Number(impId || 0) <= 0) {
-          return;
-        }
-
-        if (Number(impId) !== 1) {
-          return;
-        }
-
-        const current = taxesByImp.get(impId) || {
-          impId: Number(impId),
-          taxTotal: 0,
-          taxableSubtotal: 0,
-          tras: 1,
-        };
-
-        current.taxTotal = roundMoney(current.taxTotal + (item.importeCon - item.importeSin));
-        current.taxableSubtotal = roundMoney(current.taxableSubtotal + item.importeSin);
-        taxesByImp.set(impId, current);
-      });
-    });
-
+    const transferredTaxTotal = roundMoney(
+      detailItems.reduce((sum, item) => sum + (item.impIds.length > 0 ? item.importeCon - item.importeSin : 0), 0)
+    );
     const taxRows = [
       {
         impId: DEFAULT_ZERO_TAX_IMP_ID,
@@ -451,15 +493,18 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         taxableSubtotal: 0,
         tras: 0,
       },
-      ...Array.from(taxesByImp.values()),
+      {
+        impId: 1,
+        taxTotal: transferredTaxTotal,
+        taxableSubtotal,
+        tras: 1,
+      },
     ];
 
     return {
       orderDate: String(order.fecha || '').trim(),
-      orderNumber: Number(order.id || 0),
       subtotal,
       total,
-      totalWeight,
       discount: 0,
       detailItems,
       taxRows,
@@ -468,17 +513,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   };
 
   const insertQuoteDraft = async (order = {}, draft = {}) => {
-    const header = [
-      `Pedido app #${String(order?.id || '').padStart(3, '0')}`,
-      `Cliente: ${String(order?.cliente || '').trim() || 'Cliente tienda virtual'}`,
-      order?.telefono ? `Telefono: ${String(order.telefono).trim()}` : '',
-      order?.direccion ? `Direccion: ${String(order.direccion).trim()}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n');
-    const footer = order?.observaciones
-      ? `Observaciones: ${String(order.observaciones).trim()}`
-      : '';
+    const header = '';
+    const footer = '';
 
     const detailValues = draft.detailItems.map((item) => `
       (
@@ -498,19 +534,19 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         ${formatMoney(item.importeNorCon)},
         ${formatMoney(item.importeSin)},
         ${formatMoney(item.importeCon)},
-        ${formatMoney(item.monPriceNorSin)},
-        ${formatMoney(item.monPriceNorCon)},
-        ${formatMoney(item.monPriceSin)},
-        ${formatMoney(item.monPriceCon)},
-        ${formatMoney(item.monImporteNorSin)},
-        ${formatMoney(item.monImporteNorCon)},
-        ${formatMoney(item.monImporteSin)},
-        ${formatMoney(item.monImporteCon)},
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
         ${formatMoney(item.diferencia)},
         ${formatRate(item.utilidad)},
         0.00,
         0.00,
-        NULL,
+        ${escapeSqlText(item.characteristics || '', sqlEscape)},
         ${item.order}
       )
     `);
@@ -531,7 +567,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     const detailTaxValues = draft.detailItems
       .flatMap((item) =>
         (Array.isArray(item.impIds) ? item.impIds : [])
-          .filter((impId) => Number(impId || 0) > 0)
+          .filter((impId) => Number(impId || 0) === 1)
           .map((impId) => `(@cotId, ${item.artId}, ${Number(impId)})`)
       );
 
@@ -578,29 +614,29 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         ${formatMoney(draft.subtotal)},
         ${formatMoney(draft.discount)},
         ${formatMoney(draft.total)},
-        ${formatMoney(draft.subtotal)},
-        ${formatMoney(draft.discount)},
-        ${formatMoney(draft.total)},
+        NULL,
+        NULL,
+        NULL,
         ${escapeSqlText(DEFAULT_CURRENCY_ABBR, sqlEscape)},
         ${formatRate(DEFAULT_CURRENCY_EXCHANGE)},
-        ${formatRate(draft.totalWeight)},
-        1,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
+        0.0000,
         1,
         1,
         0,
         0,
         0,
         1,
-        ${Number(draft.orderNumber || 0)},
-        ${escapeSqlText(QUOTE_SERIE, sqlEscape)},
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
         NULL,
-        0,
+        NULL,
+        NULL,
+        NULL,
         ${DEFAULT_USER_ID},
         ${DEFAULT_CLIENT_ID},
         ${DEFAULT_CURRENCY_ID},
@@ -673,7 +709,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     }
 
     const headerRows = await runMysqlQuery(`
-      SELECT cot_id, fecha, subtotal, descuento, total, folioMovil, serieMovil
+      SELECT cot_id, fecha, subtotal, descuento, total
       FROM cotizacion
       WHERE cot_id = ${quoteId}
       LIMIT 1;
@@ -683,7 +719,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       throw new Error('La cotizacion SICAR enlazada ya no existe.');
     }
 
-    const [cotId, fecha, subtotal, descuento, total, folioMovil, serieMovil] = headerRows[0].split('\t');
+    const [cotId, fecha, subtotal, descuento, total] = headerRows[0].split('\t');
     const detailRows = await runMysqlQuery(`
       SELECT
         dc.art_id,
@@ -731,8 +767,6 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     return {
       cotId: Number(cotId || 0),
       orderDate: String(fecha || '').trim(),
-      orderNumber: Number(folioMovil || 0),
-      serieMovil: String(serieMovil || '').trim(),
       subtotal: roundMoney(subtotal),
       discount: roundMoney(descuento),
       total: roundMoney(total),
@@ -780,8 +814,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       sicarQuote: {
         status: missingCodes.length > 0 ? 'partial' : 'linked',
         cotId: quote.cotId,
-        folioMovil: quote.orderNumber,
-        serieMovil: quote.serieMovil || QUOTE_SERIE,
+        appOrderNumber: Number(order.id || 0),
         orderDate: quote.orderDate,
         subtotal: quote.subtotal,
         discount: quote.discount,
@@ -814,13 +847,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const created = await insertQuoteDraft(order, draft);
       createdQuote = true;
       missingCodes = Array.isArray(created.missingCodes) ? created.missingCodes : [];
-      quoteReference = await getQuoteByOrderReference({
-        ...order,
-        sicarQuote: {
-          ...(order.sicarQuote || {}),
-          cotId: created.cotId,
-        },
-      });
+      quoteReference = { cotId: created.cotId };
     } else {
       missingCodes = Array.isArray(order?.sicarQuote?.missingCodes) ? order.sicarQuote.missingCodes : [];
     }
@@ -834,8 +861,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     const quoteMetaPatch = {
       status: quoteStatus,
       cotId: quote.cotId,
-      folioMovil: quote.orderNumber,
-      serieMovil: quote.serieMovil || QUOTE_SERIE,
+      appOrderNumber: Number(order.id || 0),
       orderDate: quote.orderDate,
       subtotal: quote.subtotal,
       discount: quote.discount,
@@ -848,14 +874,17 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     if (applyToFirebase) {
       const orderPatch = buildFirebaseOrderPatchFromQuote(order, quote, missingCodes);
       await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
+      await syncLinkedQuoteWatch(orderKey, order, quote, { applyToFirebase: true });
     } else {
       await updateOrderQuoteStatus(orderKey, quoteMetaPatch);
+      await syncLinkedQuoteWatch(orderKey, order, quote, { applyToFirebase: false });
     }
 
     await clearQueueEntry(orderKey);
 
     return {
       orderKey,
+      appOrderNumber: Number(order.id || 0),
       createdQuote,
       quote,
       missingCodes,
@@ -863,6 +892,98 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       customerPhone: String(order.telefono || '').trim(),
       customerName: String(order.cliente || '').trim(),
     };
+  };
+
+  const refreshLinkedQuotes = async () => {
+    if (linkedQuotesRefreshing) {
+      return;
+    }
+
+    linkedQuotesRefreshing = true;
+    state.refreshingLinkedQuotes = true;
+    state.lastLinkedRefreshAt = new Date().toISOString();
+
+    try {
+      const snapshot = await get(ref(database, LINKED_QUOTES_PATH));
+      const linkedQuotes = snapshot.val() || {};
+      const entries = Object.entries(linkedQuotes).sort(
+        (left, right) => Number(left[1]?.appOrderNumber || 0) - Number(right[1]?.appOrderNumber || 0)
+      );
+
+      state.watchedQuotesCount = entries.length;
+
+      for (const [orderKey, watchEntry] of entries) {
+        try {
+          const order = await getOrderByKey(orderKey);
+
+          if (!order || String(order.canal || '').trim() !== STORE_CHANNEL || isFinalStoreStatus(order.estado)) {
+            await update(ref(database), {
+              [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
+            });
+            continue;
+          }
+
+          const cotId = Number(watchEntry?.cotId || order?.sicarQuote?.cotId || 0);
+          if (cotId <= 0) {
+            await update(ref(database), {
+              [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
+            });
+            continue;
+          }
+
+          const quote = await getQuoteSnapshot({ cotId });
+          const fingerprint = buildQuoteFingerprint(quote);
+          const knownFingerprint = String(watchEntry?.lastObservedFingerprint || '').trim();
+
+          if (!knownFingerprint) {
+            await syncLinkedQuoteWatch(orderKey, order, quote, {
+              applyToFirebase: order?.totalAproximado === false,
+            });
+            continue;
+          }
+
+          if (knownFingerprint === fingerprint) {
+            continue;
+          }
+
+          const missingCodes = Array.isArray(order?.sicarQuote?.missingCodes)
+            ? order.sicarQuote.missingCodes
+            : [];
+          const orderPatch = buildFirebaseOrderPatchFromQuote(order, quote, missingCodes);
+          await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
+          await syncLinkedQuoteWatch(orderKey, order, quote, { applyToFirebase: true });
+
+          const nowIso = new Date().toISOString();
+          state.lastAutoApplyAt = nowIso;
+          state.lastSuccessAt = nowIso;
+          state.lastProcessedOrderKey = orderKey;
+          state.lastQuoteId = Number(quote.cotId || 0);
+        } catch (error) {
+          state.lastError = String(
+            error?.message || error || `No se pudo refrescar la cotizacion SICAR del pedido ${orderKey}.`
+          );
+        }
+      }
+    } catch (error) {
+      state.lastError = String(error?.message || error || 'No se pudieron refrescar las cotizaciones enlazadas.');
+    } finally {
+      linkedQuotesRefreshing = false;
+      state.refreshingLinkedQuotes = false;
+    }
+  };
+
+  const scheduleLinkedQuotesRefresh = (delayMs = LINKED_QUOTES_REFRESH_MS) => {
+    if (linkedQuotesRefreshTimer) {
+      clearTimeout(linkedQuotesRefreshTimer);
+    }
+
+    linkedQuotesRefreshTimer = setTimeout(() => {
+      refreshLinkedQuotes()
+        .catch(() => {})
+        .finally(() => {
+          scheduleLinkedQuotesRefresh(LINKED_QUOTES_REFRESH_MS);
+        });
+    }, Math.max(1000, Number(delayMs || LINKED_QUOTES_REFRESH_MS)));
   };
 
   const syncOrderQuote = async (orderKey, options = {}) => {
@@ -910,8 +1031,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
           await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
             status: result.missingCodes.length > 0 ? 'partial' : 'synced',
             cotId: result.quote.cotId,
-            folioMovil: result.quote.orderNumber,
-            serieMovil: result.quote.serieMovil || QUOTE_SERIE,
+            appOrderNumber: Number(result.appOrderNumber || 0),
             orderDate: result.quote.orderDate,
             subtotal: result.quote.subtotal,
             discount: result.quote.discount,
@@ -965,6 +1085,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       }
     );
     state.listening = true;
+    seedLinkedQuoteWatchesFromOrders().catch((error) => {
+      state.lastError = String(error?.message || error || 'No se pudieron preparar las cotizaciones enlazadas.');
+    });
+    scheduleLinkedQuotesRefresh(1500);
   };
 
   const stopAutoSync = () => {
@@ -974,6 +1098,12 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     queueUnsubscribe = null;
     queueListenerStarted = false;
     state.listening = false;
+    if (linkedQuotesRefreshTimer) {
+      clearTimeout(linkedQuotesRefreshTimer);
+      linkedQuotesRefreshTimer = null;
+    }
+    linkedQuotesRefreshing = false;
+    state.refreshingLinkedQuotes = false;
   };
 
   return {

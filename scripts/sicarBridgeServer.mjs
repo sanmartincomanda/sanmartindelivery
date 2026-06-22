@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
@@ -15,9 +16,15 @@ import {
   normalizeStoreSubcategory,
 } from '../src/data/storeSubcategoryRules.js';
 
+const scriptPath = fileURLToPath(import.meta.url);
+const repoRoot = resolve(scriptPath, '..', '..');
 const cwd = process.cwd();
-const localConfigPath = resolve(cwd, 'sicar.local.json');
-const localConfig = existsSync(localConfigPath)
+const localConfigCandidates = [
+  resolve(repoRoot, 'sicar.local.json'),
+  resolve(cwd, 'sicar.local.json'),
+];
+const localConfigPath = localConfigCandidates.find((candidate) => existsSync(candidate)) || '';
+const localConfig = localConfigPath
   ? JSON.parse(readFileSync(localConfigPath, 'utf8'))
   : {};
 
@@ -33,6 +40,8 @@ const bridgeConfig = {
     'C:\\Program Files (x86)\\SICAR-S-131AB\\MySQL\\MySQL Server 5.6\\bin\\mysql.exe',
   bridgePort: Number(process.env.SICAR_BRIDGE_PORT || localConfig.bridgePort || 3077),
 };
+
+const ENABLE_SICAR_QUOTE_SYNC = true;
 
 const sqlEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
@@ -151,12 +160,15 @@ const runMysqlQuery = (query) =>
       String(bridgeConfig.port),
       '-u',
       bridgeConfig.user,
-      `-p${bridgeConfig.password}`,
       '-D',
       bridgeConfig.database,
       '-e',
       query,
     ];
+
+    if (String(bridgeConfig.password || '') !== '') {
+      args.splice(args.indexOf('-D'), 0, `--password=${bridgeConfig.password}`);
+    }
 
     const child = spawn(bridgeConfig.mysqlExePath, args, {
       cwd,
@@ -176,7 +188,13 @@ const runMysqlQuery = (query) =>
 
     child.on('error', (error) => rejectPromise(error));
 
+    const queryTimeout = setTimeout(() => {
+      child.kill();
+      rejectPromise(new Error('mysql.exe excedio el tiempo de espera de 30 segundos.'));
+    }, 30000);
+
     child.on('close', (code) => {
+      clearTimeout(queryTimeout);
       if (code !== 0) {
         rejectPromise(new Error(stderr || `mysql.exe finalizo con codigo ${code}`));
         return;
@@ -601,10 +619,14 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
     return json(200, {
       ok: true,
       bridgePort: bridgeConfig.bridgePort,
+      configPath: localConfigPath || 'env-only',
+      cwd,
+      repoRoot,
       mysqlExePath: bridgeConfig.mysqlExePath,
       database: bridgeConfig.database,
       host: bridgeConfig.host,
       departments: SICAR_SYNC_DEPARTMENTS.map((entry) => entry.sicarDepartment),
+      quoteSyncEnabled: ENABLE_SICAR_QUOTE_SYNC,
       quoteSync: sicarQuoteSync.state,
     });
   }
@@ -659,6 +681,13 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
   if (requestUrl.pathname === '/api/sicar/quote') {
     if (String(request.method || '').toUpperCase() !== 'POST') {
       return json(405, { ok: false, error: 'Metodo no permitido.' });
+    }
+
+    if (!ENABLE_SICAR_QUOTE_SYNC) {
+      return json(503, {
+        ok: false,
+        error: 'La creacion de cotizaciones SICAR esta desactivada temporalmente mientras revisamos la estructura correcta.',
+      });
     }
 
     const orderKey = String(requestBody?.orderKey || '').trim();
@@ -753,5 +782,9 @@ const server = createServer(async (request, response) => {
 
 server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
-  sicarQuoteSync.initAutoSync();
+  if (ENABLE_SICAR_QUOTE_SYNC) {
+    sicarQuoteSync.initAutoSync();
+  } else {
+    console.log('Cotizaciones SICAR desactivadas temporalmente.');
+  }
 });
