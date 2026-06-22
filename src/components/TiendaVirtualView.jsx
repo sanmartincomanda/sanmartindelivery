@@ -694,7 +694,7 @@ export default function TiendaVirtualView({
   );
 
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !ordersOpen) {
       setCustomerOrders([]);
       return undefined;
     }
@@ -717,7 +717,7 @@ export default function TiendaVirtualView({
     );
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUser, ordersOpen]);
 
   useEffect(() => {
     if (!currentUser) {

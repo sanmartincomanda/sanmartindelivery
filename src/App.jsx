@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import { onValue, ref, update } from 'firebase/database';
+import { get, onValue, ref, update } from 'firebase/database';
 import { Suspense, lazy } from 'react';
 import { database } from './firebase';
 import logo from './logo.svg';
@@ -179,25 +179,39 @@ function App() {
   }, [route]);
 
   useEffect(() => {
+    if (!isKitchenRoute) {
+      return undefined;
+    }
+
     const kitchenUserRef = ref(database, `${SYSTEM_USERS_PATH}/${KITCHEN_USER_KEY}`);
     const unsubscribe = onValue(kitchenUserRef, (snapshot) => {
       setKitchenUser(normalizeKitchenUser(snapshot.val()));
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [isKitchenRoute]);
 
   useEffect(() => {
+    if (!(isPublicStoreRoute || route === 'dashboard')) {
+      return undefined;
+    }
+
     const counterRef = ref(database, `orderCounters/${todayKey}`);
     const unsubscribe = onValue(counterRef, (snapshot) => {
       setTodayCounter(Number(snapshot.val() || 0));
     });
 
     return () => unsubscribe();
-  }, [todayKey]);
+  }, [isPublicStoreRoute, route, todayKey]);
 
   useEffect(() => {
-    if (isPublicStoreRoute || isDriverRoute) {
+    const shouldSubscribeOrders =
+      !isPublicStoreRoute &&
+      !isDriverRoute &&
+      route === 'dashboard' &&
+      (view === 'ingreso' || view === 'lista' || view === 'cocina');
+
+    if (!shouldSubscribeOrders) {
       return undefined;
     }
 
@@ -254,7 +268,7 @@ function App() {
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
     };
-  }, [isDriverRoute, isPublicStoreRoute, todayKey]);
+  }, [isDriverRoute, isPublicStoreRoute, route, todayKey, view]);
 
   useEffect(() => {
     const shouldLoadClients =
@@ -268,9 +282,7 @@ function App() {
     }
 
     const clientsRef = ref(database, 'clients');
-
-    const unsubscribe = onValue(clientsRef, (snapshot) => {
-      const data = snapshot.val();
+    const applyClientsSnapshot = (data) => {
       if (!data) {
         setClientes([]);
         return;
@@ -285,6 +297,33 @@ function App() {
         String(left.nombre || '').localeCompare(String(right.nombre || ''))
       );
       setClientes(nextClients);
+    };
+
+    if (view === 'ingreso') {
+      let cancelled = false;
+
+      get(clientsRef)
+        .then((snapshot) => {
+          if (cancelled) {
+            return;
+          }
+
+          applyClientsSnapshot(snapshot.val());
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            console.error('Error cargando clientes:', error);
+            setClientes([]);
+          }
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const unsubscribe = onValue(clientsRef, (snapshot) => {
+      applyClientsSnapshot(snapshot.val());
     });
 
     return () => unsubscribe();
