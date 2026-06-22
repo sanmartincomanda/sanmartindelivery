@@ -7,6 +7,7 @@ import {
   STORE_PROMOTIONS,
 } from '../data/tiendaVirtual';
 import {
+  compareCatalogProducts,
   getProductMinQuantity,
   getProductQuantityStep,
   isUnitMeasure,
@@ -72,6 +73,40 @@ const MAP_PICKER_WIDTH = 360;
 const MAP_PICKER_HEIGHT = 260;
 const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
+
+const normalizeStorePriorityText = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+
+const STORE_ALL_PRODUCTS_PRIORITY_INDEX = new Map(
+  [
+    ['res', 'linea diaria'],
+    ['res', 'linea gold'],
+    ['res', 'linea parrillera'],
+    ['res', 'linea practica y tortas hamburguesa'],
+    ['pollo', 'pollo'],
+    ['cerdo', 'cerdo'],
+    ['abarroteria', 'basicos'],
+    ['congelados', 'mariscos'],
+    ['refrigerados', 'embutidos'],
+  ].map(([category, subcategory], index) => [
+    `${normalizeStorePriorityText(category)}::${normalizeStorePriorityText(subcategory)}`,
+    index,
+  ])
+);
+
+const getStoreAllProductsPriority = (product = {}) => {
+  const priorityKey = `${normalizeStorePriorityText(product?.category)}::${normalizeStorePriorityText(product?.subcategory)}`;
+  if (STORE_ALL_PRODUCTS_PRIORITY_INDEX.has(priorityKey)) {
+    return STORE_ALL_PRODUCTS_PRIORITY_INDEX.get(priorityKey);
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+};
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -787,7 +822,7 @@ export default function TiendaVirtualView({
   const filteredProducts = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
 
-    return activeProducts.filter((product) => {
+    const matchingProducts = activeProducts.filter((product) => {
       const matchesCategory =
         activeCategory === 'todos' ||
         (activeCategory === 'promociones' && (product.promo || product.category === 'promociones')) ||
@@ -805,6 +840,21 @@ export default function TiendaVirtualView({
           .includes(normalizedQuery);
 
       return matchesCategory && matchesSubcategory && matchesSearch;
+    });
+
+    if (activeCategory !== 'todos') {
+      return matchingProducts;
+    }
+
+    return [...matchingProducts].sort((left, right) => {
+      const priorityDifference =
+        getStoreAllProductsPriority(left) - getStoreAllProductsPriority(right);
+
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      return compareCatalogProducts(left, right);
     });
   }, [activeCategory, activeProducts, activeSubcategory, deferredQuery]);
 
