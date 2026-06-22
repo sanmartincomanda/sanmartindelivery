@@ -11,9 +11,57 @@ export const getStoreUserKey = (phone) => {
   return cleanPhone.replace(/[.#$/[\]]/g, '_');
 };
 
-const buildClientCode = (phone) => {
+const normalizeCodeText = (value = '') =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+const buildClientCodeBase = (name, phone) => {
   const digits = cleanStorePhone(phone).replace(/\D/g, '');
-  return `TV-${digits.slice(-4) || 'WEB'}`;
+  const nameToken = normalizeCodeText(name);
+  const initial = nameToken.charAt(0) || 'X';
+  return `TV-${digits.slice(-4) || 'WEB'}${initial}`;
+};
+
+const isLegacyClientCode = (code = '') => /^TV-(WEB|\d{1,4})$/i.test(String(code || '').trim());
+
+const resolveUniqueClientCode = async ({ name, phone, currentUserKey = '', currentCode = '' }) => {
+  const normalizedCurrentCode = String(currentCode || '').trim().toUpperCase();
+  if (normalizedCurrentCode && !isLegacyClientCode(normalizedCurrentCode)) {
+    return normalizedCurrentCode;
+  }
+
+  const baseCode = buildClientCodeBase(name, phone);
+  const snapshot = await get(ref(database, STORE_USERS_PATH));
+  const usedCodes = new Set();
+
+  Object.entries(snapshot.val() || {}).forEach(([userKey, value]) => {
+    if (userKey === currentUserKey) {
+      return;
+    }
+
+    const code = String(value?.codigo || '')
+      .trim()
+      .toUpperCase();
+    if (code) {
+      usedCodes.add(code);
+    }
+  });
+
+  if (!usedCodes.has(baseCode)) {
+    return baseCode;
+  }
+
+  let suffix = 2;
+  let candidate = `${baseCode}-${suffix}`;
+  while (usedCodes.has(candidate)) {
+    suffix += 1;
+    candidate = `${baseCode}-${suffix}`;
+  }
+
+  return candidate;
 };
 
 const toHex = (buffer) =>
@@ -75,13 +123,20 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
     throw error;
   }
 
+  const resolvedClientCode = await resolveUniqueClientCode({
+    name: nombre,
+    phone: cleanPhone,
+    currentUserKey: userKey,
+    currentCode: existingUser?.codigo,
+  });
+
   const profile = {
     nombre: String(nombre || '').trim(),
     telefono: cleanPhone,
     direccion: String(direccion || '').trim(),
     referencia: String(referencia || '').trim(),
     ubicacion: normalizedLocation,
-    codigo: existingUser?.codigo || buildClientCode(cleanPhone),
+    codigo: resolvedClientCode,
     updatedAt: now,
   };
 
