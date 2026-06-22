@@ -21,6 +21,7 @@ import {
 import {
   calculateCouponDiscount,
   mergeStoreCoupons,
+  normalizeCouponUsageLimit,
   normalizeCouponCode,
   STORE_COUPONS_PATH,
 } from '../services/storeCoupons';
@@ -122,6 +123,10 @@ const getStoreAllProductsPriority = (product = {}) => {
 };
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+const isCanceledOrderStatus = (status) => {
+  const normalized = normalizeStorePriorityText(status);
+  return normalized.includes('cancel') || normalized.includes('anulad');
+};
 
 const getInitialCatalogState = () => {
   const cachedCatalog = unwrapStoreCache(
@@ -567,6 +572,8 @@ export default function TiendaVirtualView({
   const [authPromptDismissed, setAuthPromptDismissed] = useState(() => Boolean(currentUser));
   const [pendingAuthIntent, setPendingAuthIntent] = useState('');
   const [customerOrders, setCustomerOrders] = useState([]);
+  const [couponHistoryOrders, setCouponHistoryOrders] = useState([]);
+  const [couponHistoryReady, setCouponHistoryReady] = useState(false);
   const [customer, setCustomer] = useState({
     nombre: '',
     telefono: '',
@@ -792,6 +799,39 @@ export default function TiendaVirtualView({
 
   useEffect(() => {
     if (!currentUser) {
+      setCouponHistoryOrders([]);
+      setCouponHistoryReady(true);
+      return undefined;
+    }
+
+    const cleanUserKey = String(currentUser.key || '').trim();
+    if (!cleanUserKey) {
+      setCouponHistoryOrders([]);
+      setCouponHistoryReady(true);
+      return undefined;
+    }
+
+    setCouponHistoryReady(false);
+
+    const unsubscribe = subscribeOrdersForStoreUser(
+      cleanUserKey,
+      (orders) => {
+        setCouponHistoryOrders(orders);
+        setCouponHistoryReady(true);
+      },
+      (error) => {
+        console.error('No se pudo cargar el historial de cupones del cliente:', error);
+        setCouponHistoryOrders([]);
+        setCouponHistoryReady(true);
+      },
+      0
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
       return;
     }
 
@@ -1011,6 +1051,49 @@ export default function TiendaVirtualView({
     [appliedCoupon, totalAmount]
   );
 
+  const couponUsageByCode = useMemo(() => {
+    const counts = {};
+
+    couponHistoryOrders.forEach((order) => {
+      if (isCanceledOrderStatus(order?.estado)) {
+        return;
+      }
+
+      const code = normalizeCouponCode(order?.cupon?.code);
+      if (!code) {
+        return;
+      }
+
+      counts[code] = Number(counts[code] || 0) + 1;
+    });
+
+    return counts;
+  }, [couponHistoryOrders]);
+
+  const getCouponUsageMessage = (coupon) => {
+    const limit = normalizeCouponUsageLimit(coupon?.maxUsesPerUser || 0);
+    if (limit <= 0) {
+      return '';
+    }
+
+    if (!currentUser?.key) {
+      return 'Inicia sesion para usar este cupon.';
+    }
+
+    if (!couponHistoryReady) {
+      return 'Estamos revisando tus cupones. Intenta nuevamente en unos segundos.';
+    }
+
+    const usedCount = Number(couponUsageByCode[normalizeCouponCode(coupon?.code)] || 0);
+    if (usedCount < limit) {
+      return '';
+    }
+
+    return limit === 1
+      ? 'Este cupon ya fue utilizado en tu cuenta.'
+      : `Este cupon ya alcanzo su limite de ${limit} usos en tu cuenta.`;
+  };
+
   const approximateTotalAmount = useMemo(
     () => Number(Math.max(totalAmount - couponDiscount, 0).toFixed(2)),
     [couponDiscount, totalAmount]
@@ -1106,10 +1189,17 @@ export default function TiendaVirtualView({
       return;
     }
 
+    const usageMessage = getCouponUsageMessage(refreshedCoupon);
+    if (usageMessage) {
+      setAppliedCoupon(null);
+      setCouponMessage(usageMessage);
+      return;
+    }
+
     if (JSON.stringify(refreshedCoupon) !== JSON.stringify(appliedCoupon)) {
       setAppliedCoupon(refreshedCoupon);
     }
-  }, [appliedCoupon, coupons]);
+  }, [appliedCoupon, coupons, couponHistoryReady, couponUsageByCode, currentUser]);
 
   useEffect(() => {
     if (!appliedCoupon) {
@@ -1182,6 +1272,13 @@ export default function TiendaVirtualView({
     if (coupon.minimum > 0 && totalAmount < coupon.minimum) {
       setAppliedCoupon(null);
       setCouponMessage(`Este cupon aplica desde ${formatCurrency(coupon.minimum)}.`);
+      return;
+    }
+
+    const usageMessage = getCouponUsageMessage(coupon);
+    if (usageMessage) {
+      setAppliedCoupon(null);
+      setCouponMessage(usageMessage);
       return;
     }
 
@@ -1529,6 +1626,16 @@ export default function TiendaVirtualView({
       return;
     }
 
+    if (appliedCoupon) {
+      const usageMessage = getCouponUsageMessage(appliedCoupon);
+      if (usageMessage) {
+        setAppliedCoupon(null);
+        setCouponMessage(usageMessage);
+        alert(usageMessage);
+        return;
+      }
+    }
+
     const whatsappLink = `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
       buildGuestCartWhatsAppMessage({
         customer,
@@ -1571,6 +1678,16 @@ export default function TiendaVirtualView({
       return;
     }
 
+    if (appliedCoupon) {
+      const usageMessage = getCouponUsageMessage(appliedCoupon);
+      if (usageMessage) {
+        setAppliedCoupon(null);
+        setCouponMessage(usageMessage);
+        alert(usageMessage);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -1597,6 +1714,7 @@ export default function TiendaVirtualView({
                 title: appliedCoupon.title,
                 type: appliedCoupon.type,
                 value: appliedCoupon.value,
+                maxUsesPerUser: appliedCoupon.maxUsesPerUser || 0,
               }
             : null,
           total: approximateTotalAmount,

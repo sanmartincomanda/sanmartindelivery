@@ -201,19 +201,21 @@ export const subscribeOrdersForDate = (date, onData, onError) =>
 
 export const subscribeOrdersForStoreUser = (userKey, onData, onError, limit = 10) => {
   const cleanUserKey = String(userKey || '').trim();
+  const limitNumber = Number(limit || 0);
 
   if (!cleanUserKey) {
     onData([]);
     return () => {};
   }
 
+  const baseQuery = query(
+    ref(database, 'orders'),
+    orderByChild('storeUserKey'),
+    equalTo(cleanUserKey)
+  );
+
   return onValue(
-    query(
-      ref(database, 'orders'),
-      orderByChild('storeUserKey'),
-      equalTo(cleanUserKey),
-      limitToLast(Math.max(1, Number(limit || 10)))
-    ),
+    limitNumber > 0 ? query(baseQuery, limitToLast(Math.max(1, limitNumber))) : baseQuery,
     (snapshot) => {
       const orders = mapOrdersSnapshot(snapshot).sort((left, right) => Number(right.timestamp || 0) - Number(left.timestamp || 0));
       onData(orders);
@@ -304,6 +306,7 @@ export async function createOrder(payload, options = {}) {
         title: String(payload.cupon.title || '').trim(),
         type: String(payload.cupon.type || '').trim(),
         value: Number(payload.cupon.value || 0),
+        maxUsesPerUser: Math.max(0, Math.trunc(Number(payload.cupon.maxUsesPerUser || 0))),
       }
     : null;
 

@@ -11,6 +11,9 @@
     "clients": {
       ".indexOn": ["codigo", "telefono"]
     },
+    "storeUsers": {
+      ".indexOn": ["updatedAt", "codigo", "telefono"]
+    },
     "storeCatalogMeta": {
       ".read": true
     }

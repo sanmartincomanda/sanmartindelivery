@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createSicarClientSyncManager } from './sicarClientSync.mjs';
 import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
@@ -211,6 +212,11 @@ const runMysqlQuery = (query) =>
 const sicarQuoteSync = createSicarQuoteSyncManager({
   runMysqlQuery,
   sqlEscape,
+});
+
+const sicarClientSync = createSicarClientSyncManager({
+  runMysqlQuery,
+  repoRoot,
 });
 
 const getOverallQuantityTotal = async (startDate, endExclusiveDate) => {
@@ -628,6 +634,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       departments: SICAR_SYNC_DEPARTMENTS.map((entry) => entry.sicarDepartment),
       quoteSyncEnabled: ENABLE_SICAR_QUOTE_SYNC,
       quoteSync: sicarQuoteSync.state,
+      clientSync: sicarClientSync.state,
     });
   }
 
@@ -782,6 +789,7 @@ const server = createServer(async (request, response) => {
 
 server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
+  sicarClientSync.initAutoSync();
   if (ENABLE_SICAR_QUOTE_SYNC) {
     sicarQuoteSync.initAutoSync();
   } else {

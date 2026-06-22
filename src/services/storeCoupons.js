@@ -14,6 +14,11 @@ export const normalizeCouponCode = sanitizeCouponCode;
 export const getStoreCouponKey = (code) =>
   sanitizeCouponCode(code).replace(/[.#$/[\]]/g, '_');
 
+export const normalizeCouponUsageLimit = (value) => {
+  const numeric = Math.trunc(Number(value || 0));
+  return Number.isFinite(numeric) ? Math.max(numeric, 0) : 0;
+};
+
 export const normalizeStoreCoupon = (coupon = {}, fallback = {}) => {
   const source = coupon || {};
   const backup = fallback || {};
@@ -26,6 +31,7 @@ export const normalizeStoreCoupon = (coupon = {}, fallback = {}) => {
     type,
     value: Number(source.value ?? backup.value ?? 0),
     minimum: Number(source.minimum ?? backup.minimum ?? 0),
+    maxUsesPerUser: normalizeCouponUsageLimit(source.maxUsesPerUser ?? backup.maxUsesPerUser ?? 0),
     active: source.active ?? backup.active ?? true,
     notes: String(source.notes ?? backup.notes ?? '').trim(),
   };

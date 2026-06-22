@@ -130,6 +130,7 @@ const emptyCoupon = {
   type: 'percent',
   value: '',
   minimum: '',
+  maxUsesPerUser: '',
   active: true,
   notes: '',
 };
@@ -799,6 +800,7 @@ export default function ConfiguracionView() {
       type: coupon.type || 'percent',
       value: coupon.value ?? '',
       minimum: coupon.minimum ?? '',
+      maxUsesPerUser: coupon.maxUsesPerUser ?? '',
       active: coupon.active !== false,
       notes: coupon.notes || '',
     });
@@ -1014,6 +1016,7 @@ export default function ConfiguracionView() {
         ...couponForm,
         value: Number(couponForm.value || 0),
         minimum: Number(couponForm.minimum || 0),
+        maxUsesPerUser: Math.max(0, Math.trunc(Number(couponForm.maxUsesPerUser || 0))),
       });
       setCouponForm(emptyCoupon);
       setMessage('Cupon guardado.');
@@ -3207,6 +3210,14 @@ function CouponsManager({
 }) {
   const formatCouponValue = (coupon) =>
     coupon.type === 'amount' ? `C$ ${Number(coupon.value || 0).toFixed(2)}` : `${Number(coupon.value || 0)}%`;
+  const formatCouponUsageLimit = (coupon) => {
+    const limit = Math.max(0, Math.trunc(Number(coupon.maxUsesPerUser || 0)));
+    if (limit <= 0) {
+      return 'Sin limite por usuario';
+    }
+
+    return limit === 1 ? '1 uso por usuario' : `${limit} usos por usuario`;
+  };
 
   if (!couponsUnlocked) {
     return (
@@ -3306,6 +3317,7 @@ function CouponsManager({
                   </div>
                   <div style={{ color: '#94a3b8', marginTop: 4, fontSize: 13 }}>
                     Minimo: C$ {Number(coupon.minimum || 0).toFixed(2)}
+                    {` | ${formatCouponUsageLimit(coupon)}`}
                     {coupon.notes ? ` | ${coupon.notes}` : ''}
                   </div>
                   <div style={{ marginTop: 8 }}>
@@ -3390,6 +3402,15 @@ function CouponsManager({
             placeholder="Minimo de compra"
           />
         </div>
+        <input
+          className="cfg-input"
+          type="number"
+          min="0"
+          step="1"
+          value={couponForm.maxUsesPerUser}
+          onChange={(event) => updateCouponForm('maxUsesPerUser', event.target.value)}
+          placeholder="Usos maximos por usuario (0 = sin limite)"
+        />
         <textarea
           className="cfg-textarea"
           value={couponForm.notes}

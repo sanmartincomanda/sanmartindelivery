@@ -13,6 +13,8 @@ const FIREBASE_CONFIG = {
 
 const STORE_CHANNEL = 'tienda_virtual';
 const STORE_ORDERS_PATH = 'orders';
+const CLIENTS_PATH = 'clients';
+const STORE_USERS_PATH = 'storeUsers';
 const QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
 const LINKED_QUOTES_PATH = 'sicarLinkedQuotes';
 const LINKED_QUOTES_REFRESH_MS = 5000;
@@ -23,6 +25,7 @@ const DEFAULT_CURRENCY_ID = 1;
 const DEFAULT_CURRENCY_ABBR = 'NIO';
 const DEFAULT_CURRENCY_EXCHANGE = 1;
 const DEFAULT_ZERO_TAX_IMP_ID = 4;
+const STORE_CUSTOMER_COMMENT = 'Cliente tienda virtual';
 
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 const roundQuantity = (value) => Number(Number(value || 0).toFixed(3));
@@ -31,6 +34,28 @@ const truncateMoney = (value) => Math.trunc(Number(value || 0) * 100) / 100;
 const formatMoney = (value) => roundMoney(value).toFixed(2);
 const formatQuantity = (value) => roundQuantity(value).toFixed(3);
 const formatRate = (value) => roundRate(value).toFixed(6);
+const normalizeText = (value = '') =>
+  String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+const normalizeCode = (value = '') => String(value ?? '').trim();
+const normalizeEmail = (value = '') => String(value ?? '').trim().toLowerCase();
+const normalizePhone = (value = '') => String(value ?? '').replace(/[^\d+]/g, '').trim();
+const toComparableValue = (value) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+};
 
 const formatWeightLabel = (value) => {
   const numeric = Number(value || 0);
@@ -299,6 +324,360 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     return value ? { firebaseKey: orderKey, ...value } : null;
   };
 
+  const getFirebaseClientRecord = async (clientKey = '') => {
+    const cleanKey = normalizeCode(clientKey);
+    if (!cleanKey) {
+      return null;
+    }
+
+    const snapshot = await get(ref(database, `${CLIENTS_PATH}/${cleanKey}`));
+    const value = snapshot.val();
+    return value ? { firebaseKey: cleanKey, ...value } : null;
+  };
+
+  const getStoreUserRecord = async (storeUserKey = '') => {
+    const cleanKey = normalizeCode(storeUserKey);
+    if (!cleanKey) {
+      return null;
+    }
+
+    const snapshot = await get(ref(database, `${STORE_USERS_PATH}/${cleanKey}`));
+    const value = snapshot.val();
+    return value ? { firebaseKey: cleanKey, ...value } : null;
+  };
+
+  const buildStoreUserFullAddress = (storeUser = {}) => {
+    const baseAddress = normalizeText(storeUser?.direccion);
+    const reference = normalizeText(storeUser?.referencia);
+    return reference ? `${baseAddress} | Ref: ${reference}` : baseAddress;
+  };
+
+  const parseSicarCustomerRow = (line = '') => {
+    const parts = String(line || '').split('\t');
+    return {
+      cliId: Number(parts[0] || 0),
+      clave: normalizeCode(parts[1]),
+      name: normalizeText(parts[2]),
+      address: normalizeText(parts[3]),
+      phone: normalizeText(parts[4]),
+      mobile: normalizeText(parts[5]),
+      email: normalizeEmail(parts[6]),
+      rfc: normalizeText(parts[7]),
+      status: Number(parts[8] || 0),
+    };
+  };
+
+  const getSicarCustomerById = async (cliId) => {
+    const cleanCliId = Number(cliId || 0);
+    if (cleanCliId <= 0) {
+      return null;
+    }
+
+    const rows = await runMysqlQuery(`
+      SELECT
+        cli_id,
+        COALESCE(clave, ''),
+        COALESCE(nombre, ''),
+        COALESCE(domicilio, ''),
+        COALESCE(telefono, ''),
+        COALESCE(celular, ''),
+        COALESCE(mail, ''),
+        COALESCE(rfc, ''),
+        COALESCE(status, 0)
+      FROM cliente
+      WHERE cli_id = ${cleanCliId}
+      LIMIT 1;
+    `);
+
+    return rows.length > 0 ? parseSicarCustomerRow(rows[0]) : null;
+  };
+
+  const getSicarCustomerByClave = async (clave = '') => {
+    const cleanClave = normalizeCode(clave);
+    if (!cleanClave) {
+      return null;
+    }
+
+    const rows = await runMysqlQuery(`
+      SELECT
+        cli_id,
+        COALESCE(clave, ''),
+        COALESCE(nombre, ''),
+        COALESCE(domicilio, ''),
+        COALESCE(telefono, ''),
+        COALESCE(celular, ''),
+        COALESCE(mail, ''),
+        COALESCE(rfc, ''),
+        COALESCE(status, 0)
+      FROM cliente
+      WHERE clave = ${escapeSqlText(cleanClave, sqlEscape)}
+      LIMIT 1;
+    `);
+
+    return rows.length > 0 ? parseSicarCustomerRow(rows[0]) : null;
+  };
+
+  const getActiveSicarCustomerByPhone = async (phone = '') => {
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone) {
+      return null;
+    }
+
+    const rows = await runMysqlQuery(`
+      SELECT
+        cli_id,
+        COALESCE(clave, ''),
+        COALESCE(nombre, ''),
+        COALESCE(domicilio, ''),
+        COALESCE(telefono, ''),
+        COALESCE(celular, ''),
+        COALESCE(mail, ''),
+        COALESCE(rfc, ''),
+        COALESCE(status, 0)
+      FROM cliente
+      WHERE status = 1
+        AND (
+          REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono, ''), ' ', ''), '-', ''), '(', ''), ')', '') = ${escapeSqlText(cleanPhone, sqlEscape)}
+          OR REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(celular, ''), ' ', ''), '-', ''), '(', ''), ')', '') = ${escapeSqlText(cleanPhone, sqlEscape)}
+        )
+      ORDER BY cli_id ASC
+      LIMIT 1;
+    `);
+
+    return rows.length > 0 ? parseSicarCustomerRow(rows[0]) : null;
+  };
+
+  const buildDesiredSicarCustomer = (order = {}, firebaseClient = null, storeUser = null) => {
+    const orderAddress = normalizeText(order?.direccion);
+    const profileAddress = buildStoreUserFullAddress(storeUser) || normalizeText(firebaseClient?.direccion);
+    const preferredAddress = profileAddress || orderAddress || '-';
+
+    return {
+      firebaseClientKey: normalizeCode(order?.clienteFirebaseKey),
+      storeUserKey: normalizeCode(order?.storeUserKey),
+      code: normalizeCode(order?.clienteCodigo || storeUser?.codigo || firebaseClient?.codigo),
+      name: normalizeText(order?.cliente || storeUser?.nombre || firebaseClient?.nombre),
+      address: preferredAddress,
+      phone: normalizePhone(order?.telefono || storeUser?.telefono || firebaseClient?.telefono || firebaseClient?.celular),
+      email: normalizeEmail(storeUser?.mail || storeUser?.email || firebaseClient?.mail || firebaseClient?.email),
+      linkedCliId:
+        Number(storeUser?.sicarCliId || 0) ||
+        Number(firebaseClient?.sicarCliId || 0) ||
+        Number(order?.sicarQuote?.cliId || 0),
+      shouldOverwriteAddress: normalizeText(order?.deliveryMode) !== 'otra',
+    };
+  };
+
+  const createSicarCustomer = async (customer = {}) => {
+    const rows = await runMysqlQuery(`
+      START TRANSACTION;
+      INSERT INTO cliente (
+        nombre,
+        domicilio,
+        noExt,
+        noInt,
+        localidad,
+        ciudad,
+        estado,
+        pais,
+        codigoPostal,
+        colonia,
+        rfc,
+        curp,
+        telefono,
+        celular,
+        mail,
+        comentario,
+        status,
+        limite,
+        precio,
+        diasCredito,
+        retener,
+        desglosarIEPS,
+        notificar,
+        clave
+      ) VALUES (
+        ${escapeSqlText(customer.name || 'Cliente tienda virtual', sqlEscape)},
+        ${escapeSqlText(customer.address || '-', sqlEscape)},
+        '',
+        '',
+        '',
+        '',
+        '',
+        'NICARAGUA',
+        '',
+        '',
+        '',
+        '',
+        ${escapeSqlText(customer.phone || '', sqlEscape)},
+        ${escapeSqlText(customer.phone || '', sqlEscape)},
+        ${escapeSqlText(customer.email || '', sqlEscape)},
+        ${escapeSqlText(STORE_CUSTOMER_COMMENT, sqlEscape)},
+        1,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        ${customer.code ? escapeSqlText(customer.code, sqlEscape) : 'NULL'}
+      );
+      SELECT LAST_INSERT_ID();
+      COMMIT;
+    `);
+
+    const insertedId = Number(rows[rows.length - 1] || 0);
+    if (insertedId <= 0) {
+      throw new Error('No se pudo crear el cliente en SICAR antes de generar la cotizacion.');
+    }
+
+    const inserted = await getSicarCustomerById(insertedId);
+    if (!inserted?.cliId) {
+      throw new Error('SICAR no devolvio el cliente creado para la cotizacion.');
+    }
+
+    return {
+      ...inserted,
+      created: true,
+      matchedBy: 'created',
+    };
+  };
+
+  const updateSicarCustomer = async (existingCustomer = {}, desiredCustomer = {}) => {
+    const nextAddress =
+      desiredCustomer.shouldOverwriteAddress || !normalizeText(existingCustomer?.address)
+        ? desiredCustomer.address || existingCustomer?.address || '-'
+        : existingCustomer?.address || '-';
+
+    const desiredPatch = {
+      nombre: desiredCustomer.name || existingCustomer?.name || 'Cliente tienda virtual',
+      domicilio: nextAddress,
+      telefono: desiredCustomer.phone || existingCustomer?.phone || '',
+      celular: desiredCustomer.phone || existingCustomer?.mobile || '',
+      mail: desiredCustomer.email || existingCustomer?.email || '',
+      comentario: STORE_CUSTOMER_COMMENT,
+      status: 1,
+      notificar: 1,
+      clave: desiredCustomer.code || existingCustomer?.clave || '',
+    };
+
+    const comparableExisting = {
+      nombre: normalizeText(existingCustomer?.name),
+      domicilio: normalizeText(existingCustomer?.address),
+      telefono: normalizeText(existingCustomer?.phone),
+      celular: normalizeText(existingCustomer?.mobile),
+      mail: normalizeEmail(existingCustomer?.email),
+      comentario: STORE_CUSTOMER_COMMENT,
+      status: Number(existingCustomer?.status || 0),
+      notificar: 1,
+      clave: normalizeCode(existingCustomer?.clave),
+    };
+
+    const changedFields = Object.entries(desiredPatch).filter(([field, value]) => {
+      if (field === 'clave' && !value) {
+        return false;
+      }
+      return toComparableValue(comparableExisting[field]) !== toComparableValue(value);
+    });
+
+    if (changedFields.length === 0) {
+      return {
+        ...existingCustomer,
+        created: false,
+        matchedBy: 'existing',
+      };
+    }
+
+    const assignments = changedFields
+      .map(([field, value]) =>
+        `${field} = ${typeof value === 'number' ? Number(value) : escapeSqlText(value, sqlEscape)}`
+      )
+      .join(', ');
+
+    await runMysqlQuery(`
+      UPDATE cliente
+      SET ${assignments}
+      WHERE cli_id = ${Number(existingCustomer.cliId || 0)}
+      LIMIT 1;
+    `);
+
+    const refreshed = await getSicarCustomerById(existingCustomer.cliId);
+    return {
+      ...(refreshed || existingCustomer),
+      created: false,
+      matchedBy: 'existing',
+    };
+  };
+
+  const syncCustomerLinksToFirebase = async (orderKey, order = {}, sicarCustomer = {}) => {
+    if (!orderKey || !sicarCustomer?.cliId) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const rootUpdates = {
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/cliId`]: Number(sicarCustomer.cliId || 0),
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/clientCode`]: normalizeCode(sicarCustomer.clave),
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/clientName`]: normalizeText(sicarCustomer.name),
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/customerLinkedAt`]: nowIso,
+    };
+
+    if (order?.storeUserKey) {
+      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
+      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
+      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
+      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarLastSyncedAt`] = nowIso;
+    }
+
+    if (order?.clienteFirebaseKey) {
+      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
+      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
+      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
+      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarLastSyncedAt`] = nowIso;
+    }
+
+    await update(ref(database), rootUpdates);
+  };
+
+  const ensureSicarCustomerForOrder = async (orderKey, order = {}) => {
+    const [firebaseClient, storeUser] = await Promise.all([
+      getFirebaseClientRecord(order?.clienteFirebaseKey),
+      getStoreUserRecord(order?.storeUserKey),
+    ]);
+
+    const desiredCustomer = buildDesiredSicarCustomer(order, firebaseClient, storeUser);
+    if (!desiredCustomer.name) {
+      throw new Error('Falta el nombre del cliente para crear la cotizacion SICAR.');
+    }
+
+    let existingCustomer = null;
+
+    if (desiredCustomer.linkedCliId > 0) {
+      existingCustomer = await getSicarCustomerById(desiredCustomer.linkedCliId);
+    }
+
+    if (!existingCustomer && desiredCustomer.code) {
+      if (/^\d+$/.test(desiredCustomer.code)) {
+        existingCustomer = await getSicarCustomerById(desiredCustomer.code);
+      }
+
+      if (!existingCustomer) {
+        existingCustomer = await getSicarCustomerByClave(desiredCustomer.code);
+      }
+    }
+
+    if (!existingCustomer && desiredCustomer.phone) {
+      existingCustomer = await getActiveSicarCustomerByPhone(desiredCustomer.phone);
+    }
+
+    const sicarCustomer = existingCustomer
+      ? await updateSicarCustomer(existingCustomer, desiredCustomer)
+      : await createSicarCustomer(desiredCustomer);
+
+    await syncCustomerLinksToFirebase(orderKey, order, sicarCustomer);
+    return sicarCustomer;
+  };
+
   const getQuoteByOrderReference = async (order = {}) => {
     const explicitQuoteId = Number(order?.sicarQuote?.cotId || 0);
     if (explicitQuoteId > 0) {
@@ -512,9 +891,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     };
   };
 
-  const insertQuoteDraft = async (order = {}, draft = {}) => {
+  const insertQuoteDraft = async (order = {}, draft = {}, sicarCustomer = null) => {
     const header = '';
     const footer = '';
+    const targetCliId = Number(sicarCustomer?.cliId || DEFAULT_CLIENT_ID || 1);
 
     const detailValues = draft.detailItems.map((item) => `
       (
@@ -638,7 +1018,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         NULL,
         NULL,
         ${DEFAULT_USER_ID},
-        ${DEFAULT_CLIENT_ID},
+        ${targetCliId},
         ${DEFAULT_CURRENCY_ID},
         ${DEFAULT_VENDOR_ID}
       );
@@ -700,6 +1080,21 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       cotId,
       missingCodes: draft.missingCodes || [],
     };
+  };
+
+  const assignCustomerToQuote = async (quoteId, sicarCustomer = {}) => {
+    const cleanQuoteId = Number(quoteId || 0);
+    const cleanCliId = Number(sicarCustomer?.cliId || 0);
+    if (cleanQuoteId <= 0 || cleanCliId <= 0) {
+      return;
+    }
+
+    await runMysqlQuery(`
+      UPDATE cotizacion
+      SET cli_id = ${cleanCliId}
+      WHERE cot_id = ${cleanQuoteId}
+        AND cli_id <> ${cleanCliId};
+    `);
   };
 
   const getQuoteSnapshot = async (quoteReference = {}) => {
@@ -774,7 +1169,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     };
   };
 
-  const buildFirebaseOrderPatchFromQuote = (order = {}, quote = {}, missingCodes = []) => {
+  const buildFirebaseOrderPatchFromQuote = (order = {}, quote = {}, missingCodes = [], sicarCustomer = null) => {
     const existingItemsByCode = new Map(
       normalizeOrderItems(order.items).map((item) => [item.code, item])
     );
@@ -816,6 +1211,9 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         cotId: quote.cotId,
         appOrderNumber: Number(order.id || 0),
         orderDate: quote.orderDate,
+        cliId: Number(sicarCustomer?.cliId || order?.sicarQuote?.cliId || 0),
+        clientCode: normalizeCode(sicarCustomer?.clave || order?.sicarQuote?.clientCode || ''),
+        clientName: normalizeText(sicarCustomer?.name || order?.cliente || ''),
         subtotal: quote.subtotal,
         discount: quote.discount,
         total: quote.total,
@@ -838,18 +1236,20 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       throw new Error('Solo los pedidos de tienda virtual pueden sincronizar cotizaciones SICAR.');
     }
 
+    const sicarCustomer = await ensureSicarCustomerForOrder(orderKey, order);
     let quoteReference = await getQuoteByOrderReference(order);
     let missingCodes = [];
     let createdQuote = false;
 
     if (!quoteReference) {
       const draft = await buildQuoteDraft(order);
-      const created = await insertQuoteDraft(order, draft);
+      const created = await insertQuoteDraft(order, draft, sicarCustomer);
       createdQuote = true;
       missingCodes = Array.isArray(created.missingCodes) ? created.missingCodes : [];
       quoteReference = { cotId: created.cotId };
     } else {
       missingCodes = Array.isArray(order?.sicarQuote?.missingCodes) ? order.sicarQuote.missingCodes : [];
+      await assignCustomerToQuote(quoteReference.cotId, sicarCustomer);
     }
 
     if (!quoteReference?.cotId) {
@@ -863,6 +1263,9 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       cotId: quote.cotId,
       appOrderNumber: Number(order.id || 0),
       orderDate: quote.orderDate,
+      cliId: Number(sicarCustomer?.cliId || 0),
+      clientCode: normalizeCode(sicarCustomer?.clave),
+      clientName: normalizeText(sicarCustomer?.name || order?.cliente),
       subtotal: quote.subtotal,
       discount: quote.discount,
       total: quote.total,
@@ -872,7 +1275,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     };
 
     if (applyToFirebase) {
-      const orderPatch = buildFirebaseOrderPatchFromQuote(order, quote, missingCodes);
+      const orderPatch = buildFirebaseOrderPatchFromQuote(order, quote, missingCodes, sicarCustomer);
       await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
       await syncLinkedQuoteWatch(orderKey, order, quote, { applyToFirebase: true });
     } else {
@@ -888,6 +1291,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       createdQuote,
       quote,
       missingCodes,
+      sicarCustomer,
       whatsappMessage: buildCustomerQuoteMessage(order, quote),
       customerPhone: String(order.telefono || '').trim(),
       customerName: String(order.cliente || '').trim(),
