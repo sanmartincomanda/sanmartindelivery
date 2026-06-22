@@ -82,6 +82,7 @@ const MAP_PICKER_WIDTH = 360;
 const MAP_PICKER_HEIGHT = 260;
 const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
+const STORE_GROUP_PAGE_SIZE = 5;
 
 const normalizeStorePriorityText = (value) =>
   String(value || '')
@@ -121,6 +122,21 @@ const getStoreAllProductsPriority = (product = {}) => {
   }
 
   return Number.MAX_SAFE_INTEGER;
+};
+
+const getStoreGeneralCatalogTailPriority = (product = {}) => {
+  const normalizedCategory = normalizeStorePriorityText(product?.category);
+  const normalizedSubcategory = normalizeStorePriorityText(product?.subcategory);
+
+  if (normalizedCategory === 'res' && normalizedSubcategory === 'productos industriales') {
+    return 2;
+  }
+
+  if (normalizedSubcategory.includes('otros')) {
+    return 1;
+  }
+
+  return 0;
 };
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
@@ -590,6 +606,7 @@ export default function TiendaVirtualView({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
+  const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const quantityNoticeTimeoutRef = useRef(null);
 
   const deferredQuery = useDeferredValue(query);
@@ -1018,6 +1035,13 @@ export default function TiendaVirtualView({
         return priorityDifference;
       }
 
+      const tailPriorityDifference =
+        getStoreGeneralCatalogTailPriority(left) - getStoreGeneralCatalogTailPriority(right);
+
+      if (tailPriorityDifference !== 0) {
+        return tailPriorityDifference;
+      }
+
       return compareCatalogProducts(left, right);
     });
   }, [activeCategory, activeProducts, activeSubcategory, deferredQuery]);
@@ -1056,8 +1080,8 @@ export default function TiendaVirtualView({
     if (remainingProducts.length > 0) {
       sections.push({
         id: 'otros-productos',
-        title: 'Todo lo demas',
-        kicker: 'Catalogo general',
+        title: 'Catalogo general',
+        kicker: 'Todo lo demas',
         subtitle: `${remainingProducts.length} productos`,
         products: remainingProducts,
       });
@@ -1065,6 +1089,27 @@ export default function TiendaVirtualView({
 
     return sections;
   }, [activeCategory, filteredProducts]);
+
+  useEffect(() => {
+    if (activeCategory !== 'todos') {
+      setGroupVisibleCounts({});
+      return;
+    }
+
+    setGroupVisibleCounts((current) => {
+      const next = {};
+
+      groupedAllProductsSections.forEach((section) => {
+        const currentVisible = Number(current[section.id] || STORE_GROUP_PAGE_SIZE);
+        next[section.id] = Math.max(
+          STORE_GROUP_PAGE_SIZE,
+          Math.min(currentVisible, section.products.length)
+        );
+      });
+
+      return next;
+    });
+  }, [activeCategory, groupedAllProductsSections]);
 
   const cartItems = useMemo(
     () =>
@@ -2617,6 +2662,14 @@ export default function TiendaVirtualView({
           letter-spacing: 0.08em;
           white-space: nowrap;
         }
+        .store-product-group-footer {
+          display: flex;
+          justify-content: center;
+          margin-top: 14px;
+        }
+        .store-product-group-more {
+          min-width: 190px;
+        }
         .store-count {
           margin: 0;
           font-size: 26px;
@@ -3896,6 +3949,10 @@ export default function TiendaVirtualView({
             font-size: 11px;
             white-space: normal;
           }
+          .store-product-group-more {
+            width: 100%;
+            min-width: 0;
+          }
           .store-add {
             top: 10px;
             right: 6px;
@@ -4207,20 +4264,48 @@ export default function TiendaVirtualView({
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
           ) : activeCategory === 'todos' ? (
             <div className="store-grouped-sections">
-              {groupedAllProductsSections.map((section) => (
-                <section key={section.id} className="store-product-group">
-                  <div className="store-product-group-head">
-                    <div>
-                      <span className="store-product-group-kicker">{section.kicker}</span>
-                      <h3 className="store-product-group-title">{section.title}</h3>
+              {groupedAllProductsSections.map((section) => {
+                const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
+                const visibleProducts = section.products.slice(0, visibleCount);
+                const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
+                const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
+
+                return (
+                  <section key={section.id} className="store-product-group">
+                    <div className="store-product-group-head">
+                      <div>
+                        <span className="store-product-group-kicker">{section.kicker}</span>
+                        <h3 className="store-product-group-title">{section.title}</h3>
+                      </div>
+                      <span className="store-product-group-meta">
+                        {visibleProducts.length} de {section.products.length} productos
+                      </span>
                     </div>
-                    <span className="store-product-group-meta">{section.subtitle}</span>
-                  </div>
-                  <div className="store-grid">
-                    {section.products.map((product) => renderStoreProductTile(product))}
-                  </div>
-                </section>
-              ))}
+                    <div className="store-grid">
+                      {visibleProducts.map((product) => renderStoreProductTile(product))}
+                    </div>
+                    {remainingCount > 0 && (
+                      <div className="store-product-group-footer">
+                        <button
+                          type="button"
+                          className="store-button secondary store-product-group-more"
+                          onClick={() =>
+                            setGroupVisibleCounts((current) => ({
+                              ...current,
+                              [section.id]: Math.min(
+                                Number(current[section.id] || STORE_GROUP_PAGE_SIZE) + STORE_GROUP_PAGE_SIZE,
+                                section.products.length
+                              ),
+                            }))
+                          }
+                        >
+                          Mostrar {nextBatchSize} mas
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           ) : (
             <div className="store-grid">
