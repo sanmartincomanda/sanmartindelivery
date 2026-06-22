@@ -65,6 +65,7 @@ import {
   formatWeight,
   STORE_CHANNEL,
 } from '../services/orders';
+import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
@@ -574,6 +575,8 @@ export default function TiendaVirtualView({
   const [customerOrders, setCustomerOrders] = useState([]);
   const [couponHistoryOrders, setCouponHistoryOrders] = useState([]);
   const [couponHistoryReady, setCouponHistoryReady] = useState(false);
+  const [archivedCouponUsage, setArchivedCouponUsage] = useState({});
+  const [archivedCouponUsageReady, setArchivedCouponUsageReady] = useState(false);
   const [customer, setCustomer] = useState({
     nombre: '',
     telefono: '',
@@ -801,6 +804,8 @@ export default function TiendaVirtualView({
     if (!currentUser) {
       setCouponHistoryOrders([]);
       setCouponHistoryReady(true);
+      setArchivedCouponUsage({});
+      setArchivedCouponUsageReady(true);
       return undefined;
     }
 
@@ -828,6 +833,48 @@ export default function TiendaVirtualView({
     );
 
     return () => unsubscribe();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setArchivedCouponUsage({});
+      setArchivedCouponUsageReady(true);
+      return undefined;
+    }
+
+    const cleanUserKey = String(currentUser.key || '').trim();
+    if (!cleanUserKey) {
+      setArchivedCouponUsage({});
+      setArchivedCouponUsageReady(true);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setArchivedCouponUsageReady(false);
+
+    get(ref(database, `${STORE_COUPON_ARCHIVE_USAGE_PATH}/${cleanUserKey}`))
+      .then((snapshot) => {
+        if (cancelled) {
+          return;
+        }
+
+        const counts = snapshot.val();
+        setArchivedCouponUsage(counts && typeof counts === 'object' ? counts : {});
+        setArchivedCouponUsageReady(true);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        console.error('No se pudo cargar el uso archivado de cupones:', error);
+        setArchivedCouponUsage({});
+        setArchivedCouponUsageReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -1054,6 +1101,15 @@ export default function TiendaVirtualView({
   const couponUsageByCode = useMemo(() => {
     const counts = {};
 
+    Object.entries(archivedCouponUsage || {}).forEach(([code, value]) => {
+      const normalizedCode = normalizeCouponCode(code);
+      if (!normalizedCode) {
+        return;
+      }
+
+      counts[normalizedCode] = Number(value || 0);
+    });
+
     couponHistoryOrders.forEach((order) => {
       if (isCanceledOrderStatus(order?.estado)) {
         return;
@@ -1068,7 +1124,9 @@ export default function TiendaVirtualView({
     });
 
     return counts;
-  }, [couponHistoryOrders]);
+  }, [archivedCouponUsage, couponHistoryOrders]);
+
+  const couponUsageReady = couponHistoryReady && archivedCouponUsageReady;
 
   const getCouponUsageMessage = (coupon) => {
     const limit = normalizeCouponUsageLimit(coupon?.maxUsesPerUser || 0);
@@ -1080,7 +1138,7 @@ export default function TiendaVirtualView({
       return 'Inicia sesion para usar este cupon.';
     }
 
-    if (!couponHistoryReady) {
+    if (!couponUsageReady) {
       return 'Estamos revisando tus cupones. Intenta nuevamente en unos segundos.';
     }
 
@@ -1199,7 +1257,7 @@ export default function TiendaVirtualView({
     if (JSON.stringify(refreshedCoupon) !== JSON.stringify(appliedCoupon)) {
       setAppliedCoupon(refreshedCoupon);
     }
-  }, [appliedCoupon, coupons, couponHistoryReady, couponUsageByCode, currentUser]);
+  }, [appliedCoupon, coupons, couponUsageByCode, couponUsageReady, currentUser]);
 
   useEffect(() => {
     if (!appliedCoupon) {

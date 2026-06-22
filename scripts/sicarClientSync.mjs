@@ -16,7 +16,8 @@ const FIREBASE_CONFIG = {
 const CLIENTS_PATH = 'clients';
 const STORE_USERS_PATH = 'storeUsers';
 const STORE_USER_CODE_PREFIX = 'TV-';
-const POLL_INTERVAL_MS = 60 * 1000;
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
+const FULL_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const UPDATE_BATCH_SIZE = 400;
 
 const normalizeText = (value = '') =>
@@ -260,6 +261,15 @@ const persistState = (stateFilePath, state) => {
     ),
     'utf8'
   );
+};
+
+const isPastSyncStale = (value, maxAgeMs = FULL_SYNC_INTERVAL_MS) => {
+  const timestamp = Date.parse(String(value || '').trim());
+  if (!timestamp) {
+    return true;
+  }
+
+  return Date.now() - timestamp >= Math.max(60 * 1000, normalizeNumber(maxAgeMs, FULL_SYNC_INTERVAL_MS));
 };
 
 const writeLatestReport = (reportFilePath, report) => {
@@ -834,9 +844,21 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     }
 
     state.listening = true;
+    const needsFullClientSync =
+      !state.lastSeenCliId ||
+      !state.lastFullSyncAt ||
+      isPastSyncStale(state.lastFullSyncAt);
+    const needsFullStoreUserSync =
+      !state.lastStoreUserFullSyncAt ||
+      isPastSyncStale(state.lastStoreUserFullSyncAt);
+
     Promise.resolve()
-      .then(() => reconcileActiveClients())
-      .then(() => syncStoreUsersToSicar({ incremental: false }))
+      .then(() => (needsFullClientSync ? reconcileActiveClients() : pollNewActiveSicarClientsOnce()))
+      .then(() =>
+        needsFullStoreUserSync
+          ? syncStoreUsersToSicar({ incremental: false })
+          : syncStoreUsersToSicar({ incremental: true })
+      )
       .catch(() => {})
       .finally(() => {
         scheduleNextPoll(5000);

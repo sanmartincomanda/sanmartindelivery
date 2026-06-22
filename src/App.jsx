@@ -71,12 +71,45 @@ const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
 
 const isStoreHost = (hostname = '') => STORE_HOSTS.has(String(hostname || '').trim().toLowerCase());
 
+const isLocalHostname = (hostname = '') => {
+  const cleanHost = String(hostname || '').trim().toLowerCase();
+
+  if (!cleanHost) {
+    return false;
+  }
+
+  if (cleanHost === 'localhost' || cleanHost === '127.0.0.1' || cleanHost === '::1') {
+    return true;
+  }
+
+  if (/^10\.\d+\.\d+\.\d+$/.test(cleanHost)) {
+    return true;
+  }
+
+  if (/^192\.168\.\d+\.\d+$/.test(cleanHost)) {
+    return true;
+  }
+
+  const match = cleanHost.match(/^172\.(\d+)\.\d+\.\d+$/);
+  if (match) {
+    const secondOctet = Number(match[1] || 0);
+    return secondOctet >= 16 && secondOctet <= 31;
+  }
+
+  return false;
+};
+
 const getRouteFromLocation = () => {
   if (typeof window === 'undefined') {
     return 'dashboard';
   }
 
-  if (isStoreHost(window.location.hostname)) {
+  const hostname = window.location.hostname;
+  if (isStoreHost(hostname)) {
+    return 'tienda';
+  }
+
+  if (!isLocalHostname(hostname)) {
     return 'tienda';
   }
 

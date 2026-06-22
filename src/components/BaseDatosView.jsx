@@ -10,6 +10,7 @@ import { push, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
 import { fetchOrdersByDateRange } from '../services/orders';
+import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import { hoyISO, normalizar } from './Utils';
 
 const Icons = {
@@ -378,9 +379,17 @@ export default function BaseDatosView({ clientes = [] }) {
     setHistoryRange(requestedRange);
 
     try {
-      const nextOrders = sortOrders(
-        await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo)
-      );
+      let nextOrders = [];
+
+      if (canUseLocalBridgeHistory()) {
+        nextOrders = sortOrders(
+          await fetchArchivedOrdersFromBridge(requestedRange.dateFrom, requestedRange.dateTo)
+        );
+      } else {
+        nextOrders = sortOrders(
+          await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo)
+        );
+      }
 
       setHistoryOrders(nextOrders);
       setHistoryLoaded(true);

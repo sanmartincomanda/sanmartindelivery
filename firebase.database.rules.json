@@ -1,21 +1,66 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true,
+    ".read": false,
+    ".write": false,
     "orders": {
+      ".read": true,
+      ".write": true,
       ".indexOn": ["fecha", "storeUserKey", "repartidorCodigo"]
     },
     "rutaOrders": {
+      ".read": true,
+      ".write": true,
       ".indexOn": ["fecha"]
     },
+    "orderCounters": {
+      ".read": true,
+      ".write": true
+    },
     "clients": {
+      ".read": true,
+      ".write": true,
       ".indexOn": ["codigo", "telefono"]
     },
     "storeUsers": {
+      ".read": true,
+      ".write": true,
       ".indexOn": ["updatedAt", "codigo", "telefono"]
     },
+    "storeCouponUsageArchive": {
+      ".read": true,
+      ".write": true
+    },
+    "storeCatalog": {
+      ".read": true,
+      ".write": true
+    },
     "storeCatalogMeta": {
-      ".read": true
+      ".read": true,
+      ".write": true
+    },
+    "storeCategories": {
+      ".read": true,
+      ".write": true
+    },
+    "storeCoupons": {
+      ".read": true,
+      ".write": true
+    },
+    "storePromotions": {
+      ".read": true,
+      ".write": true
+    },
+    "drivers": {
+      ".read": true,
+      ".write": true
+    },
+    "systemUsers": {
+      ".read": true,
+      ".write": true
+    },
+    "sicarQuoteQueue": {
+      ".read": true,
+      ".write": true
     }
   }
 }

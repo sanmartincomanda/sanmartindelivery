@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSicarClientSyncManager } from './sicarClientSync.mjs';
+import { createOrderArchiveManager } from './orderArchiveManager.mjs';
 import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
@@ -216,6 +217,10 @@ const sicarQuoteSync = createSicarQuoteSyncManager({
 
 const sicarClientSync = createSicarClientSyncManager({
   runMysqlQuery,
+  repoRoot,
+});
+
+const orderArchive = createOrderArchiveManager({
   repoRoot,
 });
 
@@ -635,6 +640,28 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       quoteSyncEnabled: ENABLE_SICAR_QUOTE_SYNC,
       quoteSync: sicarQuoteSync.state,
       clientSync: sicarClientSync.state,
+      orderArchive: orderArchive.state,
+    });
+  }
+
+  if (requestUrl.pathname === '/api/orders/history') {
+    const dateFrom = String(requestUrl.searchParams.get('dateFrom') || '').trim();
+    const dateTo = String(requestUrl.searchParams.get('dateTo') || '').trim();
+
+    if (!dateFrom || !dateTo) {
+      return json(400, {
+        ok: false,
+        error: 'Debes enviar dateFrom y dateTo en formato YYYY-MM-DD.',
+      });
+    }
+
+    const orders = await orderArchive.fetchHistoryByDateRange(dateFrom, dateTo);
+    return json(200, {
+      ok: true,
+      dateFrom,
+      dateTo,
+      count: orders.length,
+      orders,
     });
   }
 
@@ -789,6 +816,7 @@ const server = createServer(async (request, response) => {
 
 server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
+  orderArchive.initAutoArchive();
   sicarClientSync.initAutoSync();
   if (ENABLE_SICAR_QUOTE_SYNC) {
     sicarQuoteSync.initAutoSync();
