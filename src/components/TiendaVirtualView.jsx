@@ -345,6 +345,32 @@ const normalizeCustomerOrderStatus = (status) => {
 const isFinalCustomerOrder = (order = {}) =>
   ['cancelado', 'entregado'].includes(normalizeCustomerOrderStatus(order.estado));
 
+const isSameStoreCustomerOrder = (left, right) => {
+  if (!left || !right) {
+    return false;
+  }
+
+  if (left.firebaseKey && right.firebaseKey && left.firebaseKey === right.firebaseKey) {
+    return true;
+  }
+
+  return left.id !== undefined && right.id !== undefined && String(left.id) === String(right.id);
+};
+
+const resolveActiveStoreCustomerOrder = (orders = [], createdOrder = null) => {
+  const listedOrders = Array.isArray(orders) ? orders : [];
+  const liveCreatedOrder = createdOrder
+    ? listedOrders.find((order) => isSameStoreCustomerOrder(order, createdOrder))
+    : null;
+  const liveOrCreatedOrder = liveCreatedOrder || createdOrder;
+
+  if (liveOrCreatedOrder && !isFinalCustomerOrder(liveOrCreatedOrder)) {
+    return liveOrCreatedOrder;
+  }
+
+  return listedOrders.find((order) => !isFinalCustomerOrder(order)) || null;
+};
+
 const getFulfillmentTypeLabel = (fulfillmentType) =>
   fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Pickup en tienda' : 'Entrega a domicilio';
 
@@ -363,7 +389,6 @@ const getShortPersonName = (name, fallback) => {
 
 const getCustomerStatusMeta = (order = {}) => {
   const statusKey = normalizeCustomerOrderStatus(order.estado);
-  const cookName = getShortPersonName(order.cocinero, 'Harvey');
   const riderName = getShortPersonName(order.repartidor, 'Jordin');
   const pickupOrder = isPickupOrder(order);
 
@@ -381,7 +406,7 @@ const getCustomerStatusMeta = (order = {}) => {
       soft: '#fffbeb',
       emoji: '👨‍🍳',
       label: 'En cocina',
-      message: `Carnicero ${cookName} ya esta preparando tu pedido.`,
+      message: 'Nuestro equipo ya esta preparando tu pedido con cuidado.',
       progress: 2,
     },
     preparado: {
@@ -630,6 +655,7 @@ export default function TiendaVirtualView({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
+  const [orderSuccessOpen, setOrderSuccessOpen] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const quantityNoticeTimeoutRef = useRef(null);
 
@@ -817,7 +843,7 @@ export default function TiendaVirtualView({
   );
 
   useEffect(() => {
-    if (!currentUser || !ordersOpen) {
+    if (!currentUser) {
       setCustomerOrders([]);
       return undefined;
     }
@@ -840,7 +866,7 @@ export default function TiendaVirtualView({
     );
 
     return () => unsubscribe();
-  }, [currentUser, ordersOpen]);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -1106,7 +1132,7 @@ export default function TiendaVirtualView({
       sections.push({
         id: 'otros-productos',
         title: 'Catalogo general',
-        kicker: 'Todo lo demas',
+        kicker: 'Catalogo general',
         subtitle: `${remainingProducts.length} productos`,
         products: remainingProducts,
       });
@@ -1135,6 +1161,13 @@ export default function TiendaVirtualView({
       return next;
     });
   }, [activeCategory, groupedAllProductsSections]);
+
+  const activeCustomerOrder = useMemo(
+    () => resolveActiveStoreCustomerOrder(customerOrders, createdOrder),
+    [createdOrder, customerOrders]
+  );
+
+  const hasTrackedOrder = Boolean(activeCustomerOrder);
 
   const cartItems = useMemo(
     () =>
@@ -1256,6 +1289,19 @@ export default function TiendaVirtualView({
   }, [activePromotions.length, selectedPromotionIndex]);
 
   const cartCount = cartItems.length;
+
+  useEffect(() => {
+    if (!orderSuccessOpen || !createdOrder) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setOrderSuccessOpen(false);
+      setOrdersOpen(true);
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [createdOrder, orderSuccessOpen]);
 
   const activeFilterSummary = useMemo(() => {
     if (catalogLoading && catalog.length === 0) {
@@ -1528,6 +1574,7 @@ export default function TiendaVirtualView({
   const clearStoreSession = () => {
     setCurrentUser(null);
     setCreatedOrder(null);
+    setOrderSuccessOpen(false);
     setCustomerOrders([]);
     setDeliveryMode('perfil');
     setAlternateDelivery(createEmptyDeliveryDraft());
@@ -1731,6 +1778,22 @@ export default function TiendaVirtualView({
     setOrdersOpen(true);
   };
 
+  const openProfilePanel = () => {
+    if (currentUser) {
+      setProfileOpen(true);
+      return;
+    }
+
+    openAuthSheet('login', 'guest');
+  };
+
+  const dismissOrderSuccess = () => {
+    setOrderSuccessOpen(false);
+    if (createdOrder) {
+      setOrdersOpen(true);
+    }
+  };
+
   const submitGuestOrderByWhatsApp = (event) => {
     event.preventDefault();
 
@@ -1865,7 +1928,7 @@ export default function TiendaVirtualView({
       setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
       setDeliveryMode('perfil');
       setAlternateDelivery(createEmptyDeliveryDraft());
-      setOrdersOpen(true);
+      setOrderSuccessOpen(true);
     } catch (error) {
       console.error('Error creando pedido virtual:', error);
       if (error.code === 'ORDER_LIMIT_REACHED') {
@@ -2137,32 +2200,58 @@ export default function TiendaVirtualView({
           z-index: 80;
           background: rgba(255, 250, 250, 0.9);
           backdrop-filter: blur(12px);
-          padding: 10px 0 14px;
+          padding: 8px 0 12px;
           display: grid;
-          gap: 14px;
+          gap: 12px;
+          overflow: clip;
         }
         .store-brand-row {
           display: flex;
           align-items: center;
+          justify-content: space-between;
           gap: 12px;
+          min-width: 0;
+        }
+        .store-brand-main {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 1;
+        }
+        .store-brand-copy {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+        }
+        .store-brand-kicker {
+          display: inline-flex;
+          align-items: center;
+          color: #7b1022;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
         .store-logo {
-          width: 42px;
-          height: 42px;
-          border-radius: 8px;
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
           object-fit: contain;
           background: #ffffff;
+          box-shadow: 0 12px 24px rgba(123, 16, 34, 0.1);
         }
         .store-title {
-          font-size: 18px;
-          font-weight: 900;
-          line-height: 1.1;
+          font-size: 24px;
+          font-weight: 950;
+          line-height: 1.02;
+          letter-spacing: -0.03em;
         }
-        .store-actions {
-          margin-left: auto;
+        .store-brand-actions {
           display: flex;
           gap: 8px;
           align-items: center;
+          flex-shrink: 0;
         }
         .store-icon-button,
         .store-order-status-button,
@@ -2187,20 +2276,42 @@ export default function TiendaVirtualView({
           width: 42px;
           height: 42px;
           border-radius: 999px;
-          background: #ffffff;
-          border: 1px solid #e5e7eb;
+          background: linear-gradient(180deg, #ffffff 0%, #fff7f4 100%);
+          border: 1px solid rgba(123, 16, 34, 0.1);
           color: #111827;
           font-size: 18px;
           font-weight: 900;
+          box-shadow: 0 12px 22px rgba(15, 23, 42, 0.06);
+        }
+        .store-profile-button {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .store-profile-icon {
+          width: 18px;
+          height: 18px;
+          display: block;
+        }
+        .store-profile-indicator {
+          position: absolute;
+          top: 5px;
+          right: 5px;
+          width: 9px;
+          height: 9px;
+          border-radius: 999px;
+          background: #ef4444;
+          border: 2px solid #ffffff;
         }
         .store-order-status-button {
           min-height: 42px;
           border-radius: 999px;
-          padding: 0 16px;
+          padding: 0 15px;
           background: linear-gradient(135deg, #7b1022, #d94a3f);
           color: #fffaf5;
           box-shadow: 0 14px 28px rgba(123, 16, 34, 0.2);
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 950;
           letter-spacing: 0.04em;
           white-space: nowrap;
@@ -3162,8 +3273,24 @@ export default function TiendaVirtualView({
           border: 1px solid rgba(123, 16, 34, 0.12);
         }
         .store-back-icon {
-          font-size: 28px;
+          width: 24px;
+          height: 24px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0;
           line-height: 1;
+          position: relative;
+        }
+        .store-back-icon::before {
+          content: '';
+          width: 10px;
+          height: 10px;
+          display: block;
+          border-left: 2.8px solid currentColor;
+          border-bottom: 2.8px solid currentColor;
+          transform: rotate(45deg);
+          margin-left: 3px;
         }
         .store-back-label {
           font-size: 13px;
@@ -3654,6 +3781,100 @@ export default function TiendaVirtualView({
           font-weight: 950;
           white-space: nowrap;
         }
+        .store-order-bubble {
+          position: fixed;
+          right: 14px;
+          bottom: 22px;
+          z-index: 135;
+          min-height: 56px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px 10px 10px;
+          border: 0;
+          border-radius: 999px;
+          background: linear-gradient(135deg, #7b1022, #d94a3f);
+          color: #fffaf5;
+          box-shadow: 0 24px 48px rgba(123, 16, 34, 0.32);
+          text-align: left;
+        }
+        .store-order-bubble.elevated {
+          bottom: 92px;
+        }
+        .store-order-bubble-icon {
+          width: 36px;
+          height: 36px;
+          flex: 0 0 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.16);
+        }
+        .store-order-bubble-copy {
+          display: grid;
+          gap: 1px;
+        }
+        .store-order-bubble-copy strong {
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+        .store-order-bubble-copy span {
+          font-size: 12px;
+          color: rgba(255, 250, 245, 0.84);
+          font-weight: 800;
+        }
+        .store-success-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 250;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 18px;
+          background: rgba(15, 23, 42, 0.34);
+          backdrop-filter: blur(10px);
+        }
+        .store-success-card {
+          width: min(360px, 100%);
+          border-radius: 28px;
+          padding: 28px 24px 22px;
+          background: linear-gradient(180deg, #ffffff 0%, #f7fff9 100%);
+          border: 1px solid rgba(16, 185, 129, 0.14);
+          box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
+          text-align: center;
+        }
+        .store-success-check {
+          width: 76px;
+          height: 76px;
+          margin: 0 auto 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: radial-gradient(circle at top, #34d399, #10b981);
+          box-shadow: 0 18px 36px rgba(16, 185, 129, 0.28);
+        }
+        .store-success-card h3 {
+          margin: 0;
+          color: #111827;
+          font-size: 24px;
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+        }
+        .store-success-card p {
+          margin: 10px 0 0;
+          color: #475569;
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1.5;
+        }
+        .store-success-card .store-button {
+          width: 100%;
+          margin-top: 18px;
+        }
         .store-status-card {
           border: 1px solid #e5e7eb;
           border-radius: 8px;
@@ -3832,6 +4053,30 @@ export default function TiendaVirtualView({
         .store-history-list {
           margin-top: 8px;
         }
+        .store-orders-hero {
+          margin-top: 2px;
+          padding: 18px 18px 16px;
+          border-radius: 24px;
+          background:
+            radial-gradient(circle at top right, rgba(255, 225, 214, 0.65), transparent 32%),
+            linear-gradient(180deg, #ffffff 0%, #fff8f6 100%);
+          border: 1px solid rgba(123, 16, 34, 0.1);
+          box-shadow: 0 20px 44px rgba(123, 16, 34, 0.08);
+        }
+        .store-orders-hero h2 {
+          margin: 12px 0 4px;
+          color: #111827;
+          font-size: 24px;
+          line-height: 1.04;
+          letter-spacing: -0.03em;
+        }
+        .store-orders-hero p {
+          margin: 0;
+          color: #64748b;
+          font-size: 14px;
+          line-height: 1.5;
+          font-weight: 700;
+        }
         .store-status-items {
           position: relative;
           z-index: 1;
@@ -3841,6 +4086,15 @@ export default function TiendaVirtualView({
           color: #6b7280;
           font-size: 13px;
           line-height: 1.5;
+        }
+        .store-status-items-title {
+          display: block;
+          margin-bottom: 8px;
+          color: #111827;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
         }
         @media (min-width: 1181px) {
           .store-page.with-floating-cart {
@@ -3885,7 +4139,7 @@ export default function TiendaVirtualView({
           .store-page {
             padding-left: 14px;
             padding-right: 14px;
-            padding-bottom: 160px;
+            padding-bottom: 180px;
           }
           .store-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4005,7 +4259,29 @@ export default function TiendaVirtualView({
             border-radius: 20px;
           }
           .store-brand-row {
+            align-items: center;
+            gap: 10px;
+          }
+          .store-brand-main {
+            gap: 10px;
             align-items: flex-start;
+          }
+          .store-brand-copy {
+            gap: 4px;
+          }
+          .store-brand-kicker {
+            font-size: 9px;
+          }
+          .store-title {
+            font-size: 16px;
+            line-height: 1.06;
+          }
+          .store-brand-actions {
+            gap: 6px;
+          }
+          .store-icon-button {
+            width: 40px;
+            height: 40px;
           }
           .store-filter-strip {
             flex-direction: column;
@@ -4037,23 +4313,21 @@ export default function TiendaVirtualView({
           .store-filter-chip.compact {
             min-width: auto;
           }
-          .store-actions {
-            flex-direction: column;
-            align-items: flex-end;
-          }
-          .store-account-card {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-          .store-inline-actions,
-          .store-auth-inline-actions {
-            width: 100%;
-            justify-content: flex-start;
-          }
           .store-order-status-button {
             min-height: 38px;
             padding: 0 12px;
             font-size: 11px;
+          }
+          .store-order-bubble {
+            left: 14px;
+            right: 14px;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+          }
+          .store-order-bubble.elevated {
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+          }
+          .store-mobile-cart {
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
           }
           .store-auth-page {
             padding: 24px 14px;
@@ -4066,6 +4340,13 @@ export default function TiendaVirtualView({
           }
           .store-auth-brand h1 {
             font-size: 22px;
+          }
+          .store-orders-hero {
+            padding: 16px 16px 14px;
+            border-radius: 22px;
+          }
+          .store-orders-hero h2 {
+            font-size: 20px;
           }
           .store-order-meta,
           .store-progress {
@@ -4101,57 +4382,33 @@ export default function TiendaVirtualView({
           </div>
         )}
 
-        {currentUser ? (
-          <div className="store-account-card">
-            <div>
-              <strong>{currentUser.nombre}</strong>
-              <span>
-                {currentUser.direccion}
-                {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <button type="button" className="store-button secondary" onClick={() => setProfileOpen(true)}>
-                Perfil
-              </button>
-              <button type="button" className="store-button secondary" onClick={clearStoreSession}>
-                Salir
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="store-account-card guest">
-            <div>
-              <strong>Inicia sesion para enviar pedidos y ver el estado de tu pedido</strong>
-              <span>Continuar como invitado. Como invitado podras enviar pedidos directo a nuestro WhatsApp.</span>
-            </div>
-            <div className="store-inline-actions">
-              <button type="button" className="store-button" onClick={() => openAuthSheet('login', 'guest')}>
-                Inicia sesion
-              </button>
-              <button
-                type="button"
-                className="store-button secondary"
-                onClick={() => openAuthSheet('register', 'guest')}
-              >
-                Crear cuenta
-              </button>
-            </div>
-          </div>
-        )}
-
         <header className="store-top">
           <div className="store-brand-row">
-            <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
-            <div className="store-title">{STORE_BRAND_TITLE}</div>
-            <div className="store-actions">
+            <div className="store-brand-main">
+              <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
+              <div className="store-brand-copy">
+                <span className="store-brand-kicker">Tu carne favorita, a un toque de distancia</span>
+                <div className="store-title">{STORE_BRAND_TITLE}</div>
+              </div>
+            </div>
+            <div className="store-brand-actions">
+              {!isMobileLayout && hasTrackedOrder && (
+                <button
+                  type="button"
+                  className="store-order-status-button"
+                  title="Estado de mi pedido"
+                  onClick={openCustomerOrders}
+                >
+                  Mi pedido
+                </button>
+              )}
               <button
                 type="button"
-                className="store-order-status-button"
-                title="Estado de mi pedido"
-                onClick={openCustomerOrders}
+                className="store-icon-button store-profile-button"
+                title={currentUser ? 'Mi perfil' : 'Inicia sesion'}
+                onClick={openProfilePanel}
               >
-                ESTADO DE MI PEDIDO
+                <StoreProfileGlyph active={hasTrackedOrder} />
               </button>
               <button
                 type="button"
@@ -4163,27 +4420,6 @@ export default function TiendaVirtualView({
               </button>
             </div>
           </div>
-
-          {showPromotions && (
-            <section className="store-promo">
-              <h2 className="store-section-title">Promociones activas</h2>
-              <div className="store-stories">
-                {activePromotions.map((promotion, index) => (
-                  <button
-                    key={promotion.id}
-                    type="button"
-                    className="store-story"
-                    onClick={() => setSelectedPromotionIndex(index)}
-                  >
-                    <span className="store-story-ring">
-                      <img src={promotion.image} alt={promotion.title} loading="lazy" decoding="async" />
-                    </span>
-                    <span className="store-story-title">{promotion.title}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
 
           <label className="store-search-wrap">
             <span className="store-search-tag">Buscar</span>
@@ -4292,48 +4528,63 @@ export default function TiendaVirtualView({
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
           ) : activeCategory === 'todos' ? (
             <div className="store-grouped-sections">
-              {groupedAllProductsSections.map((section) => {
+              {groupedAllProductsSections.map((section, sectionIndex) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = section.products.slice(0, visibleCount);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
                 const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
 
                 return (
-                  <section key={section.id} className="store-product-group">
-                    <div className="store-product-group-head">
-                      <div>
-                        <span className="store-product-group-kicker">{section.kicker}</span>
-                        <h3 className="store-product-group-title">{section.title}</h3>
+                  <React.Fragment key={section.id}>
+                    <section className="store-product-group">
+                      <div className="store-product-group-head">
+                        <div>
+                          <span className="store-product-group-kicker">{section.kicker}</span>
+                          <h3 className="store-product-group-title">{section.title}</h3>
+                        </div>
+                        <span className="store-product-group-meta">
+                          {visibleProducts.length} de {section.products.length} productos
+                        </span>
                       </div>
-                      <span className="store-product-group-meta">
-                        {visibleProducts.length} de {section.products.length} productos
-                      </span>
-                    </div>
-                    <div className="store-grid">
-                      {visibleProducts.map((product) => renderStoreProductTile(product))}
-                    </div>
-                    {remainingCount > 0 && (
-                      <div className="store-product-group-footer">
-                        <button
-                          type="button"
-                          className="store-button secondary store-product-group-more"
-                          onClick={() =>
-                            setGroupVisibleCounts((current) => ({
-                              ...current,
-                              [section.id]: Math.min(
-                                Number(current[section.id] || STORE_GROUP_PAGE_SIZE) + STORE_GROUP_PAGE_SIZE,
-                                section.products.length
-                              ),
-                            }))
-                          }
-                        >
-                          Mostrar {nextBatchSize} mas
-                        </button>
+                      <div className="store-grid">
+                        {visibleProducts.map((product) => renderStoreProductTile(product))}
                       </div>
+                      {remainingCount > 0 && (
+                        <div className="store-product-group-footer">
+                          <button
+                            type="button"
+                            className="store-button secondary store-product-group-more"
+                            onClick={() =>
+                              setGroupVisibleCounts((current) => ({
+                                ...current,
+                                [section.id]: Math.min(
+                                  Number(current[section.id] || STORE_GROUP_PAGE_SIZE) + STORE_GROUP_PAGE_SIZE,
+                                  section.products.length
+                                ),
+                              }))
+                            }
+                          >
+                            Mostrar {nextBatchSize} mas
+                          </button>
+                        </div>
+                      )}
+                    </section>
+
+                    {showPromotions && sectionIndex === 0 && (
+                      <PromotionsStrip
+                        promotions={activePromotions}
+                        onOpen={(promotionIndex) => setSelectedPromotionIndex(promotionIndex)}
+                      />
                     )}
-                  </section>
+                  </React.Fragment>
                 );
               })}
+              {showPromotions && groupedAllProductsSections.length === 0 && (
+                <PromotionsStrip
+                  promotions={activePromotions}
+                  onOpen={(promotionIndex) => setSelectedPromotionIndex(promotionIndex)}
+                />
+              )}
             </div>
           ) : (
             <div className="store-grid">
@@ -4364,6 +4615,19 @@ export default function TiendaVirtualView({
       )}
 
       {quantityNotice && <div className="store-quantity-notice">{quantityNotice}</div>}
+
+      {isMobileLayout &&
+        hasTrackedOrder &&
+        !ordersOpen &&
+        !profileOpen &&
+        !authSheetOpen &&
+        !orderSuccessOpen && (
+          <FloatingOrderBubble
+            order={activeCustomerOrder}
+            elevated={cartItems.length > 0 && !selectedProduct && !checkoutOpen}
+            onOpen={openCustomerOrders}
+          />
+        )}
 
       {selectedProduct && (
         <ProductSheet
@@ -4445,6 +4709,7 @@ export default function TiendaVirtualView({
           user={currentUser}
           saving={submitting}
           onClose={() => setProfileOpen(false)}
+          onSignOut={clearStoreSession}
           onSave={handleProfileSave}
         />
       )}
@@ -4475,6 +4740,8 @@ export default function TiendaVirtualView({
           onRegister={handleStoreRegister}
         />
       )}
+
+      {orderSuccessOpen && <OrderSuccessSheet onClose={dismissOrderSuccess} />}
     </div>
   );
 }
@@ -4617,6 +4884,27 @@ function StoreAuthView({
   }
 
   return <div className="store-auth-page">{content}</div>;
+}
+
+function StoreProfileGlyph({ active = false }) {
+  return (
+    <>
+      <svg
+        className="store-profile-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M20 21a8 8 0 0 0-16 0" />
+        <circle cx="12" cy="8" r="4" />
+      </svg>
+      {active && <span className="store-profile-indicator" aria-hidden="true" />}
+    </>
+  );
 }
 
 function StoreBackButton({ onClick, label = 'Volver' }) {
@@ -4933,7 +5221,7 @@ function MapPointPicker({ location, onClose, onSave }) {
   );
 }
 
-function ProfileSheet({ user, saving, onClose, onSave }) {
+function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
   const [profile, setProfile] = useState({
     nombre: user?.nombre || '',
     direccion: user?.direccion || '',
@@ -5023,6 +5311,9 @@ function ProfileSheet({ user, saving, onClose, onSave }) {
           />
           <button type="submit" className="store-button" disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar perfil'}
+          </button>
+          <button type="button" className="store-button secondary" onClick={onSignOut}>
+            Cerrar sesion
           </button>
         </form>
       </div>
@@ -5754,30 +6045,86 @@ function CheckoutSheet({
   );
 }
 
+function PromotionsStrip({ promotions, onOpen }) {
+  if (!Array.isArray(promotions) || promotions.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="store-promo">
+      <h2 className="store-section-title">Promociones activas</h2>
+      <div className="store-stories">
+        {promotions.map((promotion, index) => (
+          <button
+            key={promotion.id}
+            type="button"
+            className="store-story"
+            onClick={() => onOpen(index)}
+          >
+            <span className="store-story-ring">
+              <img src={promotion.image} alt={promotion.title} loading="lazy" decoding="async" />
+            </span>
+            <span className="store-story-title">{promotion.title}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FloatingOrderBubble({ order, elevated = false, onOpen }) {
+  const meta = getCustomerStatusMeta(order);
+  const orderNumber = formatOrderNumber(order?.id);
+
+  return (
+    <button
+      type="button"
+      className={`store-order-bubble ${elevated ? 'elevated' : ''}`}
+      onClick={onOpen}
+    >
+      <span className="store-order-bubble-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
+          <path d="M3 7h18" />
+          <path d="M7 3v8" />
+          <path d="M17 3v8" />
+          <rect x="4" y="5" width="16" height="15" rx="3" />
+          <path d="M9 13h6" />
+          <path d="M9 17h4" />
+        </svg>
+      </span>
+      <span className="store-order-bubble-copy">
+        <strong>Pedido #{orderNumber}</strong>
+        <span>{meta.label}</span>
+      </span>
+    </button>
+  );
+}
+
+function OrderSuccessSheet({ onClose }) {
+  return (
+    <div className="store-success-overlay" onClick={onClose}>
+      <div className="store-success-card" onClick={(event) => event.stopPropagation()}>
+        <div className="store-success-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#ffffff" strokeWidth="2.8">
+            <path d="M5 12l4.2 4.2L19 6.5" />
+          </svg>
+        </div>
+        <h3>Pedido realizado con exito</h3>
+        <p>Tu pedido ya entro al sistema. Enseguida te mostramos el estado para que le des seguimiento.</p>
+        <button type="button" className="store-button" onClick={onClose}>
+          Ver estado del pedido
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose }) {
   const [showPreviousOrders, setShowPreviousOrders] = useState(false);
   const listedOrders = Array.isArray(orders) ? orders : [];
-  const isSameCustomerOrder = (left, right) => {
-    if (!left || !right) {
-      return false;
-    }
-
-    if (left.firebaseKey && right.firebaseKey && left.firebaseKey === right.firebaseKey) {
-      return true;
-    }
-
-    return left.id !== undefined && right.id !== undefined && String(left.id) === String(right.id);
-  };
-  const liveCreatedOrder = createdOrder
-    ? listedOrders.find((order) => isSameCustomerOrder(order, createdOrder))
-    : null;
-  const liveOrCreatedOrder = liveCreatedOrder || createdOrder;
-  const activeOrder =
-    liveOrCreatedOrder && !isFinalCustomerOrder(liveOrCreatedOrder)
-      ? liveOrCreatedOrder
-      : listedOrders.find((order) => !isFinalCustomerOrder(order)) || null;
+  const activeOrder = resolveActiveStoreCustomerOrder(listedOrders, createdOrder);
   const previousOrders = activeOrder
-    ? listedOrders.filter((order) => !isSameCustomerOrder(order, activeOrder))
+    ? listedOrders.filter((order) => !isSameStoreCustomerOrder(order, activeOrder))
     : listedOrders;
 
   return (
@@ -5788,10 +6135,12 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
           <strong>ESTADO DE MI PEDIDO</strong>
         </div>
 
-        <div className="store-status-card" style={{ marginTop: 0 }}>
-          <div className="store-status-pill">Cuenta</div>
-          <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
-          <div style={{ color: '#6b7280' }}>{currentUser.telefono}</div>
+        <div className="store-orders-hero">
+          <div className="store-status-pill">Seguimiento en vivo</div>
+          <h2>{currentUser.nombre}</h2>
+          <p>
+            Aqui veras si tu pedido ya esta en cocina, listo para recoger o en camino hacia ti.
+          </p>
         </div>
 
         {activeOrder ? (
@@ -5843,7 +6192,6 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
   const meta = getCustomerStatusMeta(order);
   const orderNumber = formatOrderNumber(order.id);
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
-  const cookName = order.cocinero ? getShortPersonName(order.cocinero, order.cocinero) : 'Por asignar';
   const pickupOrder = isPickupOrder(order);
   const riderName = order.repartidor
     ? getShortPersonName(order.repartidor, order.repartidor)
@@ -5913,14 +6261,14 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           <strong>{formatCurrency(order.total)}</strong>
         </div>
         <div>
-          <span>Carnicero</span>
+          <span>{pickupOrder ? 'Modalidad' : 'Entrega'}</span>
           <strong>
-            {cookName}
+            {pickupOrder ? 'Pickup en tienda' : 'Delivery a domicilio'}
             {order.timestampPreparacion ? ` - ${order.timestampPreparacion}` : ''}
           </strong>
         </div>
         <div>
-          <span>{pickupOrder ? 'Retiro' : 'Entrega'}</span>
+          <span>{pickupOrder ? 'Retiro' : 'Repartidor'}</span>
           <strong>
             {riderName}
             {order.timestampEntregado
@@ -5934,6 +6282,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
 
       {Array.isArray(order.items) && order.items.length > 0 && (
         <div className="store-status-items">
+          <strong className="store-status-items-title">Detalle del pedido</strong>
           {order.items.map((item) => (
             <div key={`${order.firebaseKey || order.id}-${item.codigo || item.nombre}`}>
               <div>
