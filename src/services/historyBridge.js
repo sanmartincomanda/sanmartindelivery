@@ -1,6 +1,7 @@
 import { sortOrdersByDateAndNumberDesc } from './orderArchive';
 
 const LOCAL_BRIDGE_ORIGIN = 'http://127.0.0.1:3077';
+const TRUSTED_PUBLIC_BRIDGE_HOSTS = ['sanmartinsr.com', 'verdant-youtiao-5cd9d3.netlify.app'];
 
 export const isLocalHostname = (hostname = '') => {
   const cleanHost = String(hostname || '').trim().toLowerCase();
@@ -30,8 +31,20 @@ export const isLocalHostname = (hostname = '') => {
   return false;
 };
 
+const isTrustedPublicBridgeHostname = (hostname = '') => {
+  const cleanHost = String(hostname || '').trim().toLowerCase();
+  if (!cleanHost) {
+    return false;
+  }
+
+  return TRUSTED_PUBLIC_BRIDGE_HOSTS.some(
+    (trustedHost) => cleanHost === trustedHost || cleanHost.endsWith(`.${trustedHost}`)
+  );
+};
+
 export const canUseLocalBridgeHistory = () =>
-  typeof window !== 'undefined' && isLocalHostname(window.location.hostname);
+  typeof window !== 'undefined' &&
+  (isLocalHostname(window.location.hostname) || isTrustedPublicBridgeHostname(window.location.hostname));
 
 export async function fetchArchivedOrdersFromBridge(dateFrom, dateTo) {
   const cleanDateFrom = String(dateFrom || '').trim();

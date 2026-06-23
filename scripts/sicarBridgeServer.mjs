@@ -44,6 +44,7 @@ const bridgeConfig = {
 };
 
 const ENABLE_SICAR_QUOTE_SYNC = true;
+const TRUSTED_PUBLIC_BRIDGE_HOSTS = ['sanmartinsr.com', 'verdant-youtiao-5cd9d3.netlify.app'];
 
 const sqlEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
@@ -75,6 +76,17 @@ const isLocalBridgeHostname = (hostname = '') => {
   return false;
 };
 
+const isTrustedPublicBridgeHostname = (hostname = '') => {
+  const cleanHost = String(hostname || '').trim().toLowerCase();
+  if (!cleanHost) {
+    return false;
+  }
+
+  return TRUSTED_PUBLIC_BRIDGE_HOSTS.some(
+    (trustedHost) => cleanHost === trustedHost || cleanHost.endsWith(`.${trustedHost}`)
+  );
+};
+
 const resolveCorsHeaders = (request) => {
   const origin = String(request?.headers?.origin || '').trim();
 
@@ -88,7 +100,7 @@ const resolveCorsHeaders = (request) => {
       return null;
     }
 
-    if (!isLocalBridgeHostname(originUrl.hostname)) {
+    if (!isLocalBridgeHostname(originUrl.hostname) && !isTrustedPublicBridgeHostname(originUrl.hostname)) {
       return null;
     }
 

@@ -1,11 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { getApps, initializeApp } from 'firebase/app';
 import { endAt, get, getDatabase, orderByChild, query, ref, startAt, update } from 'firebase/database';
 import {
   buildArchivedOrderRecord,
   getArchiveMonthKey,
+  getOrderHistoryRetentionStartDate,
   isCanceledOrderStatus,
+  isOrderWithinHistoryRetention,
+  ORDER_HISTORY_RETENTION_DAYS,
   normalizeCouponCode,
   shouldArchiveRealtimeOrder,
   sortOrdersByDateAndNumberDesc,
@@ -143,6 +146,46 @@ export function createOrderArchiveManager({ repoRoot }) {
     }
   };
 
+  const pruneExpiredArchivedOrders = () => {
+    if (!existsSync(archiveRootDir)) {
+      return {
+        removedCount: 0,
+        retentionStartDate: getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS),
+      };
+    }
+
+    const retentionStartDate = getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS);
+    let removedCount = 0;
+
+    readdirSync(archiveRootDir)
+      .filter((fileName) => fileName.toLowerCase().endsWith('.json'))
+      .forEach((fileName) => {
+        const filePath = resolve(archiveRootDir, fileName);
+        const bucket = loadJsonFile(filePath, {});
+        const nextBucket = {};
+        let changed = false;
+
+        Object.entries(bucket || {}).forEach(([orderKey, order]) => {
+          if (isOrderWithinHistoryRetention(order, retentionStartDate)) {
+            nextBucket[orderKey] = order;
+            return;
+          }
+
+          changed = true;
+          removedCount += 1;
+        });
+
+        if (changed) {
+          saveJsonFile(filePath, nextBucket);
+        }
+      });
+
+    return {
+      removedCount,
+      retentionStartDate,
+    };
+  };
+
   const archiveOrdersOnce = async () => {
     if (archivePromise) {
       return archivePromise;
@@ -154,6 +197,7 @@ export function createOrderArchiveManager({ repoRoot }) {
 
       try {
         const todayKey = formatDate(new Date());
+        const pruneResult = pruneExpiredArchivedOrders();
         const [ordersSnapshot, routeOrdersSnapshot, archiveUsageSnapshot] = await Promise.all([
           get(ref(database, 'orders')),
           get(ref(database, 'rutaOrders')),
@@ -218,6 +262,7 @@ export function createOrderArchiveManager({ repoRoot }) {
           return {
             ok: true,
             archivedCount: 0,
+            prunedCount: pruneResult.removedCount,
           };
         }
 
@@ -234,6 +279,7 @@ export function createOrderArchiveManager({ repoRoot }) {
         return {
           ok: true,
           archivedCount,
+          prunedCount: pruneResult.removedCount,
         };
       } catch (error) {
         state.lastError = String(error?.message || error || 'No se pudo archivar el historial.');
@@ -251,6 +297,7 @@ export function createOrderArchiveManager({ repoRoot }) {
   const fetchArchivedOrdersByDateRange = async (dateFrom, dateTo) => {
     const cleanDateFrom = String(dateFrom || '').trim();
     const cleanDateTo = String(dateTo || '').trim();
+    const retentionStartDate = getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS);
     const months = listMonthKeysBetween(cleanDateFrom, cleanDateTo);
     const archivedOrders = [];
 
@@ -260,6 +307,9 @@ export function createOrderArchiveManager({ repoRoot }) {
       Object.values(bucket).forEach((order) => {
         const fecha = String(order?.fecha || '').trim();
         if (!fecha) {
+          return;
+        }
+        if (!isOrderWithinHistoryRetention(order, retentionStartDate)) {
           return;
         }
         if (cleanDateFrom && fecha < cleanDateFrom) {

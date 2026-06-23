@@ -11,6 +11,7 @@ import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
 import { fetchOrdersByDateRange } from '../services/orders';
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
+import { ORDER_HISTORY_RETENTION_DAYS } from '../services/orderArchive';
 import { hoyISO, normalizar } from './Utils';
 
 const Icons = {
@@ -343,7 +344,7 @@ export default function BaseDatosView({ clientes = [] }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySyncAt, setHistorySyncAt] = useState(null);
   const [historyRange, setHistoryRange] = useState(() => ({
-    dateFrom: shiftIsoDate(hoyISO(), -7),
+    dateFrom: shiftIsoDate(hoyISO(), -(ORDER_HISTORY_RETENTION_DAYS - 1)),
     dateTo: hoyISO(),
   }));
 
@@ -380,12 +381,20 @@ export default function BaseDatosView({ clientes = [] }) {
 
     try {
       let nextOrders = [];
+      let loadedFromBridge = false;
 
       if (canUseLocalBridgeHistory()) {
-        nextOrders = sortOrders(
-          await fetchArchivedOrdersFromBridge(requestedRange.dateFrom, requestedRange.dateTo)
-        );
-      } else {
+        try {
+          nextOrders = sortOrders(
+            await fetchArchivedOrdersFromBridge(requestedRange.dateFrom, requestedRange.dateTo)
+          );
+          loadedFromBridge = true;
+        } catch (bridgeError) {
+          console.warn('Bridge history fallback:', bridgeError);
+        }
+      }
+
+      if (!loadedFromBridge) {
         nextOrders = sortOrders(
           await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo)
         );
