@@ -5,6 +5,7 @@ import {
   QUICK_WEIGHTS,
   STORE_PAYMENT_OPTIONS,
 } from '../data/tiendaVirtual';
+import { STORE_SUBCATEGORY_CANONICALS } from '../data/storeSubcategoryRules';
 import {
   compareCatalogProducts,
   getProductMinQuantity,
@@ -160,7 +161,13 @@ const STORE_ALL_PRODUCTS_PRIORITY_GROUPS = [
   },
   { category: 'pollo', subcategory: 'pollo', title: 'Pollo · Pollo' },
   { category: 'cerdo', subcategory: 'cerdo', title: 'Cerdo · Cerdo' },
-  { category: 'abarroteria', subcategory: 'basicos', title: 'Abarroteria · Basicos' },
+  ...(STORE_SUBCATEGORY_CANONICALS.abarroteria || []).map((subcategory) => ({
+    category: 'abarroteria',
+    subcategory,
+    title: `Abarroteria - ${subcategory}`,
+    kicker: 'Top 5 mas vendido',
+    homeLimit: STORE_GROUP_PAGE_SIZE,
+  })),
   { category: 'congelados', subcategory: 'mariscos', title: 'Congelados · Mariscos' },
   { category: 'refrigerados', subcategory: 'embutidos', title: 'Refrigerados · Embutidos' },
 ];
@@ -1193,7 +1200,15 @@ export default function TiendaVirtualView({
     filteredProducts.forEach((product) => {
       const priorityIndex = getStoreAllProductsPriority(product);
       if (priorityIndex < groupedProducts.length) {
-        groupedProducts[priorityIndex].products.push(product);
+        const group = groupedProducts[priorityIndex];
+        const homeLimit = Number(group.homeLimit || 0);
+
+        if (homeLimit > 0 && group.products.length >= homeLimit) {
+          remainingProducts.push(product);
+          return;
+        }
+
+        group.products.push(product);
         return;
       }
 
@@ -1205,7 +1220,7 @@ export default function TiendaVirtualView({
       .map((group) => ({
         id: `${group.category}-${group.subcategory}`,
         title: group.title,
-        kicker: 'Prioridad tienda',
+        kicker: group.kicker || 'Prioridad tienda',
         subtitle: `${group.products.length} productos`,
         products: group.products,
       }));
