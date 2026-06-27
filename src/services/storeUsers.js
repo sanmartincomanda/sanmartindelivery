@@ -5,6 +5,7 @@ import {
   createStoreCustomerAuth,
   getCurrentAuthUser,
   normalizeAuthEmail,
+  sendStoreCustomerPasswordReset,
   signInStoreCustomer,
   signInStoreCustomerWithGoogle,
   touchLastLogin,
@@ -303,6 +304,20 @@ export async function registerStoreUserWithEmail({ nombre, email, telefono, dire
 
 export async function loginStoreUser({ email, telefono, password }) {
   return loginStoreUserWithEmail({ email, telefono, password });
+}
+
+export async function requestStorePasswordReset({ email, telefono }) {
+  const cleanEmail = cleanStoreEmail(email);
+  const cleanPhone = cleanStorePhone(telefono);
+
+  if (!cleanEmail) {
+    const error = new Error('Correo requerido');
+    error.code = 'EMAIL_REQUIRED';
+    throw error;
+  }
+
+  await sendStoreCustomerPasswordReset({ email: cleanEmail, telefono: cleanPhone });
+  return true;
 }
 
 export async function loginStoreUserWithEmail({ email, telefono, password }) {

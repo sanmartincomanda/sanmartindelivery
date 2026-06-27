@@ -60,6 +60,7 @@ import {
   loginStoreUserWithGoogle,
   loginStoreUser,
   registerStoreUser,
+  requestStorePasswordReset,
   updateStoreUserProfile,
 } from '../services/storeUsers';
 import {
@@ -141,6 +142,26 @@ const getPaymentMeta = (payment) => {
     value,
     ...(meta[value] || meta.EFECTIVO),
   };
+};
+
+const getGoogleAuthErrorMessage = (error = {}) => {
+  if (error.code === 'auth/unauthorized-domain') {
+    return 'Google no esta autorizado para este dominio. Agrega tienda.sanmartinsr.com en Firebase Authentication > Settings > Authorized domains.';
+  }
+
+  if (error.code === 'auth/operation-not-allowed') {
+    return 'Google no esta habilitado en Firebase Authentication > Sign-in method.';
+  }
+
+  if (error.code === 'auth/popup-blocked') {
+    return 'El navegador bloqueo la ventana de Google. Permite popups para esta pagina e intenta de nuevo.';
+  }
+
+  if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+    return 'Se cerro la ventana de Google antes de terminar el ingreso.';
+  }
+
+  return 'No se pudo entrar con Google. Revisa que Google este habilitado y el dominio autorizado en Firebase.';
 };
 
 const normalizeStorePriorityText = (value) =>
@@ -716,6 +737,7 @@ export default function TiendaVirtualView({
   });
   const [authProviderDraft, setAuthProviderDraft] = useState(null);
   const [authError, setAuthError] = useState('');
+  const [authNotice, setAuthNotice] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authLocating, setAuthLocating] = useState(false);
   const [authSheetOpen, setAuthSheetOpen] = useState(() => mode !== 'dashboard' && !currentUser);
@@ -1586,6 +1608,7 @@ export default function TiendaVirtualView({
     setAuthMode(mode);
     setAuthProviderDraft(null);
     setAuthError('');
+    setAuthNotice('');
     setPendingAuthIntent(intent);
     setAuthSheetOpen(true);
   };
@@ -1599,6 +1622,7 @@ export default function TiendaVirtualView({
     setPendingAuthIntent('');
     setAuthProviderDraft(null);
     setAuthError('');
+    setAuthNotice('');
   };
 
   const fillAddressFromLocation = (currentAddress, location, fallback) => {
@@ -1828,6 +1852,7 @@ export default function TiendaVirtualView({
     event.preventDefault();
     setAuthLoading(true);
     setAuthError('');
+    setAuthNotice('');
 
     try {
       const user = await loginStoreUser({
@@ -1855,9 +1880,38 @@ export default function TiendaVirtualView({
     }
   };
 
+  const handleStorePasswordReset = async () => {
+    const email = String(authForm.email || '').trim();
+
+    if (!email) {
+      setAuthNotice('');
+      setAuthError('Escribe tu correo electronico para enviarte la recuperacion.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError('');
+    setAuthNotice('');
+
+    try {
+      await requestStorePasswordReset({ email });
+      setAuthNotice('Te enviamos un correo para recuperar tu contrasena. Revisa tambien spam o promociones.');
+    } catch (error) {
+      console.error('Error enviando recuperacion de contrasena:', error);
+      if (error.code === 'EMAIL_REQUIRED') {
+        setAuthError('Escribe tu correo electronico para recuperar tu contrasena.');
+      } else {
+        setAuthError('No pudimos enviar la recuperacion. Revisa el correo e intenta de nuevo.');
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const handleStoreGoogleLogin = async () => {
     setAuthLoading(true);
     setAuthError('');
+    setAuthNotice('');
 
     try {
       const user = await loginStoreUserWithGoogle();
@@ -1883,7 +1937,7 @@ export default function TiendaVirtualView({
         }));
         setAuthError('Completa telefono, direccion y punto del mapa para terminar tu cuenta.');
       } else {
-        setAuthError('No se pudo entrar con Google. Intenta de nuevo.');
+        setAuthError(getGoogleAuthErrorMessage(error));
       }
     } finally {
       setAuthLoading(false);
@@ -1894,6 +1948,7 @@ export default function TiendaVirtualView({
     event.preventDefault();
     setAuthLoading(true);
     setAuthError('');
+    setAuthNotice('');
     const isGoogleProfileCompletion = authProviderDraft?.provider === 'google';
 
     if (!isGoogleProfileCompletion && authForm.password !== authForm.confirmPassword) {
@@ -2324,6 +2379,31 @@ export default function TiendaVirtualView({
           font-size: 13px;
           font-weight: 900;
           margin-bottom: 10px;
+        }
+        .store-auth-notice {
+          border-radius: 12px;
+          padding: 10px 12px;
+          background: #ecfdf5;
+          color: #047857;
+          font-size: 13px;
+          font-weight: 900;
+          margin-bottom: 10px;
+        }
+        .store-auth-link-button {
+          justify-self: end;
+          border: 0;
+          padding: 0 2px 4px;
+          background: transparent;
+          color: #7b1022;
+          font-size: 13px;
+          font-weight: 950;
+          cursor: pointer;
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+        .store-auth-link-button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
         }
         .store-google-button {
           width: 100%;
@@ -3686,6 +3766,52 @@ export default function TiendaVirtualView({
           font-weight: 800;
           line-height: 1.4;
         }
+        .store-checkout-progress {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          padding: 4px;
+          margin: -2px 0 14px;
+          border-radius: 999px;
+          background: #f7f7f8;
+        }
+        .store-checkout-progress span {
+          border-radius: 999px;
+          padding: 9px 10px;
+          color: #9b6b72;
+          font-size: 12px;
+          font-weight: 950;
+          text-align: center;
+        }
+        .store-checkout-progress span.active {
+          background: #7b1022;
+          color: #ffffff;
+          box-shadow: 0 10px 22px rgba(123, 16, 34, 0.16);
+        }
+        .store-checkout-step {
+          display: grid;
+          gap: 12px;
+        }
+        .store-checkout-mini-total {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          border: 1px solid #fde2e2;
+          border-radius: 18px;
+          padding: 12px 14px;
+          background: #fff7f4;
+        }
+        .store-checkout-mini-total span {
+          color: #7b1022;
+          font-size: 12px;
+          font-weight: 950;
+          text-transform: uppercase;
+        }
+        .store-checkout-mini-total strong {
+          color: #111827;
+          font-size: 20px;
+        }
         .store-location-card {
           display: grid;
           gap: 10px;
@@ -4056,6 +4182,24 @@ export default function TiendaVirtualView({
           color: #7b1022;
           font-size: 13px;
           font-weight: 950;
+        }
+        .store-payment-note {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          border: 1px solid #fde2e2;
+          border-radius: 18px;
+          padding: 12px;
+          background: #fff7f4;
+          color: #7b1022;
+          font-size: 13px;
+          font-weight: 950;
+          line-height: 1.35;
+        }
+        .store-payment-note .store-checkout-icon {
+          width: 34px;
+          height: 34px;
+          background: #ffffff;
         }
         .store-mobile-cart {
           position: fixed;
@@ -5081,6 +5225,7 @@ export default function TiendaVirtualView({
           authMode={authMode}
           authForm={authForm}
           authError={authError}
+          authNotice={authNotice}
           authLoading={authLoading}
           authLocating={authLocating}
           authProviderDraft={authProviderDraft}
@@ -5092,6 +5237,7 @@ export default function TiendaVirtualView({
               setAuthProviderDraft(null);
             }
             setAuthError('');
+            setAuthNotice('');
           }}
           onFormChange={updateAuthForm}
           onCaptureLocation={captureAuthLocation}
@@ -5104,6 +5250,7 @@ export default function TiendaVirtualView({
           }}
           onLogin={handleStoreLogin}
           onGoogleLogin={handleStoreGoogleLogin}
+          onPasswordReset={handleStorePasswordReset}
           onRegister={handleStoreRegister}
         />
       )}
@@ -5117,6 +5264,7 @@ function StoreAuthView({
   authMode,
   authForm,
   authError,
+  authNotice,
   authLoading,
   authLocating,
   authProviderDraft,
@@ -5127,6 +5275,7 @@ function StoreAuthView({
   onFormChange,
   onLogin,
   onGoogleLogin,
+  onPasswordReset,
   onRegister,
 }) {
   const isRegister = authMode === 'register';
@@ -5165,6 +5314,7 @@ function StoreAuthView({
       </p>
 
       {authError && <div className="store-auth-error">{authError}</div>}
+      {authNotice && <div className="store-auth-notice">{authNotice}</div>}
 
       <button
         type="button"
@@ -5215,14 +5365,26 @@ function StoreAuthView({
           />
         )}
         {!isGoogleProfileCompletion && (
-          <input
-            className="store-field"
-            type="password"
-            value={authForm.password}
-            onChange={(event) => onFormChange('password', event.target.value)}
-            placeholder="Contrasena"
-            required
-          />
+          <>
+            <input
+              className="store-field"
+              type="password"
+              value={authForm.password}
+              onChange={(event) => onFormChange('password', event.target.value)}
+              placeholder="Contrasena"
+              required
+            />
+            {!isRegister && (
+              <button
+                type="button"
+                className="store-auth-link-button"
+                onClick={onPasswordReset}
+                disabled={authLoading}
+              >
+                Olvide mi contrasena
+              </button>
+            )}
+          </>
         )}
         {isRegister && !isGoogleProfileCompletion && (
           <input
@@ -6316,6 +6478,8 @@ function CheckoutSheet({
   const isGuestCheckout = !currentUser;
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const paymentValue = normalizeCheckoutPayment(customer.metodoPago);
+  const [checkoutStep, setCheckoutStep] = useState('cart');
+  const isCartStep = checkoutStep === 'cart';
   const deliveryChoices = [
     {
       value: ORDER_FULFILLMENT_DELIVERY,
@@ -6346,293 +6510,324 @@ function CheckoutSheet({
   ];
   const paymentChoices = STORE_PAYMENT_OPTIONS.map(getPaymentMeta);
 
+  useEffect(() => {
+    setCheckoutStep('cart');
+  }, [cartItems.length]);
+
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet">
         <div className="store-sheet-head">
-          <StoreBackButton onClick={onClose} />
-          <strong>Tu pedido</strong>
+          <StoreBackButton onClick={isCartStep ? onClose : () => setCheckoutStep('cart')} />
+          <strong>{isCartStep ? 'Tu pedido' : 'Entrega y pago'}</strong>
         </div>
 
-        {cartItems.map((item) => (
-          <div key={item.codigo} className="store-order-line">
-            <img src={item.image || LOGO_PATH} alt={item.nombre} />
-            <div>
-              <strong>{item.nombre}</strong>
-              <div style={{ color: '#6b7280', fontSize: 13 }}>
-                {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} x{' '}
-                {formatCurrency(item.precioUnitario)}
+        <div className="store-checkout-progress">
+          <span className={isCartStep ? 'active' : ''}>1. Carrito</span>
+          <span className={!isCartStep ? 'active' : ''}>2. Confirmar</span>
+        </div>
+
+        {isCartStep ? (
+          <div className="store-checkout-step">
+            {cartItems.map((item) => (
+              <div key={item.codigo} className="store-order-line">
+                <img src={item.image || LOGO_PATH} alt={item.nombre} />
+                <div>
+                  <strong>{item.nombre}</strong>
+                  <div style={{ color: '#6b7280', fontSize: 13 }}>
+                    {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} x{' '}
+                    {formatCurrency(item.precioUnitario)}
+                  </div>
+                  <div className="store-order-line-controls">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onQuantityChange(
+                          item.codigo,
+                          Number(item.cantidad || 0) <= Number(item.minQuantity || 0) + QUANTITY_EPSILON
+                            ? 0
+                            : Number(item.cantidad || 0) - Number(item.quantityStep || 1)
+                        )
+                      }
+                    >
+                      -
+                    </button>
+                    <QuantityInput
+                      className="store-floating-qty-input"
+                      step={item.quantityStep}
+                      value={Number(item.cantidad || 0)}
+                      ariaLabel={`Cantidad de ${item.nombre}`}
+                      onChange={(nextValue) => onQuantityChange(item.codigo, nextValue)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onQuantityChange(item.codigo, Number(item.cantidad || 0) + Number(item.quantityStep || 1))}
+                    >
+                      +
+                    </button>
+                    <button type="button" className="store-order-line-remove" onClick={() => onQuantityChange(item.codigo, 0)}>
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+                <strong>{formatCurrency(item.subtotal)}</strong>
               </div>
-              <div className="store-order-line-controls">
-                <button
-                  type="button"
-                  onClick={() =>
-                    onQuantityChange(
-                      item.codigo,
-                      Number(item.cantidad || 0) <= Number(item.minQuantity || 0) + QUANTITY_EPSILON
-                        ? 0
-                        : Number(item.cantidad || 0) - Number(item.quantityStep || 1)
-                    )
-                  }
-                >
-                  -
-                </button>
-                <QuantityInput
-                  className="store-floating-qty-input"
-                  step={item.quantityStep}
-                  value={Number(item.cantidad || 0)}
-                  ariaLabel={`Cantidad de ${item.nombre}`}
-                  onChange={(nextValue) => onQuantityChange(item.codigo, nextValue)}
+            ))}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
+              <strong>Subtotal estimado</strong>
+              <strong>{formatCurrency(totalAmount)}</strong>
+            </div>
+
+            <div className="store-coupon-card">
+              <div>
+                <strong>Cupon</strong>
+                <span>Si tienes un codigo promocional, aplicalo aqui.</span>
+              </div>
+              <div className="store-coupon-row">
+                <input
+                  className="store-input"
+                  value={couponInput}
+                  onChange={(event) => onCouponInputChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      onApplyCoupon();
+                    }
+                  }}
+                  placeholder="Codigo de cupon"
                 />
-                <button
-                  type="button"
-                  onClick={() => onQuantityChange(item.codigo, Number(item.cantidad || 0) + Number(item.quantityStep || 1))}
-                >
-                  +
-                </button>
-                <button type="button" className="store-order-line-remove" onClick={() => onQuantityChange(item.codigo, 0)}>
-                  Quitar
-                </button>
+                {appliedCoupon ? (
+                  <button type="button" className="store-button secondary" onClick={onRemoveCoupon}>
+                    Quitar
+                  </button>
+                ) : (
+                  <button type="button" className="store-button secondary" onClick={onApplyCoupon}>
+                    Aplicar
+                  </button>
+                )}
               </div>
-            </div>
-            <strong>{formatCurrency(item.subtotal)}</strong>
-          </div>
-        ))}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
-          <strong>Subtotal estimado</strong>
-          <strong>{formatCurrency(totalAmount)}</strong>
-        </div>
-
-        <form className="store-form" onSubmit={onSubmit}>
-          <div className="store-coupon-card">
-            <div>
-              <strong>Cupon</strong>
-              <span>Si tienes un codigo promocional, aplicalo aqui.</span>
-            </div>
-            <div className="store-coupon-row">
-              <input
-                className="store-input"
-                value={couponInput}
-                onChange={(event) => onCouponInputChange(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    onApplyCoupon();
-                  }
-                }}
-                placeholder="Codigo de cupon"
-              />
-              {appliedCoupon ? (
-                <button type="button" className="store-button secondary" onClick={onRemoveCoupon}>
-                  Quitar
-                </button>
-              ) : (
-                <button type="button" className="store-button secondary" onClick={onApplyCoupon}>
-                  Aplicar
-                </button>
+              {couponMessage && <p>{couponMessage}</p>}
+              {couponDiscount > 0 && (
+                <div className="store-coupon-discount">
+                  <span>{appliedCoupon?.code}</span>
+                  <strong>-{formatCurrency(couponDiscount)}</strong>
+                </div>
               )}
             </div>
-            {couponMessage && <p>{couponMessage}</p>}
-            {couponDiscount > 0 && (
-              <div className="store-coupon-discount">
-                <span>{appliedCoupon?.code}</span>
-                <strong>-{formatCurrency(couponDiscount)}</strong>
-              </div>
-            )}
-          </div>
 
-          <div className="store-total-note">
-            <div>
+            <div className="store-total-note">
+              <div>
+                <span>Total aproximado</span>
+                <strong>{formatCurrency(approximateTotalAmount)}</strong>
+              </div>
+              <p>
+                Puede variar por los pesos exactos de los productos. Se le actualizara el nuevo monto
+                cuando este listo el pedido.
+              </p>
+            </div>
+
+            <button type="button" className="store-button" onClick={() => setCheckoutStep('details')}>
+              Pedir en linea
+            </button>
+          </div>
+        ) : (
+          <form className="store-form" onSubmit={onSubmit}>
+            <div className="store-checkout-mini-total">
               <span>Total aproximado</span>
               <strong>{formatCurrency(approximateTotalAmount)}</strong>
             </div>
-            <p>
-              Puede variar por los pesos exactos de los productos. Se le actualizara el nuevo monto
-              cuando este listo el pedido.
-            </p>
-          </div>
 
-          <div className="store-choice-section">
-            <div className="store-choice-title">
-              <StoreCheckoutIcon name="route" />
-              <span>Tipo de entrega</span>
-            </div>
-            <div className="store-choice-grid two">
-              {deliveryChoices.map((choice) => (
-                <button
-                  key={choice.value}
-                  type="button"
-                  className={`store-choice-card ${fulfillmentType === choice.value ? 'active' : ''}`}
-                  aria-pressed={fulfillmentType === choice.value}
-                  onClick={() => onFulfillmentTypeChange(choice.value)}
-                >
-                  <StoreCheckoutIcon name={choice.icon} />
-                  <strong>{choice.title}</strong>
-                  <span>{choice.detail}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isGuestCheckout ? (
-            <div className="store-status-card store-auth-choice-card">
-              <div className="store-status-pill">Realizar pedido en linea</div>
-              <h3 style={{ margin: '10px 0 4px' }}>
-                Inicia sesion o crea tu cuenta para enviar el pedido
-              </h3>
-              <p>Asi guardamos tu direccion, historial y estado del pedido en un solo lugar.</p>
-              <div className="store-auth-inline-actions">
-                <button type="button" className="store-button" onClick={onOpenLogin}>
-                  Inicia sesion
-                </button>
-                <button type="button" className="store-button secondary" onClick={onOpenRegister}>
-                  Crear cuenta
-                </button>
+            <div className="store-choice-section">
+              <div className="store-choice-title">
+                <StoreCheckoutIcon name="route" />
+                <span>Tipo de entrega</span>
+              </div>
+              <div className="store-choice-grid two">
+                {deliveryChoices.map((choice) => (
+                  <button
+                    key={choice.value}
+                    type="button"
+                    className={`store-choice-card ${fulfillmentType === choice.value ? 'active' : ''}`}
+                    aria-pressed={fulfillmentType === choice.value}
+                    onClick={() => onFulfillmentTypeChange(choice.value)}
+                  >
+                    <StoreCheckoutIcon name={choice.icon} />
+                    <strong>{choice.title}</strong>
+                    <span>{choice.detail}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          ) : (
-            <>
-              {pickupFlow ? (
-                <div className="store-status-card" style={{ marginTop: 0 }}>
-                  <div className="store-status-pill">Pickup</div>
-                  <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
-                  <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
-                    {currentUser.telefono}
-                    <br />
-                    Recogeras este pedido directamente en tienda.
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="store-choice-section compact">
-                    <div className="store-choice-title">
-                      <StoreCheckoutIcon name="pin" />
-                      <span>Direccion</span>
-                    </div>
-                    <div className="store-choice-grid two">
-                      {addressChoices.map((choice) => (
-                        <button
-                          key={choice.value}
-                          type="button"
-                          className={`store-choice-card mini ${deliveryMode === choice.value ? 'active' : ''}`}
-                          aria-pressed={deliveryMode === choice.value}
-                          onClick={() => onDeliveryModeChange(choice.value)}
-                        >
-                          <StoreCheckoutIcon name={choice.icon} />
-                          <strong>{choice.title}</strong>
-                          <span>{choice.detail}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {deliveryMode === 'perfil' ? (
-                    <div className="store-status-card" style={{ marginTop: 0 }}>
-                      <div className="store-status-pill">Entrega</div>
-                      <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
-                      <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
-                        {currentUser.telefono}
-                        <br />
-                        {currentUser.direccion}
-                        {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+            {isGuestCheckout ? (
+              <div className="store-status-card store-auth-choice-card">
+                <div className="store-status-pill">Realizar pedido en linea</div>
+                <h3 style={{ margin: '10px 0 4px' }}>
+                  Inicia sesion o crea tu cuenta para enviar el pedido
+                </h3>
+                <p>Asi guardamos tu direccion, historial y estado del pedido en un solo lugar.</p>
+                <div className="store-auth-inline-actions">
+                  <button type="button" className="store-button" onClick={onOpenLogin}>
+                    Inicia sesion
+                  </button>
+                  <button type="button" className="store-button secondary" onClick={onOpenRegister}>
+                    Crear cuenta
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {pickupFlow ? (
+                  <div className="store-status-card" style={{ marginTop: 0 }}>
+                    <div className="store-status-pill">Pickup</div>
+                    <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+                    <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+                      {currentUser.telefono}
+                      <br />
+                      Recogeras este pedido directamente en tienda.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="store-choice-section compact">
+                      <div className="store-choice-title">
+                        <StoreCheckoutIcon name="pin" />
+                        <span>Direccion</span>
                       </div>
-                      {!hasLocation(currentUser.ubicacion) && (
-                        <div className="store-location-feedback error" style={{ marginTop: 10 }}>
-                          Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
+                      <div className="store-choice-grid two">
+                        {addressChoices.map((choice) => (
+                          <button
+                            key={choice.value}
+                            type="button"
+                            className={`store-choice-card mini ${deliveryMode === choice.value ? 'active' : ''}`}
+                            aria-pressed={deliveryMode === choice.value}
+                            onClick={() => onDeliveryModeChange(choice.value)}
+                          >
+                            <StoreCheckoutIcon name={choice.icon} />
+                            <strong>{choice.title}</strong>
+                            <span>{choice.detail}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {deliveryMode === 'perfil' ? (
+                      <div className="store-status-card" style={{ marginTop: 0 }}>
+                        <div className="store-status-pill">Entrega</div>
+                        <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
+                        <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
+                          {currentUser.telefono}
+                          <br />
+                          {currentUser.direccion}
+                          {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
                         </div>
-                      )}
-                      <button
-                        type="button"
-                        className="store-button secondary"
-                        style={{ marginTop: 10 }}
-                        onClick={onEditProfile}
-                      >
-                        Editar mi direccion
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="store-status-card" style={{ marginTop: 0 }}>
-                      <div className="store-status-pill">Entrega alterna</div>
-                      <div className="store-form" style={{ marginTop: 12 }}>
-                        <input
-                          className="store-field"
-                          value={alternateDelivery.direccion}
-                          onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
-                          placeholder="Direccion de entrega"
-                        />
-                        <input
-                          className="store-field"
-                          value={alternateDelivery.referencia}
-                          onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
-                          placeholder="Referencia"
-                        />
-                        <LocationCaptureBlock
-                          location={alternateDelivery.ubicacion}
-                          locating={alternateLocating}
-                          onCapture={onCaptureAlternateLocation}
-                          onManualLocation={(location) => {
-                            onAlternateDeliveryChange('ubicacion', location);
-                            if (shouldAutofillAddress(alternateDelivery.direccion)) {
-                              onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
-                            }
-                          }}
-                          onAddressResolved={(value) => {
-                            if (shouldAutofillAddress(alternateDelivery.direccion)) {
-                              onAlternateDeliveryChange('direccion', value);
-                            }
-                          }}
-                        />
+                        {!hasLocation(currentUser.ubicacion) && (
+                          <div className="store-location-feedback error" style={{ marginTop: 10 }}>
+                            Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="store-button secondary"
+                          style={{ marginTop: 10 }}
+                          onClick={onEditProfile}
+                        >
+                          Editar mi direccion
+                        </button>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-          <div className="store-choice-section">
-            <div className="store-choice-title">
-              <StoreCheckoutIcon name="wallet" />
-              <span>Forma de pago</span>
+                    ) : (
+                      <div className="store-status-card" style={{ marginTop: 0 }}>
+                        <div className="store-status-pill">Entrega alterna</div>
+                        <div className="store-form" style={{ marginTop: 12 }}>
+                          <input
+                            className="store-field"
+                            value={alternateDelivery.direccion}
+                            onChange={(event) => onAlternateDeliveryChange('direccion', event.target.value)}
+                            placeholder="Direccion de entrega"
+                          />
+                          <input
+                            className="store-field"
+                            value={alternateDelivery.referencia}
+                            onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
+                            placeholder="Referencia"
+                          />
+                          <LocationCaptureBlock
+                            location={alternateDelivery.ubicacion}
+                            locating={alternateLocating}
+                            onCapture={onCaptureAlternateLocation}
+                            onManualLocation={(location) => {
+                              onAlternateDeliveryChange('ubicacion', location);
+                              if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                                onAlternateDeliveryChange('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
+                              }
+                            }}
+                            onAddressResolved={(value) => {
+                              if (shouldAutofillAddress(alternateDelivery.direccion)) {
+                                onAlternateDeliveryChange('direccion', value);
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            <div className="store-choice-section">
+              <div className="store-choice-title">
+                <StoreCheckoutIcon name="wallet" />
+                <span>Forma de pago</span>
+              </div>
+              <div className="store-choice-grid payment">
+                {paymentChoices.map((payment) => (
+                  <button
+                    key={payment.value}
+                    type="button"
+                    className={`store-choice-card payment ${paymentValue === payment.value ? 'active' : ''}`}
+                    aria-pressed={paymentValue === payment.value}
+                    onClick={() => onCustomerChange('metodoPago', payment.value)}
+                  >
+                    <StoreCheckoutIcon name={payment.icon} />
+                    <strong>{payment.title}</strong>
+                    <span>{payment.detail}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="store-choice-grid payment">
-              {paymentChoices.map((payment) => (
-                <button
-                  key={payment.value}
-                  type="button"
-                  className={`store-choice-card payment ${paymentValue === payment.value ? 'active' : ''}`}
-                  aria-pressed={paymentValue === payment.value}
-                  onClick={() => onCustomerChange('metodoPago', payment.value)}
-                >
-                  <StoreCheckoutIcon name={payment.icon} />
-                  <strong>{payment.title}</strong>
-                  <span>{payment.detail}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          {paymentValue === STORE_CASH_PAYMENT && (
-            <label className="store-cash-change">
-              <span>Necesito cambio para:</span>
-              <input
-                className="store-field"
-                value={customer.cambioPara || ''}
-                inputMode="decimal"
-                onChange={(event) => onCustomerChange('cambioPara', event.target.value)}
-                placeholder="Ej. C$ 500"
-              />
-            </label>
-          )}
-          <textarea
-            className="store-textarea"
-            value={notes}
-            onChange={(event) => onNotesChange(event.target.value)}
-            placeholder="Notas para tu pedido"
-          />
-          <button type="submit" className="store-button" disabled={submitting}>
-            {submitting ? 'Enviando...' : 'Realizar pedido en linea'}
-          </button>
-        </form>
+
+            {paymentValue === 'LINK DE PAGO' && (
+              <div className="store-payment-note">
+                <StoreCheckoutIcon name="link" />
+                <span>Se enviara el link por WhatsApp a tu numero registrado.</span>
+              </div>
+            )}
+
+            {paymentValue === STORE_CASH_PAYMENT && (
+              <label className="store-cash-change">
+                <span>Necesito cambio para:</span>
+                <input
+                  className="store-field"
+                  value={customer.cambioPara || ''}
+                  inputMode="decimal"
+                  onChange={(event) => onCustomerChange('cambioPara', event.target.value)}
+                  placeholder="Ej. C$ 500"
+                />
+              </label>
+            )}
+            <textarea
+              className="store-textarea"
+              value={notes}
+              onChange={(event) => onNotesChange(event.target.value)}
+              placeholder="Notas para tu pedido"
+            />
+            <button type="submit" className="store-button" disabled={submitting}>
+              {submitting ? 'Enviando...' : 'Realizar pedido en linea'}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

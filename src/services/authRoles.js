@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -75,6 +76,18 @@ export async function signInStoreCustomer({ email, telefono, password }) {
   );
 
   return credential.user;
+}
+
+export async function sendStoreCustomerPasswordReset({ email, telefono }) {
+  const authEmail = resolveStoreCustomerEmail({ email, telefono });
+  if (!authEmail || authEmail.endsWith(`@clientes.${AUTH_DOMAIN}`)) {
+    const error = new Error('Correo requerido');
+    error.code = 'auth/email-required';
+    throw error;
+  }
+
+  await sendPasswordResetEmail(auth, authEmail);
+  return true;
 }
 
 export async function createStoreCustomerAuth({ nombre, email, telefono, password }) {
