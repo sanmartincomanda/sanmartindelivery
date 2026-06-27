@@ -6681,10 +6681,9 @@ function StoreOrderStatusVisual({ type = 'prep', compact = false }) {
       <svg {...commonProps}>
         <path d="M22 57c0-14 14-25 31-25 12 0 22 5 25 14 4 10-6 22-25 25-18 3-31-2-31-14Z" fill="#fecaca" />
         <path d="M28 57c0-9 11-17 25-17 8 0 15 3 18 8 3 6-4 14-18 16-14 3-25 0-25-7Z" fill="#dc2626" />
-        <path d="M40 45c4 8 13 9 22 5" stroke="#fff7ed" strokeWidth="4" strokeLinecap="round" />
-        <path d="M20 26l27 27M15 31l10-10M49 18 28 39" stroke="#7f1d1d" strokeWidth="5" strokeLinecap="round" />
-        <path d="M66 18l13 13M79 18 66 31" stroke="#7f1d1d" strokeWidth="5" strokeLinecap="round" />
-        <path d="M65 18 37 46" stroke="#111827" strokeWidth="4" strokeLinecap="round" />
+        <path d="M39 46c4 8 14 10 24 5" stroke="#fff7ed" strokeWidth="4" strokeLinecap="round" />
+        <path d="M33 56c8 5 20 6 31 0" stroke="#991b1b" strokeWidth="4" strokeLinecap="round" opacity=".45" />
+        <path d="M29 36c5-7 15-12 27-12" stroke="#fecaca" strokeWidth="6" strokeLinecap="round" opacity=".7" />
       </svg>
     ),
     driver: (

@@ -176,6 +176,7 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   const normalizedItems = normalizeStoreItems(items);
   const totalLabel = String(summary.totalLabel || 'Total aproximado de pedido').trim();
   const subtotalLabel = String(summary.subtotalLabel || 'Subtotal estimado').trim();
+  const observations = String(summary.observaciones || summary.notes || '').trim();
   const subtotal = Number(
     summary.subtotal ?? normalizedItems.reduce((sum, item) => sum + item.subtotal, 0)
   );
@@ -188,6 +189,12 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
     lines.push(`${totalLabel}: C$${formatAmount(total)}`);
+  }
+
+  if (observations) {
+    lines.push('');
+    lines.push('Notas del cliente:');
+    lines.push(observations);
   }
 
   return lines.join('\n').trim();
@@ -337,6 +344,7 @@ export async function createOrder(payload, options = {}) {
   const generatedKitchenPedidoTexto = buildStoreKitchenOrderText(normalizedItems, {
     couponCode: coupon?.code,
     total,
+    observaciones: payload.observaciones,
   });
   const pedidoTexto =
     channel === STORE_CHANNEL

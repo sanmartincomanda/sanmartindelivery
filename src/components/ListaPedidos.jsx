@@ -3,7 +3,7 @@ import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
 import { DRIVERS_PATH, mergeDrivers } from '../services/drivers';
-import { isPickupOrder } from '../services/orders';
+import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 
 // Iconos SVG (mismos que en KitchenView)
@@ -376,6 +376,32 @@ export default function ListaPedidos({ pedidos = [] }) {
       'CREDITO': '#ec4899'  // Rosa
     };
     return colores[metodo] || '#64748b'; // Gris por defecto
+  };
+
+  const getPedidoDetalle = (pedido = {}) => {
+    const observaciones = String(pedido.observaciones || '').trim();
+
+    if (Array.isArray(pedido.items) && pedido.items.length > 0) {
+      return buildStoreKitchenOrderText(pedido.items, {
+        subtotal: pedido.subtotalEstimado,
+        total: pedido.total,
+        totalLabel:
+          pedido?.totalAproximado === false
+            ? 'Total actualizado de pedido'
+            : 'Total aproximado de pedido',
+        subtotalLabel:
+          pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado',
+        observaciones,
+      });
+    }
+
+    const detalle = String(pedido.pedido || '').trim();
+
+    if (!observaciones || detalle.includes(observaciones)) {
+      return detalle;
+    }
+
+    return [detalle, '', 'Notas del cliente:', observaciones].filter(Boolean).join('\n');
   };
 
   return (
@@ -1161,7 +1187,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                         wordBreak: 'break-word',
                         textDecoration: status === 'Cancelado' ? 'line-through' : 'none'
                       }}>
-                        {pedido.pedido}
+                        {getPedidoDetalle(pedido)}
                       </pre>
                     </div>
 
