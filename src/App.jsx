@@ -18,6 +18,7 @@ import {
   normalizeKitchenUser,
   SYSTEM_USERS_PATH,
 } from './services/systemUsers';
+import { CLIENT_DIRECTORY_PATH } from './services/clientDirectory';
 
 const OrderForm = lazy(() => import('./components/OrderForm'));
 const KitchenView = lazy(() => import('./components/KitchenView'));
@@ -213,6 +214,7 @@ function App() {
   const isDriverRoute = route === 'driver';
   const todayKey = hoyISO();
   const isAdminDashboard = dashboardRole === AUTH_ROLES.ADMIN;
+  const isOperatorDashboard = dashboardRole === AUTH_ROLES.OPERATOR;
 
   useEffect(() => {
     const unsubscribe = onFirebaseAuthChange((user) => {
@@ -351,15 +353,16 @@ function App() {
     const shouldLoadClients =
       !isPublicStoreRoute &&
       route === 'dashboard' &&
-      isAdminDashboard &&
-      (view === 'ingreso' || view === 'basedatos');
+      ((isAdminDashboard && (view === 'ingreso' || view === 'basedatos')) ||
+        (isOperatorDashboard && view === 'ingreso'));
 
     if (!shouldLoadClients) {
       setClientes([]);
       return undefined;
     }
 
-    const clientsRef = ref(database, 'clients');
+    const clientsPath = isOperatorDashboard && !isAdminDashboard ? CLIENT_DIRECTORY_PATH : 'clients';
+    const clientsRef = ref(database, clientsPath);
     const applyClientsSnapshot = (data) => {
       if (!data) {
         setClientes([]);
@@ -405,7 +408,7 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [isAdminDashboard, isPublicStoreRoute, route, view]);
+  }, [isAdminDashboard, isOperatorDashboard, isPublicStoreRoute, route, view]);
 
   const nextOrderNumber = useMemo(
     () => Math.min(todayCounter + 1, ORDER_LIMIT_PER_DAY + 1),
@@ -926,8 +929,8 @@ function App() {
             {view === 'ingreso' && (
               <OrderForm
                 onAddOrder={addOrder}
-                clientes={isAdminDashboard ? clientes : []}
-                allowClientDirectory={isAdminDashboard}
+                clientes={clientes}
+                allowClientDirectory={isAdminDashboard || isOperatorDashboard}
                 nextOrderNumber={nextOrderNumber}
                 remainingOrders={remainingOrders}
               />

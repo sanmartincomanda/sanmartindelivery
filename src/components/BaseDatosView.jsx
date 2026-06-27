@@ -10,6 +10,11 @@ import { push, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
 import { fetchOrdersByDateRange } from '../services/orders';
+import {
+  buildClientDirectoryRootUpdate,
+  removeClientDirectoryEntry,
+  setClientDirectoryEntry,
+} from '../services/clientDirectory';
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import { ORDER_HISTORY_RETENTION_DAYS } from '../services/orderArchive';
 import { hoyISO, normalizar } from './Utils';
@@ -824,7 +829,13 @@ function ClientesManager({ clientes, onToast }) {
 
   const handleSaveClient = async (firebaseKey, payload) => {
     try {
+      const existingClient = clientes.find((client) => client.firebaseKey === firebaseKey) || {};
       await update(ref(database, `clients/${firebaseKey}`), payload);
+      await setClientDirectoryEntry(firebaseKey, {
+        ...existingClient,
+        ...payload,
+        updatedAt: Date.now(),
+      });
       return true;
     } catch (error) {
       console.error('Error saving client:', error);
@@ -841,9 +852,15 @@ function ClientesManager({ clientes, onToast }) {
     }
 
     try {
+      const existingClient = clientes.find((client) => client.firebaseKey === firebaseKey) || {};
       await update(ref(database, `clients/${firebaseKey}`), {
         ubicacion: location,
         ubicacionActualizadaAt: Date.now(),
+      });
+      await setClientDirectoryEntry(firebaseKey, {
+        ...existingClient,
+        ubicacion: location,
+        updatedAt: Date.now(),
       });
       onToast('Ubicacion del cliente guardada');
       return true;
@@ -875,6 +892,7 @@ function ClientesManager({ clientes, onToast }) {
 
     try {
       await remove(ref(database, `clients/${firebaseKey}`));
+      await removeClientDirectoryEntry(firebaseKey);
       onToast('Cliente eliminado');
     } catch (error) {
       console.error('Error deleting client:', error);
@@ -941,13 +959,17 @@ function ClientesManager({ clientes, onToast }) {
       const updates = {};
 
       previewData.forEach((client) => {
+        const now = Date.now();
         const key = push(ref(database, 'clients')).key;
-        updates[`clients/${key}`] = {
+        const clientPayload = {
           codigo: client.codigo,
           nombre: client.nombre,
           direccion: client.direccion,
-          timestamp: Date.now(),
+          timestamp: now,
+          updatedAt: now,
         };
+        updates[`clients/${key}`] = clientPayload;
+        Object.assign(updates, buildClientDirectoryRootUpdate(key, clientPayload));
       });
 
       await update(ref(database), updates);

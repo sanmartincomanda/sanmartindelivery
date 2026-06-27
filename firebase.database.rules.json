@@ -38,7 +38,24 @@
       ".indexOn": ["codigo", "telefono", "storeUserKey"],
       "$clientId": {
         ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || data.child('storeUserKey').val() == auth.uid)",
-        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid)"
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && !data.exists() && newData.child('createdByRole').val() == 'operator'))",
+        ".validate": "root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid || newData.hasChildren(['nombre', 'codigo', 'direccion'])",
+        "$other": {
+          ".validate": "root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.parent().child('storeUserKey').val() == auth.uid || $other == 'nombre' || $other == 'codigo' || $other == 'direccion' || $other == 'telefono' || $other == 'ubicacion' || $other == 'origen' || $other == 'createdByRole' || $other == 'createdAt' || $other == 'updatedAt'"
+        }
+      }
+    },
+
+    "clientDirectory": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator')",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["nombre", "codigo", "telefono"],
+      "$clientId": {
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && (!data.exists() || data.child('createdByRole').val() == 'operator') && newData.child('createdByRole').val() == 'operator') || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && newData.child('storeUserKey').val() == auth.uid))",
+        ".validate": "root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid || newData.hasChildren(['nombre', 'codigo', 'direccion'])",
+        "$other": {
+          ".validate": "root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.parent().child('storeUserKey').val() == auth.uid || $other == 'nombre' || $other == 'codigo' || $other == 'direccion' || $other == 'telefono' || $other == 'ubicacion' || $other == 'origen' || $other == 'storeUserKey' || $other == 'createdByRole' || $other == 'createdAt' || $other == 'updatedAt'"
+        }
       }
     },
 

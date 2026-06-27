@@ -12,6 +12,7 @@
     "catalog:migrate:images": "node scripts/migrateCatalogImagesToStorage.mjs",
     "auth:bootstrap": "node scripts/bootstrapAuthUsers.mjs",
     "auth:cleanup:store-customers": "node scripts/cleanupLegacyStoreCustomers.mjs",
+    "clients:sync-directory": "node scripts/syncClientDirectory.mjs",
     "firebase:login": "npx firebase-tools login",
     "firebase:use": "npx firebase-tools use comanda-digital-ac1ec",
     "firebase:deploy:rules": "npx firebase-tools deploy --only database,storage",

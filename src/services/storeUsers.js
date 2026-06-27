@@ -10,6 +10,7 @@ import {
   touchLastLogin,
   upsertOwnClientRole,
 } from './authRoles';
+import { setClientDirectoryEntry } from './clientDirectory';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
@@ -168,10 +169,11 @@ export async function ensureStoreUser({
   };
 
   let clientKey = existingUser?.clientKey || null;
+  let clientPayload = null;
   if (!clientKey) {
     const newClientRef = push(ref(database, 'clients'));
     clientKey = newClientRef.key;
-    await set(newClientRef, {
+    clientPayload = {
       nombre: profile.nombre,
       codigo: profile.codigo,
       direccion: profile.referencia
@@ -183,9 +185,10 @@ export async function ensureStoreUser({
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       createdAt: now,
-    });
+    };
+    await set(newClientRef, clientPayload);
   } else {
-    await update(ref(database, `clients/${clientKey}`), {
+    clientPayload = {
       nombre: profile.nombre,
       codigo: profile.codigo,
       direccion: profile.referencia
@@ -197,8 +200,15 @@ export async function ensureStoreUser({
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       updatedAt: now,
-    });
+    };
+    await update(ref(database, `clients/${clientKey}`), clientPayload);
   }
+
+  await setClientDirectoryEntry(clientKey, {
+    ...clientPayload,
+    createdByRole: 'client',
+    updatedAt: now,
+  });
 
   await set(userRef, {
     ...(existingUser || {}),

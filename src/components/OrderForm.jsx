@@ -1,6 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { push, ref, set } from 'firebase/database';
-import { database } from '../firebase';
 import { hoyISO, normalizar } from './Utils';
 import {
   MANUAL_CHANNEL,
@@ -9,6 +7,7 @@ import {
   formatOrderNumber,
 } from '../services/orders';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation } from '../services/geo';
+import { createManualClient } from '../services/clientDirectory';
 
 const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
 
@@ -33,7 +32,13 @@ export default function OrderForm({
   const [pedido, setPedido] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
   const [showNewClient, setShowNewClient] = useState(false);
-  const [nuevoCliente, setNuevoCliente] = useState({ nombre: '', codigo: '', direccion: '', ubicacion: null });
+  const [nuevoCliente, setNuevoCliente] = useState({
+    nombre: '',
+    codigo: '',
+    telefono: '',
+    direccion: '',
+    ubicacion: null,
+  });
   const [savingClient, setSavingClient] = useState(false);
   const [locatingClient, setLocatingClient] = useState(false);
   const [metodoPago, setMetodoPago] = useState('Efectivo');
@@ -146,20 +151,19 @@ export default function OrderForm({
 
     try {
       setSavingClient(true);
-      const newClientRef = push(ref(database, 'clients'));
       const clientData = {
         nombre: nombre.trim(),
         codigo: codigo.trim(),
         direccion: direccion.trim(),
+        telefono: nuevoCliente.telefono || '',
         ubicacion: nuevoCliente.ubicacion || null,
       };
-
-      await set(newClientRef, clientData);
+      const createdClient = await createManualClient(clientData);
 
       setShowNewClient(false);
-      setNuevoCliente({ nombre: '', codigo: '', direccion: '', ubicacion: null });
-      setSelectedClient({ firebaseKey: newClientRef.key, ...clientData });
-      setClienteInput(clientData.nombre);
+      setNuevoCliente({ nombre: '', codigo: '', telefono: '', direccion: '', ubicacion: null });
+      setSelectedClient(createdClient);
+      setClienteInput(createdClient.nombre);
     } catch (error) {
       console.error('Error guardando cliente:', error);
       alert('No se pudo guardar el cliente.');
@@ -692,6 +696,23 @@ export default function OrderForm({
                       value={nuevoCliente.codigo}
                       onChange={(event) =>
                         setNuevoCliente((current) => ({ ...current, codigo: event.target.value }))
+                      }
+                      style={{
+                        padding: '14px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        outline: 'none',
+                      }}
+                    />
+                    <input
+                      placeholder="Telefono"
+                      value={nuevoCliente.telefono}
+                      onChange={(event) =>
+                        setNuevoCliente((current) => ({ ...current, telefono: event.target.value }))
                       }
                       style={{
                         padding: '14px 16px',
