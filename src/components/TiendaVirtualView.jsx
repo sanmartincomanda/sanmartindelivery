@@ -76,8 +76,16 @@ const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
-const ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo', 'En camino', 'Entregado'];
-const PICKUP_ORDER_PROGRESS_STEPS = ['Recibido', 'Cocina', 'Listo para recoger', 'Recogido'];
+const ORDER_PROGRESS_STEPS = [
+  { key: 'preparando', label: 'Preparando', icon: 'prep' },
+  { key: 'en_camino', label: 'En camino', icon: 'driver' },
+  { key: 'entregado', label: 'Entregado', icon: 'done' },
+];
+const PICKUP_ORDER_PROGRESS_STEPS = [
+  { key: 'preparando', label: 'Preparando', icon: 'prep' },
+  { key: 'pickup', label: 'Pickup listo', icon: 'pickup' },
+  { key: 'entregado', label: 'Recogido', icon: 'done' },
+];
 const MAP_PICKER_DEFAULT_LOCATION = normalizeLocation({
   lat: 11.9299,
   lng: -85.956,
@@ -493,6 +501,70 @@ const getCustomerStatusMeta = (order = {}) => {
   };
 
   return statusMeta[statusKey] || statusMeta.pendiente;
+};
+
+const getCustomerStatusMetaV2 = (order = {}) => {
+  const statusKey = normalizeCustomerOrderStatus(order.estado);
+  const pickupOrder = isPickupOrder(order);
+  const riderName = getShortPersonName(order.repartidor, 'Por asignar');
+  const preparingMeta = {
+    accent: '#9f1239',
+    soft: '#fff1f2',
+    visual: 'prep',
+    label: 'Carnes San Martin',
+    message: 'Carnes San Martin esta preparando tu pedido.',
+    progress: 1,
+  };
+
+  if (statusKey === 'cancelado') {
+    return {
+      accent: '#64748b',
+      soft: '#f8fafc',
+      visual: 'cancel',
+      label: 'Pedido cancelado',
+      message: 'Este pedido fue cancelado. Si necesitas ayuda, escribenos por WhatsApp.',
+      progress: 0,
+    };
+  }
+
+  if (statusKey === 'entregado') {
+    return {
+      accent: '#16a34a',
+      soft: '#f0fdf4',
+      visual: 'done',
+      label: pickupOrder ? 'Pedido recogido' : 'Pedido entregado',
+      message: pickupOrder
+        ? 'Entregado - tu pedido fue recogido. Gracias por comprar en Carnes San Martin Granada.'
+        : 'Entregado - tu pedido fue entregado. Gracias por comprar en Carnes San Martin Granada.',
+      progress: 3,
+    };
+  }
+
+  if (statusKey === 'enviado') {
+    return {
+      accent: '#2563eb',
+      soft: '#eff6ff',
+      visual: 'driver',
+      label: pickupOrder ? 'Pickup listo' : 'Driver en camino',
+      message: pickupOrder
+        ? 'Tu pedido esta listo para recoger en tienda.'
+        : `Driver - ${riderName} tiene tu pedido en camino.`,
+      progress: 2,
+    };
+  }
+
+  if (statusKey === 'preparado' && pickupOrder) {
+    return {
+      accent: '#2563eb',
+      soft: '#eff6ff',
+      visual: 'pickup',
+      label: 'Pickup listo',
+      message: 'Tu pedido esta listo para recoger en tienda.',
+      progress: 2,
+    };
+  }
+
+  return preparingMeta;
 };
 
 const buildOrderItemsMessage = (order = {}) => {
@@ -4135,16 +4207,31 @@ export default function TiendaVirtualView({
           align-items: flex-start;
           gap: 12px;
         }
-        .store-status-emoji {
-          width: 48px;
-          height: 48px;
+        .store-status-visual {
+          width: 72px;
+          height: 72px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: 16px;
+          border-radius: 24px;
           background: #ffffff;
-          font-size: 26px;
-          box-shadow: 0 12px 25px rgba(15, 23, 42, 0.08);
+          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+          flex: 0 0 auto;
+        }
+        .store-status-visual svg {
+          width: 62px;
+          height: 62px;
+        }
+        .store-status-visual.compact {
+          width: 28px;
+          height: 28px;
+          border-radius: 10px;
+          box-shadow: none;
+          background: rgba(255, 255, 255, 0.88);
+        }
+        .store-status-visual.compact svg {
+          width: 24px;
+          height: 24px;
         }
         .store-status-message {
           position: relative;
@@ -4157,24 +4244,31 @@ export default function TiendaVirtualView({
           position: relative;
           z-index: 1;
           display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: 6px;
-          margin-top: 14px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 16px;
         }
         .store-progress-step {
-          min-height: 36px;
+          min-height: 58px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: 999px;
+          flex-direction: column;
+          gap: 5px;
+          border-radius: 18px;
           background: rgba(255, 255, 255, 0.72);
           color: #94a3b8;
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 900;
           text-align: center;
+          line-height: 1.1;
+          padding: 7px 6px;
         }
         .store-progress-step.done {
           color: #ffffff;
+        }
+        .store-progress-step.done .store-status-visual.compact {
+          background: #ffffff;
         }
         .store-order-meta {
           position: relative;
@@ -4582,9 +4676,11 @@ export default function TiendaVirtualView({
           .store-orders-hero h2 {
             font-size: 20px;
           }
-          .store-order-meta,
-          .store-progress {
+          .store-order-meta {
             grid-template-columns: 1fr;
+          }
+          .store-progress {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
           }
           .store-location-actions,
           .store-map-fields,
@@ -4601,7 +4697,8 @@ export default function TiendaVirtualView({
             min-height: 82px;
           }
           .store-progress-step {
-            min-height: 32px;
+            min-height: 54px;
+            font-size: 9.5px;
           }
         }
       `}</style>
@@ -6509,7 +6606,7 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
           <div className="store-status-pill">Seguimiento en vivo</div>
           <h2>{currentUser.nombre}</h2>
           <p>
-            Aqui veras si tu pedido ya esta en cocina, listo para recoger o en camino hacia ti.
+            Aqui veras tu pedido en tres pasos simples: preparacion, camino y entrega.
           </p>
         </div>
 
@@ -6558,8 +6655,68 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
   );
 }
 
+function StoreOrderStatusVisual({ type = 'prep', compact = false }) {
+  const commonProps = {
+    viewBox: '0 0 96 96',
+    fill: 'none',
+    'aria-hidden': true,
+  };
+  const visuals = {
+    prep: (
+      <svg {...commonProps}>
+        <path d="M22 57c0-14 14-25 31-25 12 0 22 5 25 14 4 10-6 22-25 25-18 3-31-2-31-14Z" fill="#fecaca" />
+        <path d="M28 57c0-9 11-17 25-17 8 0 15 3 18 8 3 6-4 14-18 16-14 3-25 0-25-7Z" fill="#dc2626" />
+        <path d="M40 45c4 8 13 9 22 5" stroke="#fff7ed" strokeWidth="4" strokeLinecap="round" />
+        <path d="M20 26l27 27M15 31l10-10M49 18 28 39" stroke="#7f1d1d" strokeWidth="5" strokeLinecap="round" />
+        <path d="M66 18l13 13M79 18 66 31" stroke="#7f1d1d" strokeWidth="5" strokeLinecap="round" />
+        <path d="M65 18 37 46" stroke="#111827" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    ),
+    driver: (
+      <svg {...commonProps}>
+        <path d="M18 54h38l10-18h11c7 0 12 6 12 13v12H76" fill="#dbeafe" />
+        <path d="M18 54h38l10-18h11c7 0 12 6 12 13v12H76M18 54v7h10" stroke="#1d4ed8" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M37 61h24" stroke="#1d4ed8" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="33" cy="64" r="9" fill="#111827" />
+        <circle cx="71" cy="64" r="9" fill="#111827" />
+        <circle cx="33" cy="64" r="3" fill="#ffffff" />
+        <circle cx="71" cy="64" r="3" fill="#ffffff" />
+        <path d="M23 43h25" stroke="#ef4444" strokeWidth="5" strokeLinecap="round" />
+        <path d="M12 38h18M8 49h14" stroke="#93c5fd" strokeWidth="5" strokeLinecap="round" />
+      </svg>
+    ),
+    pickup: (
+      <svg {...commonProps}>
+        <path d="M26 32h44l-4 42H30z" fill="#dbeafe" />
+        <path d="M26 32h44l-4 42H30z" stroke="#1d4ed8" strokeWidth="5" strokeLinejoin="round" />
+        <path d="M37 32a11 11 0 0 1 22 0" stroke="#1d4ed8" strokeWidth="5" strokeLinecap="round" />
+        <path d="M36 49h24" stroke="#ef4444" strokeWidth="5" strokeLinecap="round" />
+      </svg>
+    ),
+    done: (
+      <svg {...commonProps}>
+        <circle cx="48" cy="48" r="33" fill="#dcfce7" />
+        <path d="m31 49 12 12 24-28" stroke="#16a34a" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M24 75h48" stroke="#86efac" strokeWidth="5" strokeLinecap="round" />
+      </svg>
+    ),
+    cancel: (
+      <svg {...commonProps}>
+        <circle cx="48" cy="48" r="32" fill="#f1f5f9" />
+        <path d="m35 35 26 26M61 35 35 61" stroke="#64748b" strokeWidth="8" strokeLinecap="round" />
+      </svg>
+    ),
+  };
+
+  return (
+    <span className={`store-status-visual ${compact ? 'compact' : ''}`}>
+      {visuals[type] || visuals.prep}
+    </span>
+  );
+}
+
 function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder }) {
-  const meta = getCustomerStatusMeta(order);
+  const meta = getCustomerStatusMetaV2(order);
   const orderNumber = formatOrderNumber(order.id);
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const pickupOrder = isPickupOrder(order);
@@ -6582,9 +6739,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
       }}
     >
       <div className="store-friendly-head">
-        <span className="store-status-emoji" aria-hidden="true">
-          {meta.emoji}
-        </span>
+        <StoreOrderStatusVisual type={meta.visual} />
         <div style={{ flex: 1 }}>
           <div
             className="store-status-pill"
@@ -6609,11 +6764,12 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           const isDone = meta.progress >= index + 1;
           return (
             <span
-              key={step}
+              key={step.key}
               className={`store-progress-step ${isDone ? 'done' : ''}`}
               style={isDone ? { background: meta.accent } : undefined}
             >
-              {step}
+              <StoreOrderStatusVisual type={step.icon} compact />
+              {step.label}
             </span>
           );
         })}
