@@ -45,6 +45,7 @@ import {
   writeStoreVersionedCache,
 } from '../services/storeCache';
 import {
+  buildGoogleMapsAddressUrl,
   buildGoogleMapsEmbedUrl,
   buildGoogleMapsPlaceUrl,
   getBrowserLocation,
@@ -3729,12 +3730,14 @@ export default function TiendaVirtualView({
           gap: 8px;
         }
         .store-location-feedback {
+          display: block;
           border-radius: 12px;
           padding: 10px 12px;
           background: #ffffff;
           color: #7b1022;
           font-size: 12px;
           font-weight: 900;
+          text-decoration: none;
         }
         .store-location-feedback.error {
           background: #fff1f2;
@@ -3814,8 +3817,12 @@ export default function TiendaVirtualView({
           border: 1px solid #ead8da;
           border-radius: 18px;
           background: #f3f4f6;
-          cursor: crosshair;
-          touch-action: manipulation;
+          cursor: grab;
+          touch-action: none;
+          user-select: none;
+        }
+        .store-map-canvas.dragging {
+          cursor: grabbing;
         }
         .store-map-canvas img {
           position: absolute;
@@ -3833,6 +3840,7 @@ export default function TiendaVirtualView({
           background: #b91c1c;
           box-shadow: 0 10px 25px rgba(185, 28, 28, 0.35);
           transform: translate(-50%, -100%) rotate(-45deg);
+          pointer-events: none;
         }
         .store-map-pin::after {
           content: '';
@@ -5343,10 +5351,14 @@ function LocationCaptureBlock({ location, locating, onCapture, onManualLocation,
       setSearchError('');
 
       try {
-        const results = await searchLocationCandidates(trimmedQuery, { countryCode: 'ni' });
+        const results = await searchLocationCandidates(trimmedQuery, {
+          countryCode: 'ni',
+          limit: 12,
+          broad: true,
+        });
         setSearchResults(results);
         if (results.length === 0) {
-          setSearchError('No encontramos coincidencias. Prueba con otra direccion o negocio.');
+          setSearchError('No encontramos coincidencias. Prueba con barrio, negocio, calle o referencia.');
         }
       } catch (error) {
         console.error('No se pudieron buscar direcciones:', error);
@@ -5376,6 +5388,16 @@ function LocationCaptureBlock({ location, locating, onCapture, onManualLocation,
       />
       {searching && <div className="store-location-feedback">Buscando ubicaciones...</div>}
       {searchError && <div className="store-location-feedback error">{searchError}</div>}
+      {searchQuery.trim().length >= 3 && (
+        <a
+          className="store-location-feedback"
+          href={buildGoogleMapsAddressUrl(searchQuery)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Buscar esta direccion en Google Maps
+        </a>
+      )}
       {searchResults.length > 0 && (
         <div className="store-location-results">
           {searchResults.map((result) => (
@@ -5443,6 +5465,8 @@ function MapPointPicker({ location, onClose, onSave }) {
   const [latDraft, setLatDraft] = useState(initialLocation.lat.toFixed(6));
   const [lngDraft, setLngDraft] = useState(initialLocation.lng.toFixed(6));
   const [savingPoint, setSavingPoint] = useState(false);
+  const [draggingMap, setDraggingMap] = useState(false);
+  const dragStateRef = useRef(null);
 
   useEffect(() => {
     setLatDraft(selected.lat.toFixed(6));
@@ -5499,18 +5523,99 @@ function MapPointPicker({ location, onClose, onSave }) {
     setCenter(nextLocation);
   };
 
-  const handleMapClick = (event) => {
+  const getMapEventPoint = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const clickX = (event.clientX - rect.left) * (MAP_PICKER_WIDTH / rect.width);
-    const clickY = (event.clientY - rect.top) * (MAP_PICKER_HEIGHT / rect.height);
+    return {
+      x: (event.clientX - rect.left) * (MAP_PICKER_WIDTH / rect.width),
+      y: (event.clientY - rect.top) * (MAP_PICKER_HEIGHT / rect.height),
+    };
+  };
+
+  const movePinToLocation = (nextLocation) => {
+    if (!nextLocation) {
+      return;
+    }
+
+    setSelected(nextLocation);
+    setCenter(nextLocation);
+  };
+
+  const handleMapPointerDown = (event) => {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startCenterPoint: locationToWorldPoint(center, zoom),
+      rectWidth: rect.width,
+      rectHeight: rect.height,
+      dragged: false,
+    };
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDraggingMap(true);
+  };
+
+  const handleMapPointerMove = (event) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = (event.clientX - dragState.startClientX) * (MAP_PICKER_WIDTH / dragState.rectWidth);
+    const deltaY = (event.clientY - dragState.startClientY) * (MAP_PICKER_HEIGHT / dragState.rectHeight);
+
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 4) {
+      dragState.dragged = true;
+    }
+
+    if (!dragState.dragged) {
+      return;
+    }
+
+    event.preventDefault();
+    movePinToLocation(
+      worldPointToLocation(
+        dragState.startCenterPoint.x - deltaX,
+        dragState.startCenterPoint.y - deltaY,
+        zoom
+      )
+    );
+  };
+
+  const finishMapPointer = (event) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    dragStateRef.current = null;
+    setDraggingMap(false);
+
+    if (dragState.dragged) {
+      return;
+    }
+
+    const point = getMapEventPoint(event);
     const nextLocation = worldPointToLocation(
-      mapGeometry.topLeft.x + clickX,
-      mapGeometry.topLeft.y + clickY,
+      mapGeometry.topLeft.x + point.x,
+      mapGeometry.topLeft.y + point.y,
       zoom
     );
 
-    if (nextLocation) {
-      setSelected(nextLocation);
+    movePinToLocation(nextLocation);
+  };
+
+  const cancelMapPointer = (event) => {
+    if (dragStateRef.current?.pointerId === event.pointerId) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+      dragStateRef.current = null;
+      setDraggingMap(false);
     }
   };
 
@@ -5520,12 +5625,18 @@ function MapPointPicker({ location, onClose, onSave }) {
         <div className="store-map-picker-head">
           <div>
             <strong>Ubicar punto de entrega</strong>
-            <span>Toca el mapa donde debe llegar el entregador y guarda el punto.</span>
+            <span>Arrastra el mapa o toca el punto exacto donde debe llegar el entregador.</span>
           </div>
           <StoreBackButton onClick={onClose} />
         </div>
 
-        <div className="store-map-canvas" onClick={handleMapClick}>
+        <div
+          className={`store-map-canvas ${draggingMap ? 'dragging' : ''}`}
+          onPointerDown={handleMapPointerDown}
+          onPointerMove={handleMapPointerMove}
+          onPointerUp={finishMapPointer}
+          onPointerCancel={cancelMapPointer}
+        >
           {mapGeometry.tiles.map((tile) => (
             <img
               key={tile.key}
@@ -5537,7 +5648,7 @@ function MapPointPicker({ location, onClose, onSave }) {
             />
           ))}
           <span className="store-map-pin" style={{ left: selectedPoint.left, top: selectedPoint.top }} />
-          <div className="store-map-hint">Toca el mapa para mover el pin</div>
+          <div className="store-map-hint">Arrastra el mapa o toca para mover el pin</div>
         </div>
 
         <div className="store-map-tools">

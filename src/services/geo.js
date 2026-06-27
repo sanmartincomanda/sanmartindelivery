@@ -111,20 +111,21 @@ const parseNominatimResult = (result = {}) => {
   };
 };
 
-export const searchLocationCandidates = async (query, options = {}) => {
-  const cleanQuery = String(query || '').trim();
-  if (cleanQuery.length < 3) {
-    return [];
-  }
-
+const runNominatimSearch = async ({ query, limit, countryCode }) => {
   const params = new URLSearchParams({
-    q: cleanQuery,
+    q: query,
     format: 'jsonv2',
     addressdetails: '1',
-    limit: String(Math.max(1, Math.min(Number(options.limit || 6), 8))),
+    namedetails: '1',
+    extratags: '1',
+    limit: String(limit),
     dedupe: '1',
-    countrycodes: String(options.countryCode || DEFAULT_COUNTRY_CODE).toLowerCase(),
   });
+
+  const cleanCountryCode = String(countryCode || '').trim().toLowerCase();
+  if (cleanCountryCode) {
+    params.set('countrycodes', cleanCountryCode);
+  }
 
   const response = await fetch(`${NOMINATIM_BASE_URL}/search?${params.toString()}`, {
     headers: buildGeoHeaders(),
@@ -135,11 +136,55 @@ export const searchLocationCandidates = async (query, options = {}) => {
   }
 
   const payload = await response.json();
-  if (!Array.isArray(payload)) {
+  return Array.isArray(payload) ? payload.map(parseNominatimResult).filter(Boolean) : [];
+};
+
+export const searchLocationCandidates = async (query, options = {}) => {
+  const cleanQuery = String(query || '').trim();
+  if (cleanQuery.length < 3) {
     return [];
   }
 
-  return payload.map(parseNominatimResult).filter(Boolean);
+  const limit = Math.max(1, Math.min(Number(options.limit || 10), 12));
+  const countryCode = String(options.countryCode || DEFAULT_COUNTRY_CODE).toLowerCase();
+  const broadSearch = Boolean(options.broad);
+  const queryVariants = broadSearch
+    ? Array.from(new Set([
+        cleanQuery,
+        `${cleanQuery}, Granada, Nicaragua`,
+        `${cleanQuery}, Nicaragua`,
+      ]))
+    : [cleanQuery];
+  const byKey = new Map();
+
+  const collectResults = (results = []) => {
+    results.forEach((result) => {
+      const key = result.placeId || `${Number(result.lat).toFixed(6)},${Number(result.lng).toFixed(6)}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, result);
+      }
+    });
+  };
+
+  for (const variant of queryVariants) {
+    if (byKey.size >= limit) {
+      break;
+    }
+
+    collectResults(await runNominatimSearch({ query: variant, limit, countryCode }));
+  }
+
+  if (broadSearch && byKey.size < Math.min(6, limit)) {
+    for (const variant of queryVariants) {
+      if (byKey.size >= limit) {
+        break;
+      }
+
+      collectResults(await runNominatimSearch({ query: variant, limit, countryCode: '' }));
+    }
+  }
+
+  return Array.from(byKey.values()).slice(0, limit);
 };
 
 export const reverseGeocodeLocation = async (location, options = {}) => {
