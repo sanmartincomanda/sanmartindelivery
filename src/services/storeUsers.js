@@ -4,7 +4,9 @@ import { hasLocation, normalizeLocation } from './geo';
 import {
   createStoreCustomerAuth,
   getCurrentAuthUser,
+  normalizeAuthEmail,
   signInStoreCustomer,
+  signInStoreCustomerWithGoogle,
   touchLastLogin,
   upsertOwnClientRole,
 } from './authRoles';
@@ -12,6 +14,7 @@ import {
 export const STORE_USERS_PATH = 'storeUsers';
 
 export const cleanStorePhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
+export const cleanStoreEmail = (email) => normalizeAuthEmail(email);
 
 export const getStoreUserKey = (phone) => {
   const cleanPhone = cleanStorePhone(phone);
@@ -116,11 +119,21 @@ const sanitizeStoreUser = (user, key) => {
   };
 };
 
-export async function ensureStoreUser({ nombre, telefono, direccion, referencia, passwordHash, ubicacion, authUid }) {
+export async function ensureStoreUser({
+  nombre,
+  email,
+  telefono,
+  direccion,
+  referencia,
+  passwordHash,
+  ubicacion,
+  authUid,
+}) {
   const cleanPhone = cleanStorePhone(telefono);
+  const cleanEmail = cleanStoreEmail(email);
   const userKey = String(authUid || getCurrentAuthUser()?.uid || '').trim() || getStoreUserKey(cleanPhone);
 
-  if (!userKey || !String(nombre || '').trim() || !String(direccion || '').trim()) {
+  if (!userKey || !String(nombre || '').trim() || !cleanPhone || !String(direccion || '').trim()) {
     throw new Error('Datos de cliente incompletos');
   }
 
@@ -145,6 +158,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
 
   const profile = {
     nombre: String(nombre || '').trim(),
+    email: cleanEmail,
     telefono: cleanPhone,
     direccion: String(direccion || '').trim(),
     referencia: String(referencia || '').trim(),
@@ -165,6 +179,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
         : profile.direccion,
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
+      email: profile.email,
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       createdAt: now,
@@ -178,6 +193,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
         : profile.direccion,
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
+      email: profile.email,
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       updatedAt: now,
@@ -200,16 +216,22 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
   };
 }
 
-export async function registerStoreUser({ nombre, telefono, direccion, referencia, password, ubicacion }) {
+export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, password, ubicacion }) {
+  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, password, ubicacion });
+}
+
+export async function registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, password, ubicacion }) {
+  const cleanEmail = cleanStoreEmail(email);
   const cleanPhone = cleanStorePhone(telefono);
   const userKey = getStoreUserKey(cleanPhone);
   const cleanPassword = String(password || '').trim();
 
   if (
+    !cleanEmail ||
     !userKey ||
     !String(nombre || '').trim() ||
     !String(direccion || '').trim() ||
-    cleanPassword.length < 4 ||
+    cleanPassword.length < 6 ||
     !hasLocation(ubicacion)
   ) {
     const error = new Error('Datos de registro incompletos');
@@ -219,10 +241,10 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
 
   let authUser = null;
   try {
-    authUser = await createStoreCustomerAuth({ nombre, telefono: cleanPhone, password: cleanPassword });
+    authUser = await createStoreCustomerAuth({ nombre, email: cleanEmail, telefono: cleanPhone, password: cleanPassword });
   } catch (error) {
     if (error.code === 'auth/email-already-in-use') {
-      const userExistsError = new Error('El usuario ya existe');
+      const userExistsError = new Error('El correo ya tiene cuenta');
       userExistsError.code = 'USER_EXISTS';
       throw userExistsError;
     }
@@ -231,7 +253,7 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
   }
 
   const authUserKey = authUser.uid;
-  await upsertOwnClientRole(authUserKey, { nombre, telefono: cleanPhone });
+  await upsertOwnClientRole(authUserKey, { nombre, email: cleanEmail, telefono: cleanPhone });
 
   const authUserRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
   const userSnapshot = await get(authUserRef);
@@ -246,6 +268,7 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
   const passwordHash = await hashStorePassword(cleanPhone, cleanPassword);
   const profile = await ensureStoreUser({
     nombre,
+    email: cleanEmail,
     telefono: cleanPhone,
     direccion,
     referencia,
@@ -268,18 +291,28 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
   );
 }
 
-export async function loginStoreUser({ telefono, password }) {
+export async function loginStoreUser({ email, telefono, password }) {
+  return loginStoreUserWithEmail({ email, telefono, password });
+}
+
+export async function loginStoreUserWithEmail({ email, telefono, password }) {
+  const cleanEmail = cleanStoreEmail(email);
   const cleanPhone = cleanStorePhone(telefono);
-  const userKey = getStoreUserKey(cleanPhone);
   const cleanPassword = String(password || '').trim();
 
-  if (!userKey || !cleanPassword) {
+  if (!cleanEmail && !cleanPhone) {
+    const error = new Error('Correo requerido');
+    error.code = 'LOGIN_INCOMPLETE';
+    throw error;
+  }
+
+  if (!cleanPassword) {
     const error = new Error('Credenciales incompletas');
     error.code = 'LOGIN_INCOMPLETE';
     throw error;
   }
 
-  const authUser = await signInStoreCustomer({ telefono: cleanPhone, password: cleanPassword });
+  const authUser = await signInStoreCustomer({ email: cleanEmail, telefono: cleanPhone, password: cleanPassword });
   const authUserKey = authUser.uid;
   await touchLastLogin(authUserKey);
 
@@ -300,10 +333,91 @@ export async function loginStoreUser({ telefono, password }) {
   return sanitizeStoreUser(user, authUserKey);
 }
 
+export async function loginStoreUserWithGoogle() {
+  const authUser = await signInStoreCustomerWithGoogle();
+  const authUserKey = authUser.uid;
+  const userRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
+  const userSnapshot = await get(userRef);
+  const user = userSnapshot.val();
+
+  if (!user) {
+    await upsertOwnClientRole(authUserKey, {
+      nombre: authUser.displayName,
+      email: authUser.email,
+      provider: 'google',
+    });
+
+    const error = new Error('Perfil incompleto');
+    error.code = 'PROFILE_REQUIRED';
+    error.authUser = {
+      uid: authUser.uid,
+      nombre: authUser.displayName || '',
+      email: authUser.email || '',
+    };
+    throw error;
+  }
+
+  await upsertOwnClientRole(authUserKey, {
+    nombre: user.nombre || authUser.displayName,
+    email: user.email || authUser.email,
+    telefono: user.telefono,
+    provider: 'google',
+  });
+
+  await update(userRef, {
+    email: user.email || cleanStoreEmail(authUser.email),
+    lastLoginAt: Date.now(),
+  });
+
+  return sanitizeStoreUser(
+    {
+      ...user,
+      email: user.email || cleanStoreEmail(authUser.email),
+    },
+    authUserKey
+  );
+}
+
+export async function completeGoogleStoreUserProfile({ nombre, email, telefono, direccion, referencia, ubicacion }) {
+  const authUser = getCurrentAuthUser();
+  if (!authUser) {
+    const error = new Error('Sesion de Google no encontrada');
+    error.code = 'AUTH_REQUIRED';
+    throw error;
+  }
+
+  const cleanEmail = cleanStoreEmail(email || authUser.email);
+  const cleanPhone = cleanStorePhone(telefono);
+
+  await upsertOwnClientRole(authUser.uid, {
+    nombre: nombre || authUser.displayName,
+    email: cleanEmail,
+    telefono: cleanPhone,
+    provider: 'google',
+  });
+
+  const profile = await ensureStoreUser({
+    nombre: nombre || authUser.displayName,
+    email: cleanEmail,
+    telefono: cleanPhone,
+    direccion,
+    referencia,
+    ubicacion,
+    authUid: authUser.uid,
+  });
+
+  await update(ref(database, `${STORE_USERS_PATH}/${authUser.uid}`), {
+    lastLoginAt: Date.now(),
+  });
+
+  return sanitizeStoreUser(profile, authUser.uid);
+}
+
 export async function updateStoreUserProfile(user, patch) {
   const currentUser = user || {};
   const nextProfile = await ensureStoreUser({
     nombre: patch.nombre ?? currentUser.nombre,
+    email: patch.email ?? currentUser.email,
     telefono: currentUser.telefono,
     direccion: patch.direccion ?? currentUser.direccion,
     referencia: patch.referencia ?? currentUser.referencia,

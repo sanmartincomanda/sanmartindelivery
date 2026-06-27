@@ -54,12 +54,13 @@ import {
 } from '../services/geo';
 import {
   cleanStorePhone,
+  completeGoogleStoreUserProfile,
+  loginStoreUserWithGoogle,
   loginStoreUser,
   registerStoreUser,
   updateStoreUserProfile,
 } from '../services/storeUsers';
 import {
-  buildStoreOrderText,
   isPickupOrder,
   ORDER_FULFILLMENT_DELIVERY,
   ORDER_FULFILLMENT_PICKUP,
@@ -69,7 +70,7 @@ import {
   STORE_CHANNEL,
 } from '../services/orders';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
-import { signOutCurrentUser } from '../services/authRoles';
+import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
@@ -517,48 +518,6 @@ const buildOrderWhatsAppLink = (order, currentUser) =>
     buildOrderWhatsAppMessage(order, currentUser)
   )}`;
 
-const buildGuestCartWhatsAppMessage = ({
-  customer = {},
-  items = [],
-  notes = '',
-  coupon = null,
-  discount = 0,
-  total = 0,
-  fulfillmentType = ORDER_FULFILLMENT_DELIVERY,
-}) => {
-  const deliveryAddress = [customer.direccion, customer.referencia ? `Ref: ${customer.referencia}` : '']
-    .filter(Boolean)
-    .join(' | ');
-  const pickupOrder = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
-
-  const orderText = buildStoreOrderText(items, notes, {
-    couponCode: coupon?.code,
-    discount,
-    total,
-  });
-
-  return [
-    `Hola, quiero hacer este pedido desde ${STORE_BRAND_TITLE}.`,
-    '',
-    `Cliente: ${String(customer.nombre || 'Invitado').trim() || 'Invitado'}`,
-    customer.telefono ? `Telefono: ${String(customer.telefono).trim()}` : null,
-    `Tipo: ${getFulfillmentTypeLabel(fulfillmentType)}`,
-    pickupOrder ? 'Recogere el pedido directamente en tienda.' : null,
-    !pickupOrder && deliveryAddress ? `Direccion: ${deliveryAddress}` : null,
-    customer.metodoPago ? `Pago: ${customer.metodoPago}` : null,
-    '',
-    'Pedido:',
-    orderText,
-    '',
-    'Nota: El total puede *variar* por el peso exacto de cada producto.',
-    '',
-    'Lo envio como invitado para coordinarlo por WhatsApp.',
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-};
-
 export default function TiendaVirtualView({
   onCreateOrder,
   mode = 'public',
@@ -624,6 +583,7 @@ export default function TiendaVirtualView({
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({
     nombre: '',
+    email: '',
     telefono: '',
     password: '',
     confirmPassword: '',
@@ -631,10 +591,11 @@ export default function TiendaVirtualView({
     referencia: '',
     ubicacion: null,
   });
+  const [authProviderDraft, setAuthProviderDraft] = useState(null);
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authLocating, setAuthLocating] = useState(false);
-  const [authSheetOpen, setAuthSheetOpen] = useState(false);
+  const [authSheetOpen, setAuthSheetOpen] = useState(() => mode !== 'dashboard' && !currentUser);
   const [authPromptDismissed, setAuthPromptDismissed] = useState(() => Boolean(currentUser));
   const [pendingAuthIntent, setPendingAuthIntent] = useState('');
   const [customerOrders, setCustomerOrders] = useState([]);
@@ -1488,20 +1449,21 @@ export default function TiendaVirtualView({
 
   const openAuthSheet = (mode = 'login', intent = '') => {
     setAuthMode(mode);
+    setAuthProviderDraft(null);
     setAuthError('');
     setPendingAuthIntent(intent);
     setAuthSheetOpen(true);
   };
 
-  const closeAuthSheet = () => {
+  const closeAuthSheet = ({ force = false } = {}) => {
+    if (!force && !currentUser && !isDashboard) {
+      return;
+    }
+
     setAuthSheetOpen(false);
     setPendingAuthIntent('');
+    setAuthProviderDraft(null);
     setAuthError('');
-  };
-
-  const continueAsGuest = () => {
-    setAuthPromptDismissed(true);
-    closeAuthSheet();
   };
 
   const fillAddressFromLocation = (currentAddress, location, fallback) => {
@@ -1587,6 +1549,7 @@ export default function TiendaVirtualView({
     setCheckoutOpen(false);
     setProfileOpen(false);
     setAuthSheetOpen(false);
+    setAuthProviderDraft(null);
     setAuthPromptDismissed(false);
     setPendingAuthIntent('');
     if (typeof window !== 'undefined') {
@@ -1594,6 +1557,74 @@ export default function TiendaVirtualView({
     }
     await signOutCurrentUser().catch(() => {});
   };
+
+  useEffect(() => {
+    if (isDashboard) {
+      return undefined;
+    }
+
+    return onFirebaseAuthChange((authUser) => {
+      if (authUser && (!currentUser || currentUser.key === authUser.uid)) {
+        return;
+      }
+
+      if (!authUser && !currentUser) {
+        setAuthSheetOpen(true);
+        return;
+      }
+
+      setCurrentUser(null);
+      setCreatedOrder(null);
+      setCustomerOrders([]);
+      setOrdersOpen(false);
+      setProfileOpen(false);
+      setAuthPromptDismissed(false);
+      setAuthSheetOpen(true);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(STORE_SESSION_KEY);
+      }
+    });
+  }, [currentUser, isDashboard]);
+
+  useEffect(() => {
+    if (isDashboard || !currentUser?.key) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const verifyStoredSession = async () => {
+      try {
+        const snapshot = await get(ref(database, `storeUsers/${currentUser.key}`));
+        if (cancelled || snapshot.exists()) {
+          return;
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        console.warn('Sesion de tienda no valida:', error);
+      }
+
+      setCurrentUser(null);
+      setCreatedOrder(null);
+      setCustomerOrders([]);
+      setOrdersOpen(false);
+      setProfileOpen(false);
+      setAuthPromptDismissed(false);
+      setAuthSheetOpen(true);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(STORE_SESSION_KEY);
+      }
+      await signOutCurrentUser().catch(() => {});
+    };
+
+    verifyStoredSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.key, isDashboard]);
 
   useEffect(() => {
     if (isDashboard) {
@@ -1665,12 +1696,14 @@ export default function TiendaVirtualView({
 
     try {
       const user = await loginStoreUser({
+        email: authForm.email,
         telefono: authForm.telefono,
         password: authForm.password,
       });
+      setAuthProviderDraft(null);
       persistStoreSession(user);
       const nextIntent = pendingAuthIntent;
-      closeAuthSheet();
+      closeAuthSheet({ force: true });
       if (nextIntent === 'orders') {
         setOrdersOpen(true);
       }
@@ -1681,7 +1714,42 @@ export default function TiendaVirtualView({
       }));
     } catch (error) {
       console.error('Error iniciando sesion de tienda:', error);
-      setAuthError('Telefono o contrasena incorrecta.');
+      setAuthError('Correo o contrasena incorrecta.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleStoreGoogleLogin = async () => {
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      const user = await loginStoreUserWithGoogle();
+      setAuthProviderDraft(null);
+      persistStoreSession(user);
+      const nextIntent = pendingAuthIntent;
+      closeAuthSheet({ force: true });
+      if (nextIntent === 'orders') {
+        setOrdersOpen(true);
+      }
+    } catch (error) {
+      console.error('Error iniciando sesion con Google:', error);
+      if (error.code === 'PROFILE_REQUIRED') {
+        const authUser = error.authUser || {};
+        setAuthProviderDraft({ provider: 'google', uid: authUser.uid });
+        setAuthMode('register');
+        setAuthForm((current) => ({
+          ...current,
+          nombre: authUser.nombre || current.nombre,
+          email: authUser.email || current.email,
+          password: '',
+          confirmPassword: '',
+        }));
+        setAuthError('Completa telefono, direccion y punto del mapa para terminar tu cuenta.');
+      } else {
+        setAuthError('No se pudo entrar con Google. Intenta de nuevo.');
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -1691,10 +1759,17 @@ export default function TiendaVirtualView({
     event.preventDefault();
     setAuthLoading(true);
     setAuthError('');
+    const isGoogleProfileCompletion = authProviderDraft?.provider === 'google';
 
-    if (authForm.password !== authForm.confirmPassword) {
+    if (!isGoogleProfileCompletion && authForm.password !== authForm.confirmPassword) {
       setAuthLoading(false);
       setAuthError('Las contrasenas no coinciden.');
+      return;
+    }
+
+    if (!isGoogleProfileCompletion && String(authForm.password || '').trim().length < 6) {
+      setAuthLoading(false);
+      setAuthError('La contrasena debe tener al menos 6 caracteres.');
       return;
     }
 
@@ -1705,15 +1780,19 @@ export default function TiendaVirtualView({
     }
 
     try {
-      const user = await registerStoreUser(authForm);
+      const user = isGoogleProfileCompletion
+        ? await completeGoogleStoreUserProfile(authForm)
+        : await registerStoreUser(authForm);
+      setAuthProviderDraft(null);
       persistStoreSession(user);
       const nextIntent = pendingAuthIntent;
-      closeAuthSheet();
+      closeAuthSheet({ force: true });
       if (nextIntent === 'orders') {
         setOrdersOpen(true);
       }
       setAuthForm({
         nombre: '',
+        email: '',
         telefono: '',
         password: '',
         confirmPassword: '',
@@ -1724,12 +1803,12 @@ export default function TiendaVirtualView({
     } catch (error) {
       console.error('Error registrando usuario de tienda:', error);
       if (error.code === 'USER_EXISTS') {
-        setAuthError('Ese telefono ya tiene cuenta. Inicia sesion.');
+        setAuthError('Ese correo ya tiene cuenta. Inicia sesion.');
         setAuthMode('login');
       } else if (error.code === 'LOCATION_REQUIRED') {
         setAuthError('La ubicacion exacta en el mapa es obligatoria.');
       } else {
-        setAuthError('Completa nombre, telefono, contrasena, direccion y el punto exacto del mapa.');
+        setAuthError('Completa nombre, correo, telefono, direccion y el punto exacto del mapa.');
       }
     } finally {
       setAuthLoading(false);
@@ -1798,59 +1877,6 @@ export default function TiendaVirtualView({
     if (createdOrder) {
       setOrdersOpen(true);
     }
-  };
-
-  const submitGuestOrderByWhatsApp = (event) => {
-    event.preventDefault();
-
-    if (cartItems.length === 0) {
-      alert('Agrega al menos un producto.');
-      return;
-    }
-
-    if (!String(customer.nombre || '').trim()) {
-      alert('Escribe tu nombre para enviar el pedido por WhatsApp.');
-      return;
-    }
-
-    if (!String(customer.telefono || '').trim()) {
-      alert('Escribe tu telefono o WhatsApp para enviar el pedido.');
-      return;
-    }
-
-    if (!pickupFlow && !String(customer.direccion || '').trim()) {
-      alert('Escribe la direccion de entrega para enviar el pedido.');
-      return;
-    }
-
-    if (appliedCoupon) {
-      const usageMessage = getCouponUsageMessage(appliedCoupon);
-      if (usageMessage) {
-        setAppliedCoupon(null);
-        setCouponMessage(usageMessage);
-        alert(usageMessage);
-        return;
-      }
-    }
-
-    const whatsappLink = `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
-      buildGuestCartWhatsAppMessage({
-        customer,
-        items: cartItems,
-        notes: notes.trim(),
-        coupon: appliedCoupon,
-        discount: couponDiscount,
-        total: approximateTotalAmount,
-        fulfillmentType,
-      })
-    )}`;
-
-    const popup = window.open(whatsappLink, '_blank', 'noopener,noreferrer');
-    if (!popup) {
-      window.location.href = whatsappLink;
-    }
-
-    setCheckoutOpen(false);
   };
 
   const submitOrder = async (event) => {
@@ -2150,6 +2176,25 @@ export default function TiendaVirtualView({
           font-size: 13px;
           font-weight: 900;
           margin-bottom: 10px;
+        }
+        .store-google-button {
+          width: 100%;
+          justify-content: center;
+          gap: 10px;
+          margin-bottom: 12px;
+          background: #ffffff;
+        }
+        .store-google-mark {
+          width: 24px;
+          height: 24px;
+          display: inline-grid;
+          place-items: center;
+          border-radius: 999px;
+          background: conic-gradient(from -40deg, #4285f4, #34a853, #fbbc05, #ea4335, #4285f4);
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 950;
+          box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.72);
         }
         .store-account-card {
           margin: 0 0 14px;
@@ -4695,7 +4740,6 @@ export default function TiendaVirtualView({
           onOpenLogin={() => openAuthSheet('login', 'checkout')}
           onOpenRegister={() => openAuthSheet('register', 'checkout')}
           onRemoveCoupon={removeCoupon}
-          onGuestSubmit={submitGuestOrderByWhatsApp}
           onSubmit={submitOrder}
         />
       )}
@@ -4727,10 +4771,14 @@ export default function TiendaVirtualView({
           authError={authError}
           authLoading={authLoading}
           authLocating={authLocating}
+          authProviderDraft={authProviderDraft}
+          locked={!isDashboard && !currentUser}
           onClose={closeAuthSheet}
-          onContinueAsGuest={continueAsGuest}
           onAuthModeChange={(mode) => {
             setAuthMode(mode);
+            if (mode !== 'register') {
+              setAuthProviderDraft(null);
+            }
             setAuthError('');
           }}
           onFormChange={updateAuthForm}
@@ -4743,6 +4791,7 @@ export default function TiendaVirtualView({
             );
           }}
           onLogin={handleStoreLogin}
+          onGoogleLogin={handleStoreGoogleLogin}
           onRegister={handleStoreRegister}
         />
       )}
@@ -4758,16 +4807,18 @@ function StoreAuthView({
   authError,
   authLoading,
   authLocating,
+  authProviderDraft,
   embedded = false,
-  onContinueAsGuest,
   onAuthModeChange,
   onCaptureLocation,
   onManualLocation,
   onFormChange,
   onLogin,
+  onGoogleLogin,
   onRegister,
 }) {
   const isRegister = authMode === 'register';
+  const isGoogleProfileCompletion = isRegister && authProviderDraft?.provider === 'google';
 
   const content = (
     <section className={`store-auth-card ${embedded ? 'inline' : ''}`}>
@@ -4798,10 +4849,22 @@ function StoreAuthView({
       <p style={{ margin: '0 0 16px', color: '#6b7280', fontWeight: 700 }}>
         {isRegister
           ? 'Usaremos estos datos para tus pedidos delivery.'
-          : 'Ingresa con tu telefono y contrasena.'}
+          : 'Ingresa con tu correo y contrasena.'}
       </p>
 
       {authError && <div className="store-auth-error">{authError}</div>}
+
+      <button
+        type="button"
+        className="store-button secondary store-google-button"
+        onClick={onGoogleLogin}
+        disabled={authLoading}
+      >
+        <span className="store-google-mark">G</span>
+        Continuar con Google
+      </button>
+
+      <div className="store-auth-choice-divider">o</div>
 
       <form className="store-form" onSubmit={isRegister ? onRegister : onLogin}>
         {isRegister && (
@@ -4815,29 +4878,52 @@ function StoreAuthView({
         )}
         <input
           className="store-field"
-          value={authForm.telefono}
-          onChange={(event) => onFormChange('telefono', event.target.value)}
-          placeholder="Telefono o WhatsApp"
-          required
-        />
-        <input
-          className="store-field"
-          type="password"
-          value={authForm.password}
-          onChange={(event) => onFormChange('password', event.target.value)}
-          placeholder="Contrasena"
+          type="email"
+          value={authForm.email}
+          onChange={(event) => onFormChange('email', event.target.value)}
+          placeholder="Correo electronico"
+          disabled={isGoogleProfileCompletion}
           required
         />
         {isRegister && (
+          <input
+            className="store-field"
+            value={authForm.telefono}
+            onChange={(event) => onFormChange('telefono', event.target.value)}
+            placeholder="Telefono o WhatsApp"
+            required
+          />
+        )}
+        {!isRegister && (
+          <input
+            className="store-field store-legacy-phone-field"
+            value={authForm.telefono}
+            onChange={(event) => onFormChange('telefono', event.target.value)}
+            placeholder="Telefono antiguo (opcional)"
+          />
+        )}
+        {!isGoogleProfileCompletion && (
+          <input
+            className="store-field"
+            type="password"
+            value={authForm.password}
+            onChange={(event) => onFormChange('password', event.target.value)}
+            placeholder="Contrasena"
+            required
+          />
+        )}
+        {isRegister && !isGoogleProfileCompletion && (
+          <input
+            className="store-field"
+            type="password"
+            value={authForm.confirmPassword}
+            onChange={(event) => onFormChange('confirmPassword', event.target.value)}
+            placeholder="Confirmar contrasena"
+            required
+          />
+        )}
+        {isRegister && (
           <>
-            <input
-              className="store-field"
-              type="password"
-              value={authForm.confirmPassword}
-              onChange={(event) => onFormChange('confirmPassword', event.target.value)}
-              placeholder="Confirmar contrasena"
-              required
-            />
             <input
               className="store-field"
               value={authForm.direccion}
@@ -4865,23 +4951,15 @@ function StoreAuthView({
           </>
         )}
         <button type="submit" className="store-button" disabled={authLoading}>
-          {authLoading ? 'Procesando...' : isRegister ? 'Crear cuenta y entrar' : 'Entrar a la tienda'}
+          {authLoading
+            ? 'Procesando...'
+            : isGoogleProfileCompletion
+              ? 'Completar cuenta'
+              : isRegister
+                ? 'Crear cuenta y entrar'
+                : 'Entrar a la tienda'}
         </button>
       </form>
-
-      {typeof onContinueAsGuest === 'function' && (
-        <div className="store-auth-guest-card">
-          <div className="store-auth-choice-divider">o</div>
-          <button
-            type="button"
-            className="store-button secondary store-auth-guest-button"
-            onClick={onContinueAsGuest}
-          >
-            Continuar como invitado
-          </button>
-          <p>Como invitado podras enviar pedidos directo a nuestro WhatsApp.</p>
-        </div>
-      )}
     </section>
   );
 
@@ -4924,15 +5002,15 @@ function StoreBackButton({ onClick, label = 'Volver' }) {
   );
 }
 
-function StoreAuthSheet({ onClose, onContinueAsGuest, ...props }) {
+function StoreAuthSheet({ onClose, locked = false, ...props }) {
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet store-auth-sheet">
         <div className="store-sheet-head">
-          <StoreBackButton onClick={onClose} />
-          <strong>Inicia sesion</strong>
+          {locked ? <span /> : <StoreBackButton onClick={onClose} />}
+          <strong>{locked ? 'Ingresa a la tienda' : 'Inicia sesion'}</strong>
         </div>
-        <StoreAuthView {...props} embedded onContinueAsGuest={onContinueAsGuest} />
+        <StoreAuthView {...props} embedded />
       </div>
     </div>
   );
@@ -5727,7 +5805,6 @@ function CheckoutSheet({
   onFulfillmentTypeChange,
   onDeliveryModeChange,
   onEditProfile,
-  onGuestSubmit,
   onNotesChange,
   onOpenLogin,
   onOpenRegister,
@@ -5796,7 +5873,7 @@ function CheckoutSheet({
           <strong>{formatCurrency(totalAmount)}</strong>
         </div>
 
-        <form className="store-form" onSubmit={isGuestCheckout ? onGuestSubmit : onSubmit}>
+        <form className="store-form" onSubmit={onSubmit}>
           <div className="store-coupon-card">
             <div>
               <strong>Cupon</strong>
@@ -5863,70 +5940,21 @@ function CheckoutSheet({
           </div>
 
           {isGuestCheckout ? (
-            <>
-              <div className="store-status-card store-auth-choice-card">
-                <div className="store-status-pill">Pedido por la app</div>
-                <h3 style={{ margin: '10px 0 4px' }}>
-                  Inicia sesion para enviar pedidos y ver el estado de tu pedido
-                </h3>
-                <div className="store-auth-inline-actions">
-                  <button type="button" className="store-button" onClick={onOpenLogin}>
-                    Inicia sesion
-                  </button>
-                  <button type="button" className="store-button secondary" onClick={onOpenRegister}>
-                    Crear cuenta
-                  </button>
-                </div>
-                <div className="store-auth-choice-divider">o</div>
-                <strong>Continuar como invitado</strong>
-                <p>Como invitado podras enviar pedidos directo a nuestro WhatsApp.</p>
+            <div className="store-status-card store-auth-choice-card">
+              <div className="store-status-pill">Realizar pedido en linea</div>
+              <h3 style={{ margin: '10px 0 4px' }}>
+                Inicia sesion o crea tu cuenta para enviar el pedido
+              </h3>
+              <p>Asi guardamos tu direccion, historial y estado del pedido en un solo lugar.</p>
+              <div className="store-auth-inline-actions">
+                <button type="button" className="store-button" onClick={onOpenLogin}>
+                  Inicia sesion
+                </button>
+                <button type="button" className="store-button secondary" onClick={onOpenRegister}>
+                  Crear cuenta
+                </button>
               </div>
-
-              <div className="store-status-card guest-form-card">
-                <div className="store-status-pill">Invitado</div>
-                <h3 style={{ margin: '10px 0 4px' }}>Datos para enviar por WhatsApp</h3>
-                <div className="store-form" style={{ marginTop: 12 }}>
-                  <input
-                    className="store-field"
-                    value={customer.nombre}
-                    onChange={(event) => onCustomerChange('nombre', event.target.value)}
-                    placeholder="Nombre completo"
-                    required
-                  />
-                  <input
-                    className="store-field"
-                    value={customer.telefono}
-                    onChange={(event) => onCustomerChange('telefono', event.target.value)}
-                    placeholder="Telefono o WhatsApp"
-                    required
-                  />
-                  {pickupFlow ? (
-                    <div className="store-auth-inline-note">
-                      Este pedido quedara como <strong>pickup</strong>. Te lo prepararemos para recoger en tienda.
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        className="store-field"
-                        value={customer.direccion}
-                        onChange={(event) => onCustomerChange('direccion', event.target.value)}
-                        placeholder="Direccion de entrega"
-                        required
-                      />
-                      <input
-                        className="store-field"
-                        value={customer.referencia}
-                        onChange={(event) => onCustomerChange('referencia', event.target.value)}
-                        placeholder="Referencia"
-                      />
-                    </>
-                  )}
-                </div>
-                <div className="store-auth-inline-note">
-                  Tu pedido se abrira listo para enviar al WhatsApp de la tienda.
-                </div>
-              </div>
-            </>
+            </div>
           ) : (
             <>
               {pickupFlow ? (
@@ -6039,11 +6067,7 @@ function CheckoutSheet({
             placeholder="Observaciones"
           />
           <button type="submit" className="store-button" disabled={submitting}>
-            {submitting
-              ? 'Enviando...'
-              : isGuestCheckout
-                ? 'Enviar pedido por WhatsApp'
-                : 'Enviar pedido por la app'}
+            {submitting ? 'Enviando...' : 'Realizar pedido en linea'}
           </button>
         </form>
       </div>

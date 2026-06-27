@@ -1,7 +1,9 @@
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
@@ -21,6 +23,10 @@ export const AUTH_ROLES = {
 const AUTH_DOMAIN = 'auth.sanmartinsr.local';
 
 export const cleanAuthPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
+export const normalizeAuthEmail = (email) => String(email || '').trim().toLowerCase();
+
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 const sanitizeEmailToken = (value = '') =>
   String(value || '')
@@ -34,6 +40,9 @@ export const buildStoreCustomerEmail = (phone) => {
   const cleanPhone = cleanAuthPhone(phone).replace(/\D/g, '');
   return `${cleanPhone || 'cliente'}@clientes.${AUTH_DOMAIN}`;
 };
+
+export const resolveStoreCustomerEmail = ({ email, telefono } = {}) =>
+  normalizeAuthEmail(email) || buildStoreCustomerEmail(telefono);
 
 export const buildInternalEmail = (username, scope = 'internal') => {
   const cleanUsername = sanitizeEmailToken(username);
@@ -57,20 +66,20 @@ export async function fetchUserRole(uid = auth.currentUser?.uid) {
   return snapshot.val() || null;
 }
 
-export async function signInStoreCustomer({ telefono, password }) {
+export async function signInStoreCustomer({ email, telefono, password }) {
   const credential = await signInWithEmailAndPassword(
     auth,
-    buildStoreCustomerEmail(telefono),
+    resolveStoreCustomerEmail({ email, telefono }),
     String(password || '')
   );
 
   return credential.user;
 }
 
-export async function createStoreCustomerAuth({ nombre, telefono, password }) {
+export async function createStoreCustomerAuth({ nombre, email, telefono, password }) {
   const credential = await createUserWithEmailAndPassword(
     auth,
-    buildStoreCustomerEmail(telefono),
+    resolveStoreCustomerEmail({ email, telefono }),
     String(password || '')
   );
 
@@ -78,6 +87,11 @@ export async function createStoreCustomerAuth({ nombre, telefono, password }) {
     await updateProfile(credential.user, { displayName: String(nombre || '').trim() }).catch(() => {});
   }
 
+  return credential.user;
+}
+
+export async function signInStoreCustomerWithGoogle() {
+  const credential = await signInWithPopup(auth, googleProvider);
   return credential.user;
 }
 
@@ -124,7 +138,9 @@ export async function upsertOwnClientRole(uid, payload = {}) {
   await set(ref(database, `${USER_ROLES_PATH}/${cleanUid}`), {
     role: AUTH_ROLES.CLIENT,
     telefono: cleanAuthPhone(payload.telefono),
+    email: normalizeAuthEmail(payload.email),
     nombre: String(payload.nombre || '').trim(),
+    provider: String(payload.provider || 'password').trim() || 'password',
     updatedAt: Date.now(),
   });
 }

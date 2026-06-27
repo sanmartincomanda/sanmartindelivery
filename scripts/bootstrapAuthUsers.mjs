@@ -153,7 +153,12 @@ async function main() {
   console.log('Usuarios Auth y roles listos.');
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    db.goOffline();
+    process.exit(process.exitCode || 0);
+  });
