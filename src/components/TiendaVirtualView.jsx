@@ -2007,8 +2007,9 @@ export default function TiendaVirtualView({
         </button>
         <button
           type="button"
-          className="store-add"
+          className={`store-add ${quantity > 0 ? 'has-quantity' : ''}`}
           title="Agregar"
+          aria-label={`Agregar ${product.name}`}
           onClick={() => openProduct(product, { prefillMinimum: true })}
         >
           {quantity > 0 ? formatStoreQuantity(quantity, product.unit) : '+'}
@@ -2982,23 +2983,35 @@ export default function TiendaVirtualView({
         }
         .store-add {
           position: absolute;
-          top: 12px;
-          right: 8px;
-          min-width: 42px;
-          height: 42px;
-          padding: 0 10px;
+          top: 10px;
+          right: 6px;
+          min-width: 56px;
+          height: 56px;
+          padding: 0 16px;
           border-radius: 999px;
           background: linear-gradient(135deg, #b91c1c, #ef4444);
           color: #ffffff;
-          font-size: 13px;
+          font-size: 24px;
           font-weight: 950;
           line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           box-shadow: 0 16px 32px rgba(185, 28, 28, 0.24);
           border: 0;
           z-index: 3;
+          cursor: pointer;
+          transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+        .store-add.has-quantity {
+          min-width: 64px;
+          font-size: 14px;
+          letter-spacing: -0.01em;
         }
         .store-add:hover {
-          transform: translateY(-2px) scale(1.02);
+          transform: translateY(-3px) scale(1.04);
+          box-shadow: 0 20px 38px rgba(185, 28, 28, 0.3);
+          filter: saturate(1.06);
         }
         .store-product-code {
           display: inline-flex;
@@ -4288,9 +4301,15 @@ export default function TiendaVirtualView({
           }
           .store-add {
             top: 10px;
-            right: 6px;
-            min-width: 38px;
-            height: 38px;
+            right: 4px;
+            min-width: 52px;
+            height: 52px;
+            padding: 0 14px;
+            font-size: 22px;
+          }
+          .store-add.has-quantity {
+            min-width: 58px;
+            font-size: 13px;
           }
           .store-product-name {
             font-size: 12px;
