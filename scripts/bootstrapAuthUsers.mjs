@@ -1,4 +1,6 @@
-import admin from 'firebase-admin';
+import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getDatabase } from 'firebase-admin/database';
 
 const DATABASE_URL =
   process.env.FIREBASE_DATABASE_URL ||
@@ -54,15 +56,15 @@ const INTERNAL_USERS = [
   },
 ];
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+if (!getApps().length) {
+  initializeApp({
+    credential: applicationDefault(),
     databaseURL: DATABASE_URL,
   });
 }
 
-const auth = admin.auth();
-const db = admin.database();
+const auth = getAuth();
+const db = getDatabase();
 
 async function upsertAuthUser({ email, password, displayName }) {
   try {
@@ -120,9 +122,10 @@ async function seedDrivers() {
   for (const driver of DEFAULT_DRIVERS) {
     const code = normalizeDriverCode(driver.code);
     const email = buildDriverEmail(code);
+    const defaultPassword = `${code}26`;
     const authUser = await upsertAuthUser({
       email,
-      password: process.env[`DRIVER_${code.replace(/[^A-Z0-9]/g, '_')}_PASSWORD`] || code,
+      password: process.env[`DRIVER_${code.replace(/[^A-Z0-9]/g, '_')}_PASSWORD`] || defaultPassword,
       displayName: driver.name,
     });
 

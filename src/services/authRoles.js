@@ -92,10 +92,12 @@ export async function signInInternalUser({ username, password, scope = 'internal
 }
 
 export async function signInDriverAuth({ code, password }) {
+  const rawPassword = String(password || '');
+  const authPassword = rawPassword.length < 6 ? `${rawPassword}26` : rawPassword;
   const credential = await signInWithEmailAndPassword(
     auth,
     buildDriverEmail(code),
-    String(password || '')
+    authPassword
   );
 
   return credential.user;
