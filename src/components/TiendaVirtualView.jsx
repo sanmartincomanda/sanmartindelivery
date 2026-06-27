@@ -1,5 +1,5 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { get, ref, update } from 'firebase/database';
+import { equalTo, get, orderByChild, query as databaseQuery, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
@@ -69,6 +69,7 @@ import {
   STORE_CHANNEL,
 } from '../services/orders';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
+import { signOutCurrentUser } from '../services/authRoles';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
@@ -695,7 +696,9 @@ export default function TiendaVirtualView({
           return;
         }
 
-        const catalogSnapshot = await get(ref(database, STORE_CATALOG_PATH));
+        const catalogSnapshot = await get(
+          databaseQuery(ref(database, STORE_CATALOG_PATH), orderByChild('active'), equalTo(true))
+        );
         const remoteCatalog = catalogSnapshot.val() || {};
 
         writeStoreVersionedCache(
@@ -766,7 +769,9 @@ export default function TiendaVirtualView({
 
     const loadCoupons = async () => {
       try {
-        const snapshot = await get(ref(database, STORE_COUPONS_PATH));
+        const snapshot = await get(
+          databaseQuery(ref(database, STORE_COUPONS_PATH), orderByChild('active'), equalTo(true))
+        );
         const remoteCoupons = snapshot.val() || {};
         writeStoreVersionedCache(
           STORE_COUPONS_CACHE_KEY,
@@ -1571,7 +1576,7 @@ export default function TiendaVirtualView({
     }
   };
 
-  const clearStoreSession = () => {
+  const clearStoreSession = async () => {
     setCurrentUser(null);
     setCreatedOrder(null);
     setOrderSuccessOpen(false);
@@ -1587,6 +1592,7 @@ export default function TiendaVirtualView({
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(STORE_SESSION_KEY);
     }
+    await signOutCurrentUser().catch(() => {});
   };
 
   useEffect(() => {

@@ -7,8 +7,14 @@ import './App.css';
 import { hoyISO } from './components/Utils';
 import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForDate } from './services/orders';
 import {
+  assertRole,
+  AUTH_ROLES,
+  fetchUserRole,
+  onFirebaseAuthChange,
+  signInInternalUser,
+} from './services/authRoles';
+import {
   KITCHEN_USER_KEY,
-  loginKitchenUser,
   normalizeKitchenUser,
   SYSTEM_USERS_PATH,
 } from './services/systemUsers';
@@ -207,6 +213,28 @@ function App() {
   const todayKey = hoyISO();
 
   useEffect(() => {
+    const unsubscribe = onFirebaseAuthChange((user) => {
+      if (!user) {
+        setIsAuthenticated(false);
+        setKitchenAuth(false);
+        return;
+      }
+
+      fetchUserRole(user.uid)
+        .then((roleRecord) => {
+          setIsAuthenticated(roleRecord?.role === AUTH_ROLES.ADMIN);
+          setKitchenAuth(roleRecord?.role === AUTH_ROLES.KITCHEN);
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+          setKitchenAuth(false);
+        });
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const handleHashChange = () => setRoute(getRouteFromLocation());
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -221,7 +249,7 @@ function App() {
   }, [route]);
 
   useEffect(() => {
-    if (!isKitchenRoute) {
+    if (!isKitchenRoute || !kitchenAuth) {
       return undefined;
     }
 
@@ -250,6 +278,7 @@ function App() {
     const shouldSubscribeOrders =
       !isPublicStoreRoute &&
       !isDriverRoute &&
+      (isAuthenticated || (isKitchenRoute && kitchenAuth)) &&
       ((route === 'dashboard' && (view === 'ingreso' || view === 'lista' || view === 'cocina')) ||
         isKitchenRoute);
 
@@ -310,12 +339,13 @@ function App() {
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
     };
-  }, [isDriverRoute, isPublicStoreRoute, route, todayKey, view]);
+  }, [isAuthenticated, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, route, todayKey, view]);
 
   useEffect(() => {
     const shouldLoadClients =
       !isPublicStoreRoute &&
       route === 'dashboard' &&
+      isAuthenticated &&
       (view === 'ingreso' || view === 'basedatos');
 
     if (!shouldLoadClients) {
@@ -369,7 +399,7 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [isPublicStoreRoute, route, view]);
+  }, [isAuthenticated, isPublicStoreRoute, route, view]);
 
   const nextOrderNumber = useMemo(
     () => Math.min(todayCounter + 1, ORDER_LIMIT_PER_DAY + 1),
@@ -393,13 +423,21 @@ function App() {
     return STORE_CANONICAL_ORIGIN;
   }, []);
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
 
-    if (inputUser === 'delivery' && inputPass === 'delivery2026') {
+    try {
+      const authUser = await signInInternalUser({
+        username: inputUser,
+        password: inputPass,
+        scope: 'admin',
+      });
+      await assertRole(AUTH_ROLES.ADMIN, authUser.uid);
       setIsAuthenticated(true);
       setLoginError(false);
       return;
+    } catch (error) {
+      console.error('Error iniciando sesion admin:', error);
     }
 
     setLoginError(true);
@@ -407,7 +445,12 @@ function App() {
 
   const handleKitchenLogin = async ({ user, password }) => {
     try {
-      await loginKitchenUser({ user, password }, kitchenUser);
+      const authUser = await signInInternalUser({
+        username: user,
+        password,
+        scope: 'kitchen',
+      });
+      await assertRole(AUTH_ROLES.KITCHEN, authUser.uid);
       setKitchenAuth(true);
       setKitchenLoginError(false);
       window.localStorage.setItem('sanmartin_kitchen_auth', 'true');

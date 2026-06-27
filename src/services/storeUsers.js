@@ -1,6 +1,13 @@
 import { get, push, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { hasLocation, normalizeLocation } from './geo';
+import {
+  createStoreCustomerAuth,
+  getCurrentAuthUser,
+  signInStoreCustomer,
+  touchLastLogin,
+  upsertOwnClientRole,
+} from './authRoles';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
@@ -18,11 +25,12 @@ const normalizeCodeText = (value = '') =>
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
 
-const buildClientCodeBase = (name, phone) => {
+const buildClientCodeBase = (name, phone, uid = '') => {
   const digits = cleanStorePhone(phone).replace(/\D/g, '');
   const nameToken = normalizeCodeText(name);
   const initial = nameToken.charAt(0) || 'X';
-  return `TV-${digits.slice(-4) || 'WEB'}${initial}`;
+  const uidSuffix = normalizeCodeText(uid).slice(0, 4);
+  return `TV-${digits.slice(-4) || 'WEB'}${initial}${uidSuffix ? `-${uidSuffix}` : ''}`;
 };
 
 const isLegacyClientCode = (code = '') => /^TV-(WEB|\d{1,4})$/i.test(String(code || '').trim());
@@ -33,7 +41,12 @@ const resolveUniqueClientCode = async ({ name, phone, currentUserKey = '', curre
     return normalizedCurrentCode;
   }
 
-  const baseCode = buildClientCodeBase(name, phone);
+  const baseCode = buildClientCodeBase(name, phone, currentUserKey);
+
+  if (currentUserKey && !isLegacyClientCode(baseCode)) {
+    return baseCode;
+  }
+
   const snapshot = await get(ref(database, STORE_USERS_PATH));
   const usedCodes = new Set();
 
@@ -103,9 +116,9 @@ const sanitizeStoreUser = (user, key) => {
   };
 };
 
-export async function ensureStoreUser({ nombre, telefono, direccion, referencia, passwordHash, ubicacion }) {
+export async function ensureStoreUser({ nombre, telefono, direccion, referencia, passwordHash, ubicacion, authUid }) {
   const cleanPhone = cleanStorePhone(telefono);
-  const userKey = getStoreUserKey(cleanPhone);
+  const userKey = String(authUid || getCurrentAuthUser()?.uid || '').trim() || getStoreUserKey(cleanPhone);
 
   if (!userKey || !String(nombre || '').trim() || !String(direccion || '').trim()) {
     throw new Error('Datos de cliente incompletos');
@@ -153,6 +166,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       origen: 'tienda_virtual',
+      storeUserKey: userKey,
       createdAt: now,
     });
   } else {
@@ -165,6 +179,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       origen: 'tienda_virtual',
+      storeUserKey: userKey,
       updatedAt: now,
     });
   }
@@ -174,6 +189,7 @@ export async function ensureStoreUser({ nombre, telefono, direccion, referencia,
     ...profile,
     clientKey,
     passwordHash: passwordHash || existingUser?.passwordHash || '',
+    authUid: userKey,
     createdAt: existingUser?.createdAt || now,
   });
 
@@ -201,11 +217,27 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
     throw error;
   }
 
-  const userRef = ref(database, `${STORE_USERS_PATH}/${userKey}`);
-  const userSnapshot = await get(userRef);
+  let authUser = null;
+  try {
+    authUser = await createStoreCustomerAuth({ nombre, telefono: cleanPhone, password: cleanPassword });
+  } catch (error) {
+    if (error.code === 'auth/email-already-in-use') {
+      const userExistsError = new Error('El usuario ya existe');
+      userExistsError.code = 'USER_EXISTS';
+      throw userExistsError;
+    }
+
+    throw error;
+  }
+
+  const authUserKey = authUser.uid;
+  await upsertOwnClientRole(authUserKey, { nombre, telefono: cleanPhone });
+
+  const authUserRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
+  const userSnapshot = await get(authUserRef);
   const existingUser = userSnapshot.val();
 
-  if (existingUser?.passwordHash) {
+  if (existingUser?.createdAt) {
     const error = new Error('El usuario ya existe');
     error.code = 'USER_EXISTS';
     throw error;
@@ -219,9 +251,10 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
     referencia,
     ubicacion,
     passwordHash,
+    authUid: authUserKey,
   });
 
-  await update(userRef, {
+  await update(authUserRef, {
     passwordHash,
     lastLoginAt: Date.now(),
   });
@@ -231,7 +264,7 @@ export async function registerStoreUser({ nombre, telefono, direccion, referenci
       ...profile,
       passwordHash,
     },
-    userKey
+    authUserKey
   );
 }
 
@@ -246,20 +279,17 @@ export async function loginStoreUser({ telefono, password }) {
     throw error;
   }
 
-  const userRef = ref(database, `${STORE_USERS_PATH}/${userKey}`);
+  const authUser = await signInStoreCustomer({ telefono: cleanPhone, password: cleanPassword });
+  const authUserKey = authUser.uid;
+  await touchLastLogin(authUserKey);
+
+  const userRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
   const userSnapshot = await get(userRef);
   const user = userSnapshot.val();
 
-  if (!user?.passwordHash) {
+  if (!user) {
     const error = new Error('Usuario no encontrado');
     error.code = 'USER_NOT_FOUND';
-    throw error;
-  }
-
-  const passwordHash = await hashStorePassword(cleanPhone, cleanPassword);
-  if (passwordHash !== user.passwordHash) {
-    const error = new Error('Contrasena incorrecta');
-    error.code = 'INVALID_PASSWORD';
     throw error;
   }
 
@@ -267,7 +297,7 @@ export async function loginStoreUser({ telefono, password }) {
     lastLoginAt: Date.now(),
   });
 
-  return sanitizeStoreUser(user, userKey);
+  return sanitizeStoreUser(user, authUserKey);
 }
 
 export async function updateStoreUserProfile(user, patch) {
@@ -278,6 +308,7 @@ export async function updateStoreUserProfile(user, patch) {
     direccion: patch.direccion ?? currentUser.direccion,
     referencia: patch.referencia ?? currentUser.referencia,
     ubicacion: patch.ubicacion ?? currentUser.ubicacion,
+    authUid: currentUser.key || getCurrentAuthUser()?.uid,
   });
 
   const safeUser = sanitizeStoreUser(

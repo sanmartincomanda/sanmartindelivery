@@ -2,65 +2,118 @@
   "rules": {
     ".read": false,
     ".write": false,
-    "orders": {
-      ".read": true,
-      ".write": true,
-      ".indexOn": ["fecha", "storeUserKey", "repartidorCodigo"]
+
+    "userRoles": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && ((auth.uid == $uid && (!data.exists() || data.child('role').val() == 'client') && newData.child('role').val() == 'client') || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')"
+      }
     },
+
+    "orders": {
+      ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && query.orderByChild == 'fecha') || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && query.orderByChild == 'storeUserKey' && query.equalTo == auth.uid) || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && query.orderByChild == 'repartidorCodigo' && query.equalTo == root.child('userRoles').child(auth.uid).child('driverCode').val()))",
+      ".indexOn": ["fecha", "storeUserKey", "repartidorCodigo", "timestamp"],
+      "$orderId": {
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || data.child('storeUserKey').val() == auth.uid || data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val())",
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))))"
+      }
+    },
+
     "rutaOrders": {
-      ".read": true,
-      ".write": true,
+      ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin') || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null))",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')",
       ".indexOn": ["fecha"]
     },
+
     "orderCounters": {
-      ".read": true,
-      ".write": true
+      "$date": {
+        ".read": true,
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || root.child('userRoles').child(auth.uid).child('role').val() == 'client') && newData.isNumber() && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1))"
+      }
     },
+
     "clients": {
-      ".read": true,
-      ".write": true,
-      ".indexOn": ["codigo", "telefono"]
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["codigo", "telefono", "storeUserKey"],
+      "$clientId": {
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || data.child('storeUserKey').val() == auth.uid)",
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid)"
+      }
     },
+
     "storeUsers": {
-      ".read": true,
-      ".write": true,
-      ".indexOn": ["updatedAt", "codigo", "telefono"]
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["updatedAt", "codigo", "telefono", "authUid"],
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')"
+      }
     },
+
     "storeCouponUsageArchive": {
-      ".read": true,
-      ".write": true
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
+      }
     },
-    "storeCatalog": {
-      ".read": true,
-      ".write": true
-    },
+
     "storeCatalogMeta": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
     },
+
+    "storeCatalog": {
+      ".read": "(query.orderByChild == 'active' && query.equalTo == true) || (auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["active", "category", "subcategory", "updatedAt", "sicarUpdatedAt"]
+    },
+
     "storeCategories": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
     },
+
     "storeCoupons": {
-      ".read": true,
-      ".write": true
+      ".read": "(query.orderByChild == 'active' && query.equalTo == true) || (auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["active", "code"]
     },
+
     "storePromotions": {
       ".read": true,
-      ".write": true
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["active", "sortOrder"]
     },
+
+    "deliveryDrivers": {
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      "$driverCode": {
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('driverCode').val() == $driverCode)",
+        ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
+      }
+    },
+
     "drivers": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
     },
+
     "systemUsers": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      "kitchen": {
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')"
+      }
     },
+
     "sicarQuoteQueue": {
-      ".read": true,
-      ".write": true
+      "$orderId": {
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service' || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && !data.exists() && newData.child('status').val() == 'pending'))"
+      }
     }
   }
 }

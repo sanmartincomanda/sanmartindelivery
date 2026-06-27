@@ -106,6 +106,16 @@ export async function updateDriver(code, patch) {
   await update(ref(database, `${DRIVERS_PATH}/${driverKey}`), payload);
 }
 
+export async function fetchDriverByCode(code) {
+  const driverKey = getDriverKey(code);
+  if (!driverKey) {
+    return null;
+  }
+
+  const snapshot = await get(ref(database, `${DRIVERS_PATH}/${driverKey}`));
+  return snapshot.exists() ? normalizeDriver(snapshot.val()) : null;
+}
+
 export async function seedDefaultDriversIfEmpty() {
   const snapshot = await get(ref(database, DRIVERS_PATH));
   if (snapshot.exists()) {

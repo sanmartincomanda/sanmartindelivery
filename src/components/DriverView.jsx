@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { onValue, ref, update } from 'firebase/database';
+import { ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { hoyISO } from './Utils';
 import {
@@ -11,8 +11,14 @@ import {
   normalizeLocation,
   optimizeStopsByNearest,
 } from '../services/geo';
-import { DRIVERS_PATH, loginDriver, mergeDrivers } from '../services/drivers';
+import { fetchDriverByCode } from '../services/drivers';
 import { formatOrderNumber, subscribeOrdersForDriverCode } from '../services/orders';
+import {
+  assertRole,
+  AUTH_ROLES,
+  signInDriverAuth,
+  signOutCurrentUser,
+} from '../services/authRoles';
 
 const DRIVER_SESSION_KEY = 'sanmartin_driver_session';
 const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
@@ -308,7 +314,6 @@ const getStatusMeta = (order = {}) => {
 
 export default function DriverView() {
   const todayKey = hoyISO();
-  const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [driver, setDriver] = useState(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -333,14 +338,6 @@ export default function DriverView() {
   const [routeFilter, setRouteFilter] = useState('todos');
   const [notice, setNotice] = useState('');
   const [nowTick, setNowTick] = useState(() => Date.now());
-
-  useEffect(() => {
-    const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
-      setDrivers(mergeDrivers(snapshot.val()));
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
     if (!driver?.code) {
@@ -438,7 +435,14 @@ export default function DriverView() {
     setLoginError('');
 
     try {
-      const loggedDriver = await loginDriver(loginForm, drivers);
+      const authUser = await signInDriverAuth(loginForm);
+      const roleRecord = await assertRole(AUTH_ROLES.DRIVER, authUser.uid);
+      const loggedDriver = await fetchDriverByCode(roleRecord.driverCode || loginForm.code);
+
+      if (!loggedDriver?.code || loggedDriver.active === false) {
+        throw new Error('Entregador no autorizado');
+      }
+
       setDriver(loggedDriver);
       window.localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(loggedDriver));
       setLoginForm({ code: '', password: '' });
@@ -448,9 +452,10 @@ export default function DriverView() {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     setDriver(null);
     window.localStorage.removeItem(DRIVER_SESSION_KEY);
+    await signOutCurrentUser().catch(() => {});
   };
 
   const optimizeRoute = async () => {

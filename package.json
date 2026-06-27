@@ -10,6 +10,7 @@
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
     "sicar:update:prices": "node scripts/updateSicarPrices.mjs",
     "catalog:migrate:images": "node scripts/migrateCatalogImagesToStorage.mjs",
+    "auth:bootstrap": "node scripts/bootstrapAuthUsers.mjs",
     "firebase:login": "npx firebase-tools login",
     "firebase:use": "npx firebase-tools use comanda-digital-ac1ec",
     "firebase:deploy:rules": "npx firebase-tools deploy --only database,storage",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.5.2",
+    "firebase-admin": "^14.1.0",
     "vite": "^5.4.19"
   }
 }
