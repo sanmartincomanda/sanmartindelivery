@@ -89,6 +89,49 @@ const MAP_PICKER_HEIGHT = 260;
 const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
 const STORE_GROUP_PAGE_SIZE = 5;
+const STORE_CASH_PAYMENT = 'EFECTIVO';
+
+const normalizeCheckoutPayment = (value) => {
+  const cleanValue = String(value || '').trim().toUpperCase();
+
+  if (cleanValue.includes('EFECTIVO')) return 'EFECTIVO';
+  if (cleanValue.includes('TRANSFER')) return 'TRANSFERENCIA';
+  if (cleanValue.includes('LINK')) return 'LINK DE PAGO';
+  if (cleanValue.includes('TARJETA') || cleanValue.includes('POS')) return 'TARJETA';
+
+  return STORE_CASH_PAYMENT;
+};
+
+const getPaymentMeta = (payment) => {
+  const value = normalizeCheckoutPayment(payment);
+  const meta = {
+    TARJETA: {
+      icon: 'card',
+      title: 'Tarjeta',
+      detail: 'POS / tarjeta',
+    },
+    TRANSFERENCIA: {
+      icon: 'bank',
+      title: 'Transferencia',
+      detail: 'Bancaria',
+    },
+    'LINK DE PAGO': {
+      icon: 'link',
+      title: 'Link de pago',
+      detail: 'Te enviamos link',
+    },
+    EFECTIVO: {
+      icon: 'cash',
+      title: 'Efectivo',
+      detail: 'Pago al recibir',
+    },
+  };
+
+  return {
+    value,
+    ...(meta[value] || meta.EFECTIVO),
+  };
+};
 
 const normalizeStorePriorityText = (value) =>
   String(value || '')
@@ -608,7 +651,8 @@ export default function TiendaVirtualView({
     telefono: '',
     direccion: '',
     referencia: '',
-    metodoPago: STORE_PAYMENT_OPTIONS[0],
+    metodoPago: STORE_CASH_PAYMENT,
+    cambioPara: '',
   });
   const [fulfillmentType, setFulfillmentType] = useState(ORDER_FULFILLMENT_DELIVERY);
   const [deliveryMode, setDeliveryMode] = useState('perfil');
@@ -1391,7 +1435,10 @@ export default function TiendaVirtualView({
   const updateCustomer = (field, value) => {
     setCustomer((current) => ({
       ...current,
-      [field]: value,
+      [field]: field === 'metodoPago' ? normalizeCheckoutPayment(value) : value,
+      ...(field === 'metodoPago' && normalizeCheckoutPayment(value) !== STORE_CASH_PAYMENT
+        ? { cambioPara: '' }
+        : {}),
     }));
   };
 
@@ -1915,6 +1962,16 @@ export default function TiendaVirtualView({
     setSubmitting(true);
 
     try {
+      const paymentMethod = normalizeCheckoutPayment(customer.metodoPago);
+      const cashChangeText = String(customer.cambioPara || '').trim();
+      const checkoutNotes = [
+        notes.trim(),
+        paymentMethod === STORE_CASH_PAYMENT && cashChangeText
+          ? `Necesito cambio para: ${cashChangeText}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
       const fullAddress = activeDeliveryAddress.referencia
         ? `${activeDeliveryAddress.direccion} | Ref: ${activeDeliveryAddress.referencia}`
         : activeDeliveryAddress.direccion;
@@ -1942,8 +1999,9 @@ export default function TiendaVirtualView({
               }
             : null,
           total: approximateTotalAmount,
-          observaciones: notes.trim(),
-          metodoPago: customer.metodoPago,
+          observaciones: checkoutNotes,
+          metodoPago: paymentMethod,
+          cambioPara: paymentMethod === STORE_CASH_PAYMENT ? cashChangeText : '',
           deliveryMode,
           fulfillmentType,
         },
@@ -1956,6 +2014,7 @@ export default function TiendaVirtualView({
       setCouponInput('');
       setCouponMessage('');
       setNotes('');
+      setCustomer((current) => ({ ...current, cambioPara: '' }));
       setCheckoutOpen(false);
       setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
       setDeliveryMode('perfil');
@@ -3775,28 +3834,133 @@ export default function TiendaVirtualView({
           object-fit: contain;
           background: #f7f7f8;
         }
-        .store-delivery-mode {
+        .store-choice-section {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .store-choice-section.compact {
           gap: 8px;
         }
-        .store-delivery-option {
-          min-height: 44px;
+        .store-choice-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #111827;
+          font-size: 13px;
+          font-weight: 950;
+          letter-spacing: -0.01em;
+        }
+        .store-choice-title .store-checkout-icon {
+          width: 24px;
+          height: 24px;
+          color: #9f1239;
+          background: #fff1f2;
+        }
+        .store-choice-grid {
+          display: grid;
+          gap: 10px;
+        }
+        .store-choice-grid.two {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .store-choice-grid.payment {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .store-choice-card {
+          min-height: 84px;
           border: 1px solid #ead8da;
-          border-radius: 16px;
-          padding: 0 12px;
-          background: #ffffff;
+          border-radius: 20px;
+          padding: 12px;
+          background: linear-gradient(180deg, #ffffff, #fffafa);
           color: #7b1022;
           cursor: pointer;
           font: inherit;
+          text-align: left;
+          display: grid;
+          grid-template-columns: 36px minmax(0, 1fr);
+          grid-template-areas:
+            "icon title"
+            "icon detail";
+          column-gap: 10px;
+          align-items: center;
+          box-shadow: 0 12px 24px rgba(123, 16, 34, 0.06);
+          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+        .store-choice-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(159, 18, 57, 0.32);
+          box-shadow: 0 18px 34px rgba(123, 16, 34, 0.12);
+        }
+        .store-choice-card.active {
+          border-color: transparent;
+          background: linear-gradient(135deg, #7b1022, #d43f3a);
+          color: #ffffff;
+          box-shadow: 0 18px 36px rgba(123, 16, 34, 0.24);
+        }
+        .store-choice-card strong {
+          grid-area: title;
+          color: inherit;
+          font-size: 15px;
+          font-weight: 950;
+          letter-spacing: -0.02em;
+        }
+        .store-choice-card span:not(.store-checkout-icon) {
+          grid-area: detail;
+          color: rgba(123, 16, 34, 0.66);
+          font-size: 11px;
+          font-weight: 850;
+          line-height: 1.25;
+        }
+        .store-choice-card.active span:not(.store-checkout-icon) {
+          color: rgba(255, 255, 255, 0.82);
+        }
+        .store-choice-card.mini {
+          min-height: 72px;
+          border-radius: 18px;
+        }
+        .store-choice-card.payment {
+          min-height: 92px;
+          grid-template-columns: 1fr;
+          grid-template-areas:
+            "icon"
+            "title"
+            "detail";
+          justify-items: center;
+          text-align: center;
+          padding: 12px 8px;
+        }
+        .store-checkout-icon {
+          grid-area: icon;
+          width: 36px;
+          height: 36px;
+          border-radius: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #7b1022;
+          background: rgba(123, 16, 34, 0.08);
+          flex: 0 0 auto;
+        }
+        .store-checkout-icon svg {
+          width: 22px;
+          height: 22px;
+        }
+        .store-choice-card.active .store-checkout-icon {
+          color: #7b1022;
+          background: #ffffff;
+        }
+        .store-cash-change {
+          display: grid;
+          gap: 8px;
+          border: 1px solid #fde2e2;
+          border-radius: 18px;
+          padding: 12px;
+          background: #fff7f4;
+        }
+        .store-cash-change span {
+          color: #7b1022;
           font-size: 13px;
           font-weight: 950;
-        }
-        .store-delivery-option.active {
-          background: linear-gradient(135deg, #7b1022, #d94a3f);
-          border-color: transparent;
-          color: #ffffff;
-          box-shadow: 0 16px 28px rgba(123, 16, 34, 0.18);
         }
         .store-mobile-cart {
           position: fixed;
@@ -4424,8 +4588,17 @@ export default function TiendaVirtualView({
           }
           .store-location-actions,
           .store-map-fields,
-          .store-delivery-mode {
+          .store-choice-grid.two {
             grid-template-columns: 1fr;
+          }
+          .store-choice-grid.payment {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .store-choice-card {
+            min-height: 76px;
+          }
+          .store-choice-card.payment {
+            min-height: 82px;
           }
           .store-progress-step {
             min-height: 32px;
@@ -5799,6 +5972,92 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
   );
 }
 
+function StoreCheckoutIcon({ name }) {
+  const commonProps = {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.9,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': true,
+  };
+  const icons = {
+    route: (
+      <svg {...commonProps}>
+        <path d="M5 18c2.8-5 11.2-2 14-7" />
+        <circle cx="5" cy="18" r="2" />
+        <circle cx="19" cy="7" r="2" />
+      </svg>
+    ),
+    delivery: (
+      <svg {...commonProps}>
+        <path d="M3 7h11v9H3z" />
+        <path d="M14 10h3l3 3v3h-6z" />
+        <circle cx="7" cy="18" r="2" />
+        <circle cx="17" cy="18" r="2" />
+      </svg>
+    ),
+    pickup: (
+      <svg {...commonProps}>
+        <path d="M6 8h12l-1 12H7z" />
+        <path d="M9 8a3 3 0 0 1 6 0" />
+        <path d="M8 12h8" />
+      </svg>
+    ),
+    home: (
+      <svg {...commonProps}>
+        <path d="M4 11 12 4l8 7" />
+        <path d="M6 10v10h12V10" />
+        <path d="M10 20v-5h4v5" />
+      </svg>
+    ),
+    pin: (
+      <svg {...commonProps}>
+        <path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z" />
+        <circle cx="12" cy="10" r="2.3" />
+      </svg>
+    ),
+    wallet: (
+      <svg {...commonProps}>
+        <path d="M4 7h15a2 2 0 0 1 2 2v9H4a2 2 0 0 1-2-2V6a2 2 0 0 0 2 1z" />
+        <path d="M16 13h5" />
+        <circle cx="17.5" cy="13" r=".5" />
+      </svg>
+    ),
+    card: (
+      <svg {...commonProps}>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M3 10h18" />
+        <path d="M7 15h4" />
+      </svg>
+    ),
+    bank: (
+      <svg {...commonProps}>
+        <path d="M4 10h16" />
+        <path d="M6 10v7M10 10v7M14 10v7M18 10v7" />
+        <path d="M3 19h18" />
+        <path d="m12 4 8 4H4z" />
+      </svg>
+    ),
+    link: (
+      <svg {...commonProps}>
+        <path d="M10 13a5 5 0 0 0 7.1 0l1.4-1.4a5 5 0 0 0-7.1-7.1L10.6 5" />
+        <path d="M14 11a5 5 0 0 0-7.1 0l-1.4 1.4a5 5 0 0 0 7.1 7.1l.8-.8" />
+      </svg>
+    ),
+    cash: (
+      <svg {...commonProps}>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M6 9v6M18 9v6" />
+      </svg>
+    ),
+  };
+
+  return <span className="store-checkout-icon">{icons[name] || icons.wallet}</span>;
+}
+
 function CheckoutSheet({
   cartItems,
   currentUser,
@@ -5833,6 +6092,36 @@ function CheckoutSheet({
 }) {
   const isGuestCheckout = !currentUser;
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
+  const paymentValue = normalizeCheckoutPayment(customer.metodoPago);
+  const deliveryChoices = [
+    {
+      value: ORDER_FULFILLMENT_DELIVERY,
+      icon: 'delivery',
+      title: 'Domicilio',
+      detail: 'Entrega a domicilio',
+    },
+    {
+      value: ORDER_FULFILLMENT_PICKUP,
+      icon: 'pickup',
+      title: 'Pickup',
+      detail: 'Retirar en tienda',
+    },
+  ];
+  const addressChoices = [
+    {
+      value: 'perfil',
+      icon: 'home',
+      title: 'Mi direccion',
+      detail: 'Usar guardada',
+    },
+    {
+      value: 'otra',
+      icon: 'pin',
+      title: 'Otra',
+      detail: 'Nueva entrega',
+    },
+  ];
+  const paymentChoices = STORE_PAYMENT_OPTIONS.map(getPaymentMeta);
 
   return (
     <div className="store-sheet-overlay">
@@ -5941,21 +6230,26 @@ function CheckoutSheet({
             </p>
           </div>
 
-          <div className="store-delivery-mode">
-            <button
-              type="button"
-              className={`store-delivery-option ${fulfillmentType === ORDER_FULFILLMENT_DELIVERY ? 'active' : ''}`}
-              onClick={() => onFulfillmentTypeChange(ORDER_FULFILLMENT_DELIVERY)}
-            >
-              Entrega a domicilio
-            </button>
-            <button
-              type="button"
-              className={`store-delivery-option ${fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'active' : ''}`}
-              onClick={() => onFulfillmentTypeChange(ORDER_FULFILLMENT_PICKUP)}
-            >
-              Pickup en tienda
-            </button>
+          <div className="store-choice-section">
+            <div className="store-choice-title">
+              <StoreCheckoutIcon name="route" />
+              <span>Tipo de entrega</span>
+            </div>
+            <div className="store-choice-grid two">
+              {deliveryChoices.map((choice) => (
+                <button
+                  key={choice.value}
+                  type="button"
+                  className={`store-choice-card ${fulfillmentType === choice.value ? 'active' : ''}`}
+                  aria-pressed={fulfillmentType === choice.value}
+                  onClick={() => onFulfillmentTypeChange(choice.value)}
+                >
+                  <StoreCheckoutIcon name={choice.icon} />
+                  <strong>{choice.title}</strong>
+                  <span>{choice.detail}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {isGuestCheckout ? (
@@ -5988,21 +6282,26 @@ function CheckoutSheet({
                 </div>
               ) : (
                 <>
-                  <div className="store-delivery-mode">
-                    <button
-                      type="button"
-                      className={`store-delivery-option ${deliveryMode === 'perfil' ? 'active' : ''}`}
-                      onClick={() => onDeliveryModeChange('perfil')}
-                    >
-                      Mi direccion guardada
-                    </button>
-                    <button
-                      type="button"
-                      className={`store-delivery-option ${deliveryMode === 'otra' ? 'active' : ''}`}
-                      onClick={() => onDeliveryModeChange('otra')}
-                    >
-                      Otra direccion
-                    </button>
+                  <div className="store-choice-section compact">
+                    <div className="store-choice-title">
+                      <StoreCheckoutIcon name="pin" />
+                      <span>Direccion</span>
+                    </div>
+                    <div className="store-choice-grid two">
+                      {addressChoices.map((choice) => (
+                        <button
+                          key={choice.value}
+                          type="button"
+                          className={`store-choice-card mini ${deliveryMode === choice.value ? 'active' : ''}`}
+                          aria-pressed={deliveryMode === choice.value}
+                          onClick={() => onDeliveryModeChange(choice.value)}
+                        >
+                          <StoreCheckoutIcon name={choice.icon} />
+                          <strong>{choice.title}</strong>
+                          <span>{choice.detail}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {deliveryMode === 'perfil' ? (
@@ -6068,22 +6367,44 @@ function CheckoutSheet({
               )}
             </>
           )}
-          <select
-            className="store-select"
-            value={customer.metodoPago}
-            onChange={(event) => onCustomerChange('metodoPago', event.target.value)}
-          >
-            {STORE_PAYMENT_OPTIONS.map((payment) => (
-              <option key={payment} value={payment}>
-                {payment}
-              </option>
-            ))}
-          </select>
+          <div className="store-choice-section">
+            <div className="store-choice-title">
+              <StoreCheckoutIcon name="wallet" />
+              <span>Forma de pago</span>
+            </div>
+            <div className="store-choice-grid payment">
+              {paymentChoices.map((payment) => (
+                <button
+                  key={payment.value}
+                  type="button"
+                  className={`store-choice-card payment ${paymentValue === payment.value ? 'active' : ''}`}
+                  aria-pressed={paymentValue === payment.value}
+                  onClick={() => onCustomerChange('metodoPago', payment.value)}
+                >
+                  <StoreCheckoutIcon name={payment.icon} />
+                  <strong>{payment.title}</strong>
+                  <span>{payment.detail}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {paymentValue === STORE_CASH_PAYMENT && (
+            <label className="store-cash-change">
+              <span>Necesito cambio para:</span>
+              <input
+                className="store-field"
+                value={customer.cambioPara || ''}
+                inputMode="decimal"
+                onChange={(event) => onCustomerChange('cambioPara', event.target.value)}
+                placeholder="Ej. C$ 500"
+              />
+            </label>
+          )}
           <textarea
             className="store-textarea"
             value={notes}
             onChange={(event) => onNotesChange(event.target.value)}
-            placeholder="Observaciones"
+            placeholder="Notas para tu pedido"
           />
           <button type="submit" className="store-button" disabled={submitting}>
             {submitting ? 'Enviando...' : 'Realizar pedido en linea'}

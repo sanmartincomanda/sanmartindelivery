@@ -251,6 +251,8 @@ const getStatusMeta = (status) => STATUS_META[normalizeStatus(status)] || STATUS
 const getMetodoPagoTone = (metodo = 'Efectivo') => {
   const palette = {
     Efectivo: { color: '#10b981', soft: 'rgba(16, 185, 129, 0.16)' },
+    EFECTIVO: { color: '#10b981', soft: 'rgba(16, 185, 129, 0.16)' },
+    TARJETA: { color: '#3b82f6', soft: 'rgba(59, 130, 246, 0.16)' },
     'POS BAC': { color: '#3b82f6', soft: 'rgba(59, 130, 246, 0.16)' },
     'POS BANPRO': { color: '#2563eb', soft: 'rgba(37, 99, 235, 0.16)' },
     'POS LAFISE': { color: '#1d4ed8', soft: 'rgba(29, 78, 216, 0.16)' },

@@ -366,6 +366,8 @@ export default function ListaPedidos({ pedidos = [] }) {
   const getMetodoPagoColor = (metodo) => {
     const colores = {
       'Efectivo': '#10b981', // Verde
+      'EFECTIVO': '#10b981',
+      'TARJETA': '#3b82f6',
       'POS BAC': '#3b82f6',  // Azul
       'POS BANPRO': '#3b82f6',
       'POS LAFISE': '#3b82f6',

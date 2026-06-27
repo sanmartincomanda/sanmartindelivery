@@ -363,6 +363,7 @@ export async function createOrder(payload, options = {}) {
     totalAproximado: channel === STORE_CHANNEL,
     estado: 'Pendiente',
     metodoPago: String(payload.metodoPago || 'Efectivo').trim() || 'Efectivo',
+    cambioPara: String(payload.cambioPara || '').trim(),
     fecha,
     id,
     canal: channel,
