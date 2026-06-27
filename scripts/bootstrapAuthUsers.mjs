@@ -22,6 +22,11 @@ const buildInternalEmail = (username, scope = 'internal') => {
   return `${cleanUsername || 'usuario'}@${cleanScope}.${AUTH_DOMAIN}`;
 };
 
+const resolveAuthPassword = (password) => {
+  const rawPassword = String(password || '');
+  return rawPassword.length < 6 ? `${rawPassword}26` : rawPassword;
+};
+
 const buildDriverEmail = (driverCode) => buildInternalEmail(driverCode, 'drivers');
 
 const normalizeDriverCode = (value = '') =>
@@ -41,11 +46,18 @@ const DEFAULT_DRIVERS = [
 
 const INTERNAL_USERS = [
   {
-    username: process.env.ADMIN_USER || 'delivery',
-    password: process.env.ADMIN_PASSWORD || 'delivery2026',
+    username: process.env.OPERATOR_USER || 'delivery',
+    password: process.env.OPERATOR_PASSWORD || 'delivery2026',
+    scope: 'admin',
+    role: 'operator',
+    displayName: 'Delivery Operativo',
+  },
+  {
+    username: process.env.ADMIN_USER || 'admin',
+    password: process.env.ADMIN_PASSWORD || 'admin',
     scope: 'admin',
     role: 'admin',
-    displayName: 'Administracion',
+    displayName: 'Administrador',
   },
   {
     username: process.env.KITCHEN_USER || 'cocina',
@@ -102,7 +114,7 @@ async function seedInternalUsers() {
     const email = buildInternalEmail(user.username, user.scope);
     const authUser = await upsertAuthUser({
       email,
-      password: user.password,
+      password: resolveAuthPassword(user.password),
       displayName: user.displayName,
     });
 

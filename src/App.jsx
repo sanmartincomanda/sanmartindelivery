@@ -189,6 +189,7 @@ function App() {
   const [route, setRoute] = useState(() => getRouteFromLocation());
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [dashboardRole, setDashboardRole] = useState(null);
   const [inputUser, setInputUser] = useState('');
   const [inputPass, setInputPass] = useState('');
   const [loginError, setLoginError] = useState(false);
@@ -211,22 +212,27 @@ function App() {
   const isKitchenRoute = route === 'cocina';
   const isDriverRoute = route === 'driver';
   const todayKey = hoyISO();
+  const isAdminDashboard = dashboardRole === AUTH_ROLES.ADMIN;
 
   useEffect(() => {
     const unsubscribe = onFirebaseAuthChange((user) => {
       if (!user) {
         setIsAuthenticated(false);
+        setDashboardRole(null);
         setKitchenAuth(false);
         return;
       }
 
       fetchUserRole(user.uid)
         .then((roleRecord) => {
-          setIsAuthenticated(roleRecord?.role === AUTH_ROLES.ADMIN);
+          const role = roleRecord?.role || null;
+          setDashboardRole(role);
+          setIsAuthenticated(role === AUTH_ROLES.ADMIN || role === AUTH_ROLES.OPERATOR);
           setKitchenAuth(roleRecord?.role === AUTH_ROLES.KITCHEN);
         })
         .catch(() => {
           setIsAuthenticated(false);
+          setDashboardRole(null);
           setKitchenAuth(false);
         });
     });
@@ -345,7 +351,7 @@ function App() {
     const shouldLoadClients =
       !isPublicStoreRoute &&
       route === 'dashboard' &&
-      isAuthenticated &&
+      isAdminDashboard &&
       (view === 'ingreso' || view === 'basedatos');
 
     if (!shouldLoadClients) {
@@ -399,7 +405,7 @@ function App() {
     });
 
     return () => unsubscribe();
-  }, [isAuthenticated, isPublicStoreRoute, route, view]);
+  }, [isAdminDashboard, isPublicStoreRoute, route, view]);
 
   const nextOrderNumber = useMemo(
     () => Math.min(todayCounter + 1, ORDER_LIMIT_PER_DAY + 1),
@@ -432,7 +438,8 @@ function App() {
         password: inputPass,
         scope: 'admin',
       });
-      await assertRole(AUTH_ROLES.ADMIN, authUser.uid);
+      const roleRecord = await assertRole([AUTH_ROLES.ADMIN, AUTH_ROLES.OPERATOR], authUser.uid);
+      setDashboardRole(roleRecord.role);
       setIsAuthenticated(true);
       setLoginError(false);
       return;
@@ -488,7 +495,18 @@ function App() {
     { id: 'configuracion', label: 'Configuraciones', icon: Icons.settings, color: '#6366f1', short: 'Config' },
   ];
 
-  const currentViewMeta = navItems.find((item) => item.id === view);
+  const availableNavItems = isAdminDashboard
+    ? navItems
+    : navItems.filter((item) => ['ingreso', 'cocina', 'lista'].includes(item.id));
+  const currentViewMeta = availableNavItems.find((item) => item.id === view) || availableNavItems[0];
+
+  useEffect(() => {
+    if (!isAuthenticated || availableNavItems.some((item) => item.id === view)) {
+      return;
+    }
+
+    setView('ingreso');
+  }, [availableNavItems, isAuthenticated, view]);
 
   if (isPublicStoreRoute) {
     return (
@@ -753,7 +771,7 @@ function App() {
         </div>
 
         <nav style={{ flex: 1, padding: '12px 0' }}>
-          {navItems.map((item) => (
+          {availableNavItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setView(item.id)}
@@ -908,19 +926,20 @@ function App() {
             {view === 'ingreso' && (
               <OrderForm
                 onAddOrder={addOrder}
-                clientes={clientes}
+                clientes={isAdminDashboard ? clientes : []}
+                allowClientDirectory={isAdminDashboard}
                 nextOrderNumber={nextOrderNumber}
                 remainingOrders={remainingOrders}
               />
             )}
 
-            {view === 'cocina' && <KitchenView orders={orders} />}
+            {view === 'cocina' && <KitchenView orders={orders} allowRuta={isAdminDashboard} />}
 
             {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
 
-            {view === 'configuracion' && <ConfiguracionView />}
+            {view === 'configuracion' && isAdminDashboard && <ConfiguracionView />}
 
-            {view === 'basedatos' && <BaseDatosView clientes={clientes} />}
+            {view === 'basedatos' && isAdminDashboard && <BaseDatosView clientes={clientes} />}
           </Suspense>
         </div>
       </main>

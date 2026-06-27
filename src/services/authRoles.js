@@ -14,6 +14,7 @@ export const USER_ROLES_PATH = 'userRoles';
 
 export const AUTH_ROLES = {
   ADMIN: 'admin',
+  OPERATOR: 'operator',
   KITCHEN: 'kitchen',
   DRIVER: 'driver',
   CLIENT: 'client',
@@ -96,10 +97,12 @@ export async function signInStoreCustomerWithGoogle() {
 }
 
 export async function signInInternalUser({ username, password, scope = 'internal' }) {
+  const rawPassword = String(password || '');
+  const authPassword = rawPassword.length < 6 ? `${rawPassword}26` : rawPassword;
   const credential = await signInWithEmailAndPassword(
     auth,
     buildInternalEmail(username, scope),
-    String(password || '')
+    authPassword
   );
 
   return credential.user;

@@ -140,7 +140,7 @@ const getKitchenStatusConfig = (pedido = {}) => {
   return baseConfig;
 };
 
-export default function KitchenView({ orders }) {
+export default function KitchenView({ orders, allowRuta = true }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const audioRef = useRef(null);
@@ -151,6 +151,11 @@ export default function KitchenView({ orders }) {
   const [cocineroSeleccionado, setCocineroSeleccionado] = useState(null);
 
   useEffect(() => {
+    if (!allowRuta) {
+      setRutaOrders([]);
+      return undefined;
+    }
+
     const today = hoyISO();
     const rutaRef = query(ref(database, 'rutaOrders'), orderByChild('fecha'), equalTo(today));
     return onValue(rutaRef, (snapshot) => {
@@ -161,7 +166,7 @@ export default function KitchenView({ orders }) {
         .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
       setRutaOrders(arr);
     });
-  }, []);
+  }, [allowRuta]);
 
   const getBasePath = (tab) => (tab === 'ruta' ? 'rutaOrders' : 'orders');
   const isKitchenBlockedStatusChange = (campo, valor) =>
@@ -247,7 +252,7 @@ export default function KitchenView({ orders }) {
     }
   }, [orders, kitchenTab]);
 
-  const currentOrdersRaw = kitchenTab === 'ruta' ? rutaOrders : orders;
+  const currentOrdersRaw = allowRuta && kitchenTab === 'ruta' ? rutaOrders : orders;
   
   // 🔥 NUEVA LÓGICA DE ORDENAMIENTO:
   // 1. Primero por estado: Pendiente -> En preparación -> Preparado -> Cancelado
@@ -559,7 +564,7 @@ export default function KitchenView({ orders }) {
           borderRadius: '16px',
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
-          {['delivery', 'ruta'].map((tab) => (
+          {(allowRuta ? ['delivery', 'ruta'] : ['delivery']).map((tab) => (
             <button
               key={tab}
               onClick={() => setKitchenTab(tab)}

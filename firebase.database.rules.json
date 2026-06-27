@@ -11,11 +11,11 @@
     },
 
     "orders": {
-      ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && query.orderByChild == 'fecha') || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && query.orderByChild == 'storeUserKey' && query.equalTo == auth.uid) || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && query.orderByChild == 'repartidorCodigo' && query.equalTo == root.child('userRoles').child(auth.uid).child('driverCode').val()))",
+      ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && query.orderByChild == 'fecha') || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && query.orderByChild == 'storeUserKey' && query.equalTo == auth.uid) || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && query.orderByChild == 'repartidorCodigo' && query.equalTo == root.child('userRoles').child(auth.uid).child('driverCode').val()))",
       ".indexOn": ["fecha", "storeUserKey", "repartidorCodigo", "timestamp"],
       "$orderId": {
-        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || data.child('storeUserKey').val() == auth.uid || data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val())",
-        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))))"
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || data.child('storeUserKey').val() == auth.uid || data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val())",
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))))"
       }
     },
 
@@ -28,7 +28,7 @@
     "orderCounters": {
       "$date": {
         ".read": true,
-        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || root.child('userRoles').child(auth.uid).child('role').val() == 'client') && newData.isNumber() && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1))"
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || root.child('userRoles').child(auth.uid).child('role').val() == 'client') && newData.isNumber() && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1))"
       }
     },
 
@@ -88,7 +88,7 @@
     },
 
     "deliveryDrivers": {
-      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator')",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       "$driverCode": {
         ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('driverCode').val() == $driverCode)",

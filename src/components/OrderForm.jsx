@@ -25,6 +25,7 @@ const PAYMENT_OPTIONS = [
 export default function OrderForm({
   onAddOrder,
   clientes = [],
+  allowClientDirectory = true,
   nextOrderNumber = 1,
   remainingOrders = 0,
 }) {
@@ -45,6 +46,10 @@ export default function OrderForm({
   const previewNumber = hasAvailability ? formatOrderNumber(nextOrderNumber) : 'MAX';
 
   const sugerencias = useMemo(() => {
+    if (!allowClientDirectory) {
+      return [];
+    }
+
     const normalizedInput = normalizar(clienteInput || '');
     if (!normalizedInput) {
       return [];
@@ -53,7 +58,7 @@ export default function OrderForm({
     return (clientes || [])
       .filter((client) => normalizar(client.nombre || '').includes(normalizedInput))
       .slice(0, 6);
-  }, [clienteInput, clientes]);
+  }, [allowClientDirectory, clienteInput, clientes]);
 
   const handleSelectCliente = (client) => {
     setSelectedClient(client);
@@ -69,8 +74,13 @@ export default function OrderForm({
       return;
     }
 
-    if (!selectedClient) {
-      alert('Selecciona un cliente de la lista o crea uno nuevo.');
+    const manualClientName = clienteInput.trim();
+    if (!selectedClient && !manualClientName) {
+      alert(
+        allowClientDirectory
+          ? 'Selecciona un cliente de la lista, crea uno nuevo o escribe el nombre.'
+          : 'Escribe el nombre del cliente.'
+      );
       return;
     }
 
@@ -79,17 +89,26 @@ export default function OrderForm({
       return;
     }
 
+    const orderClient = selectedClient || {
+      nombre: manualClientName,
+      codigo: '-',
+      firebaseKey: '',
+      direccion: '-',
+      ubicacion: null,
+      telefono: '',
+    };
+
     setIsSubmitting(true);
 
     try {
       const createdOrder = await onAddOrder(
         {
-          cliente: selectedClient.nombre,
-          clienteCodigo: selectedClient.codigo || '-',
-          clienteFirebaseKey: selectedClient.firebaseKey || '',
-          direccion: selectedClient.direccion || '-',
-          ubicacion: selectedClient.ubicacion || null,
-          telefono: selectedClient.telefono || '',
+          cliente: orderClient.nombre,
+          clienteCodigo: orderClient.codigo || '-',
+          clienteFirebaseKey: orderClient.firebaseKey || '',
+          direccion: orderClient.direccion || '-',
+          ubicacion: orderClient.ubicacion || null,
+          telefono: orderClient.telefono || '',
           pedido: pedido.trim(),
           fecha: hoyISO(),
           metodoPago,
@@ -542,7 +561,7 @@ export default function OrderForm({
                 <div style={{ position: 'relative', marginBottom: '16px' }}>
                   <input
                     type="text"
-                    placeholder="Buscar cliente por nombre..."
+                    placeholder={allowClientDirectory ? 'Buscar cliente por nombre...' : 'Nombre del cliente'}
                     value={clienteInput}
                     onChange={(event) => {
                       setClienteInput(event.target.value);
@@ -574,7 +593,7 @@ export default function OrderForm({
                     /
                   </span>
 
-                  {clienteInput && sugerencias.length > 0 && (
+                  {allowClientDirectory && clienteInput && sugerencias.length > 0 && (
                     <div
                       style={{
                         position: 'absolute',
@@ -614,26 +633,32 @@ export default function OrderForm({
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowNewClient((current) => !current)}
-                  className="btn-hover"
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: '2px dashed rgba(255,255,255,0.2)',
-                    background: 'transparent',
-                    color: showNewClient ? '#ef4444' : 'rgba(255,255,255,0.8)',
-                    fontWeight: 700,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {showNewClient ? 'Cancelar cliente nuevo' : 'Crear cliente nuevo'}
-                </button>
+                {allowClientDirectory ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowNewClient((current) => !current)}
+                    className="btn-hover"
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      borderRadius: '12px',
+                      border: '2px dashed rgba(255,255,255,0.2)',
+                      background: 'transparent',
+                      color: showNewClient ? '#ef4444' : 'rgba(255,255,255,0.8)',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showNewClient ? 'Cancelar cliente nuevo' : 'Crear cliente nuevo'}
+                  </button>
+                ) : (
+                  <div style={{ color: 'rgba(255,255,255,0.58)', fontSize: 13, fontWeight: 700 }}>
+                    Modo operativo: no se descarga la base de clientes.
+                  </div>
+                )}
 
-                {showNewClient && (
+                {allowClientDirectory && showNewClient && (
                   <div
                     className="animate-slideUp"
                     style={{
@@ -910,7 +935,12 @@ Ejemplo:
 
             <button
               type="submit"
-              disabled={isSubmitting || !selectedClient || !pedido.trim() || !hasAvailability}
+              disabled={
+                isSubmitting ||
+                (!selectedClient && !clienteInput.trim()) ||
+                !pedido.trim() ||
+                !hasAvailability
+              }
               className="btn-hover"
               style={{
                 padding: '20px 48px',
@@ -925,10 +955,10 @@ Ejemplo:
                 fontWeight: 900,
                 fontSize: '18px',
                 cursor:
-                  isSubmitting || !selectedClient || !pedido.trim() || !hasAvailability
+                  isSubmitting || (!selectedClient && !clienteInput.trim()) || !pedido.trim() || !hasAvailability
                     ? 'not-allowed'
                     : 'pointer',
-                opacity: isSubmitting || !selectedClient || !pedido.trim() ? 0.5 : 1,
+                opacity: isSubmitting || (!selectedClient && !clienteInput.trim()) || !pedido.trim() ? 0.5 : 1,
                 boxShadow:
                   isSubmitting || !hasAvailability ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)',
               }}
