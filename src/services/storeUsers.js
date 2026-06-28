@@ -17,6 +17,23 @@ export const STORE_USERS_PATH = 'storeUsers';
 
 export const cleanStorePhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
 export const cleanStoreEmail = (email) => normalizeAuthEmail(email);
+const normalizeBirthDate = (value = '') => {
+  const cleanValue = String(value || '').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanValue)) {
+    return '';
+  }
+
+  const parsedDate = new Date(`${cleanValue}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  return parsedDate <= today ? cleanValue : '';
+};
 
 export const getStoreUserKey = (phone) => {
   const cleanPhone = cleanStorePhone(phone);
@@ -127,6 +144,7 @@ export async function ensureStoreUser({
   telefono,
   direccion,
   referencia,
+  fechaNacimiento,
   passwordHash,
   ubicacion,
   authUid,
@@ -144,6 +162,7 @@ export async function ensureStoreUser({
   const userSnapshot = await get(userRef);
   const existingUser = userSnapshot.val();
   const normalizedLocation = normalizeLocation(ubicacion) || normalizeLocation(existingUser?.ubicacion);
+  const normalizedBirthDate = normalizeBirthDate(fechaNacimiento);
 
   if (!hasLocation(normalizedLocation)) {
     const error = new Error('Ubicacion exacta requerida');
@@ -164,6 +183,7 @@ export async function ensureStoreUser({
     telefono: cleanPhone,
     direccion: String(direccion || '').trim(),
     referencia: String(referencia || '').trim(),
+    fechaNacimiento: normalizedBirthDate,
     ubicacion: normalizedLocation,
     codigo: resolvedClientCode,
     updatedAt: now,
@@ -183,6 +203,7 @@ export async function ensureStoreUser({
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       email: profile.email,
+      fechaNacimiento: profile.fechaNacimiento,
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       createdAt: now,
@@ -198,6 +219,7 @@ export async function ensureStoreUser({
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       email: profile.email,
+      fechaNacimiento: profile.fechaNacimiento,
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       updatedAt: now,
@@ -227,11 +249,20 @@ export async function ensureStoreUser({
   };
 }
 
-export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, password, ubicacion }) {
-  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, password, ubicacion });
+export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, fechaNacimiento, password, ubicacion }) {
+  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, fechaNacimiento, password, ubicacion });
 }
 
-export async function registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, password, ubicacion }) {
+export async function registerStoreUserWithEmail({
+  nombre,
+  email,
+  telefono,
+  direccion,
+  referencia,
+  fechaNacimiento,
+  password,
+  ubicacion,
+}) {
   const cleanEmail = cleanStoreEmail(email);
   const cleanPhone = cleanStorePhone(telefono);
   const userKey = getStoreUserKey(cleanPhone);
@@ -283,6 +314,7 @@ export async function registerStoreUserWithEmail({ nombre, email, telefono, dire
     telefono: cleanPhone,
     direccion,
     referencia,
+    fechaNacimiento,
     ubicacion,
     passwordHash,
     authUid: authUserKey,
@@ -403,7 +435,15 @@ export async function loginStoreUserWithGoogle() {
   );
 }
 
-export async function completeGoogleStoreUserProfile({ nombre, email, telefono, direccion, referencia, ubicacion }) {
+export async function completeGoogleStoreUserProfile({
+  nombre,
+  email,
+  telefono,
+  direccion,
+  referencia,
+  fechaNacimiento,
+  ubicacion,
+}) {
   const authUser = getCurrentAuthUser();
   if (!authUser) {
     const error = new Error('Sesion de Google no encontrada');
@@ -427,6 +467,7 @@ export async function completeGoogleStoreUserProfile({ nombre, email, telefono, 
     telefono: cleanPhone,
     direccion,
     referencia,
+    fechaNacimiento,
     ubicacion,
     authUid: authUser.uid,
   });
@@ -446,6 +487,7 @@ export async function updateStoreUserProfile(user, patch) {
     telefono: currentUser.telefono,
     direccion: patch.direccion ?? currentUser.direccion,
     referencia: patch.referencia ?? currentUser.referencia,
+    fechaNacimiento: patch.fechaNacimiento ?? currentUser.fechaNacimiento,
     ubicacion: patch.ubicacion ?? currentUser.ubicacion,
     authUid: currentUser.key || getCurrentAuthUser()?.uid,
   });

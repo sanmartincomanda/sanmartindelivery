@@ -5,6 +5,10 @@ import { normalizeLocation } from './geo';
 export const CLIENT_DIRECTORY_PATH = 'clientDirectory';
 
 const cleanText = (value = '') => String(value || '').trim();
+const normalizeBirthDate = (value = '') => {
+  const cleanValue = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(cleanValue) ? cleanValue : '';
+};
 
 export const normalizeClientDirectoryEntry = (client = {}) => {
   const location = normalizeLocation(client.ubicacion || client.location);
@@ -14,6 +18,7 @@ export const normalizeClientDirectoryEntry = (client = {}) => {
     codigo: cleanText(client.codigo),
     direccion: cleanText(client.direccion),
     telefono: cleanText(client.telefono),
+    fechaNacimiento: normalizeBirthDate(client.fechaNacimiento),
     ubicacion: location || null,
     origen: cleanText(client.origen) || 'manual',
     storeUserKey: cleanText(client.storeUserKey),
@@ -53,6 +58,7 @@ export async function createManualClient(client = {}) {
     codigo: cleanText(client.codigo),
     direccion: cleanText(client.direccion),
     telefono: cleanText(client.telefono),
+    fechaNacimiento: normalizeBirthDate(client.fechaNacimiento),
     ubicacion: normalizeLocation(client.ubicacion) || null,
     origen: cleanText(client.origen) || 'manual',
     createdByRole: cleanText(client.createdByRole) || 'operator',

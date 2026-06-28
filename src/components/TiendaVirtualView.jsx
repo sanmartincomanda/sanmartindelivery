@@ -101,6 +101,24 @@ const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
 const STORE_GROUP_PAGE_SIZE = 5;
 const STORE_CASH_PAYMENT = 'EFECTIVO';
+const STORE_BIRTHDATE_MAX = (() => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+})();
+const EMPTY_STORE_AUTH_FORM = {
+  nombre: '',
+  email: '',
+  telefono: '',
+  fechaNacimiento: '',
+  password: '',
+  confirmPassword: '',
+  direccion: '',
+  referencia: '',
+  ubicacion: null,
+};
 
 const normalizeCheckoutPayment = (value) => {
   const cleanValue = String(value || '').trim().toUpperCase();
@@ -725,16 +743,7 @@ export default function TiendaVirtualView({
     }
   });
   const [authMode, setAuthMode] = useState('login');
-  const [authForm, setAuthForm] = useState({
-    nombre: '',
-    email: '',
-    telefono: '',
-    password: '',
-    confirmPassword: '',
-    direccion: '',
-    referencia: '',
-    ubicacion: null,
-  });
+  const [authForm, setAuthForm] = useState(() => ({ ...EMPTY_STORE_AUTH_FORM }));
   const [authProviderDraft, setAuthProviderDraft] = useState(null);
   const [authError, setAuthError] = useState('');
   const [authNotice, setAuthNotice] = useState('');
@@ -1980,16 +1989,7 @@ export default function TiendaVirtualView({
       if (nextIntent === 'orders') {
         setOrdersOpen(true);
       }
-      setAuthForm({
-        nombre: '',
-        email: '',
-        telefono: '',
-        password: '',
-        confirmPassword: '',
-        direccion: '',
-        referencia: '',
-        ubicacion: null,
-      });
+      setAuthForm({ ...EMPTY_STORE_AUTH_FORM });
     } catch (error) {
       console.error('Error registrando usuario de tienda:', error);
       if (error.code === 'USER_EXISTS') {
@@ -3688,6 +3688,17 @@ export default function TiendaVirtualView({
           display: grid;
           gap: 10px;
         }
+        .store-field-stack {
+          display: grid;
+          gap: 6px;
+        }
+        .store-field-caption {
+          color: #6b7280;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          padding-left: 2px;
+        }
         .store-field,
         .store-input,
         .store-textarea,
@@ -5356,6 +5367,18 @@ function StoreAuthView({
             required
           />
         )}
+        {isRegister && (
+          <label className="store-field-stack">
+            <span className="store-field-caption">Fecha de nacimiento (opcional)</span>
+            <input
+              className="store-field"
+              type="date"
+              value={authForm.fechaNacimiento || ''}
+              max={STORE_BIRTHDATE_MAX}
+              onChange={(event) => onFormChange('fechaNacimiento', event.target.value)}
+            />
+          </label>
+        )}
         {!isRegister && (
           <input
             className="store-field store-legacy-phone-field"
@@ -5887,6 +5910,7 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
     nombre: user?.nombre || '',
     direccion: user?.direccion || '',
     referencia: user?.referencia || '',
+    fechaNacimiento: user?.fechaNacimiento || '',
     ubicacion: user?.ubicacion || null,
   });
   const [locating, setLocating] = useState(false);
@@ -5948,6 +5972,16 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
             onChange={(event) => updateProfile('direccion', event.target.value)}
             placeholder="Direccion de entrega"
           />
+          <label className="store-field-stack">
+            <span className="store-field-caption">Fecha de nacimiento (opcional)</span>
+            <input
+              className="store-field"
+              type="date"
+              value={profile.fechaNacimiento || ''}
+              max={STORE_BIRTHDATE_MAX}
+              onChange={(event) => updateProfile('fechaNacimiento', event.target.value)}
+            />
+          </label>
           <input
             className="store-field"
             value={profile.referencia}
