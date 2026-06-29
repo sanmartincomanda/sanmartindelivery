@@ -34,6 +34,11 @@ export const normalizeStoreCoupon = (coupon = {}, fallback = {}) => {
     maxUsesPerUser: normalizeCouponUsageLimit(source.maxUsesPerUser ?? backup.maxUsesPerUser ?? 0),
     active: source.active ?? backup.active ?? true,
     notes: String(source.notes ?? backup.notes ?? '').trim(),
+    assignedUserKey: String(source.assignedUserKey ?? backup.assignedUserKey ?? '').trim(),
+    campaignId: String(source.campaignId ?? backup.campaignId ?? '').trim(),
+    autoApply: source.autoApply ?? backup.autoApply ?? false,
+    personal: source.personal ?? backup.personal ?? false,
+    welcomeCoupon: source.welcomeCoupon ?? backup.welcomeCoupon ?? false,
   };
 };
 

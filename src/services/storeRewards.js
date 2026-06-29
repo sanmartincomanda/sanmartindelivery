@@ -212,6 +212,7 @@ export const normalizeStoreReward = (reward = {}, fallback = {}) => {
     displayOrder: Number(source.displayOrder ?? backup.displayOrder ?? 999) || 999,
     rewardType:
       Object.values(STORE_REWARD_TYPES).includes(rewardType) ? rewardType : STORE_REWARD_TYPES.SINGLE_PRODUCT,
+    image: String(source.image ?? backup.image ?? '').trim(),
     imageProductCode: String(source.imageProductCode ?? backup.imageProductCode ?? '').trim(),
     deleted: normalizeBool(source.deleted, backup.deleted ?? false),
     maxPerOrder: Math.max(1, roundPoints(source.maxPerOrder ?? backup.maxPerOrder ?? 1)),
@@ -284,6 +285,11 @@ export const getStoreRewardChoiceItem = (reward = {}, choiceGroup = '', selected
 };
 
 export const resolveStoreRewardImage = (reward = {}, catalogByCode = {}) => {
+  const directImage = String(reward.image || '').trim();
+  if (directImage) {
+    return directImage;
+  }
+
   const imageProductCode = String(reward.imageProductCode || '').trim();
   const fallbackCode =
     imageProductCode ||
@@ -1331,6 +1337,7 @@ export const buildDefaultStoreRewardsSeed = () => [
     available: true,
     displayOrder: 60,
     rewardType: STORE_REWARD_TYPES.COMBO,
+    image: '/tienda/rewards/combo-premium-san-martin.png',
     imageProductCode: REWARD_SEED_PRODUCT_CODES.ribEye,
     items: [
       {

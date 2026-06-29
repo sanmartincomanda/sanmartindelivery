@@ -69,6 +69,14 @@
       }
     },
 
+    "storeCampaigns": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "welcomeCoupon200": {
+        ".validate": "newData.hasChildren(['campaignId', 'limit', 'amount', 'minimumPurchase', 'active', 'assignedCount', 'assignments']) && newData.child('campaignId').val() == 'welcome_coupon_200_granada_jun2026' && newData.child('limit').val() == 55 && newData.child('amount').val() == 200 && newData.child('minimumPurchase').val() == 700 && newData.child('assignedCount').isNumber() && newData.child('assignedCount').val() >= 0 && newData.child('assignedCount').val() <= 55"
+      }
+    },
+
     "storeCouponUsageArchive": {
       ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",

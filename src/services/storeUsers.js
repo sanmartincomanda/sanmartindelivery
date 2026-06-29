@@ -13,6 +13,7 @@ import {
 } from './authRoles';
 import { normalizeBirthdayValue } from './customerBirthday';
 import { setClientDirectoryEntry } from './clientDirectory';
+import { ensureStoreWelcomeCouponForUser } from './storeWelcomeCoupon';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
@@ -312,9 +313,16 @@ export async function registerStoreUserWithEmail({
     lastLoginAt: Date.now(),
   });
 
+  const welcomeCoupon = await ensureStoreWelcomeCouponForUser({
+    userKey: authUserKey,
+    phone: cleanPhone,
+    name: nombre,
+  });
+
   return sanitizeStoreUser(
     {
       ...profile,
+      welcomeCoupon,
       passwordHash,
     },
     authUserKey
@@ -463,7 +471,19 @@ export async function completeGoogleStoreUserProfile({
     lastLoginAt: Date.now(),
   });
 
-  return sanitizeStoreUser(profile, authUser.uid);
+  const welcomeCoupon = await ensureStoreWelcomeCouponForUser({
+    userKey: authUser.uid,
+    phone: cleanPhone,
+    name: nombre || authUser.displayName,
+  });
+
+  return sanitizeStoreUser(
+    {
+      ...profile,
+      welcomeCoupon,
+    },
+    authUser.uid
+  );
 }
 
 export async function updateStoreUserProfile(user, patch) {

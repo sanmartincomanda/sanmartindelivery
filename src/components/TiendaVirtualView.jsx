@@ -55,6 +55,19 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import {
+  calculateStoreDeliveryQuote,
+  DEFAULT_STORE_DELIVERY_SETTINGS,
+  formatStoreDeliveryDistance,
+  subscribeStoreDeliverySettings,
+} from '../services/storeDeliverySettings';
+import {
+  claimStoreWelcomeCoupon,
+  getStoreWelcomeCouponEffectiveStatus,
+  normalizeStoreWelcomeCoupon,
+  STORE_WELCOME_COUPON_AMOUNT,
+  STORE_WELCOME_COUPON_MINIMUM,
+} from '../services/storeWelcomeCoupon';
+import {
   formatBirthdayInputValue,
   normalizeBirthdayInput,
   normalizeBirthdayValue,
@@ -259,6 +272,101 @@ const getStoreGeneralCatalogTailPriority = (product = {}) => {
 };
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+const buildCoverageErrorMessage = (deliveryQuote) => {
+  if (!deliveryQuote || deliveryQuote.reason !== 'out_of_coverage') {
+    return '';
+  }
+
+  return `Solo atendemos dentro de ${formatStoreDeliveryDistance(
+    deliveryQuote.coverageRadiusKm
+  )} desde la tienda. Tu ubicacion esta a ${formatStoreDeliveryDistance(
+    deliveryQuote.distanceKm
+  )}.`;
+};
+
+const buildStoreDeliverySummary = (deliveryQuote) => {
+  if (!deliveryQuote) {
+    return {
+      title: 'Servicio a domicilio',
+      message: 'Guarda el punto exacto para calcular el envio.',
+      tone: 'neutral',
+    };
+  }
+
+  if (deliveryQuote.isPickup) {
+    return {
+      title: 'Pickup en tienda',
+      message: 'Retiras en tienda sin costo de envio.',
+      tone: 'pickup',
+    };
+  }
+
+  if (deliveryQuote.reason === 'missing_store_location') {
+    return {
+      title: 'Servicio a domicilio',
+      message: 'La tienda aun no tiene configurada su ubicacion base para calcular envio.',
+      tone: 'warning',
+    };
+  }
+
+  if (deliveryQuote.reason === 'missing_destination') {
+    return {
+      title: 'Servicio a domicilio',
+      message: 'Guarda tu punto exacto para calcular el costo del envio.',
+      tone: 'neutral',
+    };
+  }
+
+  if (deliveryQuote.reason === 'out_of_coverage') {
+    return {
+      title: 'Fuera de cobertura',
+      message: buildCoverageErrorMessage(deliveryQuote),
+      tone: 'error',
+    };
+  }
+
+  return {
+    title: 'Servicio a domicilio',
+    message: `Distancia estimada ${formatStoreDeliveryDistance(
+      deliveryQuote.distanceKm
+    )}. Envio ${formatCurrency(deliveryQuote.totalFee)} con IVA incluido.`,
+    tone: 'active',
+  };
+};
+
+const findWelcomeCouponHeroImage = (products = []) => {
+  const prioritizedProduct = (Array.isArray(products) ? products : []).find((product) => {
+    const text = `${product?.category || ''} ${product?.subcategory || ''} ${product?.name || ''}`
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    return (
+      String(product?.image || '').trim() &&
+      (text.includes('new york') ||
+        text.includes('rib eye') ||
+        text.includes('t-bone') ||
+        text.includes('parrill') ||
+        text.includes('res'))
+    );
+  });
+
+  return prioritizedProduct?.image || '';
+};
+
+const getWelcomeCouponCartMessage = (welcomeCoupon = null, totalAmount = 0) => {
+  const normalized = normalizeStoreWelcomeCoupon(welcomeCoupon);
+  if (!normalized) {
+    return '';
+  }
+
+  if (Number(totalAmount || 0) < Number(normalized.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)) {
+    return `Disponible desde ${formatCurrency(normalized.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)} de compra.`;
+  }
+
+  return `Listo para descontarte ${formatCurrency(normalized.amount || STORE_WELCOME_COUPON_AMOUNT)} en este pedido.`;
+};
+
 const isCanceledOrderStatus = (status) => {
   const normalized = normalizeStorePriorityText(status);
   return normalized.includes('cancel') || normalized.includes('anulad');
@@ -731,6 +839,8 @@ export default function TiendaVirtualView({
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponMessage, setCouponMessage] = useState('');
+  const [welcomeCouponOpen, setWelcomeCouponOpen] = useState(false);
+  const [welcomeCouponActionBusy, setWelcomeCouponActionBusy] = useState(false);
   const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -798,6 +908,7 @@ export default function TiendaVirtualView({
   const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const quantityNoticeTimeoutRef = useRef(null);
+  const autoAppliedCouponRef = useRef('');
 
   const deferredQuery = useDeferredValue(query);
   const isDashboard = mode === 'dashboard';
@@ -1469,8 +1580,47 @@ export default function TiendaVirtualView({
   }, [archivedCouponUsage, couponHistoryOrders]);
 
   const couponUsageReady = couponHistoryReady && archivedCouponUsageReady;
+  const welcomeCoupon = useMemo(
+    () => normalizeStoreWelcomeCoupon(currentUser?.welcomeCoupon),
+    [currentUser?.welcomeCoupon]
+  );
+  const welcomeCouponPersonalCoupon = useMemo(
+    () => normalizeStoreCoupon(welcomeCoupon?.coupon || {}),
+    [welcomeCoupon?.coupon]
+  );
+  const availableCoupons = useMemo(() => {
+    const couponMap = new Map();
+
+    coupons.forEach((coupon) => {
+      const normalizedCoupon = normalizeStoreCoupon(coupon);
+      if (normalizedCoupon.code) {
+        couponMap.set(normalizedCoupon.code, normalizedCoupon);
+      }
+    });
+
+    if (welcomeCouponPersonalCoupon.code) {
+      couponMap.set(welcomeCouponPersonalCoupon.code, welcomeCouponPersonalCoupon);
+    }
+
+    return Array.from(couponMap.values());
+  }, [coupons, welcomeCouponPersonalCoupon]);
+  const welcomeCouponUsageCount = useMemo(
+    () => Number(couponUsageByCode[normalizeCouponCode(welcomeCouponPersonalCoupon.code)] || 0),
+    [couponUsageByCode, welcomeCouponPersonalCoupon.code]
+  );
+  const welcomeCouponStatus = useMemo(
+    () => getStoreWelcomeCouponEffectiveStatus(welcomeCoupon, welcomeCouponUsageCount),
+    [welcomeCoupon, welcomeCouponUsageCount]
+  );
 
   const getCouponUsageMessage = (coupon) => {
+    const assignedUserKey = String(coupon?.assignedUserKey || '').trim();
+    if (assignedUserKey && (!currentUser?.key || currentUser.key !== assignedUserKey)) {
+      return currentUser?.key
+        ? 'Este cupon pertenece a otra cuenta.'
+        : 'Inicia sesion para usar este cupon.';
+    }
+
     const limit = normalizeCouponUsageLimit(coupon?.maxUsesPerUser || 0);
     if (limit <= 0) {
       return '';
@@ -1494,6 +1644,54 @@ export default function TiendaVirtualView({
       : `Este cupon ya alcanzo su limite de ${limit} usos en tu cuenta.`;
   };
 
+  const applyResolvedCoupon = (coupon, options = {}) => {
+    const normalizedCoupon = normalizeStoreCoupon(coupon);
+    const allowBelowMinimum = options.allowBelowMinimum === true;
+    const silent = options.silent === true;
+
+    if (!normalizedCoupon.code || normalizedCoupon.active === false) {
+      setAppliedCoupon(null);
+      if (!silent) {
+        setCouponMessage('Cupon no encontrado o inactivo.');
+      }
+      return false;
+    }
+
+    if (!allowBelowMinimum && normalizedCoupon.minimum > 0 && totalAmount < normalizedCoupon.minimum) {
+      setAppliedCoupon(null);
+      if (!silent) {
+        setCouponMessage(`Este cupon aplica desde ${formatCurrency(normalizedCoupon.minimum)}.`);
+      }
+      return false;
+    }
+
+    const usageMessage = getCouponUsageMessage(normalizedCoupon);
+    if (usageMessage) {
+      setAppliedCoupon(null);
+      if (!silent) {
+        setCouponMessage(usageMessage);
+      }
+      return false;
+    }
+
+    const discount = calculateCouponDiscount(normalizedCoupon, totalAmount);
+    if (!allowBelowMinimum && discount <= 0) {
+      setAppliedCoupon(null);
+      if (!silent) {
+        setCouponMessage('Este cupon no genera descuento para este pedido.');
+      }
+      return false;
+    }
+
+    setAppliedCoupon(normalizedCoupon);
+    setCouponInput(normalizedCoupon.code);
+    if (!silent) {
+      setCouponMessage(`Cupon aplicado: -${formatCurrency(discount)}.`);
+    }
+    autoAppliedCouponRef.current = normalizedCoupon.code;
+    return true;
+  };
+
   const approximateTotalAmount = useMemo(
     () => Number(Math.max(totalAmount - couponDiscount, 0).toFixed(2)),
     [couponDiscount, totalAmount]
@@ -1513,6 +1711,10 @@ export default function TiendaVirtualView({
   const activePromotions = useMemo(
     () => promotions.filter((promotion) => isStorePromotionVisible(promotion)),
     [promotions]
+  );
+  const welcomeCouponHeroImage = useMemo(
+    () => findWelcomeCouponHeroImage(activeProducts),
+    [activeProducts]
   );
 
   const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
@@ -1539,6 +1741,50 @@ export default function TiendaVirtualView({
   }, [activePromotions.length, selectedPromotionIndex]);
 
   const cartCount = cartItems.length;
+
+  useEffect(() => {
+    if (!currentUser?.key) {
+      setWelcomeCouponOpen(false);
+      autoAppliedCouponRef.current = '';
+      return;
+    }
+
+    if (welcomeCouponStatus === 'available' && welcomeCoupon?.coupon?.code) {
+      setWelcomeCouponOpen(true);
+      return;
+    }
+
+    if (welcomeCouponStatus === 'used') {
+      setWelcomeCouponOpen(false);
+    }
+  }, [currentUser?.key, welcomeCoupon?.coupon?.code, welcomeCouponStatus]);
+
+  useEffect(() => {
+    const welcomeCouponCode = normalizeCouponCode(welcomeCouponPersonalCoupon.code);
+    if (!currentUser?.key || !welcomeCouponCode) {
+      return;
+    }
+
+    if (welcomeCouponStatus !== 'claimed') {
+      return;
+    }
+
+    if (appliedCoupon?.code || totalAmount < Number(welcomeCouponPersonalCoupon.minimum || STORE_WELCOME_COUPON_MINIMUM)) {
+      return;
+    }
+
+    if (autoAppliedCouponRef.current === welcomeCouponCode) {
+      return;
+    }
+
+    applyResolvedCoupon(welcomeCouponPersonalCoupon, { silent: true });
+  }, [
+    appliedCoupon?.code,
+    currentUser?.key,
+    totalAmount,
+    welcomeCouponPersonalCoupon,
+    welcomeCouponStatus,
+  ]);
 
   useEffect(() => {
     if (selectedRewardRedemption && !selectedRewardDefinition) {
@@ -1612,7 +1858,7 @@ export default function TiendaVirtualView({
       return;
     }
 
-    const refreshedCoupon = coupons.find((coupon) => coupon.code === appliedCoupon.code);
+    const refreshedCoupon = availableCoupons.find((coupon) => coupon.code === appliedCoupon.code);
     if (!refreshedCoupon || refreshedCoupon.active === false) {
       setAppliedCoupon(null);
       setCouponMessage('Este cupon ya no esta disponible.');
@@ -1629,7 +1875,7 @@ export default function TiendaVirtualView({
     if (JSON.stringify(refreshedCoupon) !== JSON.stringify(appliedCoupon)) {
       setAppliedCoupon(refreshedCoupon);
     }
-  }, [appliedCoupon, coupons, couponUsageByCode, couponUsageReady, currentUser]);
+  }, [appliedCoupon, availableCoupons, couponUsageByCode, couponUsageReady, currentUser]);
 
   useEffect(() => {
     if (!appliedCoupon) {
@@ -1695,36 +1941,14 @@ export default function TiendaVirtualView({
       return;
     }
 
-    const coupon = coupons.find((item) => item.code === code);
-    if (!coupon || coupon.active === false) {
+    const coupon = availableCoupons.find((item) => item.code === code);
+    if (!coupon) {
       setAppliedCoupon(null);
       setCouponMessage('Cupon no encontrado o inactivo.');
       return;
     }
 
-    if (coupon.minimum > 0 && totalAmount < coupon.minimum) {
-      setAppliedCoupon(null);
-      setCouponMessage(`Este cupon aplica desde ${formatCurrency(coupon.minimum)}.`);
-      return;
-    }
-
-    const usageMessage = getCouponUsageMessage(coupon);
-    if (usageMessage) {
-      setAppliedCoupon(null);
-      setCouponMessage(usageMessage);
-      return;
-    }
-
-    const discount = calculateCouponDiscount(coupon, totalAmount);
-    if (discount <= 0) {
-      setAppliedCoupon(null);
-      setCouponMessage('Este cupon no genera descuento para este pedido.');
-      return;
-    }
-
-    setAppliedCoupon(coupon);
-    setCouponInput(coupon.code);
-    setCouponMessage(`Cupon aplicado: -${formatCurrency(discount)}.`);
+    applyResolvedCoupon(coupon);
   };
 
   const removeCoupon = () => {
@@ -1849,9 +2073,11 @@ export default function TiendaVirtualView({
     setCheckoutOpen(false);
     setProfileOpen(false);
     setAuthSheetOpen(false);
+    setWelcomeCouponOpen(false);
     setAuthProviderDraft(null);
     setAuthPromptDismissed(false);
     setPendingAuthIntent('');
+    autoAppliedCouponRef.current = '';
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(STORE_SESSION_KEY);
     }
@@ -2217,6 +2443,44 @@ export default function TiendaVirtualView({
     }
   };
 
+  const handleClaimWelcomeCoupon = async () => {
+    if (!currentUser?.key || !welcomeCoupon) {
+      setWelcomeCouponOpen(false);
+      return;
+    }
+
+    setWelcomeCouponActionBusy(true);
+
+    try {
+      const claimedCoupon = await claimStoreWelcomeCoupon({
+        userKey: currentUser.key,
+        welcomeCoupon,
+      });
+
+      const nextUser = {
+        ...currentUser,
+        welcomeCoupon: claimedCoupon,
+      };
+
+      persistStoreSession(nextUser);
+      setWelcomeCouponOpen(false);
+
+      if (
+        Number(totalAmount || 0) >= Number(claimedCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
+      ) {
+        applyResolvedCoupon(claimedCoupon.coupon);
+      } else {
+        setCouponInput(claimedCoupon.coupon.code || '');
+        setCouponMessage(getWelcomeCouponCartMessage(claimedCoupon, totalAmount));
+      }
+    } catch (error) {
+      console.error('No se pudo activar el cupon de bienvenida:', error);
+      alert('No pudimos activar tu cupon en este momento. Intenta nuevamente.');
+    } finally {
+      setWelcomeCouponActionBusy(false);
+    }
+  };
+
   const openRewardsPanel = (options = {}) => {
     if (!currentUser) {
       openAuthSheet('login', 'rewards');
@@ -2350,7 +2614,13 @@ export default function TiendaVirtualView({
                 title: appliedCoupon.title,
                 type: appliedCoupon.type,
                 value: appliedCoupon.value,
+                minimum: appliedCoupon.minimum || 0,
                 maxUsesPerUser: appliedCoupon.maxUsesPerUser || 0,
+                assignedUserKey: appliedCoupon.assignedUserKey || '',
+                campaignId: appliedCoupon.campaignId || '',
+                autoApply: appliedCoupon.autoApply === true,
+                personal: appliedCoupon.personal === true,
+                welcomeCoupon: appliedCoupon.welcomeCoupon === true,
               }
             : null,
           total: approximateTotalAmount,
@@ -5683,6 +5953,9 @@ export default function TiendaVirtualView({
           totalAmount={totalAmount}
           rewardSettings={rewardSettings}
           selectedReward={selectedRewardRedemption}
+          welcomeCoupon={welcomeCoupon}
+          welcomeCouponStatus={welcomeCouponStatus}
+          welcomeCouponActionBusy={welcomeCouponActionBusy}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
           onFulfillmentTypeChange={setFulfillmentType}
@@ -5691,12 +5964,14 @@ export default function TiendaVirtualView({
           onAlternateDeliveryChange={updateAlternateDelivery}
           onCaptureAlternateLocation={captureAlternateLocation}
           onApplyCoupon={applyCoupon}
+          onApplySpecificCoupon={applyResolvedCoupon}
           onCouponInputChange={setCouponInput}
           onEditProfile={() => setProfileOpen(true)}
           onNotesChange={setNotes}
           onOpenLogin={() => openAuthSheet('login', 'checkout')}
           onOpenRegister={() => openAuthSheet('register', 'checkout')}
           onOpenRewards={() => openRewardsPanel({ closeCheckout: true })}
+          onClaimWelcomeCoupon={handleClaimWelcomeCoupon}
           onClearSelectedReward={clearSelectedReward}
           onRemoveCoupon={removeCoupon}
           onSubmit={submitOrder}
@@ -5774,7 +6049,170 @@ export default function TiendaVirtualView({
         />
       )}
 
+      {welcomeCouponOpen && welcomeCoupon && (
+        <WelcomeCouponModal
+          welcomeCoupon={welcomeCoupon}
+          heroImage={welcomeCouponHeroImage}
+          busy={welcomeCouponActionBusy}
+          onClose={() => setWelcomeCouponOpen(false)}
+          onClaim={handleClaimWelcomeCoupon}
+        />
+      )}
+
       {orderSuccessOpen && <OrderSuccessSheet onClose={dismissOrderSuccess} />}
+    </div>
+  );
+}
+
+function WelcomeCouponModal({
+  welcomeCoupon,
+  heroImage = '',
+  busy = false,
+  onClose,
+  onClaim,
+}) {
+  const amount = `C$${Math.round(Number(welcomeCoupon?.amount || STORE_WELCOME_COUPON_AMOUNT))}`;
+  const minimum = `C$${Math.round(
+    Number(welcomeCoupon?.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
+  )}`;
+  const overlayStyle = {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 80,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '18px',
+    background:
+      'linear-gradient(180deg, rgba(7, 18, 37, 0.80) 0%, rgba(4, 12, 26, 0.92) 100%)',
+    backdropFilter: 'blur(8px)',
+  };
+  const cardStyle = {
+    position: 'relative',
+    width: 'min(460px, 100%)',
+    minHeight: 'min(86vh, 760px)',
+    overflow: 'hidden',
+    borderRadius: '34px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    boxShadow: '0 34px 90px rgba(0, 0, 0, 0.48)',
+    backgroundImage: heroImage
+      ? `linear-gradient(180deg, rgba(7, 9, 14, 0.12) 0%, rgba(7, 9, 14, 0.54) 38%, rgba(7, 9, 14, 0.92) 100%), url(${heroImage})`
+      : 'linear-gradient(180deg, #161616 0%, #090909 100%)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  };
+  const buttonStyle = {
+    width: '100%',
+    border: 'none',
+    borderRadius: 999,
+    padding: '18px 24px',
+    fontSize: '1rem',
+    fontWeight: 900,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    background: 'linear-gradient(135deg, #0f3b82 0%, #2166d9 100%)',
+    color: '#fff',
+    boxShadow: '0 16px 34px rgba(13, 71, 161, 0.34)',
+    cursor: busy ? 'wait' : 'pointer',
+  };
+
+  return (
+    <div style={overlayStyle}>
+      <div style={cardStyle}>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar promocion"
+          style={{
+            position: 'absolute',
+            top: 18,
+            right: 18,
+            width: 42,
+            height: 42,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.16)',
+            background: 'rgba(10, 10, 10, 0.4)',
+            color: '#fff',
+            fontSize: 22,
+            cursor: 'pointer',
+          }}
+        >
+          ×
+        </button>
+
+        <div style={{ padding: '34px 28px 0' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '12px 16px',
+              borderRadius: 24,
+              background: 'rgba(0, 0, 0, 0.36)',
+              border: '1px solid rgba(255,255,255,0.12)',
+            }}
+          >
+            <img
+              src={LOGO_PATH}
+              alt="Carnes San Martin"
+              style={{ width: 54, height: 54, objectFit: 'contain' }}
+            />
+            <div style={{ display: 'grid', gap: 2 }}>
+              <strong style={{ fontSize: 20, lineHeight: 1 }}>Carnes San Martin</strong>
+              <span style={{ fontSize: 16, fontWeight: 700, opacity: 0.9 }}>Granada</span>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 34 }}>
+            <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.04em' }}>
+              GANASTE UN CUPON DE
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                fontSize: 'clamp(4rem, 18vw, 7rem)',
+                lineHeight: 0.96,
+                fontWeight: 1000,
+                letterSpacing: '-0.08em',
+                color: '#f5cf59',
+                textShadow: '0 10px 30px rgba(0,0,0,0.26)',
+              }}
+            >
+              {amount}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800 }}>
+              Canjeable en tu siguiente compra
+            </div>
+            <div
+              style={{
+                marginTop: 18,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '11px 18px',
+                borderRadius: 999,
+                background: 'linear-gradient(135deg, #0b49ba 0%, #1f76ff 100%)',
+                color: '#fff',
+                fontSize: 18,
+                fontWeight: 800,
+                boxShadow: '0 18px 32px rgba(15, 80, 190, 0.32)',
+              }}
+            >
+              Tu compra debe ser como minimo de {minimum}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '0 28px 28px' }}>
+          <button type="button" style={buttonStyle} onClick={onClaim} disabled={busy}>
+            {busy ? 'Activando...' : 'Canjear'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -6789,10 +7227,10 @@ function FloatingCart({
 
       <div className="store-floating-cart-total">
         <div>
-          <small>Total aproximado</small>
+          <small>Total</small>
           {couponDiscount > 0 && <span>-{formatCurrency(couponDiscount)} en cupon</span>}
           <strong>{formatCurrency(approximateTotalAmount)}</strong>
-          <em>Puede variar por pesos exactos.</em>
+          <em>Precios incluyen IVA. Puede variar por pesos exactos.</em>
         </div>
         <button type="button" className="store-button" onClick={onCheckout}>
           Confirmar
@@ -7017,10 +7455,15 @@ function CheckoutSheet({
   totalAmount,
   rewardSettings,
   selectedReward,
+  welcomeCoupon,
+  welcomeCouponStatus,
+  welcomeCouponActionBusy,
   onClose,
   onApplyCoupon,
   onAlternateDeliveryChange,
   onCaptureAlternateLocation,
+  onClaimWelcomeCoupon,
+  onApplySpecificCoupon,
   onCustomerChange,
   onCouponInputChange,
   onFulfillmentTypeChange,
@@ -7069,6 +7512,15 @@ function CheckoutSheet({
     },
   ];
   const paymentChoices = STORE_PAYMENT_OPTIONS.map(getPaymentMeta);
+  const showWelcomeCouponCard =
+    welcomeCoupon &&
+    welcomeCoupon.coupon &&
+    welcomeCouponStatus !== 'used';
+  const welcomeCouponCanApply =
+    showWelcomeCouponCard &&
+    Number(totalAmount || 0) >= Number(welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM);
+  const welcomeCouponIsApplied =
+    normalizeCouponCode(appliedCoupon?.code) === normalizeCouponCode(welcomeCoupon?.coupon?.code);
 
   useEffect(() => {
     setCheckoutStep('cart');
@@ -7135,9 +7587,66 @@ function CheckoutSheet({
             ))}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
-              <strong>Subtotal estimado</strong>
+              <strong>Total</strong>
               <strong>{formatCurrency(totalAmount)}</strong>
             </div>
+            <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
+              Precios incluyen <strong>IVA</strong>.
+            </p>
+
+            {showWelcomeCouponCard && (
+              <div className="store-status-card" style={{ marginTop: 0 }}>
+                <div className="store-status-pill">Cupon de bienvenida</div>
+                <h3 style={{ margin: '10px 0 4px' }}>
+                  {formatCurrency(welcomeCoupon.amount || STORE_WELCOME_COUPON_AMOUNT)} para tu compra
+                </h3>
+                <p style={{ margin: 0 }}>
+                  {welcomeCouponStatus === 'available'
+                    ? `Activalo primero. Compra minima ${formatCurrency(
+                        welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM
+                      )}.`
+                    : getWelcomeCouponCartMessage(welcomeCoupon, totalAmount)}
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                  {welcomeCouponStatus === 'available' ? (
+                    <button
+                      type="button"
+                      className="store-button"
+                      onClick={onClaimWelcomeCoupon}
+                      disabled={welcomeCouponActionBusy}
+                    >
+                      {welcomeCouponActionBusy ? 'Activando...' : 'Canjear'}
+                    </button>
+                  ) : welcomeCouponCanApply && !welcomeCouponIsApplied ? (
+                    <button
+                      type="button"
+                      className="store-button"
+                      onClick={() => onApplySpecificCoupon(welcomeCoupon.coupon)}
+                    >
+                      Aplicar automaticamente
+                    </button>
+                  ) : welcomeCouponIsApplied ? (
+                    <button type="button" className="store-button secondary" onClick={onRemoveCoupon}>
+                      Quitar cupon
+                    </button>
+                  ) : null}
+                  <span
+                    style={{
+                      alignSelf: 'center',
+                      color: 'var(--store-text-soft)',
+                      fontSize: '0.92rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {welcomeCouponCanApply
+                      ? `Codigo ${welcomeCoupon.coupon.code}`
+                      : `Se activa al llegar a ${formatCurrency(
+                          welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM
+                        )}`}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="store-coupon-card">
               <div>
@@ -7178,12 +7687,12 @@ function CheckoutSheet({
 
             <div className="store-total-note">
               <div>
-                <span>Total aproximado</span>
+                <span>Total</span>
                 <strong>{formatCurrency(approximateTotalAmount)}</strong>
               </div>
               <p>
-                Puede variar por los pesos exactos de los productos. Se le actualizara el nuevo monto
-                cuando este listo el pedido.
+                Precios incluyen <strong>IVA</strong>. Puede variar por los pesos exactos de los productos.
+                Se le actualizara el nuevo monto cuando este listo el pedido.
               </p>
             </div>
 
@@ -7230,9 +7739,52 @@ function CheckoutSheet({
         ) : (
           <form className="store-form" onSubmit={onSubmit}>
             <div className="store-checkout-mini-total">
-              <span>Total aproximado</span>
+              <span>Total</span>
               <strong>{formatCurrency(approximateTotalAmount)}</strong>
             </div>
+            <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
+              Precios incluyen <strong>IVA</strong>.
+            </p>
+
+            {showWelcomeCouponCard && (
+              <div className="store-status-card" style={{ marginTop: 0 }}>
+                <div className="store-status-pill">Cupon de bienvenida</div>
+                <h3 style={{ margin: '10px 0 4px' }}>
+                  {formatCurrency(welcomeCoupon.amount || STORE_WELCOME_COUPON_AMOUNT)} disponibles
+                </h3>
+                <p style={{ margin: 0 }}>
+                  {welcomeCouponStatus === 'available'
+                    ? `Activalo primero. Compra minima ${formatCurrency(
+                        welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM
+                      )}.`
+                    : getWelcomeCouponCartMessage(welcomeCoupon, totalAmount)}
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                  {welcomeCouponStatus === 'available' ? (
+                    <button
+                      type="button"
+                      className="store-button"
+                      onClick={onClaimWelcomeCoupon}
+                      disabled={welcomeCouponActionBusy}
+                    >
+                      {welcomeCouponActionBusy ? 'Activando...' : 'Canjear'}
+                    </button>
+                  ) : welcomeCouponCanApply && !welcomeCouponIsApplied ? (
+                    <button
+                      type="button"
+                      className="store-button secondary"
+                      onClick={() => onApplySpecificCoupon(welcomeCoupon.coupon)}
+                    >
+                      Aplicar automaticamente
+                    </button>
+                  ) : welcomeCouponIsApplied ? (
+                    <button type="button" className="store-button secondary" onClick={onRemoveCoupon}>
+                      Cupon aplicado
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
 
             {rewardSettings?.enabled !== false && (
               <div className="store-status-card" style={{ marginTop: 0 }}>

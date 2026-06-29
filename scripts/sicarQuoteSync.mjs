@@ -3,7 +3,10 @@ import {
   ensureAuthenticatedFirebaseSession,
   getAuthenticatedFirebaseDatabase,
 } from './firebaseScriptAuth.mjs';
-import { buildStoreRewardRedemptionTextLines } from '../src/services/storeRewards.js';
+import {
+  buildStoreRewardRedemptionTextLines,
+  normalizeStoreRewardRedemption,
+} from '../src/services/storeRewards.js';
 
 const STORE_CHANNEL = 'tienda_virtual';
 const STORE_ORDERS_PATH = 'orders';
@@ -124,6 +127,133 @@ const normalizeOrderItems = (items = []) =>
       subtotal: roundMoney(item?.subtotal ?? 0),
     }))
     .filter((item) => item.code && item.quantity > 0);
+
+const DELIVERY_SERVICE_CODES_BY_BRACKET = {
+  under2km: '00171',
+  under35km: '00172',
+  under4km: '00247',
+  under6km: '00248',
+  above6km: '00249',
+};
+
+const resolveDeliveryServiceBracketKey = (order = {}) => {
+  const explicitKey = String(order?.deliveryFeeBracket || '').trim();
+  if (explicitKey && DELIVERY_SERVICE_CODES_BY_BRACKET[explicitKey]) {
+    return explicitKey;
+  }
+
+  const distanceKm = Number(order?.deliveryDistanceKm || 0);
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0) {
+    return '';
+  }
+
+  if (distanceKm < 2) return 'under2km';
+  if (distanceKm < 3.5) return 'under35km';
+  if (distanceKm < 4) return 'under4km';
+  if (distanceKm < 6) return 'under6km';
+  return 'above6km';
+};
+
+const buildDeliveryServiceOrderItem = (order = {}) => {
+  const deliveryFee = roundMoney(order?.deliveryFee || 0);
+  if (deliveryFee <= 0) {
+    return null;
+  }
+
+  const bracketKey = resolveDeliveryServiceBracketKey(order);
+  const code = DELIVERY_SERVICE_CODES_BY_BRACKET[bracketKey] || '';
+  if (!code) {
+    throw new Error('No se pudo determinar el SKU de servicio a domicilio para este pedido.');
+  }
+
+  return {
+    code,
+    name: 'SERVICIO A DOMICILIO',
+    description: 'Servicio a domicilio',
+    unit: 'unidad',
+    quantity: 1,
+    unitPrice: deliveryFee,
+    subtotal: deliveryFee,
+    isDelivery: true,
+    deliveryFeeBracket: bracketKey,
+  };
+};
+
+const normalizeRewardOrderItems = (rewardRedemption = {}) => {
+  const normalizedRewardRedemption = normalizeStoreRewardRedemption(rewardRedemption);
+  if (!normalizedRewardRedemption) {
+    return [];
+  }
+
+  return (Array.isArray(normalizedRewardRedemption.items) ? normalizedRewardRedemption.items : [])
+    .map((item) => ({
+      code: String(item?.productCode || '').trim(),
+      name: String(item?.productName || item?.choiceLabel || '').trim(),
+      description: '',
+      unit: 'unidad',
+      quantity: roundQuantity(item?.quantity || 0),
+      unitPrice: 0,
+      subtotal: 0,
+      rewardId: String(normalizedRewardRedemption.rewardId || '').trim(),
+      rewardName: String(normalizedRewardRedemption.rewardName || '').trim(),
+      isReward: true,
+    }))
+    .filter((item) => item.code && item.quantity > 0);
+};
+
+const calculateOrderCouponDiscount = (order = {}, baseTotal = 0) => {
+  const safeBaseTotal = roundMoney(baseTotal);
+  if (safeBaseTotal <= 0) {
+    return 0;
+  }
+
+  const coupon = order?.cupon || {};
+  const couponType = String(coupon?.type || '').trim().toLowerCase();
+  const couponValue = roundMoney(coupon?.value || 0);
+  const explicitDiscount = roundMoney(order?.descuentoCupon || 0);
+
+  if (couponType === 'percent') {
+    const percent = Math.min(Math.max(Number(couponValue || 0), 0), 100);
+    return roundMoney((safeBaseTotal * percent) / 100);
+  }
+
+  if (explicitDiscount > 0) {
+    return roundMoney(Math.min(explicitDiscount, safeBaseTotal));
+  }
+
+  if (couponType === 'amount' && couponValue > 0) {
+    return roundMoney(Math.min(couponValue, safeBaseTotal));
+  }
+
+  return 0;
+};
+
+const allocateDiscountByGrossTotal = (items = [], totalDiscount = 0) => {
+  const sourceItems = Array.isArray(items) ? items.filter((item) => roundMoney(item?.importeCon || 0) > 0) : [];
+  const safeDiscount = roundMoney(totalDiscount);
+
+  if (sourceItems.length === 0 || safeDiscount <= 0) {
+    return sourceItems.map(() => 0);
+  }
+
+  const grossTotal = roundMoney(sourceItems.reduce((sum, item) => sum + roundMoney(item?.importeCon || 0), 0));
+  if (grossTotal <= 0) {
+    return sourceItems.map(() => 0);
+  }
+
+  let allocated = 0;
+
+  return sourceItems.map((item, index) => {
+    if (index === sourceItems.length - 1) {
+      return roundMoney(Math.max(0, safeDiscount - allocated));
+    }
+
+    const proportional = roundMoney((safeDiscount * roundMoney(item?.importeCon || 0)) / grossTotal);
+    const capped = roundMoney(Math.min(proportional, roundMoney(item?.importeCon || 0), safeDiscount - allocated));
+    allocated = roundMoney(allocated + capped);
+    return capped;
+  });
+};
 
 const buildOrderText = (items = [], notes = '', summary = {}) => {
   const normalizedItems = normalizeOrderItems(items);
@@ -827,13 +957,19 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
   const buildQuoteDraft = async (order = {}) => {
     const orderItems = normalizeOrderItems(order.items);
-    const articleMap = await getSicarArticlesByCodes(orderItems.map((item) => item.code));
+    const deliveryItem = buildDeliveryServiceOrderItem(order);
+    const rewardItems = normalizeRewardOrderItems(order.rewardRedemption);
+    const sourceItems = [...orderItems, ...(deliveryItem ? [deliveryItem] : []), ...rewardItems];
+    const articleMap = await getSicarArticlesByCodes(sourceItems.map((item) => item.code));
     const missingCodes = [];
     const detailItems = [];
 
-    orderItems.forEach((item, index) => {
+    sourceItems.forEach((item, index) => {
       const article = articleMap.get(item.code);
       if (!article) {
+        if (item.isDelivery === true) {
+          throw new Error(`No existe en SICAR el articulo ${item.code} para servicio a domicilio.`);
+        }
         missingCodes.push(item.code);
         return;
       }
@@ -841,11 +977,21 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const quantity = roundQuantity(item.quantity);
       const taxRatePct = roundRate(article.taxRatePct || 0);
       const hasTransferredTax = taxRatePct > 0;
-      const priceNorSin = roundMoney(article.basePrice);
-      const priceSin = truncateMoney(article.basePrice);
-      const priceNorCon = roundMoney(
-        hasTransferredTax ? article.basePrice * (1 + taxRatePct / 100) : article.basePrice
-      );
+      const isReward = item.isReward === true;
+      const isDelivery = item.isDelivery === true;
+      const deliveryUnitTotal =
+        isDelivery && quantity > 0 ? roundMoney(Number(item.subtotal || 0) / quantity) : 0;
+      const sourceBasePrice =
+        isDelivery && deliveryUnitTotal > 0
+          ? roundMoney(hasTransferredTax ? deliveryUnitTotal / (1 + taxRatePct / 100) : deliveryUnitTotal)
+          : roundRate(article.basePrice);
+      const sourceGrossPrice =
+        isDelivery && deliveryUnitTotal > 0
+          ? roundMoney(deliveryUnitTotal)
+          : roundMoney(hasTransferredTax ? article.basePrice * (1 + taxRatePct / 100) : article.basePrice);
+      const priceNorSin = roundMoney(sourceBasePrice);
+      const priceSin = truncateMoney(sourceBasePrice);
+      const priceNorCon = roundMoney(sourceGrossPrice);
       const priceCon = priceNorCon;
       const purchaseBase = roundRate(article.purchaseAveragePrice || article.purchasePrice || 0);
       const purchasePrice = roundMoney(
@@ -854,10 +1000,15 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const importeCompra = roundMoney(purchasePrice * quantity);
       const importeNorSin = roundMoney(priceNorSin * quantity);
       const importeNorCon = roundMoney(priceNorCon * quantity);
-      const importeSin = roundMoney(priceSin * quantity);
-      const importeCon = roundMoney(priceCon * quantity);
-      const diferencia = roundMoney(importeCon - importeCompra);
-      const utilidad = importeCon > 0 ? roundRate((diferencia / importeCon) * 100) : 0;
+      const initialImporteSin = isReward ? 0 : roundMoney(priceSin * quantity);
+      const initialImporteCon = isReward ? 0 : roundMoney(priceCon * quantity);
+      const initialPriceSin = quantity > 0 ? roundMoney(initialImporteSin / quantity) : 0;
+      const initialPriceCon = quantity > 0 ? roundMoney(initialImporteCon / quantity) : 0;
+      const initialDiscountTotal = isReward ? roundMoney(importeNorCon) : 0;
+      const initialDiscountPercent =
+        isReward && importeNorCon > 0 ? roundRate((initialDiscountTotal / importeNorCon) * 100) : 0;
+      const diferencia = roundMoney(initialImporteCon - importeCompra);
+      const utilidad = initialImporteCon > 0 ? roundRate((diferencia / initialImporteCon) * 100) : 0;
       const taxImpIds = (Array.isArray(article.impIds) ? article.impIds : []).filter((impId) => Number(impId) === 1);
 
       detailItems.push({
@@ -874,25 +1025,62 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         purchasePrice,
         priceNorSin,
         priceNorCon,
-        priceSin,
-        priceCon,
+        priceSin: initialPriceSin,
+        priceCon: initialPriceCon,
         importeCompra,
         importeNorSin,
         importeNorCon,
-        importeSin,
-        importeCon,
+        importeSin: initialImporteSin,
+        importeCon: initialImporteCon,
         diferencia,
         utilidad,
         taxRatePct,
         impIds: taxImpIds,
         department: article.department,
         category: article.category,
+        sourceType: isReward ? 'reward' : isDelivery ? 'delivery' : 'order',
+        rewardName: isReward ? String(item.rewardName || '').trim() : '',
+        discountPercent: initialDiscountPercent,
+        discountTotal: initialDiscountTotal,
+        couponDiscountCon: 0,
       });
     });
 
     if (detailItems.length === 0) {
       throw new Error('No se pudo crear la cotizacion porque ningun SKU del pedido existe en SICAR.');
     }
+
+    const eligibleCouponItems = detailItems.filter((item) => item.sourceType !== 'reward');
+    const couponBaseTotal = roundMoney(
+      eligibleCouponItems.reduce((sum, item) => sum + roundMoney(item.importeCon), 0)
+    );
+    const couponDiscount = calculateOrderCouponDiscount(order, couponBaseTotal);
+    const couponDiscountAllocations = allocateDiscountByGrossTotal(eligibleCouponItems, couponDiscount);
+
+    eligibleCouponItems.forEach((item, index) => {
+      const discountCon = roundMoney(couponDiscountAllocations[index] || 0);
+      if (discountCon <= 0) {
+        return;
+      }
+
+      const currentImporteCon = roundMoney(item.importeCon);
+      const currentImporteSin = roundMoney(item.importeSin);
+      const discountSin =
+        currentImporteCon > 0 && currentImporteSin > 0
+          ? roundMoney(discountCon * (currentImporteSin / currentImporteCon))
+          : discountCon;
+
+      item.couponDiscountCon = discountCon;
+      item.discountTotal = roundMoney(item.discountTotal + discountCon);
+      item.importeCon = roundMoney(Math.max(0, currentImporteCon - discountCon));
+      item.importeSin = roundMoney(Math.max(0, currentImporteSin - discountSin));
+      item.priceCon = item.quantity > 0 ? roundMoney(item.importeCon / item.quantity) : 0;
+      item.priceSin = item.quantity > 0 ? roundMoney(item.importeSin / item.quantity) : 0;
+      item.discountPercent =
+        item.importeNorCon > 0 ? roundRate((item.discountTotal / item.importeNorCon) * 100) : 0;
+      item.diferencia = roundMoney(item.importeCon - item.importeCompra);
+      item.utilidad = item.importeCon > 0 ? roundRate((item.diferencia / item.importeCon) * 100) : 0;
+    });
 
     const subtotal = roundMoney(detailItems.reduce((sum, item) => sum + item.importeSin, 0));
     const total = roundMoney(detailItems.reduce((sum, item) => sum + item.importeCon, 0));
@@ -921,7 +1109,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       orderDate: String(order.fecha || '').trim(),
       subtotal,
       total,
-      discount: 0,
+      discount: couponDiscount,
       detailItems,
       taxRows,
       missingCodes,
@@ -961,8 +1149,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         NULL,
         ${formatMoney(item.diferencia)},
         ${formatRate(item.utilidad)},
-        0.00,
-        0.00,
+        ${formatRate(item.discountPercent || 0)},
+        ${formatMoney(item.discountTotal || 0)},
         ${escapeSqlText(item.characteristics || '', sqlEscape)},
         ${item.order}
       )
@@ -1196,12 +1384,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       };
     });
 
+    const headerDiscount = roundMoney(descuento);
+    const headerTotal = roundMoney(total);
+
     return {
       cotId: Number(cotId || 0),
       orderDate: String(fecha || '').trim(),
-      subtotal: roundMoney(subtotal),
-      discount: roundMoney(descuento),
-      total: roundMoney(total),
+      subtotal: roundMoney(headerTotal + headerDiscount),
+      netSubtotal: roundMoney(subtotal),
+      discount: headerDiscount,
+      total: headerTotal,
       items,
     };
   };

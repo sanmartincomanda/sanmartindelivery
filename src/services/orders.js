@@ -17,6 +17,7 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const roundToHalf = (value) => Math.round(Number(value || 0) * 2) / 2;
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
+const formatDistanceAmount = (value) => Number(value || 0).toFixed(2).replace(/\.00$/, '');
 
 const removeTextAccents = (value) =>
   String(value || '')
@@ -189,6 +190,8 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
     summary.subtotal ?? normalizedItems.reduce((sum, item) => sum + item.subtotal, 0)
   );
   const total = Number(summary.total ?? subtotal);
+  const deliveryFee = Math.max(0, Number(summary.deliveryFee || 0));
+  const deliveryDistanceKm = Math.max(0, Number(summary.deliveryDistanceKm || 0));
   const lines = normalizedItems.map(
     (item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim()
   );
@@ -202,6 +205,12 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   if (subtotal > 0) {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
+    if (deliveryFee > 0) {
+      const deliveryLabel = deliveryDistanceKm > 0
+        ? `Servicio a domicilio (${formatDistanceAmount(deliveryDistanceKm)} km)`
+        : 'Servicio a domicilio';
+      lines.push(`${deliveryLabel}: C$${formatAmount(deliveryFee)}`);
+    }
     lines.push(`${totalLabel}: C$${formatAmount(total)}`);
   }
 
@@ -340,9 +349,14 @@ export async function createOrder(payload, options = {}) {
     0,
     Math.min(Number(payload.descuentoCupon || 0), Number(subtotal || 0))
   );
+  const deliveryFee = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFee || 0));
+  const deliveryFeeBase = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFeeBase || 0));
+  const deliveryFeeTax = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFeeTax || 0));
+  const deliveryDistanceKm = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryDistanceKm || 0));
+  const coverageRadiusKm = pickupOrder ? 0 : Math.max(0, Number(payload.coverageRadiusKm || 0));
   const total =
     normalizedItems.length > 0
-      ? Number(Math.max(Number(subtotal || 0) - couponDiscount, 0).toFixed(2))
+      ? Number(Math.max(Number(subtotal || 0) - couponDiscount + deliveryFee, 0).toFixed(2))
       : Number(payload.total || 0) || null;
   const coupon = payload.cupon && payload.cupon.code
     ? {
@@ -357,6 +371,9 @@ export async function createOrder(payload, options = {}) {
   const rawPedidoTexto = String(payload.pedido || '').trim();
   const generatedKitchenPedidoTexto = buildStoreKitchenOrderText(normalizedItems, {
     couponCode: coupon?.code,
+    subtotal,
+    deliveryFee,
+    deliveryDistanceKm,
     total,
     observaciones: payload.observaciones,
     rewardRedemption: payload.rewardRedemption,
@@ -383,6 +400,12 @@ export async function createOrder(payload, options = {}) {
     items: normalizedItems,
     subtotalEstimado: subtotal,
     descuentoCupon: couponDiscount,
+    deliveryFee,
+    deliveryFeeBase,
+    deliveryFeeTax,
+    deliveryDistanceKm,
+    coverageRadiusKm,
+    deliveryFeeBracket: String(payload.deliveryFeeBracket || '').trim(),
     cupon: coupon,
     rewardRedemption: normalizedRewardRedemption,
     total,
