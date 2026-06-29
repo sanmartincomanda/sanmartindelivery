@@ -795,6 +795,7 @@ export default function TiendaVirtualView({
   const [rewardTransactions, setRewardTransactions] = useState([]);
   const [selectedRewardRedemption, setSelectedRewardRedemption] = useState(null);
   const [rewardActionBusy, setRewardActionBusy] = useState(false);
+  const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const quantityNoticeTimeoutRef = useRef(null);
 
@@ -1844,6 +1845,7 @@ export default function TiendaVirtualView({
     setAlternateDelivery(createEmptyDeliveryDraft());
     setOrdersOpen(false);
     setRewardsOpen(false);
+    setRewardsReturnTarget('');
     setCheckoutOpen(false);
     setProfileOpen(false);
     setAuthSheetOpen(false);
@@ -1879,6 +1881,7 @@ export default function TiendaVirtualView({
       setSelectedRewardRedemption(null);
       setOrdersOpen(false);
       setRewardsOpen(false);
+      setRewardsReturnTarget('');
       setProfileOpen(false);
       setAuthPromptDismissed(false);
       setAuthSheetOpen(true);
@@ -1916,6 +1919,7 @@ export default function TiendaVirtualView({
       setSelectedRewardRedemption(null);
       setOrdersOpen(false);
       setRewardsOpen(false);
+      setRewardsReturnTarget('');
       setProfileOpen(false);
       setAuthPromptDismissed(false);
       setAuthSheetOpen(true);
@@ -2213,13 +2217,28 @@ export default function TiendaVirtualView({
     }
   };
 
-  const openRewardsPanel = () => {
+  const openRewardsPanel = (options = {}) => {
     if (!currentUser) {
       openAuthSheet('login', 'rewards');
       return;
     }
 
+    const shouldCloseCheckout = options.closeCheckout === true;
+    const nextReturnTarget = shouldCloseCheckout ? 'checkout' : '';
+    setRewardsReturnTarget(nextReturnTarget);
+    if (shouldCloseCheckout) {
+      setCheckoutOpen(false);
+    }
     setRewardsOpen(true);
+  };
+
+  const closeRewardsPanel = () => {
+    const shouldReturnToCheckout = rewardsReturnTarget === 'checkout';
+    setRewardsOpen(false);
+    setRewardsReturnTarget('');
+    if (shouldReturnToCheckout) {
+      setCheckoutOpen(true);
+    }
   };
 
   const handleSelectReward = (reward, selection = {}) => {
@@ -2229,8 +2248,13 @@ export default function TiendaVirtualView({
     }
 
     const selectedSnapshot = buildStoreRewardRedemptionSnapshot(reward, selection, activeProducts);
+    const shouldReturnToCheckout = rewardsReturnTarget === 'checkout';
     setSelectedRewardRedemption(selectedSnapshot);
     setRewardsOpen(false);
+    setRewardsReturnTarget('');
+    if (shouldReturnToCheckout) {
+      setCheckoutOpen(true);
+    }
   };
 
   const clearSelectedReward = () => {
@@ -5672,7 +5696,7 @@ export default function TiendaVirtualView({
           onNotesChange={setNotes}
           onOpenLogin={() => openAuthSheet('login', 'checkout')}
           onOpenRegister={() => openAuthSheet('register', 'checkout')}
-          onOpenRewards={openRewardsPanel}
+          onOpenRewards={() => openRewardsPanel({ closeCheckout: true })}
           onClearSelectedReward={clearSelectedReward}
           onRemoveCoupon={removeCoupon}
           onSubmit={submitOrder}
@@ -5711,7 +5735,7 @@ export default function TiendaVirtualView({
         rewardActionBusy={rewardActionBusy}
         onSelectReward={handleSelectReward}
         onClearSelectedReward={clearSelectedReward}
-        onClose={() => setRewardsOpen(false)}
+        onClose={closeRewardsPanel}
         onOpenAuth={() => openAuthSheet('login', 'rewards')}
       />
 
@@ -7170,11 +7194,11 @@ function CheckoutSheet({
                   ? `Con esta compra ganaras aproximadamente ${estimatedRewardPoints} puntos.`
                   : 'Inicia sesion para acumular puntos en cada compra.'}
               </h3>
-              <p style={{ margin: 0 }}>
-                {currentUser
-                  ? 'Los puntos se acreditan cuando el pedido queda entregado y con total final actualizado por SICAR.'
-                  : 'Como invitado puedes comprar normal, pero Miembro Gold San Martin Granada necesita cuenta para guardar tus puntos.'}
-              </p>
+              {!currentUser && (
+                <p style={{ margin: 0 }}>
+                  Como invitado puedes comprar normal, pero Miembro Gold San Martin Granada necesita cuenta para guardar tus puntos.
+                </p>
+              )}
               {rewardSettings?.enabled !== false && (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
                   {selectedReward ? (
