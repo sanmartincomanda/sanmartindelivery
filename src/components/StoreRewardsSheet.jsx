@@ -67,6 +67,20 @@ function ClubSanMartinIcon({ size = 54 }) {
   );
 }
 
+function ClubChevronIcon({ size = 16, color = '#9f1239' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M9 6l6 6-6 6"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
   const targetPoints = Math.max(Number(closestReward?.pointsRequired || 0), 1);
   const progressPct = Math.max(0, Math.min(100, Math.round((Number(pointsBalance || 0) / targetPoints) * 100)));
@@ -84,10 +98,9 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.92, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {settings?.programName || 'Club San Martin'}
-          </div>
-          <h2 style={{ margin: '8px 0 0', fontSize: 30, lineHeight: 1.05 }}>Compra, acumula y reclama premios.</h2>
+          <h2 style={{ margin: 0, fontSize: 30, lineHeight: 1.05 }}>
+            {settings?.programName || 'Club San Martin Granada'}
+          </h2>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 14, opacity: 0.82 }}>Puntos actuales</div>
@@ -410,16 +423,6 @@ export function StoreRewardsSummaryCard({
   onOpen,
 }) {
   const pointsBalance = Number(account?.pointsBalance || 0);
-  const rewardSummary = buildCustomerRewardSummary(rewards, pointsBalance, cartAmount, settings);
-  const summaryText = currentUser
-    ? selectedReward
-      ? `Premio listo: ${selectedReward.rewardName}`
-      : rewardSummary.bestReward
-        ? `Ya puedes reclamar ${rewardSummary.bestReward.name}`
-        : rewardSummary.closestReward
-          ? `Siguiente premio: ${rewardSummary.closestReward.name}`
-          : 'Abre tu club para ver recompensas.'
-    : 'Inicia sesion para acumular y reclamar premios.';
 
   return (
     <button
@@ -437,79 +440,76 @@ export function StoreRewardsSummaryCard({
       <div
         style={{
           borderRadius: 24,
-          padding: '14px 16px',
+          padding: '14px 14px 14px 16px',
           background: selectedReward
             ? 'linear-gradient(135deg, rgba(22, 163, 74, 0.14) 0%, rgba(15, 118, 110, 0.12) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 241, 242, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)',
+            : 'linear-gradient(135deg, rgba(255, 244, 246, 0.98) 0%, rgba(255, 255, 255, 0.99) 100%)',
           border: selectedReward ? '1px solid rgba(22, 163, 74, 0.18)' : '1px solid rgba(251, 113, 133, 0.18)',
-          boxShadow: '0 14px 28px rgba(15, 23, 42, 0.06)',
+          boxShadow: '0 16px 30px rgba(15, 23, 42, 0.06)',
         }}
       >
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'auto minmax(0, 1fr) auto',
-            gap: 14,
+            gridTemplateColumns: 'auto minmax(0, 1fr) auto auto',
+            gap: 12,
             alignItems: 'center',
           }}
         >
           <div
             style={{
-              width: 58,
-              height: 58,
-              borderRadius: 18,
+              width: 56,
+              height: 56,
+              borderRadius: 16,
               display: 'grid',
               placeItems: 'center',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,241,242,0.9) 100%)',
-              border: '1px solid rgba(251, 113, 133, 0.16)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(255,241,242,0.92) 100%)',
+              border: '1px solid rgba(251, 113, 133, 0.14)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65)',
             }}
           >
-            <ClubSanMartinIcon size={46} />
+            <ClubSanMartinIcon size={44} />
           </div>
 
           <div style={{ minWidth: 0 }}>
-            <div style={{ color: '#9f1239', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <div
+              style={{
+                color: '#9f1239',
+                fontSize: 20,
+                fontWeight: 900,
+                lineHeight: 1.05,
+              }}
+            >
               Club San Martin Granada
             </div>
-            <strong
+            <div
               style={{
                 display: 'block',
-                marginTop: 4,
-                fontSize: 16,
-                color: '#0f172a',
-                lineHeight: 1.15,
-              }}
-            >
-              {currentUser ? 'Puntos disponibles:' : 'Mis puntos y recompensas'}
-            </strong>
-            <span
-              style={{
-                marginTop: 4,
-                display: 'block',
+                marginTop: 5,
+                fontSize: 11,
                 color: '#64748b',
-                fontWeight: 700,
-                fontSize: 12,
-                lineHeight: 1.35,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                lineHeight: 1.1,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                fontWeight: 900,
               }}
             >
-              {summaryText}
-            </span>
+              {currentUser ? 'Puntos disponibles' : 'Acceso al club'}
+            </div>
           </div>
 
-          <div style={{ display: 'grid', justifyItems: 'end', gap: 6 }}>
+          <div style={{ display: 'grid', justifyItems: 'end' }}>
             {currentUser ? (
               <div
                 style={{
-                  padding: '8px 12px',
+                  minWidth: 92,
+                  padding: '10px 12px',
                   borderRadius: 999,
                   background: '#ffffff',
                   color: '#0f172a',
                   fontWeight: 900,
-                  fontSize: 14,
+                  fontSize: 15,
+                  textAlign: 'center',
                   boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
                 }}
               >
@@ -518,29 +518,34 @@ export function StoreRewardsSummaryCard({
             ) : (
               <div
                 style={{
-                  padding: '8px 12px',
+                  minWidth: 92,
+                  padding: '10px 12px',
                   borderRadius: 999,
                   background: '#ffffff',
                   color: '#0f172a',
                   fontWeight: 900,
                   fontSize: 13,
+                  textAlign: 'center',
                   boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
                 }}
               >
                 Entrar
               </div>
             )}
-            <span
-              style={{
-                color: '#9f1239',
-                fontWeight: 900,
-                fontSize: 11,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              {currentUser ? 'Ver club' : 'Ver puntos'}
-            </span>
+          </div>
+
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 999,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'rgba(255,255,255,0.84)',
+              border: '1px solid rgba(251, 113, 133, 0.14)',
+            }}
+          >
+            <ClubChevronIcon />
           </div>
         </div>
       </div>
