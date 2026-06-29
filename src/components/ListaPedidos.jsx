@@ -320,7 +320,7 @@ export default function ListaPedidos({ pedidos = [] }) {
 
     try {
       const payload = await syncSicarQuoteForOrder(pedido.firebaseKey, {
-        applyToFirebase: false,
+        applyToFirebase: true,
       });
       const message = String(payload?.whatsappMessage || '').trim();
       if (!message) {
@@ -392,6 +392,7 @@ export default function ListaPedidos({ pedidos = [] }) {
         subtotalLabel:
           pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado',
         observaciones,
+        rewardRedemption: pedido.rewardRedemption,
       });
     }
 

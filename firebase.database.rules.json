@@ -15,7 +15,7 @@
       ".indexOn": ["fecha", "storeUserKey", "repartidorCodigo", "timestamp"],
       "$orderId": {
         ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || data.child('storeUserKey').val() == auth.uid || data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val())",
-        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))))"
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid && (!newData.child('rewardRedemption').exists() || (newData.child('rewardRedemption').child('reservationId').isString() && newData.child('rewardRedemption').child('status').val() == 'reserved' && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('status').val() == 'reserved' && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('customerId').val() == auth.uid && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardId').val() == newData.child('rewardRedemption').child('rewardId').val() && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardName').val() == newData.child('rewardRedemption').child('rewardName').val() && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('points').val() == newData.child('rewardRedemption').child('pointsRedeemed').val() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardId').val() == newData.child('rewardRedemption').child('rewardId').val() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child(newData.child('rewardRedemption').child('reservationId').val()).child('points').val() == newData.child('rewardRedemption').child('pointsRedeemed').val() && root.child('storeRewards').child(newData.child('rewardRedemption').child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardRedemption').child('rewardId').val()).child('available').val() == true))) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))))"
       }
     },
 
@@ -70,10 +70,56 @@
     },
 
     "storeCouponUsageArchive": {
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
         ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
       }
+    },
+
+    "storeRewardSettings": {
+      ".read": true,
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
+    },
+
+    "storeRewards": {
+      ".read": true,
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      ".indexOn": ["active", "available", "displayOrder", "pointsRequired"]
+    },
+
+    "storeRewardAccounts": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+        ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && data.exists() && newData.child('customerId').val() == $uid && newData.child('pointsBalance').isNumber() && newData.child('pointsBalance').val() >= 0 && newData.child('pointsBalance').val() < data.child('pointsBalance').val() && newData.child('lifetimePointsEarned').val() == data.child('lifetimePointsEarned').val() && newData.child('lifetimePointsRedeemed').val() == data.child('lifetimePointsRedeemed').val() && newData.child('earnedOrderPoints').val() == data.child('earnedOrderPoints').val() && newData.child('settledReservationIds').val() == data.child('settledReservationIds').val() && newData.child('createdAt').val() == data.child('createdAt').val() && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() >= data.child('updatedAt').val() && newData.child('pendingReservationId').isString() && newData.child('pendingReservationId').val() != '' && newData.child('pendingReservationId').val() != data.child('pendingReservationId').val()))",
+        ".indexOn": ["updatedAt"],
+        "holds": {
+          "$reservationId": {
+            ".validate": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (!data.exists() && newData.exists() && auth.uid == $uid && $reservationId == newData.parent().parent().child('pendingReservationId').val() && root.child('storeRewards').child(newData.child('rewardId').val()).exists() && root.child('storeRewards').child(newData.child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardId').val()).child('available').val() == true && newData.child('rewardName').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('name').val() && newData.child('points').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('pointsRequired').val() && newData.child('minPurchaseAmount').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('minPurchaseAmount').val() && newData.child('requestedAt').isNumber() && newData.parent().parent().child('pointsBalance').val() == data.parent().parent().child('pointsBalance').val() - newData.child('points').val()) || (data.exists() && newData.val() == data.val()))"
+          }
+        }
+      }
+    },
+
+    "storeRewardTransactions": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+        "$txId": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+          ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && !data.exists() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child($txId).exists() && root.child('storeRewards').child(newData.child('rewardId').val()).exists() && root.child('storeRewards').child(newData.child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardId').val()).child('available').val() == true && newData.child('customerId').val() == auth.uid && newData.child('type').val() == 'redeemed' && newData.child('status').val() == 'reserved' && newData.child('rewardId').val() == root.child('storeRewardAccounts').child(auth.uid).child('holds').child($txId).child('rewardId').val() && newData.child('rewardName').val() == root.child('storeRewardAccounts').child(auth.uid).child('holds').child($txId).child('rewardName').val() && newData.child('points').val() == root.child('storeRewardAccounts').child(auth.uid).child('holds').child($txId).child('points').val() && newData.child('signedPoints').isNumber() && newData.child('signedPoints').val() == 0 - root.child('storeRewardAccounts').child(auth.uid).child('holds').child($txId).child('points').val() && newData.child('balanceAfter').val() == root.child('storeRewardAccounts').child(auth.uid).child('pointsBalance').val() && newData.child('balanceBefore').val() == newData.child('balanceAfter').val() + newData.child('points').val() && newData.child('rewardSnapshot').child('reservationId').val() == $txId && newData.child('rewardSnapshot').child('rewardId').val() == newData.child('rewardId').val() && newData.child('rewardSnapshot').child('pointsRedeemed').val() == newData.child('points').val()))"
+        },
+        ".indexOn": ["createdAt"]
+      }
+    },
+
+    "storeOrderRewardRedemptions": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
     },
 
     "storeCatalogMeta": {
@@ -126,7 +172,14 @@
       }
     },
 
+    "sicarLinkedQuotes": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
+    },
+
     "sicarQuoteQueue": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
       "$orderId": {
         ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
         ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service' || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && !data.exists() && newData.child('status').val() == 'pending'))"

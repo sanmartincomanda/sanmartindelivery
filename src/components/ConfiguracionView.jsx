@@ -83,6 +83,7 @@ import {
   unwrapStoreCache,
   writeStoreVersionedCache,
 } from '../services/storeCache';
+import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 
 const COUPONS_PIN = '210397';
 
@@ -452,7 +453,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode]);
 
   useEffect(() => {
-    if (!isStoreMode || !['catalogo', 'categorias'].includes(section)) {
+    if (!isStoreMode || !['catalogo', 'categorias', 'recompensas'].includes(section)) {
       return undefined;
     }
 
@@ -1572,6 +1573,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Cupones',
           title: 'Cupones',
         },
+        recompensas: {
+          path: 'Admintv / Tienda Virtual / Programa de Recompensas',
+          title: 'Club San Martin Granada',
+        },
         promociones: {
           path: 'Admintv / Tienda Virtual / Historias',
           title: 'Historias',
@@ -1875,6 +1880,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('cupones')}
             >
               Cupones
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'recompensas' ? 'active' : ''}`}
+              onClick={() => setSection('recompensas')}
+            >
+              Recompensas
             </button>
             <button
               type="button"
@@ -2316,6 +2328,8 @@ export default function ConfiguracionView({ mode = 'users' }) {
               </div>
             )}
           </>
+        ) : isStoreMode && section === 'recompensas' ? (
+          <StoreRewardsAdminSection catalog={products} />
         ) : isStoreMode && section === 'promociones' ? (
           <PromotionsManager
             promotions={promotions}

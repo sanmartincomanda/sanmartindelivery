@@ -79,6 +79,19 @@ import {
 } from '../services/orders';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
+import StoreRewardsSheet, { StoreRewardsSummaryCard } from './StoreRewardsSheet';
+import {
+  buildStoreRewardRedemptionSnapshot,
+  calculateEarnedRewardPoints,
+  DEFAULT_STORE_REWARD_SETTINGS,
+  mergeStoreRewards,
+  normalizeStoreRewardAccount,
+  reserveStoreRewardPoints,
+  subscribeStoreRewardAccount,
+  subscribeStoreRewardSettings,
+  subscribeStoreRewardTransactions,
+  subscribeStoreRewards,
+} from '../services/storeRewards';
 
 const LOGO_PATH = '/tienda/branding/logo.png';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
@@ -773,6 +786,13 @@ export default function TiendaVirtualView({
   const [submitting, setSubmitting] = useState(false);
   const [createdOrder, setCreatedOrder] = useState(null);
   const [orderSuccessOpen, setOrderSuccessOpen] = useState(false);
+  const [rewardsOpen, setRewardsOpen] = useState(false);
+  const [rewardDefinitions, setRewardDefinitions] = useState({});
+  const [rewardSettings, setRewardSettings] = useState(DEFAULT_STORE_REWARD_SETTINGS);
+  const [rewardAccount, setRewardAccount] = useState(() => normalizeStoreRewardAccount({}, ''));
+  const [rewardTransactions, setRewardTransactions] = useState([]);
+  const [selectedRewardRedemption, setSelectedRewardRedemption] = useState(null);
+  const [rewardActionBusy, setRewardActionBusy] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const quantityNoticeTimeoutRef = useRef(null);
 
@@ -849,6 +869,32 @@ export default function TiendaVirtualView({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreRewardSettings(
+      (settings) => {
+        setRewardSettings(settings);
+      },
+      (error) => {
+        console.error('No se pudo cargar la configuracion de recompensas:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreRewards(
+      (rewardMap) => {
+        setRewardDefinitions(rewardMap && typeof rewardMap === 'object' ? rewardMap : {});
+      },
+      (error) => {
+        console.error('No se pudieron cargar los premios del Club San Martin:', error);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -990,6 +1036,46 @@ export default function TiendaVirtualView({
   }, [currentUser]);
 
   useEffect(() => {
+    if (!currentUser?.key) {
+      setRewardAccount(normalizeStoreRewardAccount({}, ''));
+      return undefined;
+    }
+
+    const unsubscribe = subscribeStoreRewardAccount(
+      currentUser.key,
+      (account) => {
+        setRewardAccount(account);
+      },
+      (error) => {
+        console.error('No se pudo cargar el saldo del Club San Martin:', error);
+        setRewardAccount(normalizeStoreRewardAccount({}, currentUser.key));
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser?.key]);
+
+  useEffect(() => {
+    if (!currentUser?.key) {
+      setRewardTransactions([]);
+      return undefined;
+    }
+
+    const unsubscribe = subscribeStoreRewardTransactions(
+      currentUser.key,
+      (transactions) => {
+        setRewardTransactions(Array.isArray(transactions) ? transactions : []);
+      },
+      (error) => {
+        console.error('No se pudo cargar el historial de puntos:', error);
+        setRewardTransactions([]);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser?.key]);
+
+  useEffect(() => {
     if (!currentUser) {
       setCouponHistoryOrders([]);
       setCouponHistoryReady(true);
@@ -1085,6 +1171,11 @@ export default function TiendaVirtualView({
   const activeProducts = useMemo(
     () => catalog.filter((product) => product.active !== false),
     [catalog]
+  );
+
+  const storeRewards = useMemo(
+    () => mergeStoreRewards(rewardDefinitions, activeProducts),
+    [activeProducts, rewardDefinitions]
   );
 
   const categoryOptions = useMemo(
@@ -1389,6 +1480,17 @@ export default function TiendaVirtualView({
     [couponDiscount, totalAmount]
   );
 
+  const estimatedRewardPoints = useMemo(
+    () => calculateEarnedRewardPoints(approximateTotalAmount, rewardSettings),
+    [approximateTotalAmount, rewardSettings]
+  );
+
+  const selectedRewardDefinition = useMemo(
+    () =>
+      storeRewards.find((reward) => reward.id === String(selectedRewardRedemption?.rewardId || '').trim()) || null,
+    [selectedRewardRedemption?.rewardId, storeRewards]
+  );
+
   const activePromotions = useMemo(
     () => promotions.filter((promotion) => isStorePromotionVisible(promotion)),
     [promotions]
@@ -1418,6 +1520,12 @@ export default function TiendaVirtualView({
   }, [activePromotions.length, selectedPromotionIndex]);
 
   const cartCount = cartItems.length;
+
+  useEffect(() => {
+    if (selectedRewardRedemption && !selectedRewardDefinition) {
+      setSelectedRewardRedemption(null);
+    }
+  }, [selectedRewardDefinition, selectedRewardRedemption]);
 
   useEffect(() => {
     if (!orderSuccessOpen || !createdOrder) {
@@ -1711,9 +1819,13 @@ export default function TiendaVirtualView({
     setCreatedOrder(null);
     setOrderSuccessOpen(false);
     setCustomerOrders([]);
+    setRewardTransactions([]);
+    setRewardAccount(normalizeStoreRewardAccount({}, ''));
+    setSelectedRewardRedemption(null);
     setDeliveryMode('perfil');
     setAlternateDelivery(createEmptyDeliveryDraft());
     setOrdersOpen(false);
+    setRewardsOpen(false);
     setCheckoutOpen(false);
     setProfileOpen(false);
     setAuthSheetOpen(false);
@@ -1744,7 +1856,11 @@ export default function TiendaVirtualView({
       setCurrentUser(null);
       setCreatedOrder(null);
       setCustomerOrders([]);
+      setRewardTransactions([]);
+      setRewardAccount(normalizeStoreRewardAccount({}, ''));
+      setSelectedRewardRedemption(null);
       setOrdersOpen(false);
+      setRewardsOpen(false);
       setProfileOpen(false);
       setAuthPromptDismissed(false);
       setAuthSheetOpen(true);
@@ -1777,7 +1893,11 @@ export default function TiendaVirtualView({
       setCurrentUser(null);
       setCreatedOrder(null);
       setCustomerOrders([]);
+      setRewardTransactions([]);
+      setRewardAccount(normalizeStoreRewardAccount({}, ''));
+      setSelectedRewardRedemption(null);
       setOrdersOpen(false);
+      setRewardsOpen(false);
       setProfileOpen(false);
       setAuthPromptDismissed(false);
       setAuthSheetOpen(true);
@@ -2075,6 +2195,30 @@ export default function TiendaVirtualView({
     }
   };
 
+  const openRewardsPanel = () => {
+    if (!currentUser) {
+      openAuthSheet('login', 'rewards');
+      return;
+    }
+
+    setRewardsOpen(true);
+  };
+
+  const handleSelectReward = (reward, selection = {}) => {
+    if (!currentUser) {
+      openAuthSheet('login', 'rewards');
+      return;
+    }
+
+    const selectedSnapshot = buildStoreRewardRedemptionSnapshot(reward, selection, activeProducts);
+    setSelectedRewardRedemption(selectedSnapshot);
+    setRewardsOpen(false);
+  };
+
+  const clearSelectedReward = () => {
+    setSelectedRewardRedemption(null);
+  };
+
   const submitOrder = async (event) => {
     event.preventDefault();
 
@@ -2110,6 +2254,8 @@ export default function TiendaVirtualView({
 
     setSubmitting(true);
 
+    let reservedReward = null;
+
     try {
       const paymentMethod = normalizeCheckoutPayment(customer.metodoPago);
       const cashChangeText = String(customer.cambioPara || '').trim();
@@ -2124,6 +2270,24 @@ export default function TiendaVirtualView({
       const fullAddress = activeDeliveryAddress.referencia
         ? `${activeDeliveryAddress.direccion} | Ref: ${activeDeliveryAddress.referencia}`
         : activeDeliveryAddress.direccion;
+
+      if (selectedRewardRedemption && !selectedRewardDefinition) {
+        throw new Error('El premio seleccionado ya no esta disponible.');
+      }
+
+      if (selectedRewardDefinition) {
+        setRewardActionBusy(true);
+        reservedReward = await reserveStoreRewardPoints({
+          userKey: currentUser.key,
+          reward: selectedRewardDefinition,
+          selection: {
+            choices: selectedRewardRedemption?.choiceSelections || {},
+          },
+          catalog: activeProducts,
+          cartAmount: approximateTotalAmount,
+          settings: rewardSettings,
+        });
+      }
 
       const order = await onCreateOrder(
         {
@@ -2148,11 +2312,13 @@ export default function TiendaVirtualView({
               }
             : null,
           total: approximateTotalAmount,
+          estimatedRewardPoints,
           observaciones: checkoutNotes,
           metodoPago: paymentMethod,
           cambioPara: paymentMethod === STORE_CASH_PAYMENT ? cashChangeText : '',
           deliveryMode,
           fulfillmentType,
+          rewardRedemption: reservedReward?.rewardSnapshot || null,
         },
         { channel: STORE_CHANNEL }
       );
@@ -2168,16 +2334,23 @@ export default function TiendaVirtualView({
       setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
       setDeliveryMode('perfil');
       setAlternateDelivery(createEmptyDeliveryDraft());
+      setSelectedRewardRedemption(null);
       setOrderSuccessOpen(true);
     } catch (error) {
       console.error('Error creando pedido virtual:', error);
       if (error.code === 'ORDER_LIMIT_REACHED') {
         alert('Hoy ya no quedan numeros disponibles.');
+      } else if (error.code === 'INSUFFICIENT_POINTS' || error.code === 'MIN_PURCHASE_REQUIRED') {
+        alert(error.message || 'No se pudo reservar el premio seleccionado.');
       } else {
-        alert('No se pudo enviar el pedido.');
+        alert(
+          error?.message ||
+            'No se pudo enviar el pedido. Si el premio ya habia quedado reservado, el integrador lo liberara automaticamente.'
+        );
       }
     } finally {
       setSubmitting(false);
+      setRewardActionBusy(false);
     }
   };
 
@@ -4965,6 +5138,20 @@ export default function TiendaVirtualView({
           </label>
         </header>
 
+        {rewardSettings.enabled !== false && (
+          <section style={{ marginTop: 18, marginBottom: 8 }}>
+            <StoreRewardsSummaryCard
+              currentUser={currentUser}
+              settings={rewardSettings}
+              account={rewardAccount}
+              rewards={storeRewards}
+              cartAmount={approximateTotalAmount}
+              selectedReward={selectedRewardRedemption}
+              onOpen={openRewardsPanel}
+            />
+          </section>
+        )}
+
         <main>
           <section className="store-filters-panel">
             <div className="store-filter-strip">
@@ -5205,7 +5392,10 @@ export default function TiendaVirtualView({
           couponInput={couponInput}
           couponMessage={couponMessage}
           approximateTotalAmount={approximateTotalAmount}
+          estimatedRewardPoints={estimatedRewardPoints}
           totalAmount={totalAmount}
+          rewardSettings={rewardSettings}
+          selectedReward={selectedRewardRedemption}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
           onFulfillmentTypeChange={setFulfillmentType}
@@ -5219,6 +5409,8 @@ export default function TiendaVirtualView({
           onNotesChange={setNotes}
           onOpenLogin={() => openAuthSheet('login', 'checkout')}
           onOpenRegister={() => openAuthSheet('register', 'checkout')}
+          onOpenRewards={openRewardsPanel}
+          onClearSelectedReward={clearSelectedReward}
           onRemoveCoupon={removeCoupon}
           onSubmit={submitOrder}
         />
@@ -5243,6 +5435,22 @@ export default function TiendaVirtualView({
           onSave={handleProfileSave}
         />
       )}
+
+      <StoreRewardsSheet
+        open={rewardsOpen}
+        currentUser={currentUser}
+        settings={rewardSettings}
+        rewards={storeRewards}
+        account={rewardAccount}
+        transactions={rewardTransactions}
+        cartAmount={approximateTotalAmount}
+        selectedReward={selectedRewardRedemption}
+        rewardActionBusy={rewardActionBusy}
+        onSelectReward={handleSelectReward}
+        onClearSelectedReward={clearSelectedReward}
+        onClose={() => setRewardsOpen(false)}
+        onOpenAuth={() => openAuthSheet('login', 'rewards')}
+      />
 
       {authSheetOpen && (
         <StoreAuthSheet
@@ -6518,7 +6726,10 @@ function CheckoutSheet({
   couponInput,
   couponMessage,
   approximateTotalAmount,
+  estimatedRewardPoints,
   totalAmount,
+  rewardSettings,
+  selectedReward,
   onClose,
   onApplyCoupon,
   onAlternateDeliveryChange,
@@ -6531,6 +6742,8 @@ function CheckoutSheet({
   onNotesChange,
   onOpenLogin,
   onOpenRegister,
+  onOpenRewards,
+  onClearSelectedReward,
   onQuantityChange,
   onRemoveCoupon,
   onSubmit,
@@ -6687,6 +6900,42 @@ function CheckoutSheet({
               </p>
             </div>
 
+            <div className="store-status-card" style={{ marginTop: 0 }}>
+              <div className="store-status-pill">Club San Martin</div>
+              <h3 style={{ margin: '10px 0 4px' }}>
+                {currentUser
+                  ? `Con esta compra ganaras aproximadamente ${estimatedRewardPoints} puntos.`
+                  : 'Inicia sesion para acumular puntos en cada compra.'}
+              </h3>
+              <p style={{ margin: 0 }}>
+                {currentUser
+                  ? 'Los puntos se acreditan cuando el pedido queda entregado y con total final actualizado por SICAR.'
+                  : 'Como invitado puedes comprar normal, pero el Club San Martin necesita cuenta para guardar tus puntos.'}
+              </p>
+              {rewardSettings?.enabled !== false && (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                  {selectedReward ? (
+                    <>
+                      <button type="button" className="store-button" onClick={onOpenRewards}>
+                        Premio seleccionado
+                      </button>
+                      <button type="button" className="store-button secondary" onClick={onClearSelectedReward}>
+                        Seguir acumulando
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="store-button secondary"
+                      onClick={currentUser ? onOpenRewards : onOpenLogin}
+                    >
+                      {currentUser ? 'Canjear premio en este pedido' : 'Inicia sesion para canjear'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button type="button" className="store-button" onClick={() => setCheckoutStep('details')}>
               Pedir en linea
             </button>
@@ -6697,6 +6946,36 @@ function CheckoutSheet({
               <span>Total aproximado</span>
               <strong>{formatCurrency(approximateTotalAmount)}</strong>
             </div>
+
+            {rewardSettings?.enabled !== false && (
+              <div className="store-status-card" style={{ marginTop: 0 }}>
+                <div className="store-status-pill">Club San Martin</div>
+                <h3 style={{ margin: '10px 0 4px' }}>
+                  {selectedReward
+                    ? `Premio elegido: ${selectedReward.rewardName}`
+                    : `Con esta compra ganaras aproximadamente ${estimatedRewardPoints} puntos.`}
+                </h3>
+                <p style={{ margin: 0 }}>
+                  {selectedReward
+                    ? 'Solo se permite un premio por pedido. Si prefieres, puedes seguir acumulando para uno mejor.'
+                    : 'Puedes elegir un premio ahora si ya alcanzaste los puntos necesarios.'}
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className="store-button secondary"
+                    onClick={currentUser ? onOpenRewards : onOpenLogin}
+                  >
+                    {selectedReward ? 'Cambiar premio' : 'Ver recompensas'}
+                  </button>
+                  {selectedReward && (
+                    <button type="button" className="store-button secondary" onClick={onClearSelectedReward}>
+                      Seguir acumulando
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="store-choice-section">
               <div className="store-choice-title">
@@ -7197,6 +7476,30 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
               </div>
               {item.descripcion && <small>{item.descripcion}</small>}
               {Number(item.subtotal || 0) > 0 && <small>{formatCurrency(item.subtotal)}</small>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {order.rewardRedemption?.rewardName && (
+        <div className="store-status-items">
+          <strong className="store-status-items-title">Premio Club San Martin</strong>
+          <div>
+            <div>{order.rewardRedemption.rewardName}</div>
+            <small>
+              {Number(order.rewardRedemption.pointsRedeemed || 0)} puntos canjeados
+              {order.rewardRedemption.status === 'redeemed'
+                ? ' - aplicado'
+                : order.rewardRedemption.status === 'refunded'
+                  ? ' - puntos devueltos'
+                  : ' - pendiente de confirmar'}
+            </small>
+          </div>
+          {(Array.isArray(order.rewardRedemption.items) ? order.rewardRedemption.items : []).map((item) => (
+            <div key={`${order.firebaseKey || order.id}-reward-${item.productCode || item.productName}`}>
+              <div>
+                {Number(item.quantity || 1)} x {item.productName || item.productCode}
+              </div>
             </div>
           ))}
         </div>

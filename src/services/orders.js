@@ -2,6 +2,7 @@ import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, ru
 import { database } from '../firebase';
 import { hoyISO } from '../components/Utils';
 import { normalizeLocation } from './geo';
+import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards';
 
 export const ORDER_LIMIT_PER_DAY = 125;
 export const MANUAL_CHANNEL = 'manual';
@@ -150,6 +151,13 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
   });
 
   const cleanNotes = String(notes || '').trim();
+  const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
+
+  if (rewardLines.length > 0) {
+    lines.push('');
+    lines.push(...rewardLines);
+  }
+
   if (cleanNotes) {
     lines.push('');
     lines.push(`Observaciones: ${cleanNotes}`);
@@ -184,6 +192,12 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   const lines = normalizedItems.map(
     (item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim()
   );
+  const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
+
+  if (rewardLines.length > 0) {
+    lines.push('');
+    lines.push(...rewardLines);
+  }
 
   if (subtotal > 0) {
     lines.push('');
@@ -345,11 +359,14 @@ export async function createOrder(payload, options = {}) {
     couponCode: coupon?.code,
     total,
     observaciones: payload.observaciones,
+    rewardRedemption: payload.rewardRedemption,
   });
   const pedidoTexto =
     channel === STORE_CHANNEL
       ? generatedKitchenPedidoTexto || rawPedidoTexto
       : rawPedidoTexto || generatedKitchenPedidoTexto;
+
+  const normalizedRewardRedemption = normalizeStoreRewardRedemption(payload.rewardRedemption);
 
   const orderRecord = {
     cliente: String(payload.cliente || '').trim() || 'Cliente sin nombre',
@@ -367,6 +384,7 @@ export async function createOrder(payload, options = {}) {
     subtotalEstimado: subtotal,
     descuentoCupon: couponDiscount,
     cupon: coupon,
+    rewardRedemption: normalizedRewardRedemption,
     total,
     totalAproximado: channel === STORE_CHANNEL,
     estado: 'Pendiente',
@@ -392,6 +410,11 @@ export async function createOrder(payload, options = {}) {
       orderDate: fecha,
       orderNumber: id,
       queuedAt: new Date(createdAt).toISOString(),
+    };
+    orderRecord.rewardPoints = {
+      status: 'pending',
+      estimatedPoints: Number(payload.estimatedRewardPoints || 0),
+      updatedAt: new Date(createdAt).toISOString(),
     };
   }
 

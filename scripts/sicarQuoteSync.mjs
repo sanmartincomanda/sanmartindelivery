@@ -1,15 +1,9 @@
-import { getApps, initializeApp } from 'firebase/app';
-import { get, getDatabase, onValue, ref, update } from 'firebase/database';
-
-const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro',
-  authDomain: 'comanda-digital-ac1ec.firebaseapp.com',
-  databaseURL: 'https://comanda-digital-ac1ec-default-rtdb.firebaseio.com',
-  projectId: 'comanda-digital-ac1ec',
-  storageBucket: 'comanda-digital-ac1ec.firebasestorage.app',
-  messagingSenderId: '41323183250',
-  appId: '1:41323183250:web:aa1d7ea9cbbc353a917a4b',
-};
+import { get, onValue, orderByChild, query, ref, startAt, update } from 'firebase/database';
+import {
+  ensureAuthenticatedFirebaseSession,
+  getAuthenticatedFirebaseDatabase,
+} from './firebaseScriptAuth.mjs';
+import { buildStoreRewardRedemptionTextLines } from '../src/services/storeRewards.js';
 
 const STORE_CHANNEL = 'tienda_virtual';
 const STORE_ORDERS_PATH = 'orders';
@@ -96,6 +90,20 @@ const isFinalStoreStatus = (status) => {
   );
 };
 
+const formatDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getLinkedQuoteSeedStartDate = (daysBack = 90) => {
+  const baseDate = new Date();
+  baseDate.setHours(0, 0, 0, 0);
+  baseDate.setDate(baseDate.getDate() - Math.max(1, Number(daysBack || 90)));
+  return formatDateKey(baseDate);
+};
+
 const escapeSqlText = (value, sqlEscape) => `'${sqlEscape(String(value || ''))}'`;
 
 const parseImpIds = (value = '') =>
@@ -128,6 +136,12 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   const lines = normalizedItems.map(
     (item) => `- ${formatStoreQuantityLabel(item.quantity, item.unit)} ${item.unit} ${item.name}`.trim()
   );
+  const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
+
+  if (rewardLines.length > 0) {
+    lines.push('');
+    lines.push(...rewardLines);
+  }
 
   if (subtotal > 0) {
     lines.push('');
@@ -163,14 +177,6 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
   return lines.filter(Boolean).join('\n').trim();
 };
 
-const getFirebaseDatabase = () => {
-  const existingApp = getApps().find((app) => app.name === 'sicar-quote-sync');
-  const app =
-    existingApp ||
-    initializeApp(FIREBASE_CONFIG, 'sicar-quote-sync');
-  return getDatabase(app);
-};
-
 const buildQuoteFingerprint = (quote = {}) =>
   JSON.stringify({
     cotId: Number(quote?.cotId || 0),
@@ -187,7 +193,7 @@ const buildQuoteFingerprint = (quote = {}) =>
   });
 
 export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
-  const database = getFirebaseDatabase();
+  const database = getAuthenticatedFirebaseDatabase();
   const state = {
     listening: false,
     processing: false,
@@ -262,7 +268,13 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   };
 
   const seedLinkedQuoteWatchesFromOrders = async () => {
-    const snapshot = await get(ref(database, STORE_ORDERS_PATH));
+    const snapshot = await get(
+      query(
+        ref(database, STORE_ORDERS_PATH),
+        orderByChild('fecha'),
+        startAt(getLinkedQuoteSeedStartDate())
+      )
+    );
     const orders = snapshot.val() || {};
     const updates = {};
     const nowIso = new Date().toISOString();
@@ -469,62 +481,87 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   };
 
   const createSicarCustomer = async (customer = {}) => {
-    const rows = await runMysqlQuery(`
-      START TRANSACTION;
-      INSERT INTO cliente (
-        nombre,
-        domicilio,
-        noExt,
-        noInt,
-        localidad,
-        ciudad,
-        estado,
-        pais,
-        codigoPostal,
-        colonia,
-        rfc,
-        curp,
-        telefono,
-        celular,
-        mail,
-        comentario,
-        status,
-        limite,
-        precio,
-        diasCredito,
-        retener,
-        desglosarIEPS,
-        notificar,
-        clave
-      ) VALUES (
-        ${escapeSqlText(customer.name || 'Cliente tienda virtual', sqlEscape)},
-        ${escapeSqlText(customer.address || '-', sqlEscape)},
-        '',
-        '',
-        '',
-        '',
-        '',
-        'NICARAGUA',
-        '',
-        '',
-        '',
-        '',
-        ${escapeSqlText(customer.phone || '', sqlEscape)},
-        ${escapeSqlText(customer.phone || '', sqlEscape)},
-        ${escapeSqlText(customer.email || '', sqlEscape)},
-        ${escapeSqlText(STORE_CUSTOMER_COMMENT, sqlEscape)},
-        1,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        ${customer.code ? escapeSqlText(customer.code, sqlEscape) : 'NULL'}
-      );
-      SELECT LAST_INSERT_ID();
-      COMMIT;
-    `);
+    let rows = [];
+
+    try {
+      rows = await runMysqlQuery(`
+        START TRANSACTION;
+        INSERT INTO cliente (
+          nombre,
+          domicilio,
+          noExt,
+          noInt,
+          localidad,
+          ciudad,
+          estado,
+          pais,
+          codigoPostal,
+          colonia,
+          rfc,
+          curp,
+          telefono,
+          celular,
+          mail,
+          comentario,
+          status,
+          limite,
+          precio,
+          diasCredito,
+          retener,
+          desglosarIEPS,
+          notificar,
+          clave
+        ) VALUES (
+          ${escapeSqlText(customer.name || 'Cliente tienda virtual', sqlEscape)},
+          ${escapeSqlText(customer.address || '-', sqlEscape)},
+          '',
+          '',
+          '',
+          '',
+          '',
+          'NICARAGUA',
+          '',
+          '',
+          '',
+          '',
+          ${escapeSqlText(customer.phone || '', sqlEscape)},
+          ${escapeSqlText(customer.phone || '', sqlEscape)},
+          ${escapeSqlText(customer.email || '', sqlEscape)},
+          ${escapeSqlText(STORE_CUSTOMER_COMMENT, sqlEscape)},
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          ${customer.code ? escapeSqlText(customer.code, sqlEscape) : 'NULL'}
+        );
+        SELECT LAST_INSERT_ID();
+        COMMIT;
+      `);
+    } catch (error) {
+      const errorMessage = String(error?.message || error || '').trim();
+      const isDuplicateCode =
+        customer.code &&
+        errorMessage.toLowerCase().includes('duplicate entry') &&
+        errorMessage.toLowerCase().includes('clave_unique');
+
+      if (!isDuplicateCode) {
+        throw error;
+      }
+
+      const existing = await getSicarCustomerByClave(customer.code);
+      if (existing?.cliId) {
+        return {
+          ...existing,
+          created: false,
+          matchedBy: 'duplicate-code',
+        };
+      }
+
+      throw error;
+    }
 
     const insertedId = Number(rows[rows.length - 1] || 0);
     if (insertedId <= 0) {
@@ -1200,6 +1237,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         discount: quote.discount,
         totalLabel: 'Total actualizado de pedido',
         subtotalLabel: 'Subtotal actualizado',
+        rewardRedemption: order.rewardRedemption,
       }),
       subtotalEstimado: quote.subtotal,
       total: quote.total,
@@ -1225,6 +1263,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   };
 
   const syncOrderQuoteInternal = async (orderKey, options = {}) => {
+    await ensureAuthenticatedFirebaseSession();
+
     const applyToFirebase = options.applyToFirebase === true;
     const order = await getOrderByKey(orderKey);
 
@@ -1299,6 +1339,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   };
 
   const refreshLinkedQuotes = async () => {
+    await ensureAuthenticatedFirebaseSession();
+
     if (linkedQuotesRefreshing) {
       return;
     }
@@ -1431,7 +1473,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
       for (const [orderKey, entry] of queueEntries) {
         try {
-          const result = await syncOrderQuote(orderKey, { applyToFirebase: false });
+          const result = await syncOrderQuote(orderKey, { applyToFirebase: true });
           await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
             status: result.missingCodes.length > 0 ? 'partial' : 'synced',
             cotId: result.quote.cotId,
@@ -1474,25 +1516,33 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       return;
     }
 
-    queueListenerStarted = true;
-    queueUnsubscribe = onValue(
-      ref(database, QUOTE_QUEUE_PATH),
-      (snapshot) => {
-        const queueData = snapshot.val() || {};
-        state.pendingCount = Object.values(queueData).filter(
-          (entry) => String(entry?.status || '').trim().toLowerCase() === 'pending'
-        ).length;
-        processQueue().catch(() => {});
-      },
-      (error) => {
-        state.lastError = String(error?.message || error || 'No se pudo escuchar la cola SICAR.');
-      }
-    );
-    state.listening = true;
-    seedLinkedQuoteWatchesFromOrders().catch((error) => {
-      state.lastError = String(error?.message || error || 'No se pudieron preparar las cotizaciones enlazadas.');
-    });
-    scheduleLinkedQuotesRefresh(1500);
+    ensureAuthenticatedFirebaseSession()
+      .then(() => {
+        queueListenerStarted = true;
+        queueUnsubscribe = onValue(
+          ref(database, QUOTE_QUEUE_PATH),
+          (snapshot) => {
+            const queueData = snapshot.val() || {};
+            state.pendingCount = Object.values(queueData).filter(
+              (entry) => String(entry?.status || '').trim().toLowerCase() === 'pending'
+            ).length;
+            processQueue().catch(() => {});
+          },
+          (error) => {
+            state.lastError = String(error?.message || error || 'No se pudo escuchar la cola SICAR.');
+          }
+        );
+        state.listening = true;
+        seedLinkedQuoteWatchesFromOrders().catch((error) => {
+          state.lastError = String(error?.message || error || 'No se pudieron preparar las cotizaciones enlazadas.');
+        });
+        scheduleLinkedQuotesRefresh(1500);
+      })
+      .catch((error) => {
+        state.lastError = String(
+          error?.message || error || 'No se pudo autenticar el integrador SICAR contra Firebase.'
+        );
+      });
   };
 
   const stopAutoSync = () => {

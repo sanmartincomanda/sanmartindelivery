@@ -121,6 +121,7 @@ const getKitchenOrderText = (pedido = {}) => {
       subtotalLabel:
         pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado',
       observaciones: pedido.observaciones,
+      rewardRedemption: pedido.rewardRedemption,
     });
   }
 

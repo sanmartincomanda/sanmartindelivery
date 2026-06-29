@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createSicarClientSyncManager } from './sicarClientSync.mjs';
 import { createOrderArchiveManager } from './orderArchiveManager.mjs';
 import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
+import { createStoreRewardsSyncManager } from './storeRewardsSync.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
   SICAR_SPECIAL_SKU_OVERRIDES,
@@ -304,6 +305,8 @@ const sicarClientSync = createSicarClientSyncManager({
   runMysqlQuery,
   repoRoot,
 });
+
+const storeRewardsSync = createStoreRewardsSyncManager();
 
 const orderArchive = createOrderArchiveManager({
   repoRoot,
@@ -725,6 +728,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       quoteSyncEnabled: ENABLE_SICAR_QUOTE_SYNC,
       quoteSync: sicarQuoteSync.state,
       clientSync: sicarClientSync.state,
+      rewardsSync: storeRewardsSync.state,
       orderArchive: orderArchive.state,
     });
   }
@@ -904,6 +908,9 @@ server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
   orderArchive.initAutoArchive();
   sicarClientSync.initAutoSync();
+  storeRewardsSync.initAutoSync().catch((error) => {
+    console.error('No se pudo iniciar la sincronizacion de recompensas:', error);
+  });
   if (ENABLE_SICAR_QUOTE_SYNC) {
     sicarQuoteSync.initAutoSync();
   } else {
