@@ -32,7 +32,7 @@ export const STORE_REWARD_TRANSACTION_TYPES = {
 
 export const DEFAULT_STORE_REWARD_SETTINGS = {
   enabled: true,
-  programName: 'Club San Martin Granada',
+  programName: 'Miembro Gold San Martin Granada',
   pointsPerAmount: 1,
   amountPerPoint: 10,
   pointsExpirationMonths: 6,
@@ -428,7 +428,7 @@ export const normalizeStoreRewardRedemption = (rewardRedemption = {}) => {
 };
 
 export const getStoreRewardRedemptionLabel = (rewardRedemption = {}) =>
-  String(rewardRedemption?.rewardName || '').trim() || 'Premio Club San Martin';
+  String(rewardRedemption?.rewardName || '').trim() || 'Premio Miembro Gold';
 
 export const buildStoreRewardRedemptionTextLines = (rewardRedemption = {}) => {
   const normalizedRewardRedemption = normalizeStoreRewardRedemption(rewardRedemption);
@@ -442,7 +442,7 @@ export const buildStoreRewardRedemptionTextLines = (rewardRedemption = {}) => {
   }
 
   const lines = [
-    'Premio Club San Martin:',
+    'Premio Miembro Gold:',
     `- ${getStoreRewardRedemptionLabel(normalizedRewardRedemption)} | C$0.00`,
   ];
 
@@ -604,7 +604,7 @@ export async function reserveStoreRewardPoints({
   const status = getRewardDisplayStatus(hydratedReward, Number(selection.pointsBalance || 0), cartAmount, normalizedSettings);
 
   if (normalizedSettings.enabled !== true) {
-    throw new Error('El Club San Martin no esta disponible en este momento.');
+    throw new Error('Miembro Gold San Martin Granada no esta disponible en este momento.');
   }
 
   if (!hydratedReward.id || hydratedReward.active === false || hydratedReward.available === false) {
@@ -1210,7 +1210,7 @@ export const buildDefaultStoreRewardsSeed = () => [
   {
     id: 'nivel_1_torta_casera',
     name: 'Paquete Torta Casera, 2 unidades',
-    description: 'Premio de entrada para empezar a disfrutar el Club San Martin.',
+    description: 'Premio de entrada para empezar a disfrutar Miembro Gold San Martin Granada.',
     pointsRequired: 400,
     internalCost: 39,
     minPurchaseAmount: 0,
@@ -1303,7 +1303,7 @@ export const buildDefaultStoreRewardsSeed = () => [
   {
     id: 'nivel_5_rib_eye',
     name: '1 Rib Eye Steak 12 oz gratis',
-    description: 'Uno de los premios mas deseados del Club San Martin.',
+    description: 'Uno de los premios mas deseados de Miembro Gold San Martin Granada.',
     pointsRequired: 1750,
     internalCost: 180,
     minPurchaseAmount: 0,
@@ -1323,7 +1323,7 @@ export const buildDefaultStoreRewardsSeed = () => [
   {
     id: 'nivel_6_combo_premium',
     name: 'Combo Premium San Martin',
-    description: 'Canjea el combo grande del Club San Martin.',
+    description: 'Canjea el combo grande de Miembro Gold San Martin Granada.',
     pointsRequired: 2500,
     internalCost: 489,
     minPurchaseAmount: 0,

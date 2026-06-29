@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   buildCustomerRewardSummary,
   getRewardDisplayStatus,
@@ -7,6 +7,24 @@ import {
 } from '../services/storeRewards';
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+const CLUB_DISPLAY_NAME = 'Miembro Gold San Martin Granada';
+const CLUB_THEME = {
+  gold: '#d4af37',
+  goldSoft: '#f0d78a',
+  goldMuted: '#b89b45',
+  bg: '#0f0f10',
+  bgAlt: '#171718',
+  panel: '#1b1b1c',
+  panelSoft: '#242426',
+  panelElevated: '#2b2b2e',
+  border: 'rgba(212, 175, 55, 0.22)',
+  borderStrong: 'rgba(212, 175, 55, 0.4)',
+  text: '#f6f1e3',
+  textSoft: '#decfa8',
+  textMuted: '#b7aa88',
+  shadow: 'rgba(0, 0, 0, 0.38)',
+  overlay: 'rgba(6, 6, 7, 0.78)',
+};
 
 const formatSignedPoints = (transaction = {}) => {
   const signedPoints = Number(transaction?.signedPoints || 0);
@@ -67,7 +85,7 @@ function ClubSanMartinIcon({ size = 54 }) {
   );
 }
 
-function ClubChevronIcon({ size = 16, color = '#9f1239' }) {
+function ClubChevronIcon({ size = 16, color = CLUB_THEME.gold }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -81,7 +99,7 @@ function ClubChevronIcon({ size = 16, color = '#9f1239' }) {
   );
 }
 
-function ClubBackIcon({ size = 18, color = '#0f172a' }) {
+function ClubBackIcon({ size = 18, color = CLUB_THEME.text }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -95,7 +113,7 @@ function ClubBackIcon({ size = 18, color = '#0f172a' }) {
   );
 }
 
-function ClubCloseIcon({ size = 18, color = '#0f172a' }) {
+function ClubCloseIcon({ size = 18, color = CLUB_THEME.text }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M7 7l10 10M17 7L7 17" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
@@ -103,7 +121,7 @@ function ClubCloseIcon({ size = 18, color = '#0f172a' }) {
   );
 }
 
-function ClubRewardsIcon({ size = 22, color = '#9f1239' }) {
+function ClubRewardsIcon({ size = 22, color = CLUB_THEME.gold }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -121,7 +139,7 @@ function ClubRewardsIcon({ size = 22, color = '#9f1239' }) {
   );
 }
 
-function ClubTransactionsIcon({ size = 22, color = '#0f766e' }) {
+function ClubTransactionsIcon({ size = 22, color = CLUB_THEME.goldMuted }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="4" y="5" width="16" height="14" rx="4" stroke={color} strokeWidth="1.8" />
@@ -131,6 +149,7 @@ function ClubTransactionsIcon({ size = 22, color = '#0f766e' }) {
 }
 
 function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
+  void settings;
   const rawTargetPoints = Math.max(0, Number(closestReward?.pointsRequired || 0));
   const targetPoints = Math.max(rawTargetPoints, 1);
   const progressPct = Math.max(0, Math.min(100, Math.round((Number(pointsBalance || 0) / targetPoints) * 100)));
@@ -140,11 +159,21 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
       style={{
         borderRadius: 28,
         padding: 18,
-        background: 'linear-gradient(160deg, #0f7a61 0%, #11a58a 58%, #1fd1a6 100%)',
-        color: '#ffffff',
-        boxShadow: '0 24px 50px rgba(7, 94, 74, 0.28)',
+        background: 'linear-gradient(155deg, #121214 0%, #1a1a1d 58%, #26221a 100%)',
+        color: CLUB_THEME.text,
+        border: `1px solid ${CLUB_THEME.borderStrong}`,
+        boxShadow: `0 24px 50px ${CLUB_THEME.shadow}`,
       }}
     >
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.05, color: CLUB_THEME.goldSoft }}>
+          {CLUB_DISPLAY_NAME}
+        </div>
+        <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: CLUB_THEME.textSoft }}>
+          {"\u00A1Acumula puntos para obtener los mejores cortes!"}
+        </div>
+      </div>
+
       <div
         style={{
           display: 'grid',
@@ -159,9 +188,9 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
             height: 84,
             borderRadius: 24,
             overflow: 'hidden',
-            background: 'rgba(255,255,255,0.16)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)',
+            background: 'linear-gradient(160deg, rgba(212, 175, 55, 0.12) 0%, rgba(255,255,255,0.04) 100%)',
+            border: `1px solid ${CLUB_THEME.borderStrong}`,
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
             display: 'grid',
             placeItems: 'center',
           }}
@@ -169,7 +198,7 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
           {closestReward?.image ? (
             <img
               src={closestReward.image}
-              alt={closestReward.name || settings?.programName || 'Club San Martin Granada'}
+              alt={closestReward.name || CLUB_DISPLAY_NAME}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               loading="lazy"
               decoding="async"
@@ -182,10 +211,10 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: 13, opacity: 0.84, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              <div style={{ fontSize: 13, color: CLUB_THEME.textSoft, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 Puntos actuales
               </div>
-              <div style={{ marginTop: 4, fontSize: 34, fontWeight: 900, lineHeight: 1 }}>
+              <div style={{ marginTop: 4, fontSize: 34, fontWeight: 900, lineHeight: 1, color: CLUB_THEME.text }}>
                 {Number(pointsBalance || 0)} pts
               </div>
             </div>
@@ -194,11 +223,12 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
               style={{
                 padding: '8px 12px',
                 borderRadius: 999,
-                background: 'rgba(255,255,255,0.18)',
-                border: '1px solid rgba(255,255,255,0.16)',
+                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.18) 0%, rgba(97, 79, 20, 0.3) 100%)',
+                border: `1px solid ${CLUB_THEME.borderStrong}`,
                 fontSize: 13,
                 fontWeight: 900,
                 whiteSpace: 'nowrap',
+                color: CLUB_THEME.goldSoft,
               }}
             >
               Meta: {rawTargetPoints} pts
@@ -220,7 +250,8 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
             overflow: 'hidden',
             height: 18,
             borderRadius: 999,
-            background: 'rgba(3, 56, 46, 0.28)',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: `1px solid ${CLUB_THEME.border}`,
           }}
         >
           <div
@@ -228,14 +259,14 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
               width: `${progressPct}%`,
               height: '100%',
               borderRadius: 999,
-              background: 'linear-gradient(90deg, #d9ff4d 0%, #53ff7b 100%)',
-              boxShadow: '0 10px 22px rgba(217, 255, 77, 0.35)',
+              background: 'linear-gradient(90deg, #9c7a1f 0%, #d4af37 45%, #f0d78a 100%)',
+              boxShadow: '0 10px 22px rgba(212, 175, 55, 0.34)',
               transition: 'width 180ms ease',
             }}
           />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 800, fontSize: 12.5 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 800, fontSize: 12.5, color: CLUB_THEME.textSoft }}>
           <span>{Number(pointsBalance || 0)} pts</span>
           <span>Meta: {rawTargetPoints} pts</span>
         </div>
@@ -243,7 +274,6 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
     </section>
   );
 }
-
 function RewardCard({
   reward,
   status,
@@ -268,18 +298,18 @@ function RewardCard({
 
   const statusMeta = (() => {
     if (isSelected) {
-      return { label: 'Seleccionado', tone: '#166534', bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.22)' };
+      return { label: 'Seleccionado', tone: CLUB_THEME.goldSoft, bg: 'rgba(212, 175, 55, 0.12)', border: CLUB_THEME.borderStrong };
     }
     if (status.status === 'available') {
-      return { label: 'Disponible', tone: '#166534', bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.22)' };
+      return { label: 'Disponible', tone: CLUB_THEME.goldSoft, bg: 'rgba(212, 175, 55, 0.12)', border: CLUB_THEME.borderStrong };
     }
     if (status.status === 'unavailable') {
-      return { label: 'Sin disponibilidad', tone: '#991b1b', bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.22)' };
+      return { label: 'Sin disponibilidad', tone: CLUB_THEME.textMuted, bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.08)' };
     }
     if (status.status === 'min_purchase') {
-      return { label: `Compra minima ${formatCurrency(reward.minPurchaseAmount)}`, tone: '#9a3412', bg: 'rgba(249, 115, 22, 0.12)', border: 'rgba(249, 115, 22, 0.22)' };
+      return { label: `Compra minima ${formatCurrency(reward.minPurchaseAmount)}`, tone: CLUB_THEME.goldSoft, bg: 'rgba(212, 175, 55, 0.1)', border: CLUB_THEME.border };
     }
-    return { label: `${missingPoints} pts faltantes`, tone: '#92400e', bg: 'rgba(245, 158, 11, 0.14)', border: 'rgba(245, 158, 11, 0.22)' };
+    return { label: `${missingPoints} pts faltantes`, tone: CLUB_THEME.goldMuted, bg: 'rgba(212, 175, 55, 0.08)', border: CLUB_THEME.border };
   })();
 
   const actionLabel = canRedeem
@@ -298,9 +328,9 @@ function RewardCard({
         gap: 16,
         padding: 18,
         borderRadius: 24,
-        background: '#ffffff',
-        border: isSelected ? '2px solid rgba(34, 197, 94, 0.28)' : '1px solid rgba(148, 163, 184, 0.24)',
-        boxShadow: isSelected ? '0 22px 44px rgba(22, 163, 74, 0.12)' : '0 18px 36px rgba(15, 23, 42, 0.06)',
+        background: CLUB_THEME.panelElevated,
+        border: isSelected ? `2px solid ${CLUB_THEME.borderStrong}` : `1px solid ${CLUB_THEME.border}`,
+        boxShadow: isSelected ? '0 22px 44px rgba(212, 175, 55, 0.12)' : '0 18px 36px rgba(0, 0, 0, 0.22)',
       }}
     >
       {reward.image && (
@@ -310,7 +340,7 @@ function RewardCard({
             width: 112,
             borderRadius: 24,
             overflow: 'hidden',
-            background: '#f8fafc',
+            background: CLUB_THEME.panelSoft,
           }}
         >
           <img
@@ -326,8 +356,8 @@ function RewardCard({
       <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <strong style={{ display: 'block', fontSize: 21, color: '#0f172a' }}>{reward.name}</strong>
-            <span style={{ color: '#64748b', fontWeight: 700 }}>{Number(reward.pointsRequired || 0)} puntos</span>
+            <strong style={{ display: 'block', fontSize: 21, color: CLUB_THEME.text }}>{reward.name}</strong>
+            <span style={{ color: CLUB_THEME.textSoft, fontWeight: 700 }}>{Number(reward.pointsRequired || 0)} puntos</span>
           </div>
           <span
             style={{
@@ -345,15 +375,15 @@ function RewardCard({
           </span>
         </div>
 
-        {reward.description && <p style={{ margin: 0, color: '#475569', lineHeight: 1.55 }}>{reward.description}</p>}
+        {reward.description && <p style={{ margin: 0, color: CLUB_THEME.textMuted, lineHeight: 1.55 }}>{reward.description}</p>}
 
         {fixedItems.length > 0 && (
           <div style={{ display: 'grid', gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <span style={{ fontSize: 12, fontWeight: 900, color: CLUB_THEME.goldMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               Incluye
             </span>
             {fixedItems.map((item) => (
-              <div key={item.id} style={{ color: '#0f172a', fontWeight: 700 }}>
+              <div key={item.id} style={{ color: CLUB_THEME.text, fontWeight: 700 }}>
                 {Number(item.quantity || 1)} x {item.productName || item.productCode}
               </div>
             ))}
@@ -362,7 +392,7 @@ function RewardCard({
 
         {choiceGroups.map((group) => (
           <div key={group.choiceGroup} style={{ display: 'grid', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <span style={{ fontSize: 12, fontWeight: 900, color: CLUB_THEME.goldMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               Elige una opcion
             </span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -380,9 +410,9 @@ function RewardCard({
                     }
                     style={{
                       borderRadius: 999,
-                      border: active ? '2px solid #0f766e' : '1px solid #cbd5e1',
-                      background: active ? 'rgba(15, 118, 110, 0.12)' : '#ffffff',
-                      color: active ? '#0f766e' : '#334155',
+                      border: active ? `2px solid ${CLUB_THEME.borderStrong}` : `1px solid ${CLUB_THEME.border}`,
+                      background: active ? 'rgba(212, 175, 55, 0.14)' : CLUB_THEME.panelElevated,
+                      color: active ? CLUB_THEME.goldSoft : CLUB_THEME.textSoft,
                       fontWeight: 800,
                       padding: '10px 14px',
                       cursor: 'pointer',
@@ -402,9 +432,9 @@ function RewardCard({
               type="button"
               onClick={onClearSelectedReward}
               style={{
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
+                border: `1px solid ${CLUB_THEME.border}`,
+                background: CLUB_THEME.panelElevated,
+                color: CLUB_THEME.text,
                 borderRadius: 999,
                 padding: '12px 18px',
                 fontWeight: 900,
@@ -420,13 +450,13 @@ function RewardCard({
               onClick={() => onSelectReward(reward, { choices })}
               style={{
                 border: 0,
-                background: canRedeem ? 'linear-gradient(135deg, #9f1239 0%, #ef4444 100%)' : '#e2e8f0',
-                color: canRedeem ? '#ffffff' : '#64748b',
+                background: canRedeem ? 'linear-gradient(135deg, #8c6b1e 0%, #d4af37 55%, #f0d78a 100%)' : 'rgba(255,255,255,0.08)',
+                color: canRedeem ? '#151515' : CLUB_THEME.textMuted,
                 borderRadius: 999,
                 padding: '12px 18px',
                 fontWeight: 900,
                 cursor: canRedeem && !busy ? 'pointer' : 'not-allowed',
-                boxShadow: canRedeem ? '0 16px 30px rgba(239, 68, 68, 0.22)' : 'none',
+                boxShadow: canRedeem ? '0 16px 30px rgba(212, 175, 55, 0.24)' : 'none',
               }}
             >
               {actionLabel}
@@ -444,13 +474,13 @@ function GuestRewardsPrompt({ onOpenAuth }) {
       style={{
         borderRadius: 24,
         padding: 22,
-        background: '#ffffff',
-        border: '1px solid rgba(148, 163, 184, 0.22)',
-        boxShadow: '0 20px 38px rgba(15, 23, 42, 0.07)',
+        background: 'linear-gradient(180deg, #18181a 0%, #202023 100%)',
+        border: `1px solid ${CLUB_THEME.border}`,
+        boxShadow: '0 20px 38px rgba(0, 0, 0, 0.22)',
       }}
     >
-      <h2 style={{ margin: 0, fontSize: 28, color: '#0f172a' }}>Club San Martin Granada</h2>
-      <p style={{ margin: '10px 0 0', color: '#475569', lineHeight: 1.6 }}>
+      <h2 style={{ margin: 0, fontSize: 28, color: CLUB_THEME.goldSoft }}>{CLUB_DISPLAY_NAME}</h2>
+      <p style={{ margin: '10px 0 0', color: CLUB_THEME.textSoft, lineHeight: 1.6 }}>
         Inicia sesion para acumular puntos, ver tus premios y canjear uno en tu proximo pedido.
       </p>
       <button
@@ -460,8 +490,8 @@ function GuestRewardsPrompt({ onOpenAuth }) {
           marginTop: 18,
           border: 0,
           borderRadius: 999,
-          background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)',
-          color: '#ffffff',
+          background: 'linear-gradient(135deg, #8c6b1e 0%, #d4af37 55%, #f0d78a 100%)',
+          color: '#151515',
           padding: '12px 18px',
           fontWeight: 900,
           cursor: 'pointer',
@@ -472,7 +502,6 @@ function GuestRewardsPrompt({ onOpenAuth }) {
     </div>
   );
 }
-
 export function StoreRewardsSummaryCard({
   currentUser,
   settings,
@@ -505,10 +534,10 @@ export function StoreRewardsSummaryCard({
           borderRadius: 24,
           padding: '14px 14px 14px 16px',
           background: selectedReward
-            ? 'linear-gradient(135deg, rgba(22, 163, 74, 0.14) 0%, rgba(15, 118, 110, 0.12) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 244, 246, 0.98) 0%, rgba(255, 255, 255, 0.99) 100%)',
-          border: selectedReward ? '1px solid rgba(22, 163, 74, 0.18)' : '1px solid rgba(251, 113, 133, 0.18)',
-          boxShadow: '0 16px 30px rgba(15, 23, 42, 0.06)',
+            ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.18) 0%, rgba(43, 43, 46, 0.96) 100%)'
+            : 'linear-gradient(135deg, #151517 0%, #202023 100%)',
+          border: selectedReward ? `1px solid ${CLUB_THEME.borderStrong}` : `1px solid ${CLUB_THEME.border}`,
+          boxShadow: '0 16px 30px rgba(0, 0, 0, 0.2)',
         }}
       >
         <div
@@ -526,9 +555,9 @@ export function StoreRewardsSummaryCard({
               borderRadius: 16,
               display: 'grid',
               placeItems: 'center',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(255,241,242,0.92) 100%)',
-              border: '1px solid rgba(251, 113, 133, 0.14)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65)',
+              background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.18) 0%, rgba(255,255,255,0.04) 100%)',
+              border: `1px solid ${CLUB_THEME.border}`,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
             }}
           >
             <ClubSanMartinIcon size={44} />
@@ -537,20 +566,20 @@ export function StoreRewardsSummaryCard({
           <div style={{ minWidth: 0 }}>
             <div
               style={{
-                color: '#9f1239',
+                color: CLUB_THEME.goldSoft,
                 fontSize: 20,
                 fontWeight: 900,
                 lineHeight: 1.05,
               }}
             >
-              Club San Martin Granada
+              {CLUB_DISPLAY_NAME}
             </div>
             <div
               style={{
                 display: 'block',
                 marginTop: 5,
                 fontSize: 11,
-                color: '#64748b',
+                color: CLUB_THEME.textMuted,
                 lineHeight: 1.1,
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -568,12 +597,13 @@ export function StoreRewardsSummaryCard({
                   minWidth: 92,
                   padding: '10px 12px',
                   borderRadius: 999,
-                  background: '#ffffff',
-                  color: '#0f172a',
+                  background: CLUB_THEME.panelElevated,
+                  border: `1px solid ${CLUB_THEME.border}`,
+                  color: CLUB_THEME.goldSoft,
                   fontWeight: 900,
                   fontSize: 15,
                   textAlign: 'center',
-                  boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
+                  boxShadow: '0 8px 18px rgba(0, 0, 0, 0.18)',
                 }}
               >
                 {pointsBalance} pts
@@ -584,12 +614,13 @@ export function StoreRewardsSummaryCard({
                   minWidth: 92,
                   padding: '10px 12px',
                   borderRadius: 999,
-                  background: '#ffffff',
-                  color: '#0f172a',
+                  background: CLUB_THEME.panelElevated,
+                  border: `1px solid ${CLUB_THEME.border}`,
+                  color: CLUB_THEME.goldSoft,
                   fontWeight: 900,
                   fontSize: 13,
                   textAlign: 'center',
-                  boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
+                  boxShadow: '0 8px 18px rgba(0, 0, 0, 0.18)',
                 }}
               >
                 Entrar
@@ -604,8 +635,8 @@ export function StoreRewardsSummaryCard({
               borderRadius: 999,
               display: 'grid',
               placeItems: 'center',
-              background: 'rgba(255,255,255,0.84)',
-              border: '1px solid rgba(251, 113, 133, 0.14)',
+              background: CLUB_THEME.panelElevated,
+              border: `1px solid ${CLUB_THEME.border}`,
             }}
           >
             <ClubChevronIcon />
@@ -615,7 +646,6 @@ export function StoreRewardsSummaryCard({
     </button>
   );
 }
-
 function SheetRoundButton({ onClick, children, ariaLabel }) {
   return (
     <button
@@ -626,13 +656,13 @@ function SheetRoundButton({ onClick, children, ariaLabel }) {
         width: 42,
         height: 42,
         borderRadius: 999,
-        border: '1px solid rgba(148, 163, 184, 0.2)',
-        background: '#ffffff',
-        color: '#0f172a',
+        border: `1px solid ${CLUB_THEME.border}`,
+        background: CLUB_THEME.panelElevated,
+        color: CLUB_THEME.text,
         display: 'grid',
         placeItems: 'center',
         cursor: 'pointer',
-        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+        boxShadow: '0 10px 24px rgba(0, 0, 0, 0.18)',
       }}
     >
       {children}
@@ -640,14 +670,14 @@ function SheetRoundButton({ onClick, children, ariaLabel }) {
   );
 }
 
-function SheetSectionShortcut({ title, icon, onClick, accent = '#9f1239' }) {
+function SheetSectionShortcut({ title, icon, onClick, accent = CLUB_THEME.gold }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        border: '1px solid rgba(148, 163, 184, 0.16)',
-        background: '#ffffff',
+        border: `1px solid ${CLUB_THEME.border}`,
+        background: CLUB_THEME.panelElevated,
         borderRadius: 24,
         padding: '18px 18px',
         display: 'grid',
@@ -656,7 +686,7 @@ function SheetSectionShortcut({ title, icon, onClick, accent = '#9f1239' }) {
         gap: 14,
         cursor: 'pointer',
         textAlign: 'left',
-        boxShadow: '0 18px 34px rgba(15, 23, 42, 0.06)',
+        boxShadow: '0 18px 34px rgba(0, 0, 0, 0.18)',
         transition: 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease',
       }}
     >
@@ -667,14 +697,14 @@ function SheetSectionShortcut({ title, icon, onClick, accent = '#9f1239' }) {
           borderRadius: 16,
           display: 'grid',
           placeItems: 'center',
-          background: accent === '#0f766e' ? 'rgba(15, 118, 110, 0.08)' : 'rgba(159, 18, 57, 0.08)',
+          background: 'rgba(212, 175, 55, 0.12)',
         }}
       >
         {icon}
       </div>
       <div
         style={{
-          color: '#0f172a',
+          color: CLUB_THEME.text,
           fontSize: 19,
           fontWeight: 900,
           lineHeight: 1.1,
@@ -689,8 +719,8 @@ function SheetSectionShortcut({ title, icon, onClick, accent = '#9f1239' }) {
           borderRadius: 999,
           display: 'grid',
           placeItems: 'center',
-          background: '#f8fafc',
-          border: '1px solid rgba(148, 163, 184, 0.14)',
+          background: CLUB_THEME.panelSoft,
+          border: `1px solid ${CLUB_THEME.border}`,
         }}
       >
         <ClubChevronIcon color={accent} />
@@ -789,10 +819,10 @@ export default function StoreRewardsSheet({
 
   const panelSurfaceStyle = {
     borderRadius: isCompactLayout ? 24 : 28,
-    background: '#ffffff',
+    background: CLUB_THEME.panelElevated,
     padding: isCompactLayout ? 16 : 22,
-    border: '1px solid rgba(148, 163, 184, 0.18)',
-    boxShadow: '0 20px 38px rgba(15, 23, 42, 0.06)',
+    border: `1px solid ${CLUB_THEME.border}`,
+    boxShadow: '0 20px 38px rgba(0, 0, 0, 0.22)',
   };
 
   if (!open) {
@@ -806,7 +836,7 @@ export default function StoreRewardsSheet({
         position: 'fixed',
         inset: 0,
         zIndex: 130,
-        background: 'rgba(7, 12, 20, 0.58)',
+        background: CLUB_THEME.overlay,
         backdropFilter: 'blur(18px)',
         padding: isCompactLayout ? 0 : 'clamp(14px, 3vw, 28px)',
         display: 'flex',
@@ -822,9 +852,9 @@ export default function StoreRewardsSheet({
           maxHeight: isCompactLayout ? '100dvh' : 'min(90vh, 920px)',
           overflow: 'hidden',
           borderRadius: isCompactLayout ? 0 : 34,
-          background: 'linear-gradient(180deg, #f8fffc 0%, #f8fafc 100%)',
+          background: 'linear-gradient(180deg, #101011 0%, #18181a 100%)',
           padding: isCompactLayout ? '14px 14px 18px' : 'clamp(16px, 3vw, 28px)',
-          boxShadow: '0 34px 80px rgba(15, 23, 42, 0.3)',
+          boxShadow: '0 34px 80px rgba(0, 0, 0, 0.42)',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -843,9 +873,9 @@ export default function StoreRewardsSheet({
               type="button"
               onClick={goHome}
               style={{
-                border: '1px solid rgba(148, 163, 184, 0.18)',
-                background: '#ffffff',
-                color: '#0f172a',
+                border: `1px solid ${CLUB_THEME.border}`,
+                background: CLUB_THEME.panelElevated,
+                color: CLUB_THEME.text,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
@@ -854,7 +884,7 @@ export default function StoreRewardsSheet({
                 fontWeight: 900,
                 fontSize: 17,
                 cursor: 'pointer',
-                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)',
+                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.18)',
               }}
             >
               <span
@@ -864,7 +894,7 @@ export default function StoreRewardsSheet({
                   borderRadius: 999,
                   display: 'grid',
                   placeItems: 'center',
-                  background: 'rgba(159, 18, 57, 0.08)',
+                  background: 'rgba(212, 175, 55, 0.12)',
                 }}
               >
                 <ClubBackIcon />
@@ -873,7 +903,7 @@ export default function StoreRewardsSheet({
             </button>
           )}
 
-          <SheetRoundButton onClick={onClose} ariaLabel="Cerrar Club San Martin">
+          <SheetRoundButton onClick={onClose} ariaLabel="Cerrar Miembro Gold San Martin">
             <ClubCloseIcon />
           </SheetRoundButton>
         </div>
@@ -899,7 +929,7 @@ export default function StoreRewardsSheet({
                 <SheetSectionShortcut
                   title="Movimientos de puntos"
                   icon={<ClubTransactionsIcon />}
-                  accent="#0f766e"
+                  accent={CLUB_THEME.goldMuted}
                   onClick={() => openView('transactions')}
                 />
               </div>
@@ -916,7 +946,7 @@ export default function StoreRewardsSheet({
                     />
                   </div>
 
-                  <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: '#0f172a' }}>
+                  <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: CLUB_THEME.goldSoft }}>
                     Premios
                   </strong>
 
@@ -928,8 +958,8 @@ export default function StoreRewardsSheet({
                         style={{
                           padding: 18,
                           borderRadius: 18,
-                          background: '#f8fafc',
-                          color: '#64748b',
+                          background: CLUB_THEME.panelSoft,
+                          color: CLUB_THEME.textSoft,
                           fontWeight: 700,
                         }}
                       >
@@ -945,15 +975,15 @@ export default function StoreRewardsSheet({
               <div style={{ height: '100%', overflowY: 'auto' }}>
                 <section style={panelSurfaceStyle}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: '#0f172a' }}>
+                    <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: CLUB_THEME.goldSoft }}>
                       Movimientos de puntos
                     </strong>
                     <div
                       style={{
                         padding: '8px 12px',
                         borderRadius: 999,
-                        background: '#f8fafc',
-                        color: '#0f172a',
+                        background: CLUB_THEME.panelSoft,
+                        color: CLUB_THEME.goldSoft,
                         fontWeight: 900,
                       }}
                     >
@@ -967,8 +997,8 @@ export default function StoreRewardsSheet({
                         style={{
                           padding: 18,
                           borderRadius: 18,
-                          background: '#f8fafc',
-                          color: '#64748b',
+                          background: CLUB_THEME.panelSoft,
+                          color: CLUB_THEME.textSoft,
                           fontWeight: 700,
                         }}
                       >
@@ -985,15 +1015,15 @@ export default function StoreRewardsSheet({
                             alignItems: 'center',
                             padding: '14px 16px',
                             borderRadius: 18,
-                            background: '#f8fafc',
+                            background: CLUB_THEME.panelSoft,
                           }}
                         >
                           <div>
-                            <strong style={{ color: '#0f172a' }}>
+                            <strong style={{ color: CLUB_THEME.text }}>
                               {transaction.rewardName || transaction.orderKey || formatTransactionType(transaction)}
                             </strong>
-                            <div style={{ marginTop: 4, color: '#475569' }}>{formatTransactionDate(transaction.createdAt)}</div>
-                            <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                            <div style={{ marginTop: 4, color: CLUB_THEME.textMuted }}>{formatTransactionDate(transaction.createdAt)}</div>
+                            <div style={{ marginTop: 4, color: CLUB_THEME.textSoft, fontWeight: 700 }}>
                               {transaction.note || formatTransactionType(transaction)}
                             </div>
                           </div>
@@ -1002,12 +1032,12 @@ export default function StoreRewardsSheet({
                               style={{
                                 display: 'block',
                                 fontSize: 22,
-                                color: Number(transaction.signedPoints || 0) >= 0 ? '#16a34a' : '#dc2626',
+                                color: Number(transaction.signedPoints || 0) >= 0 ? CLUB_THEME.goldSoft : '#d08b8b',
                               }}
                             >
                               {formatSignedPoints(transaction)}
                             </strong>
-                            <span style={{ color: '#475569', fontWeight: 700 }}>{formatTransactionType(transaction)}</span>
+                            <span style={{ color: CLUB_THEME.textMuted, fontWeight: 700 }}>{formatTransactionType(transaction)}</span>
                           </div>
                         </div>
                       ))
@@ -1022,3 +1052,4 @@ export default function StoreRewardsSheet({
     </div>
   );
 }
+

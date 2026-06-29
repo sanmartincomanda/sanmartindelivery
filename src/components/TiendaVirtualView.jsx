@@ -6901,7 +6901,7 @@ function CheckoutSheet({
             </div>
 
             <div className="store-status-card" style={{ marginTop: 0 }}>
-              <div className="store-status-pill">Club San Martin</div>
+              <div className="store-status-pill">Miembro Gold</div>
               <h3 style={{ margin: '10px 0 4px' }}>
                 {currentUser
                   ? `Con esta compra ganaras aproximadamente ${estimatedRewardPoints} puntos.`
@@ -6910,7 +6910,7 @@ function CheckoutSheet({
               <p style={{ margin: 0 }}>
                 {currentUser
                   ? 'Los puntos se acreditan cuando el pedido queda entregado y con total final actualizado por SICAR.'
-                  : 'Como invitado puedes comprar normal, pero el Club San Martin necesita cuenta para guardar tus puntos.'}
+                  : 'Como invitado puedes comprar normal, pero Miembro Gold San Martin Granada necesita cuenta para guardar tus puntos.'}
               </p>
               {rewardSettings?.enabled !== false && (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
@@ -6949,7 +6949,7 @@ function CheckoutSheet({
 
             {rewardSettings?.enabled !== false && (
               <div className="store-status-card" style={{ marginTop: 0 }}>
-                <div className="store-status-pill">Club San Martin</div>
+                <div className="store-status-pill">Miembro Gold</div>
                 <h3 style={{ margin: '10px 0 4px' }}>
                   {selectedReward
                     ? `Premio elegido: ${selectedReward.rewardName}`
@@ -7483,7 +7483,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
 
       {order.rewardRedemption?.rewardName && (
         <div className="store-status-items">
-          <strong className="store-status-items-title">Premio Club San Martin</strong>
+          <strong className="store-status-items-title">Premio Miembro Gold</strong>
           <div>
             <div>{order.rewardRedemption.rewardName}</div>
             <small>
