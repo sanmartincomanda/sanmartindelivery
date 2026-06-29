@@ -5,6 +5,9 @@ import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
 import { DRIVERS_PATH, mergeDrivers } from '../services/drivers';
 import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
+import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+
+const LIST_THEME = SAN_MARTIN_THEME;
 
 // Iconos SVG (mismos que en KitchenView)
 const Icons = {
@@ -408,7 +411,7 @@ export default function ListaPedidos({ pedidos = [] }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      background: LIST_THEME.darkGradient,
       padding: '24px',
       fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
       color: '#f8fafc'
@@ -448,9 +451,9 @@ export default function ListaPedidos({ pedidos = [] }) {
           box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
         }
         .repartidor-card.selected { 
-          background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important; 
+          background: ${LIST_THEME.primaryGradient} !important; 
           color: white !important;
-          border-color: #6366f1 !important;
+          border-color: ${LIST_THEME.blueDeep} !important;
         }
         .modal-overlay {
           position: fixed;
@@ -677,11 +680,11 @@ export default function ListaPedidos({ pedidos = [] }) {
             width: '48px',
             height: '48px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+            background: LIST_THEME.primaryGradient,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.4)',
+            boxShadow: `0 10px 25px -5px ${LIST_THEME.shadowStrong}`,
             color: 'white'
           }}>
             {Icons.truck}

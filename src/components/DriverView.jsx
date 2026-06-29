@@ -19,9 +19,11 @@ import {
   signInDriverAuth,
   signOutCurrentUser,
 } from '../services/authRoles';
+import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const DRIVER_SESSION_KEY = 'sanmartin_driver_session';
-const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
+const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
+const DRIVER_THEME = SAN_MARTIN_THEME;
 
 const Icons = {
   route: (
@@ -1102,7 +1104,7 @@ function DriverHeroVector() {
         <path d="M42 170C50 93 106 43 189 48c77 5 126 55 126 123 0 34-14 57-40 57H76c-23 0-37-22-34-58z" fill="rgba(255,255,255,0.16)" />
         <path d="M82 176h115l29-62h-82c-31 0-54 20-62 62z" fill="#fff7ed" />
         <path d="M205 176h51c7 0 12-6 11-13l-10-49h-31l-21 62z" fill="#fed7aa" />
-        <path d="M142 114h116l-12-28H163l-21 28z" fill="#7b1022" />
+        <path d="M142 114h116l-12-28H163l-21 28z" fill={DRIVER_THEME.blueDeep} />
         <circle cx="118" cy="190" r="29" fill="#111827" />
         <circle cx="118" cy="190" r="12" fill="#f8fafc" />
         <circle cx="255" cy="190" r="29" fill="#111827" />
@@ -1118,7 +1120,7 @@ function DriverEmptyVector() {
   return (
     <svg className="driver-empty-vector" viewBox="0 0 180 130" fill="none" aria-hidden="true">
       <rect x="36" y="35" width="100" height="58" rx="18" fill="#fff7ed" />
-      <path d="M56 51h61M56 67h44" stroke="#7b1022" strokeWidth="8" strokeLinecap="round" />
+      <path d="M56 51h61M56 67h44" stroke={DRIVER_THEME.blueDeep} strokeWidth="8" strokeLinecap="round" />
       <path d="M132 78l24-16" stroke="#f97316" strokeWidth="8" strokeLinecap="round" />
       <circle cx="58" cy="97" r="13" fill="#111827" />
       <circle cx="126" cy="97" r="13" fill="#111827" />
@@ -1141,7 +1143,7 @@ const driverStyles = `
     padding: 24px;
     background:
       radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.14), transparent 24%),
-      linear-gradient(135deg, #3b0b16, #7b1022 52%, #a33a36);
+      ${DRIVER_THEME.heroGradient};
   }
   .driver-login-card {
     width: min(420px, 100%);
@@ -1185,7 +1187,7 @@ const driverStyles = `
     border: 0;
     border-radius: 999px;
     padding: 0 18px;
-    background: #7b1022;
+    background: ${DRIVER_THEME.blueDeep};
     color: #fff;
     font: inherit;
     font-weight: 900;
@@ -1217,7 +1219,7 @@ const driverStyles = `
     border-radius: 24px;
     padding: 22px;
     color: #fff;
-    background: linear-gradient(135deg, #3b0b16, #7b1022);
+    background: ${DRIVER_THEME.darkPanelGradient};
     box-shadow: 0 20px 50px rgba(123, 16, 34, 0.18);
   }
   .driver-header span {
@@ -1269,7 +1271,7 @@ const driverStyles = `
   .driver-summary strong {
     display: block;
     font-size: 28px;
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
   }
   .driver-summary span,
   .driver-meta,
@@ -1311,7 +1313,7 @@ const driverStyles = `
     align-items: center;
     justify-content: center;
     background: #fff7f4;
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     font-size: 22px;
     font-weight: 950;
   }
@@ -1349,7 +1351,7 @@ const driverStyles = `
   .driver-address span {
     display: block;
     margin-bottom: 4px;
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     font-size: 11px;
     font-weight: 950;
     letter-spacing: 0.04em;
@@ -1408,7 +1410,7 @@ const driverStyles = `
   }
   .driver-actions summary {
     cursor: pointer;
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     font-weight: 950;
   }
   .driver-actions pre {
@@ -1575,7 +1577,7 @@ const driverStyles = `
   }
   .driver-primary-action {
     background: #fffaf5;
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     box-shadow: 0 18px 35px rgba(17, 24, 39, 0.18);
   }
   .driver-primary-action.green {
@@ -1659,8 +1661,8 @@ const driverStyles = `
     font-size: 34px;
     line-height: 1;
   }
-  .driver-stat.wine { color: #7b1022; }
-  .driver-stat.blue { color: #2563eb; }
+  .driver-stat.wine { color: ${DRIVER_THEME.blueDeep}; }
+  .driver-stat.blue { color: ${DRIVER_THEME.blue}; }
   .driver-stat.orange { color: #f97316; }
   .driver-stat.green { color: #16a34a; }
   .driver-next-card {
@@ -1686,7 +1688,7 @@ const driverStyles = `
     align-items: center;
     justify-content: center;
     border-radius: 18px;
-    background: #7b1022;
+    background: ${DRIVER_THEME.blueDeep};
     color: #fffaf5;
     animation: driverPulse 2.4s ease-in-out infinite;
   }
@@ -1721,7 +1723,7 @@ const driverStyles = `
     white-space: nowrap;
   }
   .driver-next-card b {
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     font-size: 16px;
   }
   .driver-filter-row {
@@ -1751,8 +1753,8 @@ const driverStyles = `
     cursor: pointer;
   }
   .driver-filter-row button.active {
-    border-color: #7b1022;
-    background: #111827;
+    border-color: ${DRIVER_THEME.blueDeep};
+    background: ${DRIVER_THEME.black};
     color: #fffaf5;
   }
   .driver-filter-row span {
@@ -1790,7 +1792,7 @@ const driverStyles = `
     width: 140px;
     height: 140px;
     border-radius: 999px;
-    background: #7b1022;
+    background: ${DRIVER_THEME.blueDeep};
     opacity: 0.06;
     pointer-events: none;
   }
@@ -1822,7 +1824,7 @@ const driverStyles = `
     justify-content: center;
     border-radius: 15px;
     background: #fff7ed;
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     font-weight: 950;
   }
   .driver-card-vector {
@@ -1865,7 +1867,7 @@ const driverStyles = `
     font-weight: 950;
   }
   .driver-progress span.done {
-    background: #7b1022;
+    background: ${DRIVER_THEME.blueDeep};
     color: #fffaf5;
   }
   .driver-card-meta {
@@ -1973,7 +1975,7 @@ const driverStyles = `
     border-radius: 24px;
     padding: 20px;
     color: #fffaf5;
-    background: linear-gradient(135deg, #3b0b16, #7b1022);
+    background: ${DRIVER_THEME.darkPanelGradient};
   }
   .driver-detail-head span {
     display: inline-flex;
@@ -2201,7 +2203,7 @@ const driverStyles = `
     gap: 14px;
     padding: 18px;
     border-radius: 28px;
-    background: linear-gradient(135deg, #111827, #7b1022 72%, #b83a33);
+    background: ${DRIVER_THEME.heroGradient};
     box-shadow: 0 18px 42px rgba(17, 24, 39, 0.18);
   }
   .driver-hero.driver-hero-compact::before {
@@ -2282,7 +2284,7 @@ const driverStyles = `
     line-height: 1.35;
   }
   .driver-featured-head b {
-    color: #7b1022;
+    color: ${DRIVER_THEME.blueDeep};
     font-size: 18px;
     white-space: nowrap;
   }
@@ -2462,7 +2464,7 @@ const driverStyles = `
   .driver-detail-head {
     border-radius: 22px;
     padding: 18px;
-    background: linear-gradient(135deg, #111827, #7b1022);
+    background: ${DRIVER_THEME.darkPanelGradient};
   }
   .driver-detail-head h2 {
     font-size: clamp(24px, 6vw, 40px);
@@ -2581,7 +2583,7 @@ const driverStyles = `
     font-size: 11px;
   }
   .driver-bottom-nav button.active {
-    background: linear-gradient(135deg, #7b1022, #c2410c);
+    background: linear-gradient(135deg, ${DRIVER_THEME.blueDeep}, ${DRIVER_THEME.red});
     color: #fffaf5;
     box-shadow: 0 14px 26px rgba(123, 16, 34, 0.24);
   }

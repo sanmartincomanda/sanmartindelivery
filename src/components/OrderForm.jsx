@@ -9,7 +9,7 @@ import {
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation } from '../services/geo';
 import { createManualClient } from '../services/clientDirectory';
 
-const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
+const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
 
 const PAYMENT_OPTIONS = [
   'Efectivo',

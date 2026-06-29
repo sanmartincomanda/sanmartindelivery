@@ -1,17 +1,20 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { getApps, initializeApp } from 'firebase/app';
-import { equalTo, get, getDatabase, orderByChild, query, ref, startAt, update } from 'firebase/database';
-
-const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro',
-  authDomain: 'comanda-digital-ac1ec.firebaseapp.com',
-  databaseURL: 'https://comanda-digital-ac1ec-default-rtdb.firebaseio.com',
-  projectId: 'comanda-digital-ac1ec',
-  storageBucket: 'comanda-digital-ac1ec.firebasestorage.app',
-  messagingSenderId: '41323183250',
-  appId: '1:41323183250:web:aa1d7ea9cbbc353a917a4b',
-};
+import {
+  equalTo,
+  get,
+  onChildAdded,
+  onChildChanged,
+  orderByChild,
+  query,
+  ref,
+  startAt,
+  update,
+} from 'firebase/database';
+import {
+  ensureAuthenticatedFirebaseSession,
+  getAuthenticatedFirebaseDatabase,
+} from './firebaseScriptAuth.mjs';
 
 const CLIENTS_PATH = 'clients';
 const STORE_USERS_PATH = 'storeUsers';
@@ -35,12 +38,6 @@ const isNumericCode = (value = '') => /^\d+$/.test(normalizeCode(value));
 const isStoreUserCode = (value = '') => normalizeCode(value).toUpperCase().startsWith(STORE_USER_CODE_PREFIX);
 const sqlEscape = (value) => String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 const getDeterministicClientKey = (code) => `sicar_${normalizeCode(code).replace(/[.#$/[\]]/g, '_')}`;
-
-const getFirebaseDatabase = () => {
-  const existingApp = getApps().find((entry) => entry.name === 'sicar-client-sync');
-  const app = existingApp || initializeApp(FIREBASE_CONFIG, 'sicar-client-sync');
-  return getDatabase(app);
-};
 
 const splitIntoBatches = (entries = [], size = UPDATE_BATCH_SIZE) => {
   const batches = [];
@@ -278,7 +275,7 @@ const writeLatestReport = (reportFilePath, report) => {
 };
 
 export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
-  const database = getFirebaseDatabase();
+  const database = getAuthenticatedFirebaseDatabase();
   const backupDir = resolve(repoRoot, '..', 'sicar-backups');
   const stateFilePath = resolve(backupDir, 'sicar-client-sync-state.json');
   const reportFilePath = resolve(backupDir, 'sicar-client-sync-report-latest.json');
@@ -313,6 +310,11 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
   let pollTimer = null;
   let reconcilePromise = null;
   let storeUsersSyncPromise = null;
+  let storeUsersRealtimeListenerStarted = false;
+  let unsubscribeStoreUserAdded = null;
+  let unsubscribeStoreUserChanged = null;
+  let storeUsersRealtimeTimer = null;
+  let storeUsersRealtimeSyncRequested = false;
 
   const flushRootUpdates = async (rootUpdates) => {
     const entries = Object.entries(rootUpdates || {});
@@ -590,6 +592,8 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     }
 
     reconcilePromise = (async () => {
+      await ensureAuthenticatedFirebaseSession();
+
       state.reconciling = true;
       state.lastRunAt = new Date().toISOString();
       state.lastError = '';
@@ -684,6 +688,8 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
   };
 
   const pollNewActiveSicarClientsOnce = async () => {
+    await ensureAuthenticatedFirebaseSession();
+
     const sicarClients = await readActiveSicarClients(state.lastSeenCliId);
     const syncedAt = new Date().toISOString();
     let createdCount = 0;
@@ -737,6 +743,8 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     }
 
     storeUsersSyncPromise = (async () => {
+      await ensureAuthenticatedFirebaseSession();
+
       state.syncingStoreUsers = true;
       state.lastError = '';
 
@@ -808,6 +816,93 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     return storeUsersSyncPromise;
   };
 
+  const scheduleStoreUsersRealtimeSync = () => {
+    storeUsersRealtimeSyncRequested = true;
+
+    if (storeUsersRealtimeTimer) {
+      return;
+    }
+
+    storeUsersRealtimeTimer = setTimeout(() => {
+      storeUsersRealtimeTimer = null;
+
+      if (!state.listening || !storeUsersRealtimeSyncRequested) {
+        return;
+      }
+
+      storeUsersRealtimeSyncRequested = false;
+      syncStoreUsersToSicar({ incremental: true }).catch((error) => {
+        state.lastError = String(
+          error?.message || error || 'No se pudo sincronizar en tiempo real los clientes de tienda virtual hacia SICAR.'
+        );
+      });
+    }, 250);
+  };
+
+  const startStoreUsersRealtimeSync = () => {
+    if (storeUsersRealtimeListenerStarted) {
+      return;
+    }
+
+    const sinceUpdatedAt = Math.max(0, normalizeNumber(state.lastStoreUserSeenUpdatedAt, 0));
+    const realtimeQuery = query(
+      ref(database, STORE_USERS_PATH),
+      orderByChild('updatedAt'),
+      startAt(sinceUpdatedAt > 0 ? sinceUpdatedAt + 1 : 0)
+    );
+
+    const handleStoreUserRealtimeSnapshot = (snapshot) => {
+      const storeUser = normalizeStoreUserRecord(snapshot?.key, snapshot?.val());
+      if (
+        !isStoreUserCode(storeUser.codigo) ||
+        !storeUser.nombre ||
+        !buildStoreUserFullAddress(storeUser)
+      ) {
+        return;
+      }
+
+      scheduleStoreUsersRealtimeSync();
+    };
+
+    const handleStoreUsersRealtimeError = (error) => {
+      state.lastError = String(
+        error?.message || error || 'No se pudo escuchar en tiempo real los clientes de tienda virtual.'
+      );
+    };
+
+    unsubscribeStoreUserAdded = onChildAdded(
+      realtimeQuery,
+      handleStoreUserRealtimeSnapshot,
+      handleStoreUsersRealtimeError
+    );
+    unsubscribeStoreUserChanged = onChildChanged(
+      realtimeQuery,
+      handleStoreUserRealtimeSnapshot,
+      handleStoreUsersRealtimeError
+    );
+    storeUsersRealtimeListenerStarted = true;
+  };
+
+  const stopStoreUsersRealtimeSync = () => {
+    if (typeof unsubscribeStoreUserAdded === 'function') {
+      unsubscribeStoreUserAdded();
+    }
+
+    if (typeof unsubscribeStoreUserChanged === 'function') {
+      unsubscribeStoreUserChanged();
+    }
+
+    unsubscribeStoreUserAdded = null;
+    unsubscribeStoreUserChanged = null;
+    storeUsersRealtimeListenerStarted = false;
+    storeUsersRealtimeSyncRequested = false;
+
+    if (storeUsersRealtimeTimer) {
+      clearTimeout(storeUsersRealtimeTimer);
+      storeUsersRealtimeTimer = null;
+    }
+  };
+
   const pollOnce = async () => {
     state.polling = true;
     state.lastError = '';
@@ -853,6 +948,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
       isPastSyncStale(state.lastStoreUserFullSyncAt);
 
     Promise.resolve()
+      .then(() => ensureAuthenticatedFirebaseSession())
       .then(() => (needsFullClientSync ? reconcileActiveClients() : pollNewActiveSicarClientsOnce()))
       .then(() =>
         needsFullStoreUserSync
@@ -861,12 +957,14 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
       )
       .catch(() => {})
       .finally(() => {
+        startStoreUsersRealtimeSync();
         scheduleNextPoll(5000);
       });
   };
 
   const stopAutoSync = () => {
     state.listening = false;
+    stopStoreUsersRealtimeSync();
     if (pollTimer) {
       clearTimeout(pollTimer);
       pollTimer = null;

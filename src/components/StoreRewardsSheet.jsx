@@ -5,26 +5,16 @@ import {
   getStoreRewardChoiceGroups,
   getStoreRewardFixedItems,
 } from '../services/storeRewards';
+import SanMartinCrownIcon from './SanMartinCrownIcon';
+import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 const CLUB_DISPLAY_NAME = 'Miembro Gold San Martin Granada';
 const CLUB_THEME = {
-  gold: '#d1ac3f',
-  goldSoft: '#e8c76c',
-  goldMuted: '#bc9a3a',
-  blueDeep: '#0c4b85',
-  blue: '#1d74c7',
-  blueSoft: '#edf6ff',
-  blueSoftAlt: '#f7fbff',
+  ...SAN_MARTIN_THEME,
   panel: '#ffffff',
   panelSoft: '#f0f7ff',
   panelElevated: '#ffffff',
-  border: 'rgba(29, 116, 199, 0.16)',
-  borderStrong: 'rgba(29, 116, 199, 0.3)',
-  text: '#102846',
-  textSoft: '#466e98',
-  textMuted: '#6986a6',
-  shadow: 'rgba(24, 93, 160, 0.16)',
   overlay: 'rgba(8, 42, 79, 0.34)',
 };
 
@@ -60,25 +50,7 @@ const formatTransactionDate = (value) => {
 };
 
 function ClubSanMartinIcon({ size = 54 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 96 96" fill="none" aria-hidden="true">
-      <path
-        d="M48 10c10 0 18 3.6 25.7 9.8l8.5 8.5C88.4 36 92 44 92 54c0 9.4-3.1 17.1-7.5 24.2l-6 9.8-10.5 4H30l-8.5-3.3-8.2-8.2C5.6 72.9 2 64.8 2 55.3c0-9.8 3.3-18.3 7.8-26.2l4.7-8.5 8-5.8C30.1 11.1 38.5 10 48 10Z"
-        fill="#D1AC3F"
-      />
-      <circle cx="47" cy="47" r="22" fill="#fff" />
-      <path
-        d="M33.5 50.2c-.5 0-.8-.4-.7-.9l3.8-16.4c.1-.6.8-.8 1.3-.4l8.1 7.3c.4.3 1 .2 1.2-.3l6.4-13.8c.3-.7 1.2-.7 1.5 0l6.3 13.8c.2.5.8.6 1.2.3l8.1-7.3c.5-.4 1.2-.2 1.3.4L75 49.3c.1.5-.2.9-.7.9H33.5Z"
-        fill="#D1AC3F"
-      />
-      <rect x="37" y="53.6" width="20" height="2.8" rx="1.4" fill="#D1AC3F" />
-      <circle cx="68" cy="68" r="11" fill="#fff" stroke="#D1AC3F" strokeWidth="3.5" />
-      <path
-        d="M68 61.2l1.8 3.8 4.2.6-3 2.9.7 4.2-3.7-2-3.7 2 .7-4.2-3-2.9 4.2-.6 1.8-3.8Z"
-        fill="#D1AC3F"
-      />
-    </svg>
-  );
+  return <SanMartinCrownIcon size={size} color={CLUB_THEME.red} />;
 }
 
 function ClubChevronIcon({ size = 16, color = CLUB_THEME.blueDeep }) {
@@ -506,11 +478,14 @@ export function StoreRewardsSummaryCard({
   cartAmount = 0,
   selectedReward,
   onOpen,
+  compact = false,
 }) {
   void settings;
   void rewards;
   void cartAmount;
   const pointsBalance = Number(account?.pointsBalance || 0);
+  const compactTitle = compact ? 'Miembro Gold' : CLUB_DISPLAY_NAME;
+  const compactSubtitle = 'San Martin Granada';
 
   return (
     <button
@@ -527,8 +502,8 @@ export function StoreRewardsSummaryCard({
     >
       <div
         style={{
-          borderRadius: 24,
-          padding: '14px 14px 14px 16px',
+          borderRadius: compact ? 20 : 24,
+          padding: compact ? '10px 12px 10px 12px' : '14px 14px 14px 16px',
           background: selectedReward
             ? 'linear-gradient(135deg, rgba(29, 116, 199, 0.14) 0%, rgba(232, 199, 108, 0.18) 100%)'
             : 'linear-gradient(135deg, #ffffff 0%, #eef7ff 100%)',
@@ -539,16 +514,16 @@ export function StoreRewardsSummaryCard({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'auto minmax(0, 1fr) auto auto',
-            gap: 12,
+            gridTemplateColumns: compact ? 'auto minmax(0, 1fr) auto auto' : 'auto minmax(0, 1fr) auto auto',
+            gap: compact ? 9 : 12,
             alignItems: 'center',
           }}
         >
           <div
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 16,
+              width: compact ? 44 : 56,
+              height: compact ? 44 : 56,
+              borderRadius: compact ? 14 : 16,
               display: 'grid',
               placeItems: 'center',
               background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(237,246,255,0.92) 100%)',
@@ -556,48 +531,78 @@ export function StoreRewardsSummaryCard({
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)',
             }}
           >
-            <ClubSanMartinIcon size={44} />
+            <ClubSanMartinIcon size={compact ? 32 : 44} />
           </div>
 
           <div style={{ minWidth: 0 }}>
             <div
               style={{
                 color: CLUB_THEME.blueDeep,
-                fontSize: 20,
+                fontSize: compact ? 14 : 20,
                 fontWeight: 900,
                 lineHeight: 1.05,
               }}
             >
-              {CLUB_DISPLAY_NAME}
+              {compactTitle}
             </div>
-            <div
-              style={{
-                display: 'block',
-                marginTop: 5,
-                fontSize: 11,
-                color: CLUB_THEME.textMuted,
-                lineHeight: 1.1,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                fontWeight: 900,
-              }}
-            >
-              {currentUser ? 'Puntos disponibles' : 'Acceso al club'}
-            </div>
+            {compact && (
+              <div
+                style={{
+                  marginTop: 3,
+                  fontSize: 9.5,
+                  color: CLUB_THEME.textMuted,
+                  lineHeight: 1.1,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  fontWeight: 900,
+                }}
+              >
+                {compactSubtitle}
+              </div>
+            )}
+            {compact && (
+              <div
+                style={{
+                  marginTop: 3,
+                  fontSize: 9.5,
+                  color: CLUB_THEME.textSoft,
+                  lineHeight: 1.1,
+                  fontWeight: 800,
+                }}
+              >
+                {currentUser ? 'Puntos disponibles' : 'Acceso al club'}
+              </div>
+            )}
+            {!compact && (
+              <div
+                style={{
+                  display: 'block',
+                  marginTop: 5,
+                  fontSize: 11,
+                  color: CLUB_THEME.textMuted,
+                  lineHeight: 1.1,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  fontWeight: 900,
+                }}
+              >
+                {currentUser ? 'Puntos disponibles' : 'Acceso al club'}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', justifyItems: 'end' }}>
             {currentUser ? (
               <div
                 style={{
-                  minWidth: 92,
-                  padding: '10px 12px',
+                  minWidth: compact ? 72 : 92,
+                  padding: compact ? '8px 10px' : '10px 12px',
                   borderRadius: 999,
                   background: 'linear-gradient(135deg, #0e4d88 0%, #1d74c7 58%, #5caaf4 100%)',
                   border: '1px solid rgba(255,255,255,0.18)',
                   color: '#ffffff',
                   fontWeight: 900,
-                  fontSize: 15,
+                  fontSize: compact ? 12 : 15,
                   textAlign: 'center',
                   boxShadow: '0 8px 18px rgba(24, 93, 160, 0.18)',
                 }}
@@ -607,14 +612,14 @@ export function StoreRewardsSummaryCard({
             ) : (
               <div
                 style={{
-                  minWidth: 92,
-                  padding: '10px 12px',
+                  minWidth: compact ? 72 : 92,
+                  padding: compact ? '8px 10px' : '10px 12px',
                   borderRadius: 999,
                   background: CLUB_THEME.panelElevated,
                   border: `1px solid ${CLUB_THEME.border}`,
                   color: CLUB_THEME.blueDeep,
                   fontWeight: 900,
-                  fontSize: 13,
+                  fontSize: compact ? 12 : 13,
                   textAlign: 'center',
                   boxShadow: '0 8px 18px rgba(24, 93, 160, 0.12)',
                 }}
@@ -626,8 +631,8 @@ export function StoreRewardsSummaryCard({
 
           <div
             style={{
-              width: 34,
-              height: 34,
+              width: compact ? 28 : 34,
+              height: compact ? 28 : 34,
               borderRadius: 999,
               display: 'grid',
               placeItems: 'center',
@@ -666,7 +671,164 @@ function SheetRoundButton({ onClick, children, ariaLabel }) {
   );
 }
 
-function SheetSectionShortcut({ title, icon, onClick, accent = CLUB_THEME.gold }) {
+function getRewardPreviewStatusLabel(status = {}, reward = {}) {
+  if (status.status === 'available') {
+    return 'Listo para canjear';
+  }
+
+  if (status.status === 'min_purchase') {
+    return 'Requiere compra minima';
+  }
+
+  if (status.status === 'unavailable') {
+    return 'Sin disponibilidad';
+  }
+
+  if (status.status === 'inactive' || status.status === 'disabled') {
+    return 'No disponible';
+  }
+
+  if (Number(status.missingPoints || 0) > 0) {
+    return `Te faltan ${Number(status.missingPoints || 0)} pts`;
+  }
+
+  return `${Number(reward?.pointsRequired || 0)} pts`;
+}
+
+function RewardPreviewCard({ reward, status }) {
+  const statusLabel = getRewardPreviewStatusLabel(status, reward);
+
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '52px minmax(0, 1fr)',
+        gap: 12,
+        alignItems: 'center',
+        padding: '10px 12px',
+        borderRadius: 18,
+        border: `1px solid ${CLUB_THEME.border}`,
+        background:
+          status.status === 'available'
+            ? 'linear-gradient(135deg, rgba(29, 116, 199, 0.12) 0%, rgba(232, 199, 108, 0.14) 100%)'
+            : CLUB_THEME.panelSoft,
+      }}
+    >
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 16,
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(237,246,255,0.92) 100%)',
+          border: `1px solid ${CLUB_THEME.border}`,
+          display: 'grid',
+          placeItems: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {reward.image ? (
+          <img
+            src={reward.image}
+            alt={reward.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <ClubSanMartinIcon size={28} />
+        )}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <strong
+          style={{
+            display: 'block',
+            color: CLUB_THEME.text,
+            fontSize: 14,
+            fontWeight: 900,
+            lineHeight: 1.15,
+          }}
+        >
+          {reward.name}
+        </strong>
+        <div
+          style={{
+            marginTop: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span style={{ color: CLUB_THEME.blueDeep, fontSize: 12, fontWeight: 900 }}>
+            {Number(reward.pointsRequired || 0)} pts
+          </span>
+          <span style={{ color: CLUB_THEME.textSoft, fontSize: 11.5, fontWeight: 800 }}>
+            {statusLabel}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TransactionPreviewItem({ transaction }) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
+        gap: 10,
+        alignItems: 'center',
+        padding: '10px 12px',
+        borderRadius: 18,
+        background: CLUB_THEME.panelSoft,
+        border: `1px solid ${CLUB_THEME.border}`,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <strong
+          style={{
+            display: 'block',
+            color: CLUB_THEME.text,
+            fontSize: 14,
+            fontWeight: 900,
+            lineHeight: 1.15,
+          }}
+        >
+          {transaction.rewardName || transaction.orderKey || formatTransactionType(transaction)}
+        </strong>
+        <div style={{ marginTop: 4, color: CLUB_THEME.textMuted, fontSize: 11.5, fontWeight: 700 }}>
+          {formatTransactionDate(transaction.createdAt)}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <strong
+          style={{
+            display: 'block',
+            color: Number(transaction.signedPoints || 0) >= 0 ? CLUB_THEME.blueDeep : '#d08b8b',
+            fontSize: 16,
+            fontWeight: 900,
+          }}
+        >
+          {formatSignedPoints(transaction)}
+        </strong>
+        <span style={{ color: CLUB_THEME.textSoft, fontSize: 11.5, fontWeight: 800 }}>
+          {formatTransactionType(transaction)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SheetSectionShortcut({
+  title,
+  icon,
+  onClick,
+  accent = CLUB_THEME.gold,
+  subtitle = '',
+  preview = null,
+  badge = '',
+}) {
   return (
     <button
       type="button"
@@ -677,8 +839,6 @@ function SheetSectionShortcut({ title, icon, onClick, accent = CLUB_THEME.gold }
         borderRadius: 24,
         padding: '18px 18px',
         display: 'grid',
-        gridTemplateColumns: 'auto minmax(0, 1fr) auto',
-        alignItems: 'center',
         gap: 14,
         cursor: 'pointer',
         textAlign: 'left',
@@ -688,39 +848,78 @@ function SheetSectionShortcut({ title, icon, onClick, accent = CLUB_THEME.gold }
     >
       <div
         style={{
-          width: 46,
-          height: 46,
-          borderRadius: 16,
           display: 'grid',
-          placeItems: 'center',
-          background: 'rgba(29, 116, 199, 0.1)',
+          gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+          alignItems: 'center',
+          gap: 14,
         }}
       >
-        {icon}
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 16,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'rgba(29, 116, 199, 0.1)',
+          }}
+        >
+          {icon}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              color: CLUB_THEME.text,
+              fontSize: 19,
+              fontWeight: 900,
+              lineHeight: 1.1,
+            }}
+          >
+            {title}
+          </div>
+          {subtitle ? (
+            <div style={{ marginTop: 4, color: CLUB_THEME.textSoft, fontSize: 13, fontWeight: 700 }}>
+              {subtitle}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {badge ? (
+            <span
+              style={{
+                minHeight: 28,
+                padding: '0 10px',
+                borderRadius: 999,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(29, 116, 199, 0.08)',
+                color: CLUB_THEME.blueDeep,
+                fontSize: 12,
+                fontWeight: 900,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {badge}
+            </span>
+          ) : null}
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 999,
+              display: 'grid',
+              placeItems: 'center',
+              background: CLUB_THEME.panelSoft,
+              border: `1px solid ${CLUB_THEME.border}`,
+              flexShrink: 0,
+            }}
+          >
+            <ClubChevronIcon color={accent} />
+          </div>
+        </div>
       </div>
-      <div
-        style={{
-          color: CLUB_THEME.text,
-          fontSize: 19,
-          fontWeight: 900,
-          lineHeight: 1.1,
-        }}
-      >
-        {title}
-      </div>
-      <div
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 999,
-          display: 'grid',
-          placeItems: 'center',
-          background: CLUB_THEME.panelSoft,
-          border: `1px solid ${CLUB_THEME.border}`,
-        }}
-      >
-        <ClubChevronIcon color={accent} />
-      </div>
+      {preview ? <div style={{ display: 'grid', gap: 10 }}>{preview}</div> : null}
     </button>
   );
 }
@@ -750,7 +949,30 @@ export default function StoreRewardsSheet({
     [rewards, pointsBalance, cartAmount, settings]
   );
   const rewardList = Array.isArray(rewards) ? rewards : [];
-  const transactionList = Array.isArray(transactions) ? transactions : [];
+  const transactionList = useMemo(
+    () =>
+      [...(Array.isArray(transactions) ? transactions : [])].sort(
+        (left, right) => Number(right?.createdAt || 0) - Number(left?.createdAt || 0)
+      ),
+    [transactions]
+  );
+  const rewardPreviewList = useMemo(() => {
+    const previewItems = [...rewardSummary.availableRewards, ...rewardSummary.upcomingRewards];
+    const uniqueItems = [];
+    const seen = new Set();
+
+    previewItems.forEach((reward) => {
+      const rewardId = String(reward?.id || '').trim();
+      if (!rewardId || seen.has(rewardId)) {
+        return;
+      }
+      seen.add(rewardId);
+      uniqueItems.push(reward);
+    });
+
+    return uniqueItems.slice(0, 3);
+  }, [rewardSummary.availableRewards, rewardSummary.upcomingRewards]);
+  const transactionPreviewList = transactionList.slice(0, 3);
   const viewOrder = ['home', 'rewards', 'transactions'];
   const activeViewIndex = Math.max(0, viewOrder.indexOf(activeView));
 
@@ -919,13 +1141,59 @@ export default function StoreRewardsSheet({
                 <SheetSectionShortcut
                   title="Premios"
                   icon={<ClubSanMartinIcon size={28} />}
+                  subtitle="Mira una vista previa y entra para verlos todos."
+                  badge={`${rewardList.length} ${rewardList.length === 1 ? 'premio' : 'premios'}`}
+                  preview={
+                    rewardPreviewList.length > 0 ? (
+                      rewardPreviewList.map((reward) => (
+                        <RewardPreviewCard
+                          key={reward.id}
+                          reward={reward}
+                          status={getRewardDisplayStatus(reward, pointsBalance, cartAmount, settings)}
+                        />
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          padding: 14,
+                          borderRadius: 18,
+                          background: CLUB_THEME.panelSoft,
+                          color: CLUB_THEME.textSoft,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Todavia no hay premios configurados.
+                      </div>
+                    )
+                  }
                   onClick={() => openView('rewards')}
                 />
 
                 <SheetSectionShortcut
-                  title="Movimientos de puntos"
+                  title="Movimientos recientes"
                   icon={<ClubTransactionsIcon />}
                   accent={CLUB_THEME.blueDeep}
+                  subtitle="Tus ultimos movimientos antes de abrir el historial completo."
+                  badge={transactionList.length > 0 ? `${transactionList.length} mov.` : ''}
+                  preview={
+                    transactionPreviewList.length > 0 ? (
+                      transactionPreviewList.map((transaction) => (
+                        <TransactionPreviewItem key={transaction.id} transaction={transaction} />
+                      ))
+                    ) : (
+                      <div
+                        style={{
+                          padding: 14,
+                          borderRadius: 18,
+                          background: CLUB_THEME.panelSoft,
+                          color: CLUB_THEME.textSoft,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Todavia no tienes movimientos de puntos.
+                      </div>
+                    )
+                  }
                   onClick={() => openView('transactions')}
                 />
               </div>

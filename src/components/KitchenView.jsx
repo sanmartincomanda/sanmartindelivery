@@ -4,6 +4,9 @@ import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
 import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
+import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+
+const KITCHEN_THEME = SAN_MARTIN_THEME;
 
 // Iconos SVG
 const Icons = {
@@ -296,7 +299,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      background: KITCHEN_THEME.darkGradient,
       padding: '24px',
       fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
       color: '#f8fafc'
@@ -538,11 +541,11 @@ export default function KitchenView({ orders, allowRuta = true }) {
             width: '48px',
             height: '48px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            background: KITCHEN_THEME.primaryGradient,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.4)',
+            boxShadow: `0 10px 25px -5px ${KITCHEN_THEME.shadowStrong}`,
             color: 'white'
           }}>
             {Icons.chef}
@@ -576,7 +579,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
                 borderRadius: '12px',
                 border: 'none',
                 background: kitchenTab === tab 
-                  ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
+                  ? KITCHEN_THEME.primaryGradient
                   : 'transparent',
                 color: kitchenTab === tab ? 'white' : 'rgba(255,255,255,0.6)',
                 fontWeight: 700,

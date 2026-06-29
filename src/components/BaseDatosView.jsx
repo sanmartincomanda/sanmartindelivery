@@ -18,6 +18,7 @@ import {
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import { ORDER_HISTORY_RETENTION_DAYS } from '../services/orderArchive';
 import { hoyISO, normalizar } from './Utils';
+import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const Icons = {
   users: (
@@ -160,6 +161,8 @@ const STATUS_META = {
   Entregado: { color: '#16a34a', soft: 'rgba(22, 163, 74, 0.16)', label: 'Entregado' },
   Cancelado: { color: '#ef4444', soft: 'rgba(239, 68, 68, 0.16)', label: 'Cancelado' },
 };
+
+const DATA_THEME = SAN_MARTIN_THEME;
 
 let xlsxModulePromise;
 
@@ -446,7 +449,7 @@ export default function BaseDatosView({ clientes = [] }) {
       style={{
         minHeight: '100vh',
         background:
-          'radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 26%), radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 28%), linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          `radial-gradient(circle at top left, rgba(29, 116, 199, 0.2), transparent 26%), radial-gradient(circle at top right, rgba(220, 38, 38, 0.1), transparent 28%), ${DATA_THEME.darkGradient}`,
         padding: '24px',
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         color: '#f8fafc',
@@ -606,11 +609,11 @@ export default function BaseDatosView({ clientes = [] }) {
                 width: '54px',
                 height: '54px',
                 borderRadius: '18px',
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                background: DATA_THEME.primaryGradient,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 18px 34px rgba(59, 130, 246, 0.32)',
+                boxShadow: `0 18px 34px ${DATA_THEME.shadowStrong}`,
               }}
             >
               {Icons.box}

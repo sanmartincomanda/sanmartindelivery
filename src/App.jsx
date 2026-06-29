@@ -3,6 +3,7 @@ import { get, onValue, ref, update } from 'firebase/database';
 import { Suspense, lazy } from 'react';
 import { database } from './firebase';
 import './App.css';
+import { SAN_MARTIN_THEME } from './styles/sanMartinTheme';
 
 import { hoyISO } from './components/Utils';
 import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForDate } from './services/orders';
@@ -81,7 +82,8 @@ const PUBLIC_HOST_ROUTE_MAP = new Map([
   ['cocina.sanmartinsr.com', 'cocina'],
   ['driver.sanmartinsr.com', 'driver'],
 ]);
-const BRAND_LOGO_PATH = '/tienda/branding/logo.png';
+const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
+const APP_THEME = SAN_MARTIN_THEME;
 
 const isStoreHost = (hostname = '') => STORE_HOSTS.has(String(hostname || '').trim().toLowerCase());
 const getPublicHostRoute = (hostname = '') =>
@@ -159,7 +161,7 @@ function LazyViewFallback({ label = 'Cargando modulo...' }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f8fafc',
+        background: APP_THEME.blueSoftAlt,
         flexDirection: 'column',
         gap: '18px',
       }}
@@ -169,20 +171,20 @@ function LazyViewFallback({ label = 'Cargando modulo...' }) {
           width: '60px',
           height: '60px',
           borderRadius: '18px',
-          background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+          background: APP_THEME.heroGradient,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 16px 36px rgba(220, 38, 38, 0.2)',
+          boxShadow: `0 16px 36px ${APP_THEME.shadowStrong}`,
         }}
       >
         <img
           src={BRAND_LOGO_PATH}
           alt="Logo"
-          style={{ width: '36px', height: '36px', objectFit: 'contain' }}
+          style={{ width: '42px', height: '42px', objectFit: 'contain' }}
         />
       </div>
-      <div style={{ fontSize: '17px', fontWeight: 700, color: '#64748b' }}>{label}</div>
+      <div style={{ fontSize: '17px', fontWeight: 700, color: APP_THEME.textSoft }}>{label}</div>
     </div>
   );
 }
@@ -492,12 +494,12 @@ function App() {
   };
 
   const navItems = [
-    { id: 'ingreso', label: 'Nuevo Pedido', icon: Icons.plus, color: '#dc2626', short: 'Nuevo' },
+    { id: 'ingreso', label: 'Nuevo Pedido', icon: Icons.plus, color: APP_THEME.red, short: 'Nuevo' },
     { id: 'cocina', label: 'Vista Cocina', icon: Icons.chef, color: '#f59e0b', short: 'Cocina' },
-    { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: '#3b82f6', short: 'Lista' },
+    { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: APP_THEME.blue, short: 'Lista' },
     { id: 'basedatos', label: 'Base de Datos', icon: Icons.database, color: '#10b981', short: 'Datos' },
-    { id: 'tienda_virtual', label: 'Tienda Virtual', icon: Icons.store, color: '#ea580c', short: 'Tienda' },
-    { id: 'configuracion', label: 'Configuraciones', icon: Icons.settings, color: '#6366f1', short: 'Config' },
+    { id: 'tienda_virtual', label: 'Tienda Virtual', icon: Icons.store, color: APP_THEME.blueBright, short: 'Tienda' },
+    { id: 'configuracion', label: 'Configuraciones', icon: Icons.settings, color: APP_THEME.blueDeep, short: 'Config' },
   ];
 
   const availableNavItems = isAdminDashboard
@@ -563,7 +565,7 @@ function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0f172a',
+          background: APP_THEME.darkGradient,
           fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
         }}
       >
@@ -576,7 +578,7 @@ function App() {
             width: '100%',
             maxWidth: '380px',
             textAlign: 'center',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+            boxShadow: `0 20px 25px -5px ${APP_THEME.shadow}`,
           }}
         >
           <div
@@ -584,7 +586,7 @@ function App() {
               width: '64px',
               height: '64px',
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+              background: APP_THEME.heroGradient,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -594,14 +596,14 @@ function App() {
             <img
               src={BRAND_LOGO_PATH}
               alt="Logo"
-              style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+              style={{ width: '48px', height: '48px', objectFit: 'contain' }}
             />
           </div>
 
-          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#1e293b', margin: '0 0 8px 0' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: APP_THEME.text, margin: '0 0 8px 0' }}>
             San Martin
           </h2>
-          <p style={{ color: '#64748b', marginBottom: '32px', fontSize: '14px', marginTop: 0 }}>
+          <p style={{ color: APP_THEME.textSoft, marginBottom: '32px', fontSize: '14px', marginTop: 0 }}>
             Acceso a Delivery
           </p>
 
@@ -615,7 +617,7 @@ function App() {
               boxSizing: 'border-box',
               padding: '14px',
               borderRadius: '12px',
-              border: '2px solid #e2e8f0',
+              border: `2px solid ${APP_THEME.border}`,
               marginBottom: '16px',
               outline: 'none',
               fontSize: '14px',
@@ -632,7 +634,7 @@ function App() {
               boxSizing: 'border-box',
               padding: '14px',
               borderRadius: '12px',
-              border: '2px solid #e2e8f0',
+              border: `2px solid ${APP_THEME.border}`,
               marginBottom: '16px',
               outline: 'none',
               fontSize: '14px',
@@ -640,7 +642,7 @@ function App() {
           />
 
           {loginError && (
-            <p style={{ color: '#dc2626', fontSize: '12px', fontWeight: 700, margin: '0 0 16px 0' }}>
+            <p style={{ color: APP_THEME.red, fontSize: '12px', fontWeight: 700, margin: '0 0 16px 0' }}>
               Credenciales incorrectas
             </p>
           )}
@@ -650,7 +652,7 @@ function App() {
             style={{
               width: '100%',
               padding: '16px',
-              background: '#dc2626',
+              background: APP_THEME.primaryGradient,
               color: 'white',
               border: 'none',
               borderRadius: '12px',
@@ -674,7 +676,7 @@ function App() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#f8fafc',
+          background: APP_THEME.blueSoftAlt,
           flexDirection: 'column',
           gap: '24px',
         }}
@@ -684,7 +686,7 @@ function App() {
             width: '64px',
             height: '64px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+            background: APP_THEME.heroGradient,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -694,10 +696,10 @@ function App() {
           <img
             src={BRAND_LOGO_PATH}
             alt="Logo"
-            style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+              style={{ width: '48px', height: '48px', objectFit: 'contain' }}
           />
         </div>
-        <div style={{ fontSize: '18px', fontWeight: 600, color: '#64748b' }}>Cargando sistema...</div>
+        <div style={{ fontSize: '18px', fontWeight: 600, color: APP_THEME.textSoft }}>Cargando sistema...</div>
         <style>{`
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 1; }
@@ -713,7 +715,7 @@ function App() {
       style={{
         minHeight: '100vh',
         display: 'flex',
-        background: '#f8fafc',
+        background: APP_THEME.blueSoftAlt,
         fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
       }}
     >
@@ -729,7 +731,7 @@ function App() {
       <aside
         style={{
           width: sidebarCollapsed ? '80px' : '260px',
-          background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+          background: APP_THEME.darkGradient,
           color: 'white',
           display: 'flex',
           flexDirection: 'column',
@@ -754,7 +756,7 @@ function App() {
               width: '44px',
               height: '44px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #dc2626 0%, #ea580c 100%)',
+              background: APP_THEME.heroGradient,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -764,7 +766,7 @@ function App() {
             <img
               src={BRAND_LOGO_PATH}
               alt="Logo"
-              style={{ width: '28px', height: '28px', objectFit: 'contain' }}
+              style={{ width: '36px', height: '36px', objectFit: 'contain' }}
             />
           </div>
           {!sidebarCollapsed && (
@@ -785,7 +787,7 @@ function App() {
                 padding: sidebarCollapsed ? '16px' : '14px 20px',
                 margin: '4px 0',
                 border: 'none',
-                background: view === item.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                background: view === item.id ? 'rgba(255,255,255,0.12)' : 'transparent',
                 color: view === item.id ? item.color : 'rgba(255,255,255,0.7)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -803,7 +805,7 @@ function App() {
                   width: '36px',
                   height: '36px',
                   borderRadius: '8px',
-                  background: view === item.id ? `${item.color}20` : 'transparent',
+                  background: view === item.id ? `${item.color}24` : 'transparent',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -821,7 +823,7 @@ function App() {
           style={{
             padding: '16px 20px',
             border: 'none',
-            background: 'rgba(255,255,255,0.05)',
+            background: 'rgba(255,255,255,0.08)',
             color: 'rgba(255,255,255,0.5)',
             cursor: 'pointer',
             display: 'flex',
@@ -852,8 +854,8 @@ function App() {
         <header
           style={{
             height: '64px',
-            background: 'white',
-            borderBottom: '1px solid #e2e8f0',
+            background: 'rgba(255,255,255,0.96)',
+            borderBottom: `1px solid ${APP_THEME.border}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -868,7 +870,7 @@ function App() {
               margin: 0,
               fontSize: '20px',
               fontWeight: 800,
-              color: '#1e293b',
+              color: APP_THEME.text,
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
@@ -888,10 +890,10 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
             <div style={{ display: 'flex', gap: '24px' }}>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', color: APP_THEME.textSoft, fontWeight: 700, textTransform: 'uppercase' }}>
                   Hoy
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>{stats.total}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: APP_THEME.text }}>{stats.total}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -900,10 +902,10 @@ function App() {
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>{stats.pendientes}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', color: APP_THEME.blue, fontWeight: 700, textTransform: 'uppercase' }}>
                   Cocina
                 </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#3b82f6' }}>{stats.preparando}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: APP_THEME.blue }}>{stats.preparando}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#f97316', fontWeight: 700, textTransform: 'uppercase' }}>
@@ -913,13 +915,13 @@ function App() {
               </div>
             </div>
 
-            <div style={{ width: '1px', height: '32px', background: '#e2e8f0' }} />
+            <div style={{ width: '1px', height: '32px', background: APP_THEME.border }} />
 
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: APP_THEME.text }}>
                 {new Date().toLocaleDateString('es-NI', { day: 'numeric', month: 'short' })}
               </div>
-              <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+              <div style={{ fontSize: '11px', color: APP_THEME.textSoft, fontWeight: 600 }}>
                 {new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
@@ -977,7 +979,7 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
         alignItems: 'center',
         justifyContent: 'center',
         background:
-          'radial-gradient(circle at 18% 18%, rgba(255,255,255,0.12), transparent 25%), linear-gradient(135deg, #3b0b16, #7b1022 52%, #a33a36)',
+          APP_THEME.heroGradient,
         fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
         padding: 20,
       }}
@@ -992,19 +994,19 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
           padding: 30,
           borderRadius: 22,
           textAlign: 'center',
-          boxShadow: '0 28px 80px rgba(38, 6, 12, 0.28)',
+          boxShadow: `0 28px 80px ${APP_THEME.shadowStrong}`,
         }}
       >
-        <img src={BRAND_LOGO_PATH} alt="Logo" style={{ width: 70, height: 70, margin: '0 auto', objectFit: 'contain' }} />
-        <h1 style={{ margin: 0, color: '#111827', fontSize: 30 }}>{title}</h1>
-        <p style={{ margin: 0, color: '#64748b', fontWeight: 800 }}>{subtitle}</p>
+        <img src={BRAND_LOGO_PATH} alt="Logo" style={{ width: 78, height: 78, margin: '0 auto', objectFit: 'contain' }} />
+        <h1 style={{ margin: 0, color: APP_THEME.text, fontSize: 30 }}>{title}</h1>
+        <p style={{ margin: 0, color: APP_THEME.textSoft, fontWeight: 800 }}>{subtitle}</p>
         {error && (
           <div
             style={{
               borderRadius: 12,
               padding: 10,
               background: '#fee2e2',
-              color: '#991b1b',
+              color: APP_THEME.redDeep,
               fontWeight: 900,
             }}
           >
@@ -1017,7 +1019,7 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
           placeholder={userPlaceholder}
           style={{
             minHeight: 46,
-            border: '1px solid #dbe3ef',
+            border: `1px solid ${APP_THEME.border}`,
             borderRadius: 12,
             padding: '0 14px',
             font: 'inherit',
@@ -1031,7 +1033,7 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
           placeholder="Contrasena"
           style={{
             minHeight: 46,
-            border: '1px solid #dbe3ef',
+            border: `1px solid ${APP_THEME.border}`,
             borderRadius: 12,
             padding: '0 14px',
             font: 'inherit',
@@ -1045,7 +1047,7 @@ function RoleLogin({ title, subtitle, userPlaceholder, error, onLogin }) {
             minHeight: 46,
             border: 0,
             borderRadius: 999,
-            background: '#7b1022',
+            background: APP_THEME.primaryGradient,
             color: 'white',
             font: 'inherit',
             fontWeight: 900,

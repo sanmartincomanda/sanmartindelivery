@@ -92,9 +92,11 @@ import {
   subscribeStoreRewardTransactions,
   subscribeStoreRewards,
 } from '../services/storeRewards';
+import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
-const LOGO_PATH = '/tienda/branding/logo.png';
+const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
+const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = [
@@ -1179,10 +1181,26 @@ export default function TiendaVirtualView({
   );
 
   const categoryOptions = useMemo(
-    () => [
-      { id: 'todos', label: 'Todos', subcategories: [] },
-      ...categories.filter((category) => category.active !== false),
-    ],
+    () => {
+      const orderedCategories = categories
+        .filter((category) => category.active !== false)
+        .sort((left, right) => {
+          const leftIsPromotions = String(left?.id || '').trim().toLowerCase() === 'promociones';
+          const rightIsPromotions = String(right?.id || '').trim().toLowerCase() === 'promociones';
+
+          if (leftIsPromotions && !rightIsPromotions) {
+            return -1;
+          }
+
+          if (!leftIsPromotions && rightIsPromotions) {
+            return 1;
+          }
+
+          return 0;
+        });
+
+      return [{ id: 'todos', label: 'Todos', subcategories: [] }, ...orderedCategories];
+    },
     [categories]
   );
 
@@ -2403,15 +2421,16 @@ export default function TiendaVirtualView({
     <div className="store-shell">
       <style>{`
         .store-shell {
+          ${SAN_MARTIN_STORE_CSS_VARS}
           min-height: ${isDashboard ? 'calc(100vh - 64px)' : '100vh'};
           position: relative;
           isolation: isolate;
           overflow-x: hidden;
           background:
-            radial-gradient(circle at 12% 12%, rgba(123, 16, 34, 0.08), transparent 28%),
-            radial-gradient(circle at 88% 28%, rgba(217, 74, 63, 0.08), transparent 30%),
-            linear-gradient(180deg, #fffafa 0%, #f8f4f4 48%, #f7f7f8 100%);
-          color: #111827;
+            radial-gradient(circle at 12% 12%, rgba(29, 116, 199, 0.1), transparent 28%),
+            radial-gradient(circle at 88% 28%, rgba(220, 38, 38, 0.08), transparent 30%),
+            linear-gradient(180deg, #f8fbff 0%, #eef6ff 48%, #f5f8fc 100%);
+          color: var(--sm-text);
           font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         }
         .store-shell::before {
@@ -2421,7 +2440,7 @@ export default function TiendaVirtualView({
           z-index: -1;
           pointer-events: none;
           opacity: 0.24;
-          background-image: url("data:image/svg+xml,%3Csvg width='420' height='420' viewBox='0 0 420 420' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%237b1022' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' opacity='.24'%3E%3Cpath d='M40 85 C82 42 128 42 170 85 S258 128 300 85'/%3E%3Cpath d='M54 138 C96 96 142 96 184 138 S272 180 314 138'/%3E%3Ccircle cx='330' cy='72' r='34' stroke-width='18'/%3E%3Cpath d='M80 302 C96 252 160 246 188 288 C204 314 184 348 142 354 C96 360 66 334 80 302Z'/%3E%3Cpath d='M250 300 C264 260 326 256 340 300Z'/%3E%3Cpath d='M252 308 H342 M270 334 C286 350 316 350 334 334'/%3E%3C/g%3E%3C/svg%3E");
+          background-image: url("data:image/svg+xml,%3Csvg width='420' height='420' viewBox='0 0 420 420' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%230c4b85' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' opacity='.24'%3E%3Cpath d='M40 85 C82 42 128 42 170 85 S258 128 300 85'/%3E%3Cpath d='M54 138 C96 96 142 96 184 138 S272 180 314 138'/%3E%3Ccircle cx='330' cy='72' r='34' stroke-width='18'/%3E%3Cpath d='M80 302 C96 252 160 246 188 288 C204 314 184 348 142 354 C96 360 66 334 80 302Z'/%3E%3Cpath d='M250 300 C264 260 326 256 340 300Z'/%3E%3Cpath d='M252 308 H342 M270 334 C286 350 316 350 334 334'/%3E%3C/g%3E%3C/svg%3E");
           background-size: 420px 420px;
           background-position: 3% 8%;
         }
@@ -2450,8 +2469,8 @@ export default function TiendaVirtualView({
           padding: 44px 18px;
           background:
             radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.12), transparent 18%),
-            radial-gradient(circle at 82% 16%, rgba(255, 224, 214, 0.12), transparent 24%),
-            linear-gradient(135deg, rgba(73, 12, 24, 0.92), rgba(111, 16, 33, 0.9) 48%, rgba(135, 39, 42, 0.82));
+            radial-gradient(circle at 82% 16%, rgba(92, 170, 244, 0.18), transparent 24%),
+            linear-gradient(135deg, rgba(8, 26, 49, 0.96), rgba(12, 77, 136, 0.94) 48%, rgba(220, 38, 38, 0.8));
           overflow: hidden;
         }
         .store-auth-page::before {
@@ -2472,7 +2491,7 @@ export default function TiendaVirtualView({
           border: 1px solid rgba(255, 255, 255, 0.6);
           border-radius: 20px;
           padding: 30px 32px 32px;
-          box-shadow: 0 28px 80px rgba(38, 6, 12, 0.28);
+          box-shadow: 0 28px 80px rgba(10, 42, 78, 0.22);
         }
         .store-auth-card.inline {
           width: 100%;
@@ -2497,7 +2516,7 @@ export default function TiendaVirtualView({
         }
         .store-auth-guest-card p {
           margin: 10px 0 0;
-          color: #6b7280;
+          color: var(--sm-text-soft);
           font-size: 13px;
           line-height: 1.5;
           text-align: center;
@@ -2512,18 +2531,18 @@ export default function TiendaVirtualView({
           height: 72px;
           margin: 0 auto 12px;
           border-radius: 18px;
-          box-shadow: 0 18px 40px rgba(123, 16, 34, 0.16);
+          box-shadow: 0 18px 40px rgba(12, 77, 136, 0.14);
         }
         .store-auth-brand h1 {
           margin: 0;
-          color: #111827;
+          color: var(--sm-text);
           font-size: 24px;
           line-height: 1.05;
           letter-spacing: -0.03em;
         }
         .store-auth-brand p {
           margin: 10px 0 0;
-          color: #6b7280;
+          color: var(--sm-text-soft);
           font-size: 14px;
           font-weight: 800;
         }
@@ -2546,9 +2565,9 @@ export default function TiendaVirtualView({
           color: #6b7280;
         }
         .store-auth-toggle button.active {
-          background: #7b1022;
+          background: var(--sm-primary-gradient);
           color: #ffffff;
-          box-shadow: 0 10px 22px rgba(123, 16, 34, 0.18);
+          box-shadow: 0 10px 22px rgba(12, 77, 136, 0.22);
         }
         .store-auth-error {
           border-radius: 12px;
@@ -2573,7 +2592,7 @@ export default function TiendaVirtualView({
           border: 0;
           padding: 0 2px 4px;
           background: transparent;
-          color: #7b1022;
+          color: var(--sm-blue-deep);
           font-size: 13px;
           font-weight: 950;
           cursor: pointer;
@@ -2590,6 +2609,22 @@ export default function TiendaVirtualView({
           gap: 10px;
           margin-bottom: 12px;
           background: #ffffff;
+        }
+        .store-auth-card .store-button {
+          background: linear-gradient(135deg, #0c4d88 0%, #3b82f6 100%);
+          color: #ffffff;
+          box-shadow: 0 16px 30px rgba(12, 77, 136, 0.24);
+        }
+        .store-auth-card .store-button.secondary {
+          background: linear-gradient(135deg, rgba(12, 77, 136, 0.08), rgba(59, 130, 246, 0.12));
+          color: var(--sm-blue-deep);
+          border: 1px solid rgba(12, 77, 136, 0.16);
+          box-shadow: none;
+        }
+        .store-auth-card .store-google-button {
+          background: linear-gradient(135deg, rgba(12, 77, 136, 0.08), rgba(59, 130, 246, 0.12));
+          border-color: rgba(12, 77, 136, 0.16);
+          color: var(--sm-blue-deep);
         }
         .store-google-mark {
           width: 24px;
@@ -2625,15 +2660,15 @@ export default function TiendaVirtualView({
           font-weight: 700;
         }
         .store-account-card.guest {
-          border-color: rgba(123, 16, 34, 0.12);
-          background: linear-gradient(135deg, rgba(123, 16, 34, 0.08), rgba(217, 74, 63, 0.06));
+          border-color: rgba(12, 77, 136, 0.14);
+          background: linear-gradient(135deg, rgba(12, 77, 136, 0.08), rgba(220, 38, 38, 0.05));
         }
         .store-account-card.guest strong {
           font-size: 15px;
-          color: #4a0d18;
+          color: var(--sm-text);
         }
         .store-account-card.guest span {
-          color: #6f4a4f;
+          color: var(--sm-text-soft);
         }
         .store-inline-actions {
           display: flex;
@@ -2656,7 +2691,7 @@ export default function TiendaVirtualView({
           position: sticky;
           top: ${isDashboard ? '64px' : '0'};
           z-index: 80;
-          background: rgba(255, 250, 250, 0.9);
+          background: rgba(247, 251, 255, 0.92);
           backdrop-filter: blur(12px);
           padding: 8px 0 12px;
           display: grid;
@@ -2685,7 +2720,7 @@ export default function TiendaVirtualView({
         .store-brand-kicker {
           display: inline-flex;
           align-items: center;
-          color: #7b1022;
+          color: var(--sm-blue-deep);
           font-size: 11px;
           font-weight: 950;
           letter-spacing: 0.08em;
@@ -2696,8 +2731,8 @@ export default function TiendaVirtualView({
           height: 48px;
           border-radius: 14px;
           object-fit: contain;
-          background: #ffffff;
-          box-shadow: 0 12px 24px rgba(123, 16, 34, 0.1);
+          background: transparent;
+          box-shadow: 0 12px 24px rgba(12, 77, 136, 0.08);
         }
         .store-title {
           font-size: 24px;
@@ -2734,9 +2769,9 @@ export default function TiendaVirtualView({
           width: 42px;
           height: 42px;
           border-radius: 999px;
-          background: linear-gradient(180deg, #ffffff 0%, #fff7f4 100%);
-          border: 1px solid rgba(123, 16, 34, 0.1);
-          color: #111827;
+          background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          color: var(--sm-text);
           font-size: 18px;
           font-weight: 900;
           box-shadow: 0 12px 22px rgba(15, 23, 42, 0.06);
@@ -2766,9 +2801,9 @@ export default function TiendaVirtualView({
           min-height: 42px;
           border-radius: 999px;
           padding: 0 15px;
-          background: linear-gradient(135deg, #7b1022, #d94a3f);
+          background: linear-gradient(135deg, #0b1220, #0c4b85 62%, #dc2626);
           color: #fffaf5;
-          box-shadow: 0 14px 28px rgba(123, 16, 34, 0.2);
+          box-shadow: 0 14px 28px rgba(10, 42, 78, 0.24);
           font-size: 11px;
           font-weight: 950;
           letter-spacing: 0.04em;
@@ -2778,8 +2813,8 @@ export default function TiendaVirtualView({
           display: flex;
           align-items: center;
           gap: 12px;
-          background: linear-gradient(180deg, #ffffff 0%, #fff8f6 100%);
-          border: 1px solid rgba(123, 16, 34, 0.12);
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+          border: 1px solid rgba(12, 77, 136, 0.12);
           border-radius: 26px;
           padding: 0 18px;
           min-height: 58px;
@@ -2800,8 +2835,8 @@ export default function TiendaVirtualView({
           min-height: 34px;
           padding: 0 12px;
           border-radius: 999px;
-          background: rgba(123, 16, 34, 0.08);
-          color: #7b1022;
+          background: rgba(12, 77, 136, 0.08);
+          color: var(--sm-blue-deep);
           font-size: 12px;
           font-weight: 950;
           letter-spacing: 0.04em;
@@ -2809,13 +2844,13 @@ export default function TiendaVirtualView({
           white-space: nowrap;
         }
         .store-filters-panel {
-          border: 1px solid rgba(123, 16, 34, 0.12);
+          border: 1px solid rgba(12, 77, 136, 0.12);
           border-radius: 28px;
           padding: 16px 16px 14px;
           background:
-            radial-gradient(circle at top right, rgba(255, 220, 209, 0.55), transparent 32%),
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 248, 246, 0.98) 100%);
-          box-shadow: 0 20px 44px rgba(123, 16, 34, 0.08);
+            radial-gradient(circle at top right, rgba(92, 170, 244, 0.3), transparent 32%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 250, 255, 0.98) 100%);
+          box-shadow: 0 20px 44px rgba(12, 77, 136, 0.08);
         }
         .store-filter-strip {
           display: flex;
@@ -2834,7 +2869,7 @@ export default function TiendaVirtualView({
         .store-filter-strip span {
           display: block;
           margin-top: 4px;
-          color: #7c5b5f;
+          color: var(--sm-text-soft);
           font-size: 13px;
           font-weight: 800;
         }
@@ -2844,8 +2879,8 @@ export default function TiendaVirtualView({
           min-height: 32px;
           padding: 0 12px;
           border-radius: 999px;
-          background: rgba(123, 16, 34, 0.08);
-          color: #7b1022;
+          background: rgba(12, 77, 136, 0.08);
+          color: var(--sm-blue-deep);
           font-size: 11px;
           font-weight: 950;
           letter-spacing: 0.08em;
@@ -2875,10 +2910,10 @@ export default function TiendaVirtualView({
           min-height: 54px;
           padding: 14px 20px;
           border-radius: 999px;
-          background: linear-gradient(180deg, #ffffff 0%, #fff7f4 100%);
+          background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
           color: #4b5563;
-          border: 1px solid #f1dfe0;
-          box-shadow: 0 12px 24px rgba(123, 16, 34, 0.08);
+          border: 1px solid #d9e8f7;
+          box-shadow: 0 12px 24px rgba(12, 77, 136, 0.08);
           font-size: 14px;
           font-weight: 900;
           position: relative;
@@ -2898,13 +2933,13 @@ export default function TiendaVirtualView({
           opacity: 1;
         }
         .store-chip:hover {
-          box-shadow: 0 16px 30px rgba(123, 16, 34, 0.12);
+          box-shadow: 0 16px 30px rgba(12, 77, 136, 0.14);
         }
         .store-chip.active {
-          background: linear-gradient(135deg, #7b1022, #d94a3f);
+          background: linear-gradient(135deg, #0b1220, #0c4b85 58%, #dc2626);
           color: #ffffff;
           border-color: transparent;
-          box-shadow: 0 16px 28px rgba(123, 16, 34, 0.22);
+          box-shadow: 0 16px 28px rgba(10, 42, 78, 0.22);
         }
         .store-filter-chip {
           display: flex;
@@ -2931,7 +2966,7 @@ export default function TiendaVirtualView({
         }
         .store-filter-meta {
           display: block;
-          color: #7c5b5f;
+          color: var(--sm-text-soft);
           font-size: 12px;
           font-weight: 800;
         }
@@ -2943,8 +2978,8 @@ export default function TiendaVirtualView({
           justify-content: center;
           border-radius: 999px;
           padding: 0 10px;
-          background: rgba(123, 16, 34, 0.08);
-          color: #7b1022;
+          background: rgba(12, 77, 136, 0.08);
+          color: var(--sm-blue-deep);
           font-size: 12px;
           font-weight: 950;
           line-height: 1;
@@ -2961,13 +2996,13 @@ export default function TiendaVirtualView({
           padding: 10px 16px;
           font-size: 14px;
           background: rgba(255, 255, 255, 0.96);
-          color: #7b1022;
-          border-color: #ead8da;
-          box-shadow: 0 10px 20px rgba(123, 16, 34, 0.06);
+          color: var(--sm-blue-deep);
+          border-color: #d7e6f7;
+          box-shadow: 0 10px 20px rgba(12, 77, 136, 0.06);
         }
         .store-subtabs .store-chip.active {
-          background: #111827;
-          border-color: #111827;
+          background: var(--sm-black);
+          border-color: var(--sm-black);
           color: #ffffff;
           box-shadow: 0 14px 28px rgba(17, 24, 39, 0.2);
         }
@@ -2981,12 +3016,12 @@ export default function TiendaVirtualView({
         .store-promo {
           margin: 0;
           padding: 14px 16px 12px;
-          border: 1px solid rgba(123, 16, 34, 0.12);
+          border: 1px solid rgba(12, 77, 136, 0.12);
           border-radius: 28px;
           background:
-            radial-gradient(circle at top right, rgba(255, 227, 214, 0.5), transparent 34%),
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 247, 243, 0.98) 100%);
-          box-shadow: 0 20px 44px rgba(123, 16, 34, 0.08);
+            radial-gradient(circle at top right, rgba(92, 170, 244, 0.26), transparent 34%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 250, 255, 0.98) 100%);
+          box-shadow: 0 20px 44px rgba(12, 77, 136, 0.08);
         }
         .store-section-title {
           font-size: 20px;
@@ -3685,6 +3720,17 @@ export default function TiendaVirtualView({
           color: #111827;
           border: 1px solid #e5e7eb;
         }
+        .store-checkout-sheet .store-button {
+          background: var(--sm-primary-gradient);
+          color: #ffffff;
+          box-shadow: 0 16px 30px rgba(12, 77, 136, 0.24);
+        }
+        .store-checkout-sheet .store-button.secondary {
+          background: #ffffff;
+          color: var(--sm-blue-deep);
+          border: 1px solid rgba(12, 77, 136, 0.16);
+          box-shadow: none;
+        }
         .store-button:disabled {
           opacity: 0.55;
           cursor: not-allowed;
@@ -3699,6 +3745,12 @@ export default function TiendaVirtualView({
           align-items: end;
           justify-content: center;
         }
+        .store-sheet-overlay.auth-overlay {
+          align-items: center;
+          padding: 20px;
+          background: rgba(8, 26, 49, 0.52);
+          backdrop-filter: blur(12px);
+        }
         .store-sheet-overlay.product-overlay {
           padding: 20px;
           align-items: center;
@@ -3706,9 +3758,58 @@ export default function TiendaVirtualView({
           backdrop-filter: blur(14px);
         }
         .store-auth-sheet {
-          width: min(560px, calc(100vw - 24px));
+          position: relative;
+          width: min(980px, calc(100vw - 24px));
           max-height: calc(100vh - 24px);
           overflow: auto;
+          border-radius: 32px;
+          padding: 26px 20px;
+          background:
+            radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.12), transparent 18%),
+            radial-gradient(circle at 82% 16%, rgba(92, 170, 244, 0.18), transparent 24%),
+            linear-gradient(135deg, rgba(8, 26, 49, 0.96), rgba(12, 77, 136, 0.94) 48%, rgba(220, 38, 38, 0.8));
+          box-shadow: 0 34px 90px rgba(10, 42, 78, 0.3);
+        }
+        .store-auth-sheet::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: 0.18;
+          background-image: url("data:image/svg+xml,%3Csvg width='520' height='520' viewBox='0 0 520 520' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23fff7ef' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='92' cy='82' r='35' stroke-width='17'/%3E%3Cpath d='M322 78 l64 28 l-44 48 z M334 102 l34 12 M326 130 l30 9'/%3E%3Cpath d='M76 356 C98 300 162 296 190 342 C206 370 182 408 136 414 C92 420 58 390 76 356Z M112 344 C132 326 160 330 168 352'/%3E%3Cpath d='M328 346 C342 302 408 300 426 346Z M330 356 H428 M352 382 C370 400 404 400 422 382'/%3E%3Cpath d='M34 198 C78 154 128 154 172 198 S266 242 310 198'/%3E%3Cpath d='M204 472 C248 428 298 428 342 472 S436 516 480 472'/%3E%3C/g%3E%3C/svg%3E");
+          background-size: 520px 520px;
+          background-position: 6% 10%;
+        }
+        .store-auth-sheet > * {
+          position: relative;
+          z-index: 1;
+        }
+        .store-auth-sheet .store-sheet-head {
+          width: min(450px, 100%);
+          margin: 0 auto 18px;
+          color: #ffffff;
+          justify-content: space-between;
+        }
+        .store-auth-sheet .store-sheet-head strong {
+          font-size: 18px;
+          font-weight: 900;
+          letter-spacing: -0.02em;
+        }
+        .store-auth-sheet .store-auth-card.inline {
+          width: min(450px, 100%);
+          margin: 0 auto;
+          padding: 30px 32px 32px;
+          background: #ffffff;
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          border-radius: 20px;
+          box-shadow: 0 28px 80px rgba(10, 42, 78, 0.22);
+        }
+        .store-auth-sheet .store-auth-card.inline .store-auth-brand {
+          text-align: center;
+          margin-bottom: 22px;
+        }
+        .store-auth-sheet .store-auth-card.inline .store-auth-brand .store-logo {
+          margin: 0 auto 12px;
         }
         .store-sheet {
           width: min(720px, 100%);
@@ -3721,6 +3822,11 @@ export default function TiendaVirtualView({
         }
         .store-sheet.full {
           width: min(980px, 100%);
+        }
+        .store-checkout-sheet {
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          box-shadow: 0 -18px 42px rgba(12, 77, 136, 0.16);
         }
         .store-product-sheet {
           width: min(980px, calc(100vw - 40px));
@@ -3766,6 +3872,11 @@ export default function TiendaVirtualView({
           font-size: 13px;
           font-weight: 900;
           letter-spacing: 0.02em;
+        }
+        .store-checkout-sheet .store-back {
+          background: linear-gradient(180deg, #ffffff 0%, #f4faff 100%);
+          color: var(--sm-blue-deep);
+          border: 1px solid rgba(12, 77, 136, 0.16);
         }
         .store-sheet-head {
           display: flex;
@@ -3914,12 +4025,20 @@ export default function TiendaVirtualView({
           display: block;
           color: #111827;
         }
+        .store-checkout-sheet .store-coupon-card {
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          background: linear-gradient(180deg, #ffffff 0%, #f4faff 100%);
+        }
         .store-coupon-card span,
         .store-coupon-card p {
           margin: 3px 0 0;
           color: #7b1022;
           font-size: 12px;
           font-weight: 800;
+        }
+        .store-checkout-sheet .store-coupon-card span,
+        .store-checkout-sheet .store-coupon-card p {
+          color: var(--sm-blue-deep);
         }
         .store-coupon-row {
           display: grid;
@@ -3937,6 +4056,9 @@ export default function TiendaVirtualView({
           border-top: 1px solid #ead8da;
           padding-top: 8px;
         }
+        .store-checkout-sheet .store-coupon-discount {
+          border-top: 1px solid rgba(12, 77, 136, 0.14);
+        }
         .store-coupon-discount strong {
           color: #047857;
         }
@@ -3946,11 +4068,18 @@ export default function TiendaVirtualView({
           padding: 13px;
           background: #fff7f4;
         }
+        .store-checkout-sheet .store-total-note {
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        }
         .store-total-note span {
           color: #7b1022;
           font-size: 13px;
           font-weight: 950;
           text-transform: uppercase;
+        }
+        .store-checkout-sheet .store-total-note span {
+          color: var(--sm-blue-deep);
         }
         .store-total-note strong {
           color: #111827;
@@ -3963,6 +4092,9 @@ export default function TiendaVirtualView({
           font-weight: 800;
           line-height: 1.4;
         }
+        .store-checkout-sheet .store-total-note p {
+          color: var(--sm-text-soft);
+        }
         .store-checkout-progress {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -3972,6 +4104,9 @@ export default function TiendaVirtualView({
           border-radius: 999px;
           background: #f7f7f8;
         }
+        .store-checkout-sheet .store-checkout-progress {
+          background: #edf4fb;
+        }
         .store-checkout-progress span {
           border-radius: 999px;
           padding: 9px 10px;
@@ -3980,10 +4115,17 @@ export default function TiendaVirtualView({
           font-weight: 950;
           text-align: center;
         }
+        .store-checkout-sheet .store-checkout-progress span {
+          color: #6a86a5;
+        }
         .store-checkout-progress span.active {
           background: #7b1022;
           color: #ffffff;
           box-shadow: 0 10px 22px rgba(123, 16, 34, 0.16);
+        }
+        .store-checkout-sheet .store-checkout-progress span.active {
+          background: var(--sm-primary-gradient);
+          box-shadow: 0 10px 22px rgba(12, 77, 136, 0.22);
         }
         .store-checkout-step {
           display: grid;
@@ -3999,11 +4141,18 @@ export default function TiendaVirtualView({
           padding: 12px 14px;
           background: #fff7f4;
         }
+        .store-checkout-sheet .store-checkout-mini-total {
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        }
         .store-checkout-mini-total span {
           color: #7b1022;
           font-size: 12px;
           font-weight: 950;
           text-transform: uppercase;
+        }
+        .store-checkout-sheet .store-checkout-mini-total span {
+          color: var(--sm-blue-deep);
         }
         .store-checkout-mini-total strong {
           color: #111827;
@@ -4242,6 +4391,10 @@ export default function TiendaVirtualView({
           font-size: 12px;
           font-weight: 950;
         }
+        .store-checkout-sheet .store-order-line-controls button {
+          border-color: rgba(12, 77, 136, 0.16);
+          color: var(--sm-blue-deep);
+        }
         .store-order-line-remove {
           margin-left: auto;
         }
@@ -4274,6 +4427,10 @@ export default function TiendaVirtualView({
           color: #9f1239;
           background: #fff1f2;
         }
+        .store-checkout-sheet .store-choice-title .store-checkout-icon {
+          color: var(--sm-blue-deep);
+          background: rgba(12, 77, 136, 0.08);
+        }
         .store-choice-grid {
           display: grid;
           gap: 10px;
@@ -4304,16 +4461,30 @@ export default function TiendaVirtualView({
           box-shadow: 0 12px 24px rgba(123, 16, 34, 0.06);
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
         }
+        .store-checkout-sheet .store-choice-card {
+          border-color: rgba(12, 77, 136, 0.14);
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+          color: var(--sm-blue-deep);
+          box-shadow: 0 12px 24px rgba(12, 77, 136, 0.08);
+        }
         .store-choice-card:hover {
           transform: translateY(-2px);
           border-color: rgba(159, 18, 57, 0.32);
           box-shadow: 0 18px 34px rgba(123, 16, 34, 0.12);
+        }
+        .store-checkout-sheet .store-choice-card:hover {
+          border-color: rgba(12, 77, 136, 0.24);
+          box-shadow: 0 18px 34px rgba(12, 77, 136, 0.14);
         }
         .store-choice-card.active {
           border-color: transparent;
           background: linear-gradient(135deg, #7b1022, #d43f3a);
           color: #ffffff;
           box-shadow: 0 18px 36px rgba(123, 16, 34, 0.24);
+        }
+        .store-checkout-sheet .store-choice-card.active {
+          background: var(--sm-primary-gradient);
+          box-shadow: 0 18px 36px rgba(12, 77, 136, 0.24);
         }
         .store-choice-card strong {
           grid-area: title;
@@ -4328,6 +4499,9 @@ export default function TiendaVirtualView({
           font-size: 11px;
           font-weight: 850;
           line-height: 1.25;
+        }
+        .store-checkout-sheet .store-choice-card span:not(.store-checkout-icon) {
+          color: var(--sm-text-soft);
         }
         .store-choice-card.active span:not(.store-checkout-icon) {
           color: rgba(255, 255, 255, 0.82);
@@ -4359,12 +4533,20 @@ export default function TiendaVirtualView({
           background: rgba(123, 16, 34, 0.08);
           flex: 0 0 auto;
         }
+        .store-checkout-sheet .store-checkout-icon {
+          color: var(--sm-blue-deep);
+          background: rgba(12, 77, 136, 0.08);
+        }
         .store-checkout-icon svg {
           width: 22px;
           height: 22px;
         }
         .store-choice-card.active .store-checkout-icon {
           color: #7b1022;
+          background: #ffffff;
+        }
+        .store-checkout-sheet .store-choice-card.active .store-checkout-icon {
+          color: var(--sm-blue-deep);
           background: #ffffff;
         }
         .store-cash-change {
@@ -4375,10 +4557,23 @@ export default function TiendaVirtualView({
           padding: 12px;
           background: #fff7f4;
         }
+        .store-checkout-sheet .store-cash-change,
+        .store-checkout-sheet .store-payment-note,
+        .store-checkout-sheet .store-location-card,
+        .store-checkout-sheet .store-location-selected {
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+        }
         .store-cash-change span {
           color: #7b1022;
           font-size: 13px;
           font-weight: 950;
+        }
+        .store-checkout-sheet .store-cash-change span,
+        .store-checkout-sheet .store-payment-note,
+        .store-checkout-sheet .store-location-card a,
+        .store-checkout-sheet .store-location-feedback {
+          color: var(--sm-blue-deep);
         }
         .store-payment-note {
           display: flex;
@@ -4396,6 +4591,17 @@ export default function TiendaVirtualView({
         .store-payment-note .store-checkout-icon {
           width: 34px;
           height: 34px;
+          background: #ffffff;
+        }
+        .store-checkout-sheet .store-location-card span,
+        .store-checkout-sheet .store-location-selected span,
+        .store-checkout-sheet .store-map-picker-head span {
+          color: var(--sm-text-soft);
+        }
+        .store-checkout-sheet .store-mini-button,
+        .store-checkout-sheet .store-location-result {
+          border-color: rgba(12, 77, 136, 0.14);
+          color: var(--sm-blue-deep);
           background: #ffffff;
         }
         .store-mobile-cart {
@@ -4544,6 +4750,11 @@ export default function TiendaVirtualView({
           border-radius: 8px;
           padding: 12px;
           margin-top: 10px;
+        }
+        .store-checkout-sheet .store-status-card {
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          border-radius: 18px;
+          background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
         }
         .store-status-card.guest-form-card {
           margin-top: 12px;
@@ -4976,14 +5187,15 @@ export default function TiendaVirtualView({
             height: 40px;
           }
           .store-filter-strip {
-            flex-direction: column;
-            align-items: flex-start;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
             gap: 8px;
-            padding-bottom: 12px;
+            padding: 0 0 8px;
           }
           .store-filters-panel {
-            padding: 14px 14px 12px;
-            border-radius: 24px;
+            padding: 10px 12px 8px;
+            border-radius: 22px;
           }
           .store-search-wrap {
             min-height: 54px;
@@ -4996,14 +5208,64 @@ export default function TiendaVirtualView({
             font-size: 11px;
           }
           .store-chip {
-            min-height: 50px;
-            padding: 12px 16px;
+            min-height: 40px;
+            padding: 9px 13px;
           }
           .store-filter-chip {
-            min-width: 132px;
+            min-width: 116px;
+            gap: 3px;
           }
           .store-filter-chip.compact {
             min-width: auto;
+          }
+          .store-filter-strip strong {
+            font-size: 15px;
+          }
+          .store-filter-strip span {
+            margin-top: 2px;
+            font-size: 11px;
+          }
+          .store-filter-strip > div span {
+            display: none;
+          }
+          .store-filter-kicker {
+            min-height: 26px;
+            padding: 0 10px;
+            font-size: 10px;
+          }
+          .store-tabs {
+            gap: 10px;
+            padding: 4px 0 8px;
+          }
+          .store-subtabs {
+            gap: 8px;
+            padding: 4px 0 0;
+          }
+          .store-filter-label,
+          .store-filter-pill-label {
+            font-size: 13px;
+          }
+          .store-filter-meta {
+            font-size: 10px;
+          }
+          .store-filter-badge {
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            font-size: 10px;
+          }
+          .store-subtabs .store-chip {
+            min-height: 36px;
+            padding: 7px 11px;
+          }
+          .store-subtabs .store-filter-chip.compact {
+            padding-right: 11px;
+          }
+          .store-product-head {
+            margin: 10px 0 10px;
+          }
+          .store-grouped-sections {
+            gap: 14px;
           }
           .store-order-status-button {
             min-height: 38px;
@@ -5139,7 +5401,7 @@ export default function TiendaVirtualView({
         </header>
 
         {rewardSettings.enabled !== false && (
-          <section style={{ marginTop: 18, marginBottom: 8 }}>
+          <section style={{ marginTop: isMobileLayout ? 10 : 18, marginBottom: isMobileLayout ? 4 : 8 }}>
             <StoreRewardsSummaryCard
               currentUser={currentUser}
               settings={rewardSettings}
@@ -5148,6 +5410,7 @@ export default function TiendaVirtualView({
               cartAmount={approximateTotalAmount}
               selectedReward={selectedRewardRedemption}
               onOpen={openRewardsPanel}
+              compact={isMobileLayout}
             />
           </section>
         )}
@@ -5726,8 +5989,8 @@ function StoreBackButton({ onClick, label = 'Volver' }) {
 
 function StoreAuthSheet({ onClose, locked = false, ...props }) {
   return (
-    <div className="store-sheet-overlay">
-      <div className="store-sheet store-auth-sheet">
+    <div className="store-sheet-overlay auth-overlay">
+      <div className="store-auth-sheet">
         <div className="store-sheet-head">
           {locked ? <span /> : <StoreBackButton onClick={onClose} />}
           <strong>{locked ? 'Ingresa a la tienda' : 'Inicia sesion'}</strong>
@@ -6789,7 +7052,7 @@ function CheckoutSheet({
 
   return (
     <div className="store-sheet-overlay">
-      <div className="store-sheet">
+      <div className="store-sheet store-checkout-sheet">
         <div className="store-sheet-head">
           <StoreBackButton onClick={isCartStep ? onClose : () => setCheckoutStep('cart')} />
           <strong>{isCartStep ? 'Tu pedido' : 'Entrega y pago'}</strong>

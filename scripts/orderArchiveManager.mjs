@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { getApps, initializeApp } from 'firebase/app';
-import { endAt, get, getDatabase, orderByChild, query, ref, startAt, update } from 'firebase/database';
+import { endAt, get, orderByChild, query, ref, startAt, update } from 'firebase/database';
 import {
   buildArchivedOrderRecord,
   getArchiveMonthKey,
@@ -14,28 +13,16 @@ import {
   sortOrdersByDateAndNumberDesc,
   STORE_COUPON_ARCHIVE_USAGE_PATH,
 } from '../src/services/orderArchive.js';
-
-const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro',
-  authDomain: 'comanda-digital-ac1ec.firebaseapp.com',
-  databaseURL: 'https://comanda-digital-ac1ec-default-rtdb.firebaseio.com',
-  projectId: 'comanda-digital-ac1ec',
-  storageBucket: 'comanda-digital-ac1ec.firebasestorage.app',
-  messagingSenderId: '41323183250',
-  appId: '1:41323183250:web:aa1d7ea9cbbc353a917a4b',
-};
+import {
+  ensureAuthenticatedFirebaseSession,
+  getAuthenticatedFirebaseDatabase,
+} from './firebaseScriptAuth.mjs';
 
 const ARCHIVE_ROOT_DIR = 'sync-backups/order-history';
 const STATE_FILE_NAME = 'sync-backups/order-archive-state.json';
 const ORDER_ARCHIVE_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const ARCHIVE_BATCH_SIZE = 250;
 const LIVE_ORDER_PATHS = ['orders', 'rutaOrders'];
-
-const getFirebaseDatabase = () => {
-  const existingApp = getApps().find((entry) => entry.name === 'order-archive-manager');
-  const app = existingApp || initializeApp(FIREBASE_CONFIG, 'order-archive-manager');
-  return getDatabase(app);
-};
 
 const normalizeNumber = (value, fallback = 0) => {
   const numeric = Number(value);
@@ -104,7 +91,7 @@ const listMonthKeysBetween = (dateFrom, dateTo) => {
 };
 
 export function createOrderArchiveManager({ repoRoot }) {
-  const database = getFirebaseDatabase();
+  const database = getAuthenticatedFirebaseDatabase();
   const archiveRootDir = resolve(repoRoot, ARCHIVE_ROOT_DIR);
   const stateFilePath = resolve(repoRoot, STATE_FILE_NAME);
   const state = {
@@ -192,6 +179,8 @@ export function createOrderArchiveManager({ repoRoot }) {
     }
 
     archivePromise = (async () => {
+      await ensureAuthenticatedFirebaseSession();
+
       state.archiving = true;
       state.lastError = '';
 
@@ -199,8 +188,8 @@ export function createOrderArchiveManager({ repoRoot }) {
         const todayKey = formatDate(new Date());
         const pruneResult = pruneExpiredArchivedOrders();
         const [ordersSnapshot, routeOrdersSnapshot, archiveUsageSnapshot] = await Promise.all([
-          get(ref(database, 'orders')),
-          get(ref(database, 'rutaOrders')),
+          get(query(ref(database, 'orders'), orderByChild('fecha'), endAt(todayKey))),
+          get(query(ref(database, 'rutaOrders'), orderByChild('fecha'), endAt(todayKey))),
           get(ref(database, STORE_COUPON_ARCHIVE_USAGE_PATH)),
         ]);
 
@@ -326,6 +315,8 @@ export function createOrderArchiveManager({ repoRoot }) {
   };
 
   const fetchLiveOrdersByDateRange = async (dateFrom, dateTo) => {
+    await ensureAuthenticatedFirebaseSession();
+
     const cleanDateFrom = String(dateFrom || '').trim();
     const cleanDateTo = String(dateTo || '').trim();
     if (!cleanDateFrom || !cleanDateTo) {

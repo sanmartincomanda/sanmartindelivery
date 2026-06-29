@@ -1,11 +1,39 @@
 
-body {
-  font-family: Arial, sans-serif;
+:root {
+  color-scheme: light;
+  --sm-blue-deep: #0c4b85;
+  --sm-blue: #1d74c7;
+  --sm-blue-bright: #5caaf4;
+  --sm-blue-soft: #edf6ff;
+  --sm-black: #0b1220;
+  --sm-red: #dc2626;
+  --sm-gold: #d1ac3f;
+  --sm-text: #102846;
+  --sm-text-soft: #466e98;
 }
-input, textarea {
+
+html {
+  background: linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
+}
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--sm-text);
+  background: linear-gradient(180deg, #f7fbff 0%, #eef6ff 100%);
+}
+
+input,
+textarea {
   width: 100%;
   margin-bottom: 10px;
 }
+
 button {
   margin-top: 5px;
+}
+
+::selection {
+  background: rgba(29, 116, 199, 0.16);
+  color: var(--sm-text);
 }
