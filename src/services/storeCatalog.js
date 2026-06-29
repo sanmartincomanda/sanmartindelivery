@@ -11,6 +11,19 @@ export const SICAR_CATALOG_SYNC_BATCH_SIZE = 25;
 
 const roundPrice = (value) => Number(Number(value || 0).toFixed(2));
 const roundQuantityRule = (value) => Number(Number(value || 0).toFixed(3));
+const normalizeOptionalInventory = (value, fallback = null) => {
+  const rawValue = value ?? fallback;
+  if (rawValue === '' || rawValue === null || rawValue === undefined) {
+    return null;
+  }
+
+  const numeric = Number(rawValue);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  return Number(numeric.toFixed(3));
+};
 
 export const isUnitMeasure = (unit = '') => String(unit || '').trim().toLowerCase() === 'unidad';
 
@@ -123,6 +136,7 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
     quantityStep,
     active: source.active ?? fallback.active ?? true,
     promo: Boolean(source.promo ?? fallback.promo),
+    inventory: normalizeOptionalInventory(source.inventory, fallback.inventory),
     image: String(source.image ?? fallback.image ?? '').trim(),
     imageStoragePath: String(source.imageStoragePath ?? fallback.imageStoragePath ?? '').trim(),
     description: String(source.description ?? fallback.description ?? '').trim(),

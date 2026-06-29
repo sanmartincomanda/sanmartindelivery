@@ -55,6 +55,11 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import {
+  formatBirthdayInputValue,
+  normalizeBirthdayInput,
+  normalizeBirthdayValue,
+} from '../services/customerBirthday';
+import {
   cleanStorePhone,
   completeGoogleStoreUserProfile,
   loginStoreUserWithGoogle,
@@ -101,18 +106,11 @@ const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
 const STORE_GROUP_PAGE_SIZE = 5;
 const STORE_CASH_PAYMENT = 'EFECTIVO';
-const STORE_BIRTHDATE_MAX = (() => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-})();
 const EMPTY_STORE_AUTH_FORM = {
   nombre: '',
   email: '',
   telefono: '',
-  fechaNacimiento: '',
+  fechaCumpleanos: '',
   password: '',
   confirmPassword: '',
   direccion: '',
@@ -130,6 +128,8 @@ const normalizeCheckoutPayment = (value) => {
 
   return STORE_CASH_PAYMENT;
 };
+
+const getBirthdayFieldValue = (value = '') => formatBirthdayInputValue(value) || normalizeBirthdayInput(value);
 
 const getPaymentMeta = (payment) => {
   const value = normalizeCheckoutPayment(payment);
@@ -1609,7 +1609,7 @@ export default function TiendaVirtualView({
   const updateAuthForm = (field, value) => {
     setAuthForm((current) => ({
       ...current,
-      [field]: value,
+      [field]: field === 'fechaCumpleanos' ? normalizeBirthdayInput(value) : value,
     }));
   };
 
@@ -1975,6 +1975,12 @@ export default function TiendaVirtualView({
     if (!hasLocation(authForm.ubicacion)) {
       setAuthLoading(false);
       setAuthError('Debes guardar el punto exacto en el mapa antes de crear la cuenta.');
+      return;
+    }
+
+    if (authForm.fechaCumpleanos && !normalizeBirthdayValue(authForm.fechaCumpleanos)) {
+      setAuthLoading(false);
+      setAuthError('Ingresa tu fecha de cumpleanos solo con dia y mes, por ejemplo 27/06.');
       return;
     }
 
@@ -3699,6 +3705,13 @@ export default function TiendaVirtualView({
           letter-spacing: 0.01em;
           padding-left: 2px;
         }
+        .store-field-note {
+          color: #8b1e2d;
+          font-size: 12px;
+          font-weight: 700;
+          line-height: 1.4;
+          padding-left: 2px;
+        }
         .store-field,
         .store-input,
         .store-textarea,
@@ -5369,14 +5382,18 @@ function StoreAuthView({
         )}
         {isRegister && (
           <label className="store-field-stack">
-            <span className="store-field-caption">Fecha de nacimiento (opcional)</span>
+            <span className="store-field-caption">Fecha de cumpleanos</span>
             <input
               className="store-field"
-              type="date"
-              value={authForm.fechaNacimiento || ''}
-              max={STORE_BIRTHDATE_MAX}
-              onChange={(event) => onFormChange('fechaNacimiento', event.target.value)}
+              type="text"
+              inputMode="numeric"
+              autoComplete="bday-day"
+              placeholder="DD/MM"
+              maxLength={5}
+              value={authForm.fechaCumpleanos || ''}
+              onChange={(event) => onFormChange('fechaCumpleanos', event.target.value)}
             />
+            <span className="store-field-note">RECIBIRAS PREMIO ESPECIAL EN TU CUMPLEANOS</span>
           </label>
         )}
         {!isRegister && (
@@ -5910,7 +5927,7 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
     nombre: user?.nombre || '',
     direccion: user?.direccion || '',
     referencia: user?.referencia || '',
-    fechaNacimiento: user?.fechaNacimiento || '',
+    fechaCumpleanos: getBirthdayFieldValue(user?.fechaCumpleanos || user?.fechaNacimiento || ''),
     ubicacion: user?.ubicacion || null,
   });
   const [locating, setLocating] = useState(false);
@@ -5918,7 +5935,7 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
   const updateProfile = (field, value) => {
     setProfile((current) => ({
       ...current,
-      [field]: value,
+      [field]: field === 'fechaCumpleanos' ? normalizeBirthdayInput(value) : value,
     }));
   };
 
@@ -5927,6 +5944,11 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
 
     if (!profile.nombre.trim() || !profile.direccion.trim() || !hasLocation(profile.ubicacion)) {
       alert('Nombre, direccion y punto exacto en el mapa son obligatorios.');
+      return;
+    }
+
+    if (profile.fechaCumpleanos && !normalizeBirthdayValue(profile.fechaCumpleanos)) {
+      alert('Ingresa tu fecha de cumpleanos solo con dia y mes, por ejemplo 27/06.');
       return;
     }
 
@@ -5973,14 +5995,18 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
             placeholder="Direccion de entrega"
           />
           <label className="store-field-stack">
-            <span className="store-field-caption">Fecha de nacimiento (opcional)</span>
+            <span className="store-field-caption">Fecha de cumpleanos</span>
             <input
               className="store-field"
-              type="date"
-              value={profile.fechaNacimiento || ''}
-              max={STORE_BIRTHDATE_MAX}
-              onChange={(event) => updateProfile('fechaNacimiento', event.target.value)}
+              type="text"
+              inputMode="numeric"
+              autoComplete="bday-day"
+              placeholder="DD/MM"
+              maxLength={5}
+              value={profile.fechaCumpleanos || ''}
+              onChange={(event) => updateProfile('fechaCumpleanos', event.target.value)}
             />
+            <span className="store-field-note">RECIBIRAS PREMIO ESPECIAL EN TU CUMPLEANOS</span>
           </label>
           <input
             className="store-field"

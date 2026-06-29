@@ -24,6 +24,7 @@ const OrderForm = lazy(() => import('./components/OrderForm'));
 const KitchenView = lazy(() => import('./components/KitchenView'));
 const ListaPedidos = lazy(() => import('./components/ListaPedidos'));
 const TiendaVirtualView = lazy(() => import('./components/TiendaVirtualView'));
+const TiendaVirtualAdminView = lazy(() => import('./components/TiendaVirtualAdminView'));
 const ConfiguracionView = lazy(() => import('./components/ConfiguracionView'));
 const DriverView = lazy(() => import('./components/DriverView'));
 const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
@@ -495,6 +496,7 @@ function App() {
     { id: 'cocina', label: 'Vista Cocina', icon: Icons.chef, color: '#f59e0b', short: 'Cocina' },
     { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: '#3b82f6', short: 'Lista' },
     { id: 'basedatos', label: 'Base de Datos', icon: Icons.database, color: '#10b981', short: 'Datos' },
+    { id: 'tienda_virtual', label: 'Tienda Virtual', icon: Icons.store, color: '#ea580c', short: 'Tienda' },
     { id: 'configuracion', label: 'Configuraciones', icon: Icons.settings, color: '#6366f1', short: 'Config' },
   ];
 
@@ -940,7 +942,9 @@ function App() {
 
             {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
 
-            {view === 'configuracion' && isAdminDashboard && <ConfiguracionView />}
+            {view === 'tienda_virtual' && isAdminDashboard && <TiendaVirtualAdminView />}
+
+            {view === 'configuracion' && isAdminDashboard && <ConfiguracionView mode="users" />}
 
             {view === 'basedatos' && isAdminDashboard && <BaseDatosView clientes={clientes} />}
           </Suspense>

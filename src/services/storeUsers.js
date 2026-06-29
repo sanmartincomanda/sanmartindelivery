@@ -11,29 +11,13 @@ import {
   touchLastLogin,
   upsertOwnClientRole,
 } from './authRoles';
+import { normalizeBirthdayValue } from './customerBirthday';
 import { setClientDirectoryEntry } from './clientDirectory';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
 export const cleanStorePhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
 export const cleanStoreEmail = (email) => normalizeAuthEmail(email);
-const normalizeBirthDate = (value = '') => {
-  const cleanValue = String(value || '').trim();
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanValue)) {
-    return '';
-  }
-
-  const parsedDate = new Date(`${cleanValue}T00:00:00`);
-  if (Number.isNaN(parsedDate.getTime())) {
-    return '';
-  }
-
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-
-  return parsedDate <= today ? cleanValue : '';
-};
 
 export const getStoreUserKey = (phone) => {
   const cleanPhone = cleanStorePhone(phone);
@@ -144,6 +128,7 @@ export async function ensureStoreUser({
   telefono,
   direccion,
   referencia,
+  fechaCumpleanos,
   fechaNacimiento,
   passwordHash,
   ubicacion,
@@ -162,7 +147,9 @@ export async function ensureStoreUser({
   const userSnapshot = await get(userRef);
   const existingUser = userSnapshot.val();
   const normalizedLocation = normalizeLocation(ubicacion) || normalizeLocation(existingUser?.ubicacion);
-  const normalizedBirthDate = normalizeBirthDate(fechaNacimiento);
+  const normalizedBirthday = normalizeBirthdayValue(
+    fechaCumpleanos || fechaNacimiento || existingUser?.fechaCumpleanos || existingUser?.fechaNacimiento
+  );
 
   if (!hasLocation(normalizedLocation)) {
     const error = new Error('Ubicacion exacta requerida');
@@ -183,7 +170,7 @@ export async function ensureStoreUser({
     telefono: cleanPhone,
     direccion: String(direccion || '').trim(),
     referencia: String(referencia || '').trim(),
-    fechaNacimiento: normalizedBirthDate,
+    fechaCumpleanos: normalizedBirthday,
     ubicacion: normalizedLocation,
     codigo: resolvedClientCode,
     updatedAt: now,
@@ -203,7 +190,7 @@ export async function ensureStoreUser({
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       email: profile.email,
-      fechaNacimiento: profile.fechaNacimiento,
+      fechaCumpleanos: profile.fechaCumpleanos,
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       createdAt: now,
@@ -219,7 +206,7 @@ export async function ensureStoreUser({
       ubicacion: profile.ubicacion,
       telefono: profile.telefono,
       email: profile.email,
-      fechaNacimiento: profile.fechaNacimiento,
+      fechaCumpleanos: profile.fechaCumpleanos,
       origen: 'tienda_virtual',
       storeUserKey: userKey,
       updatedAt: now,
@@ -249,8 +236,8 @@ export async function ensureStoreUser({
   };
 }
 
-export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, fechaNacimiento, password, ubicacion }) {
-  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, fechaNacimiento, password, ubicacion });
+export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, fechaCumpleanos, password, ubicacion }) {
+  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, fechaCumpleanos, password, ubicacion });
 }
 
 export async function registerStoreUserWithEmail({
@@ -259,7 +246,7 @@ export async function registerStoreUserWithEmail({
   telefono,
   direccion,
   referencia,
-  fechaNacimiento,
+  fechaCumpleanos,
   password,
   ubicacion,
 }) {
@@ -314,7 +301,7 @@ export async function registerStoreUserWithEmail({
     telefono: cleanPhone,
     direccion,
     referencia,
-    fechaNacimiento,
+    fechaCumpleanos,
     ubicacion,
     passwordHash,
     authUid: authUserKey,
@@ -441,7 +428,7 @@ export async function completeGoogleStoreUserProfile({
   telefono,
   direccion,
   referencia,
-  fechaNacimiento,
+  fechaCumpleanos,
   ubicacion,
 }) {
   const authUser = getCurrentAuthUser();
@@ -467,7 +454,7 @@ export async function completeGoogleStoreUserProfile({
     telefono: cleanPhone,
     direccion,
     referencia,
-    fechaNacimiento,
+    fechaCumpleanos,
     ubicacion,
     authUid: authUser.uid,
   });
@@ -487,7 +474,7 @@ export async function updateStoreUserProfile(user, patch) {
     telefono: currentUser.telefono,
     direccion: patch.direccion ?? currentUser.direccion,
     referencia: patch.referencia ?? currentUser.referencia,
-    fechaNacimiento: patch.fechaNacimiento ?? currentUser.fechaNacimiento,
+    fechaCumpleanos: patch.fechaCumpleanos ?? currentUser.fechaCumpleanos ?? currentUser.fechaNacimiento,
     ubicacion: patch.ubicacion ?? currentUser.ubicacion,
     authUid: currentUser.key || getCurrentAuthUser()?.uid,
   });

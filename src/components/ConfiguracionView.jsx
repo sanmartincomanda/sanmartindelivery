@@ -103,6 +103,7 @@ const buildEmptyProduct = (unit = 'lb') => ({
   code: '',
   name: '',
   price: '',
+  inventory: '',
   unit,
   category: 'res',
   subcategory: 'Linea Diaria',
@@ -374,8 +375,9 @@ const cropCatalogImage = async ({
   return canvas.toDataURL('image/jpeg', 0.9);
 };
 
-export default function ConfiguracionView() {
-  const [section, setSection] = useState('catalogo');
+export default function ConfiguracionView({ mode = 'users' }) {
+  const isStoreMode = mode === 'store';
+  const [section, setSection] = useState(() => (isStoreMode ? 'categorias' : 'usuarios'));
   const [usersTab, setUsersTab] = useState('administrativo');
   const [products, setProducts] = useState(() =>
     getInitialConfigCollection(
@@ -443,9 +445,14 @@ export default function ConfiguracionView() {
   const [userSearch, setUserSearch] = useState('');
   const [imageCrop, setImageCrop] = useState(() => buildEmptyImageCrop());
   const [applyingImageCrop, setApplyingImageCrop] = useState(false);
+  const [productEditorOpen, setProductEditorOpen] = useState(false);
 
   useEffect(() => {
-    if (section !== 'catalogo') {
+    setSection(isStoreMode ? 'categorias' : 'usuarios');
+  }, [isStoreMode]);
+
+  useEffect(() => {
+    if (!isStoreMode || !['catalogo', 'categorias'].includes(section)) {
       return undefined;
     }
 
@@ -478,10 +485,10 @@ export default function ConfiguracionView() {
       unsubscribeCatalog();
       unsubscribeCategories();
     };
-  }, [section]);
+  }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (section !== 'cupones') {
+    if (!isStoreMode || section !== 'cupones') {
       return undefined;
     }
 
@@ -498,10 +505,10 @@ export default function ConfiguracionView() {
     });
 
     return () => unsubscribe();
-  }, [section]);
+  }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (section !== 'promociones') {
+    if (!isStoreMode || section !== 'promociones') {
       return undefined;
     }
 
@@ -526,10 +533,10 @@ export default function ConfiguracionView() {
     });
 
     return () => unsubscribe();
-  }, [section]);
+  }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (section !== 'entregadores') {
+    if (isStoreMode || usersTab !== 'entregadores') {
       return undefined;
     }
 
@@ -540,10 +547,10 @@ export default function ConfiguracionView() {
     });
 
     return () => unsubscribe();
-  }, [section]);
+  }, [isStoreMode, usersTab]);
 
   useEffect(() => {
-    if (section !== 'usuarios') {
+    if (isStoreMode) {
       return undefined;
     }
 
@@ -561,10 +568,10 @@ export default function ConfiguracionView() {
     });
 
     return () => unsubscribe();
-  }, [section]);
+  }, [isStoreMode]);
 
   useEffect(() => {
-    if (section !== 'usuarios' || usersTab !== 'clientes') {
+    if (isStoreMode || usersTab !== 'clientes') {
       return undefined;
     }
 
@@ -586,7 +593,7 @@ export default function ConfiguracionView() {
     });
 
     return () => unsubscribe();
-  }, [section, usersTab]);
+  }, [isStoreMode, usersTab]);
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -723,6 +730,18 @@ export default function ConfiguracionView() {
     }));
   };
 
+  const resetProductEditor = () => {
+    setImageCrop(buildEmptyImageCrop());
+    setForm(buildEmptyProduct());
+    setProductEditorOpen(false);
+  };
+
+  const openNewProductEditor = () => {
+    setImageCrop(buildEmptyImageCrop());
+    setForm(buildEmptyProduct());
+    setProductEditorOpen(true);
+  };
+
   const updatePasswordForm = (userKey, field, value) => {
     setPasswordForms((current) => ({
       ...current,
@@ -781,6 +800,7 @@ export default function ConfiguracionView() {
       code: product.code || '',
       name: product.name || '',
       price: product.price || '',
+      inventory: product.inventory ?? '',
       unit: product.unit || 'lb',
       category: product.category || 'res',
       subcategory: product.subcategory || 'Linea Diaria',
@@ -791,6 +811,7 @@ export default function ConfiguracionView() {
       image: product.image || '',
       description: product.description || '',
     });
+    setProductEditorOpen(true);
   };
 
   const editCoupon = (coupon) => {
@@ -967,18 +988,17 @@ export default function ConfiguracionView() {
 
     try {
       const existingProduct = products.find((product) => product.code === form.code) || null;
-      const result = await saveCatalogProduct({
+      await saveCatalogProduct({
         ...form,
         price: Number(form.price || 0),
+        inventory: form.inventory === '' ? null : Number(form.inventory || 0),
         minQuantity: Number(form.minQuantity || getDefaultProductMinQuantity(form.unit)),
         quantityStep: Number(form.quantityStep || getDefaultProductQuantityStep(form.unit)),
       }, existingProduct);
-      setForm((current) => ({
-        ...current,
-        minQuantity: String(Number(form.minQuantity || getDefaultProductMinQuantity(form.unit))),
-        quantityStep: String(Number(form.quantityStep || getDefaultProductQuantityStep(form.unit))),
-      }));
       setMessage('Producto guardado con sus restricciones.');
+      setImageCrop(buildEmptyImageCrop());
+      setForm(buildEmptyProduct());
+      setProductEditorOpen(false);
     } catch (error) {
       console.error('Error guardando producto:', error);
       setMessage(error?.message || 'No se pudo guardar el producto.');
@@ -1538,27 +1558,37 @@ export default function ConfiguracionView() {
     }
   };
 
-  const sectionMeta = {
-    catalogo: {
-      path: 'Configuraciones / Tienda Virtual / Catalogo',
-      title: 'Catalogo de tienda virtual',
-    },
-    usuarios: {
-      path: 'Configuraciones / Usuarios',
-      title: 'Usuarios',
-    },
-    cupones: {
-      path: 'Configuraciones / Cupones',
-      title: 'Cupones',
-    },
-    entregadores: {
-      path: 'Configuraciones / Entregadores',
-      title: 'Entregadores',
-    },
-  }[section] || {
-    path: 'Configuraciones',
-    title: 'Configuraciones',
-  };
+  const sectionMeta = isStoreMode
+    ? {
+        categorias: {
+          path: 'Admintv / Tienda Virtual / Categorias',
+          title: 'Categorias y subcategorias',
+        },
+        catalogo: {
+          path: 'Admintv / Tienda Virtual / Catalogo',
+          title: 'Catalogo de tienda virtual',
+        },
+        cupones: {
+          path: 'Admintv / Tienda Virtual / Cupones',
+          title: 'Cupones',
+        },
+        promociones: {
+          path: 'Admintv / Tienda Virtual / Historias',
+          title: 'Historias',
+        },
+      }[section] || {
+        path: 'Admintv / Tienda Virtual',
+        title: 'Tienda Virtual',
+      }
+    : {
+        usuarios: {
+          path: 'Admintv / Configuracion / Usuarios',
+          title: 'Usuarios',
+        },
+      }[section] || {
+        path: 'Admintv / Configuracion',
+        title: 'Configuracion',
+      };
 
   return (
     <div
@@ -1686,6 +1716,9 @@ export default function ConfiguracionView() {
           background: #ffffff;
           box-shadow: 0 28px 80px rgba(15, 23, 42, 0.32);
         }
+        .cfg-product-modal {
+          width: min(980px, 100%);
+        }
         .cfg-driver-picker-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
@@ -1743,6 +1776,13 @@ export default function ConfiguracionView() {
           font-weight: 850;
           opacity: 0.82;
         }
+        .cfg-section-card {
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 16px;
+          margin-top: 18px;
+        }
         @media (max-width: 980px) {
           .cfg-grid {
             grid-template-columns: 1fr !important;
@@ -1760,70 +1800,17 @@ export default function ConfiguracionView() {
               {sectionMeta.title}
             </h1>
           </div>
-          {section === 'catalogo' && (
+          {isStoreMode && section === 'catalogo' && (
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
-                className="cfg-button secondary"
-                onClick={seedCatalog}
-                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
-              >
-                Inicializar catalogo base
-              </button>
-              <button
-                type="button"
-                className="cfg-button secondary"
-                onClick={testSicarConnection}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices}
-              >
-                {testingSicar ? 'Probando conexion...' : 'Probar conexion SICAR'}
-              </button>
-              <button
-                type="button"
-                className="cfg-button secondary"
+                className="cfg-button"
                 onClick={updateSicarPrices}
                 disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
               >
                 {syncingSicarPrices ? 'Actualizando precios...' : 'Actualizar precios SICAR'}
               </button>
-              <button
-                type="button"
-                className="cfg-button secondary"
-                onClick={migrateLegacyCatalogImages}
-                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
-              >
-                {migratingCatalogImages ? 'Migrando fotos...' : 'Migrar fotos a Storage'}
-              </button>
-              <button
-                type="button"
-                className="cfg-button secondary"
-                onClick={runExpiredOrdersCleanup}
-                disabled={saving || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
-              >
-                {cleaningExpiredOrders ? 'Limpiando pedidos...' : 'Limpiar pedidos vencidos'}
-              </button>
-              <button
-                type="button"
-                className="cfg-button"
-                onClick={loadSicarPreview}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
-              >
-                {loadingSicarPreview ? 'Cargando vista previa...' : 'Vista previa 90% SICAR'}
-              </button>
-              <button
-                type="button"
-                className="cfg-button"
-                onClick={() => applySicarCatalog(sicarPreview)}
-                disabled={!sicarPreview || testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
-              >
-                {syncingSicar ? 'Aplicando SICAR...' : 'Aplicar catalogo SICAR'}
-              </button>
             </div>
-          )}
-          {section === 'entregadores' && (
-            <button type="button" className="cfg-button secondary" onClick={seedDrivers} disabled={savingDriver}>
-              Inicializar entregadores base
-            </button>
           )}
         </div>
 
@@ -1842,7 +1829,7 @@ export default function ConfiguracionView() {
           </div>
         )}
 
-        {section === 'catalogo' && (sicarHealth || sicarPreview) && (
+        {isStoreMode && section === 'catalogo' && sicarHealth && (
           <div
             style={{
               marginTop: 16,
@@ -1856,11 +1843,6 @@ export default function ConfiguracionView() {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <strong style={{ color: '#1d4ed8' }}>Estado SICAR</strong>
-              {sicarPreview?.generatedAt && (
-                <span style={{ color: '#1e3a8a', fontWeight: 800 }}>
-                  Vista previa generada: {formatSicarDate(sicarPreview.generatedAt)}
-                </span>
-              )}
             </div>
             {sicarHealth && (
               <div style={{ color: '#1e3a8a', fontWeight: 700, lineHeight: 1.5 }}>
@@ -1868,457 +1850,473 @@ export default function ConfiguracionView() {
                 {sicarHealth.host}.
               </div>
             )}
-            {sicarPreview && (
-              <div style={{ color: '#1e3a8a', fontWeight: 700, lineHeight: 1.5 }}>
-                Reglas activas: {sicarPreview.rules?.thresholdPct || 0}% acumulado por categoria, categorias con al
-                menos {sicarPreview.rules?.minOverallSharePct || 0}% del total general, y {sicarPreview.products?.length || 0}{' '}
-                SKUs seleccionados para aplicar.
-              </div>
-            )}
-            {!sicarPreview && (
-              <div style={{ color: '#1e3a8a', fontWeight: 700, lineHeight: 1.5 }}>
-                Primero genera la vista previa 90% para habilitar el boton Aplicar catalogo SICAR.
-              </div>
-            )}
           </div>
         )}
 
-        <div className="cfg-tabs">
-          <button
-            type="button"
-            className={`cfg-tab ${section === 'catalogo' ? 'active' : ''}`}
-            onClick={() => setSection('catalogo')}
-          >
-            Tienda Virtual
-          </button>
-          <button
-            type="button"
-            className={`cfg-tab ${section === 'promociones' ? 'active' : ''}`}
-            onClick={() => setSection('promociones')}
-          >
-            Historias
-          </button>
-          <button
-            type="button"
-            className={`cfg-tab ${section === 'usuarios' ? 'active' : ''}`}
-            onClick={() => setSection('usuarios')}
-          >
-            Usuarios
-          </button>
-          <button
-            type="button"
-            className={`cfg-tab ${section === 'entregadores' ? 'active' : ''}`}
-            onClick={() => setSection('entregadores')}
-          >
-            Entregadores
-          </button>
-          <button
-            type="button"
-            className={`cfg-tab ${section === 'cupones' ? 'active' : ''}`}
-            onClick={() => setSection('cupones')}
-          >
-            Cupones
-          </button>
-        </div>
-
-        {section === 'catalogo' ? (
-          <>
-        <section
-          style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 8,
-            padding: 16,
-            marginTop: 18,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <h2 style={{ margin: 0, fontSize: 22 }}>Categorias y subcategorias</h2>
-              <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
-                Estas opciones alimentan los filtros de la tienda y las listas del catalogo.
-              </p>
-            </div>
-            <button type="button" className="cfg-button secondary" onClick={seedCategories} disabled={savingCategory}>
-              Inicializar categorias base
+        {isStoreMode && (
+          <div className="cfg-tabs">
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'categorias' ? 'active' : ''}`}
+              onClick={() => setSection('categorias')}
+            >
+              Categorias
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'catalogo' ? 'active' : ''}`}
+              onClick={() => setSection('catalogo')}
+            >
+              Catalogo
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'cupones' ? 'active' : ''}`}
+              onClick={() => setSection('cupones')}
+            >
+              Cupones
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'promociones' ? 'active' : ''}`}
+              onClick={() => setSection('promociones')}
+            >
+              Historias
             </button>
           </div>
+        )}
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
-              gap: 14,
-              marginTop: 14,
-              alignItems: 'start',
-            }}
-          >
-            <div style={{ display: 'grid', gap: 10 }}>
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  style={{
-                    border: '1px solid #edf2f7',
-                    borderRadius: 8,
-                    padding: 12,
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0, 1fr) auto',
-                    gap: 10,
-                    alignItems: 'center',
-                  }}
-                >
-                  <div>
-                    <strong>{category.label}</strong>
-                    <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
-                      {(category.subcategories || []).join(' | ') || 'Sin subcategorias'}
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <span className={`cfg-badge ${category.active === false ? 'off' : ''}`}>
-                        {category.active === false ? 'Inactiva' : 'Activa'}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <button type="button" className="cfg-button secondary" onClick={() => editCategory(category)}>
-                      Editar
-                    </button>
-                    <button type="button" className="cfg-button secondary" onClick={() => toggleCategory(category)}>
-                      {category.active === false ? 'Activar' : 'Desactivar'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+        {isStoreMode && section === 'categorias' ? (
+          <section className="cfg-section-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 22 }}>Categorias y subcategorias</h2>
+                <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
+                  Administra como se organizan los productos dentro de la tienda virtual.
+                </p>
+              </div>
+              <button type="button" className="cfg-button secondary" onClick={seedCategories} disabled={savingCategory}>
+                Inicializar categorias base
+              </button>
             </div>
 
-            <form onSubmit={saveCategory} style={{ display: 'grid', gap: 10 }}>
-              <input
-                className="cfg-input"
-                value={categoryForm.label}
-                onChange={(event) => updateCategoryForm('label', event.target.value)}
-                placeholder="Nombre de categoria"
-              />
-              <textarea
-                className="cfg-textarea"
-                value={categoryForm.subcategoriesText}
-                onChange={(event) => updateCategoryForm('subcategoriesText', event.target.value)}
-                placeholder="Subcategorias, una por linea o separadas por coma"
-              />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <input
-                  className="cfg-input"
-                  type="number"
-                  value={categoryForm.sortOrder}
-                  onChange={(event) => updateCategoryForm('sortOrder', event.target.value)}
-                  placeholder="Orden"
-                />
-                <select
-                  className="cfg-select"
-                  value={categoryForm.active ? 'activo' : 'inactivo'}
-                  onChange={(event) => updateCategoryForm('active', event.target.value === 'activo')}
-                >
-                  <option value="activo">Activa</option>
-                  <option value="inactivo">Inactiva</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button type="submit" className="cfg-button" disabled={savingCategory}>
-                  {savingCategory ? 'Guardando...' : 'Guardar categoria'}
-                </button>
-                <button
-                  type="button"
-                  className="cfg-button secondary"
-                  onClick={() => setCategoryForm(emptyCategory)}
-                >
-                  Nueva
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <div
-          className="cfg-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1.5fr) minmax(360px, 0.85fr)',
-            gap: 18,
-            marginTop: 18,
-            alignItems: 'start',
-          }}
-        >
-          <section>
             <div
+              className="cfg-grid"
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                marginBottom: 12,
-                alignItems: 'center',
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+                gap: 14,
+                marginTop: 14,
+                alignItems: 'start',
               }}
             >
-              <input
-                className="cfg-input"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar producto"
-                style={{ maxWidth: 360 }}
-              />
-              <strong>{catalogHydrated ? `${filteredProducts.length} productos` : 'Cargando catalogo...'}</strong>
-            </div>
-
-            <table className="cfg-table">
-              <thead>
-                <tr>
-                  <th>Foto</th>
-                  <th>Producto</th>
-                  <th>Categoria</th>
-                  <th>Precio</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!catalogHydrated && filteredProducts.length === 0 && (
-                  <tr>
-                    <td colSpan="6" style={{ color: '#64748b', fontWeight: 800 }}>
-                      Cargando catalogo real desde Firebase...
-                    </td>
-                  </tr>
-                )}
-                {filteredProducts.map((product) => (
-                  <tr key={product.code}>
-                    <td>
-                      <img
-                        className="cfg-photo"
-                        src={product.image || '/tienda/branding/logo.png'}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </td>
-                    <td>
-                      <strong>{product.name}</strong>
-                      <div style={{ color: '#64748b', marginTop: 4 }}>{product.code}</div>
-                      {isSicarManagedProduct(product) && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                          <span className="cfg-badge">SICAR</span>
-                          {product.sync?.overrides?.name && <span className="cfg-badge">Nombre manual</span>}
-                          {product.sync?.overrides?.price && <span className="cfg-badge">Precio manual</span>}
-                          {product.sync?.overrides?.image && <span className="cfg-badge">Foto manual</span>}
-                        </div>
-                      )}
-                      {hasCustomProductQuantityRules(product) && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                          <span className="cfg-badge">
-                            Min {formatRestrictionValue(getProductMinQuantity(product), product.unit)}
-                          </span>
-                          <span className="cfg-badge">
-                            Paso {formatRestrictionValue(getProductQuantityStep(product), product.unit)}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <strong>{getCategoryLabel(product.category)}</strong>
-                      <div style={{ color: '#64748b', marginTop: 4 }}>{product.subcategory || '-'}</div>
-                      {product.promo && (
-                        <div style={{ marginTop: 6 }}>
-                          <span className="cfg-badge">Promocion</span>
-                        </div>
-                      )}
-                    </td>
-                    <td>C$ {Number(product.price || 0).toFixed(2)}</td>
-                    <td>
-                      <span className={`cfg-badge ${product.active === false ? 'off' : ''}`}>
-                        {product.active === false ? 'Inactivo' : 'Activo'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button type="button" className="cfg-button secondary" onClick={() => editProduct(product)}>
-                          Editar
-                        </button>
-                        <button type="button" className="cfg-button secondary" onClick={() => toggleProduct(product)}>
-                          {product.active === false ? 'Activar' : 'Desactivar'}
-                        </button>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {categories.map((category) => (
+                  <div
+                    key={category.id}
+                    style={{
+                      border: '1px solid #edf2f7',
+                      borderRadius: 8,
+                      padding: 12,
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1fr) auto',
+                      gap: 10,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <strong>{category.label}</strong>
+                      <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
+                        {(category.subcategories || []).join(' | ') || 'Sin subcategorias'}
                       </div>
-                    </td>
-                  </tr>
+                      <div style={{ marginTop: 8 }}>
+                        <span className={`cfg-badge ${category.active === false ? 'off' : ''}`}>
+                          {category.active === false ? 'Inactiva' : 'Activa'}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <button type="button" className="cfg-button secondary" onClick={() => editCategory(category)}>
+                        Editar
+                      </button>
+                      <button type="button" className="cfg-button secondary" onClick={() => toggleCategory(category)}>
+                        {category.active === false ? 'Activar' : 'Desactivar'}
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </section>
+              </div>
 
-          <form
-            onSubmit={saveProduct}
-            style={{
-              background: '#fff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 8,
-              padding: 16,
-              display: 'grid',
-              gap: 10,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 22 }}>Producto</h2>
-            {isSicarManagedProduct(products.find((product) => product.code === form.code)) && (
+              <form onSubmit={saveCategory} style={{ display: 'grid', gap: 10 }}>
+                <input
+                  className="cfg-input"
+                  value={categoryForm.label}
+                  onChange={(event) => updateCategoryForm('label', event.target.value)}
+                  placeholder="Nombre de categoria"
+                />
+                <textarea
+                  className="cfg-textarea"
+                  value={categoryForm.subcategoriesText}
+                  onChange={(event) => updateCategoryForm('subcategoriesText', event.target.value)}
+                  placeholder="Subcategorias, una por linea o separadas por coma"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <input
+                    className="cfg-input"
+                    type="number"
+                    value={categoryForm.sortOrder}
+                    onChange={(event) => updateCategoryForm('sortOrder', event.target.value)}
+                    placeholder="Orden"
+                  />
+                  <select
+                    className="cfg-select"
+                    value={categoryForm.active ? 'activo' : 'inactivo'}
+                    onChange={(event) => updateCategoryForm('active', event.target.value === 'activo')}
+                  >
+                    <option value="activo">Activa</option>
+                    <option value="inactivo">Inactiva</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button type="submit" className="cfg-button" disabled={savingCategory}>
+                    {savingCategory ? 'Guardando...' : 'Guardar categoria'}
+                  </button>
+                  <button
+                    type="button"
+                    className="cfg-button secondary"
+                    onClick={() => setCategoryForm(emptyCategory)}
+                  >
+                    Nueva
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        ) : isStoreMode && section === 'catalogo' ? (
+          <>
+            <section className="cfg-section-card">
               <div
                 style={{
-                  padding: 12,
-                  borderRadius: 8,
-                  background: '#fff7ed',
-                  border: '1px solid #fed7aa',
-                  color: '#9a3412',
-                  fontWeight: 800,
-                  lineHeight: 1.5,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginBottom: 12,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
                 }}
               >
-                Este SKU esta sincronizado con SICAR. Si cambias nombre, precio o foto aqui, esos campos quedaran
-                protegidos y no se sobreescribiran en la proxima actualizacion.
+                <input
+                  className="cfg-input"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar producto"
+                  style={{ maxWidth: 360 }}
+                />
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <strong>{catalogHydrated ? `${filteredProducts.length} productos` : 'Cargando catalogo...'}</strong>
+                  <button type="button" className="cfg-button secondary" onClick={openNewProductEditor}>
+                    Nuevo producto
+                  </button>
+                </div>
+              </div>
+
+              <table className="cfg-table">
+                <thead>
+                  <tr>
+                    <th>Foto</th>
+                    <th>Producto</th>
+                    <th>Categoria</th>
+                    <th>Precio</th>
+                    <th>Inventario</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!catalogHydrated && filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan="7" style={{ color: '#64748b', fontWeight: 800 }}>
+                        Cargando catalogo real desde Firebase...
+                      </td>
+                    </tr>
+                  )}
+                  {filteredProducts.map((product) => (
+                    <tr key={product.code}>
+                      <td>
+                        <img
+                          className="cfg-photo"
+                          src={product.image || '/tienda/branding/logo.png'}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </td>
+                      <td>
+                        <strong>{product.name}</strong>
+                        <div style={{ color: '#64748b', marginTop: 4 }}>{product.code}</div>
+                        {product.description && (
+                          <div style={{ color: '#94a3b8', marginTop: 4, fontSize: 13 }}>{product.description}</div>
+                        )}
+                        {isSicarManagedProduct(product) && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                            <span className="cfg-badge">SICAR</span>
+                            {product.sync?.overrides?.name && <span className="cfg-badge">Nombre manual</span>}
+                            {product.sync?.overrides?.price && <span className="cfg-badge">Precio manual</span>}
+                            {product.sync?.overrides?.image && <span className="cfg-badge">Foto manual</span>}
+                          </div>
+                        )}
+                        {hasCustomProductQuantityRules(product) && (
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                            <span className="cfg-badge">
+                              Min {formatRestrictionValue(getProductMinQuantity(product), product.unit)}
+                            </span>
+                            <span className="cfg-badge">
+                              Paso {formatRestrictionValue(getProductQuantityStep(product), product.unit)}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <strong>{getCategoryLabel(product.category)}</strong>
+                        <div style={{ color: '#64748b', marginTop: 4 }}>{product.subcategory || '-'}</div>
+                        {product.promo && (
+                          <div style={{ marginTop: 6 }}>
+                            <span className="cfg-badge">Promocion</span>
+                          </div>
+                        )}
+                      </td>
+                      <td>C$ {Number(product.price || 0).toFixed(2)}</td>
+                      <td>{product.inventory === null || product.inventory === undefined || product.inventory === '' ? '-' : Number(product.inventory)}</td>
+                      <td>
+                        <span className={`cfg-badge ${product.active === false ? 'off' : ''}`}>
+                          {product.active === false ? 'Inactivo' : 'Activo'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button type="button" className="cfg-button secondary" onClick={() => editProduct(product)}>
+                            Editar
+                          </button>
+                          <button type="button" className="cfg-button secondary" onClick={() => toggleProduct(product)}>
+                            {product.active === false ? 'Activar' : 'Desactivar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+
+            {productEditorOpen && (
+              <div
+                className="cfg-driver-modal-overlay"
+                onClick={(event) => {
+                  if (event.target === event.currentTarget && !saving && !applyingImageCrop) {
+                    resetProductEditor();
+                  }
+                }}
+              >
+                <form
+                  onSubmit={saveProduct}
+                  className="cfg-driver-modal cfg-product-modal"
+                  style={{ display: 'grid', gap: 16 }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+                        Tienda Virtual / Catalogo
+                      </div>
+                      <h2 style={{ margin: '6px 0 0', fontSize: 28 }}>
+                        {products.some((product) => product.code === form.code) ? 'Editar producto' : 'Nuevo producto'}
+                      </h2>
+                    </div>
+                    <button type="button" className="cfg-button secondary" onClick={resetProductEditor} disabled={saving || applyingImageCrop}>
+                      Cerrar
+                    </button>
+                  </div>
+
+                  {isSicarManagedProduct(products.find((product) => product.code === form.code)) && (
+                    <div
+                      style={{
+                        padding: 12,
+                        borderRadius: 8,
+                        background: '#fff7ed',
+                        border: '1px solid #fed7aa',
+                        color: '#9a3412',
+                        fontWeight: 800,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Este SKU esta sincronizado con SICAR. Si cambias nombre, precio o foto aqui, esos campos quedaran
+                      protegidos y no se sobreescribiran en la proxima actualizacion.
+                    </div>
+                  )}
+
+                  <div
+                    className="cfg-grid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.8fr)',
+                      gap: 16,
+                      alignItems: 'start',
+                    }}
+                  >
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <input
+                        className="cfg-input"
+                        value={form.code}
+                        onChange={(event) => updateForm('code', event.target.value)}
+                        placeholder="Codigo SICAR"
+                      />
+                      <input
+                        className="cfg-input"
+                        value={form.name}
+                        onChange={(event) => updateForm('name', event.target.value)}
+                        placeholder="Nombre"
+                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <input
+                          className="cfg-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.price}
+                          onChange={(event) => updateForm('price', event.target.value)}
+                          placeholder="Precio"
+                        />
+                        <input
+                          className="cfg-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.inventory}
+                          onChange={(event) => updateForm('inventory', event.target.value)}
+                          placeholder="Inventario (opcional)"
+                        />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <select
+                          className="cfg-select"
+                          value={form.unit}
+                          onChange={(event) => updateProductUnit(event.target.value)}
+                        >
+                          <option value="lb">lb</option>
+                          <option value="unidad">unidad</option>
+                        </select>
+                        <select
+                          className="cfg-select"
+                          value={form.active ? 'activo' : 'inactivo'}
+                          onChange={(event) => updateForm('active', event.target.value === 'activo')}
+                        >
+                          <option value="activo">Activo</option>
+                          <option value="inactivo">Inactivo</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <input
+                          className="cfg-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.minQuantity}
+                          onChange={(event) => updateForm('minQuantity', event.target.value)}
+                          placeholder={`Minimo en ${form.unit}`}
+                        />
+                        <input
+                          className="cfg-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.quantityStep}
+                          onChange={(event) => updateForm('quantityStep', event.target.value)}
+                          placeholder={`Incremento en ${form.unit}`}
+                        />
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
+                        Ejemplo: minimo 1 y paso 1 para New York deja solo 1 lb, 2 lb, 3 lb. Si dejas 0.5 y 0.5,
+                        permite media libra, 1 lb, 1.5 lb y asi sucesivamente.
+                      </div>
+                      <select
+                        className="cfg-select"
+                        value={form.promo ? 'promo' : 'normal'}
+                        onChange={(event) => updateForm('promo', event.target.value === 'promo')}
+                      >
+                        <option value="normal">Producto normal</option>
+                        <option value="promo">Promocion / combo</option>
+                      </select>
+                      <select
+                        className="cfg-select"
+                        value={form.category}
+                        onChange={(event) => updateCategory(event.target.value)}
+                      >
+                        {catalogCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="cfg-select"
+                        value={form.subcategory}
+                        onChange={(event) => updateForm('subcategory', event.target.value)}
+                      >
+                        {formSubcategories.map((subcategory) => (
+                          <option key={subcategory} value={subcategory}>
+                            {subcategory}
+                          </option>
+                        ))}
+                        {!formSubcategories.includes(form.subcategory) && form.subcategory && (
+                          <option value={form.subcategory}>{form.subcategory}</option>
+                        )}
+                      </select>
+                      <textarea
+                        className="cfg-textarea"
+                        value={form.description}
+                        onChange={(event) => updateForm('description', event.target.value)}
+                        placeholder="Descripcion corta"
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <input
+                        className="cfg-input"
+                        value={form.image}
+                        onChange={(event) => updateForm('image', event.target.value)}
+                        placeholder="URL o imagen guardada"
+                      />
+                      <input className="cfg-input" type="file" accept="image/*" onChange={handleImageFile} />
+                      {form.image && (
+                        <img
+                          src={form.image}
+                          alt="Vista previa"
+                          style={{
+                            width: '100%',
+                            maxHeight: 280,
+                            objectFit: 'contain',
+                            background: '#f1f5f9',
+                            borderRadius: 12,
+                            border: '1px solid #e2e8f0',
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <button type="button" className="cfg-button secondary" onClick={resetProductEditor} disabled={saving || applyingImageCrop}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="cfg-button" disabled={saving}>
+                      {saving ? 'Guardando...' : 'Guardar producto'}
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
-            <input
-              className="cfg-input"
-              value={form.code}
-              onChange={(event) => updateForm('code', event.target.value)}
-              placeholder="Codigo SICAR"
-            />
-            <input
-              className="cfg-input"
-              value={form.name}
-              onChange={(event) => updateForm('name', event.target.value)}
-              placeholder="Nombre"
-            />
-            <input
-              className="cfg-input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.price}
-              onChange={(event) => updateForm('price', event.target.value)}
-              placeholder="Precio"
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <select
-                className="cfg-select"
-                value={form.unit}
-                onChange={(event) => updateProductUnit(event.target.value)}
-              >
-                <option value="lb">lb</option>
-                <option value="unidad">unidad</option>
-              </select>
-              <select
-                className="cfg-select"
-                value={form.active ? 'activo' : 'inactivo'}
-                onChange={(event) => updateForm('active', event.target.value === 'activo')}
-              >
-                <option value="activo">Activo</option>
-                <option value="inactivo">Inactivo</option>
-              </select>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <input
-                className="cfg-input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.minQuantity}
-                onChange={(event) => updateForm('minQuantity', event.target.value)}
-                placeholder={`Minimo en ${form.unit}`}
-              />
-              <input
-                className="cfg-input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.quantityStep}
-                onChange={(event) => updateForm('quantityStep', event.target.value)}
-                placeholder={`Incremento en ${form.unit}`}
-              />
-            </div>
-            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
-              Ejemplo: minimo 1 y paso 1 para New York deja solo 1 lb, 2 lb, 3 lb. Si dejas 0.5 y 0.5,
-              permite media libra, 1 lb, 1.5 lb y asi sucesivamente.
-            </div>
-            <select
-              className="cfg-select"
-              value={form.promo ? 'promo' : 'normal'}
-              onChange={(event) => updateForm('promo', event.target.value === 'promo')}
-            >
-              <option value="normal">Producto normal</option>
-              <option value="promo">Promocion / combo</option>
-            </select>
-            <select
-              className="cfg-select"
-              value={form.category}
-              onChange={(event) => updateCategory(event.target.value)}
-            >
-              {catalogCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-            <select
-              className="cfg-select"
-              value={form.subcategory}
-              onChange={(event) => updateForm('subcategory', event.target.value)}
-            >
-              {formSubcategories.map((subcategory) => (
-                <option key={subcategory} value={subcategory}>
-                  {subcategory}
-                </option>
-              ))}
-              {!formSubcategories.includes(form.subcategory) && form.subcategory && (
-                <option value={form.subcategory}>{form.subcategory}</option>
-              )}
-            </select>
-            <textarea
-              className="cfg-textarea"
-              value={form.description}
-              onChange={(event) => updateForm('description', event.target.value)}
-              placeholder="Descripcion corta"
-            />
-            <input
-              className="cfg-input"
-              value={form.image}
-              onChange={(event) => updateForm('image', event.target.value)}
-              placeholder="URL o imagen guardada"
-            />
-            <input className="cfg-input" type="file" accept="image/*" onChange={handleImageFile} />
-            {form.image && (
-              <img
-                src={form.image}
-                alt="Vista previa"
-                style={{
-                  width: '100%',
-                  maxHeight: 220,
-                  objectFit: 'contain',
-                  background: '#f1f5f9',
-                  borderRadius: 8,
-                  border: '1px solid #e2e8f0',
-                }}
-              />
-            )}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button type="submit" className="cfg-button" disabled={saving}>
-                {saving ? 'Guardando...' : 'Guardar producto'}
-              </button>
-              <button
-                type="button"
-                className="cfg-button secondary"
-                onClick={() => {
-                  setImageCrop(buildEmptyImageCrop());
-                  setForm(buildEmptyProduct());
-                }}
-              >
-                Nuevo
-              </button>
-            </div>
-          </form>
-        </div>
           </>
-        ) : section === 'promociones' ? (
+        ) : isStoreMode && section === 'promociones' ? (
           <PromotionsManager
             promotions={promotions}
             promotionForm={promotionForm}
@@ -2333,7 +2331,22 @@ export default function ConfiguracionView() {
             clearExpiredPromotions={clearExpiredPromotions}
             resetPromotionForm={() => setPromotionForm(emptyPromotion)}
           />
-        ) : section === 'usuarios' ? (
+        ) : isStoreMode && section === 'cupones' ? (
+          <CouponsManager
+            coupons={coupons}
+            couponsUnlocked={couponsUnlocked}
+            couponPin={couponPin}
+            couponForm={couponForm}
+            savingCoupon={savingCoupon}
+            setCouponPin={setCouponPin}
+            unlockCoupons={unlockCoupons}
+            updateCouponForm={updateCouponForm}
+            saveCoupon={saveCoupon}
+            editCoupon={editCoupon}
+            toggleCoupon={toggleCoupon}
+            resetCouponForm={() => setCouponForm(emptyCoupon)}
+          />
+        ) : (
           <UsersManager
             usersTab={usersTab}
             setUsersTab={setUsersTab}
@@ -2350,9 +2363,6 @@ export default function ConfiguracionView() {
             updatePasswordForm={updatePasswordForm}
             saveClientPassword={saveClientPassword}
             savingPasswordKey={savingPasswordKey}
-          />
-        ) : section === 'entregadores' ? (
-          <DriversManager
             drivers={drivers}
             driverForm={driverForm}
             savingDriver={savingDriver}
@@ -2363,21 +2373,6 @@ export default function ConfiguracionView() {
             toggleDriver={toggleDriver}
             resetDriverForm={() => setDriverForm(emptyDriver)}
             startNewDriverForm={startNewDriverForm}
-          />
-        ) : (
-          <CouponsManager
-            coupons={coupons}
-            couponsUnlocked={couponsUnlocked}
-            couponPin={couponPin}
-            couponForm={couponForm}
-            savingCoupon={savingCoupon}
-            setCouponPin={setCouponPin}
-            unlockCoupons={unlockCoupons}
-            updateCouponForm={updateCouponForm}
-            saveCoupon={saveCoupon}
-            editCoupon={editCoupon}
-            toggleCoupon={toggleCoupon}
-            resetCouponForm={() => setCouponForm(emptyCoupon)}
           />
         )}
 
@@ -2742,6 +2737,7 @@ function DriversManager({
   toggleDriver,
   resetDriverForm,
   startNewDriverForm,
+  embedded = false,
 }) {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectedDriverCode, setSelectedDriverCode] = useState(driverForm.code || '');
@@ -2790,7 +2786,7 @@ function DriversManager({
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1.35fr) minmax(340px, 0.85fr)',
         gap: 18,
-        marginTop: 18,
+        marginTop: embedded ? 0 : 18,
         alignItems: 'start',
       }}
     >
@@ -3523,6 +3519,16 @@ function UsersManager({
   updatePasswordForm,
   saveClientPassword,
   savingPasswordKey,
+  drivers,
+  driverForm,
+  savingDriver,
+  updateDriverForm,
+  saveDeliveryDriver,
+  editDriver,
+  linkDriverToUser,
+  toggleDriver,
+  resetDriverForm,
+  startNewDriverForm,
 }) {
   return (
     <section
@@ -3562,6 +3568,13 @@ function UsersManager({
             onClick={() => setUsersTab('clientes')}
           >
             Clientes
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${usersTab === 'entregadores' ? 'active' : ''}`}
+            onClick={() => setUsersTab('entregadores')}
+          >
+            Entregadores
           </button>
         </div>
       </div>
@@ -3700,7 +3713,7 @@ function UsersManager({
             </button>
           </form>
         </div>
-      ) : (
+      ) : usersTab === 'clientes' ? (
         <div style={{ marginTop: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
             <input
@@ -3783,6 +3796,22 @@ function UsersManager({
               })}
             </div>
           )}
+        </div>
+      ) : (
+        <div style={{ marginTop: 18 }}>
+          <DriversManager
+            drivers={drivers}
+            driverForm={driverForm}
+            savingDriver={savingDriver}
+            updateDriverForm={updateDriverForm}
+            saveDeliveryDriver={saveDeliveryDriver}
+            editDriver={editDriver}
+            linkDriverToUser={linkDriverToUser}
+            toggleDriver={toggleDriver}
+            resetDriverForm={resetDriverForm}
+            startNewDriverForm={startNewDriverForm}
+            embedded
+          />
         </div>
       )}
     </section>
