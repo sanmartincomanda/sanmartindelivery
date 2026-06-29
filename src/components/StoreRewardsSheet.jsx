@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   buildCustomerRewardSummary,
   getRewardDisplayStatus,
@@ -81,64 +81,144 @@ function ClubChevronIcon({ size = 16, color = '#9f1239' }) {
   );
 }
 
+function ClubBackIcon({ size = 18, color = '#0f172a' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M15 6l-6 6 6 6"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ClubCloseIcon({ size = 18, color = '#0f172a' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M7 7l10 10M17 7L7 17" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClubRewardsIcon({ size = 22, color = '#9f1239' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 5l1.9 3.9 4.3.6-3.1 3 0.7 4.3-3.8-2-3.8 2 0.7-4.3-3.1-3 4.3-.6L12 5z"
+        fill={color}
+        opacity="0.92"
+      />
+      <path
+        d="M12 5l1.9 3.9 4.3.6-3.1 3 0.7 4.3-3.8-2-3.8 2 0.7-4.3-3.1-3 4.3-.6L12 5z"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ClubTransactionsIcon({ size = 22, color = '#0f766e' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="14" rx="4" stroke={color} strokeWidth="1.8" />
+      <path d="M8 10h8M8 14h5" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
-  const targetPoints = Math.max(Number(closestReward?.pointsRequired || 0), 1);
+  const rawTargetPoints = Math.max(0, Number(closestReward?.pointsRequired || 0));
+  const targetPoints = Math.max(rawTargetPoints, 1);
   const progressPct = Math.max(0, Math.min(100, Math.round((Number(pointsBalance || 0) / targetPoints) * 100)));
-  const remainingPoints = Math.max(0, targetPoints - Number(pointsBalance || 0));
 
   return (
     <section
       style={{
         borderRadius: 28,
-        padding: 22,
+        padding: 18,
         background: 'linear-gradient(160deg, #0f7a61 0%, #11a58a 58%, #1fd1a6 100%)',
         color: '#ffffff',
         boxShadow: '0 24px 50px rgba(7, 94, 74, 0.28)',
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 30, lineHeight: 1.05 }}>
-            {settings?.programName || 'Club San Martin Granada'}
-          </h2>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '84px minmax(0, 1fr)',
+          gap: 14,
+          alignItems: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 84,
+            height: 84,
+            borderRadius: 24,
+            overflow: 'hidden',
+            background: 'rgba(255,255,255,0.16)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.28)',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          {closestReward?.image ? (
+            <img
+              src={closestReward.image}
+              alt={closestReward.name || settings?.programName || 'Club San Martin Granada'}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <ClubSanMartinIcon size={56} />
+          )}
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 14, opacity: 0.82 }}>Puntos actuales</div>
-          <div style={{ fontSize: 34, fontWeight: 900 }}>{Number(pointsBalance || 0)} pts</div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 13, opacity: 0.84, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Puntos actuales
+              </div>
+              <div style={{ marginTop: 4, fontSize: 34, fontWeight: 900, lineHeight: 1 }}>
+                {Number(pointsBalance || 0)} pts
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.16)',
+                fontSize: 13,
+                fontWeight: 900,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Meta: {rawTargetPoints} pts
+            </div>
+          </div>
         </div>
       </div>
 
       <div
         style={{
-          marginTop: 18,
-          paddingTop: 18,
-          borderTop: '1px solid rgba(255,255,255,0.22)',
+          marginTop: 16,
           display: 'grid',
-          gap: 12,
+          gap: 10,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <strong style={{ fontSize: 19 }}>{closestReward?.name || 'Sigue acumulando'}</strong>
-            <div style={{ marginTop: 4, opacity: 0.92 }}>
-              {closestReward
-                ? remainingPoints > 0
-                  ? `Te faltan ${remainingPoints} puntos para desbloquearlo.`
-                  : 'Ya puedes reclamar este premio.'
-                : 'Todavia no hay premios configurados.'}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', minWidth: 90 }}>
-            <div style={{ fontSize: 13, opacity: 0.82 }}>Meta</div>
-            <strong style={{ fontSize: 18 }}>{targetPoints} pts</strong>
-          </div>
-        </div>
-
         <div
           style={{
             position: 'relative',
             overflow: 'hidden',
-            height: 16,
+            height: 18,
             borderRadius: 999,
             background: 'rgba(3, 56, 46, 0.28)',
           }}
@@ -150,14 +230,14 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
               borderRadius: 999,
               background: 'linear-gradient(90deg, #d9ff4d 0%, #53ff7b 100%)',
               boxShadow: '0 10px 22px rgba(217, 255, 77, 0.35)',
-              transition: 'width 240ms ease',
+              transition: 'width 180ms ease',
             }}
           />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700, fontSize: 13 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 800, fontSize: 12.5 }}>
           <span>{Number(pointsBalance || 0)} pts</span>
-          <span>Meta: {targetPoints} pts</span>
+          <span>Meta: {rawTargetPoints} pts</span>
         </div>
       </div>
     </section>
@@ -166,7 +246,6 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
 
 function RewardCard({
   reward,
-  settings,
   status,
   pointsBalance,
   selectedReward,
@@ -179,17 +258,14 @@ function RewardCard({
   const fixedItems = useMemo(() => getStoreRewardFixedItems(reward), [reward]);
   const [choices, setChoices] = useState(() =>
     Object.fromEntries(
-      choiceGroups.map((group) => [
-        group.choiceGroup,
-        String(group.items?.[0]?.productCode || '').trim(),
-      ])
+      choiceGroups.map((group) => [group.choiceGroup, String(group.items?.[0]?.productCode || '').trim()])
     )
   );
 
   const missingPoints = Math.max(0, Number(reward.pointsRequired || 0) - Number(pointsBalance || 0));
-  const minPurchaseGap = Math.max(0, Number(reward.minPurchaseAmount || 0) - Number(cartAmount || 0));
   const isSelected = selectedReward?.rewardId === reward.id;
   const canRedeem = status.status === 'available';
+
   const statusMeta = (() => {
     if (isSelected) {
       return { label: 'Seleccionado', tone: '#166534', bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.22)' };
@@ -203,17 +279,16 @@ function RewardCard({
     if (status.status === 'min_purchase') {
       return { label: `Compra minima ${formatCurrency(reward.minPurchaseAmount)}`, tone: '#9a3412', bg: 'rgba(249, 115, 22, 0.12)', border: 'rgba(249, 115, 22, 0.22)' };
     }
-    return { label: `Te faltan ${missingPoints} puntos`, tone: '#92400e', bg: 'rgba(245, 158, 11, 0.14)', border: 'rgba(245, 158, 11, 0.22)' };
+    return { label: `${missingPoints} pts faltantes`, tone: '#92400e', bg: 'rgba(245, 158, 11, 0.14)', border: 'rgba(245, 158, 11, 0.22)' };
   })();
 
-  const helperMessage =
-    status.status === 'available'
-      ? 'Puedes canjearlo ahora o seguir acumulando por uno mejor.'
-      : status.status === 'min_purchase'
-        ? `Agrega ${formatCurrency(minPurchaseGap)} mas para usar este premio.`
-        : status.status === 'unavailable'
-          ? 'Este premio esta sujeto a disponibilidad.'
-          : `Te faltan ${missingPoints} puntos para reclamarlo.`;
+  const actionLabel = canRedeem
+    ? 'Canjear premio'
+    : status.status === 'min_purchase'
+      ? 'Aun no aplica'
+      : status.status === 'unavailable'
+        ? 'Sin disponibilidad'
+        : `${missingPoints} pts faltantes`;
 
   return (
     <article
@@ -270,9 +345,7 @@ function RewardCard({
           </span>
         </div>
 
-        {reward.description && (
-          <p style={{ margin: 0, color: '#475569', lineHeight: 1.55 }}>{reward.description}</p>
-        )}
+        {reward.description && <p style={{ margin: 0, color: '#475569', lineHeight: 1.55 }}>{reward.description}</p>}
 
         {fixedItems.length > 0 && (
           <div style={{ display: 'grid', gap: 6 }}>
@@ -323,19 +396,6 @@ function RewardCard({
           </div>
         ))}
 
-        <div
-          style={{
-            padding: '12px 14px',
-            borderRadius: 16,
-            background: '#f8fafc',
-            color: '#475569',
-            fontWeight: 700,
-            lineHeight: 1.45,
-          }}
-        >
-          {helperMessage}
-        </div>
-
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {isSelected ? (
             <button
@@ -369,7 +429,7 @@ function RewardCard({
                 boxShadow: canRedeem ? '0 16px 30px rgba(239, 68, 68, 0.22)' : 'none',
               }}
             >
-              {canRedeem ? 'Canjear premio' : status.status === 'min_purchase' ? 'Aun no aplica' : `Te faltan ${missingPoints} puntos`}
+              {actionLabel}
             </button>
           )}
         </div>
@@ -422,6 +482,9 @@ export function StoreRewardsSummaryCard({
   selectedReward,
   onOpen,
 }) {
+  void settings;
+  void rewards;
+  void cartAmount;
   const pointsBalance = Number(account?.pointsBalance || 0);
 
   return (
@@ -553,6 +616,89 @@ export function StoreRewardsSummaryCard({
   );
 }
 
+function SheetRoundButton({ onClick, children, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={{
+        width: 42,
+        height: 42,
+        borderRadius: 999,
+        border: '1px solid rgba(148, 163, 184, 0.2)',
+        background: '#ffffff',
+        color: '#0f172a',
+        display: 'grid',
+        placeItems: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SheetSectionShortcut({ title, icon, onClick, accent = '#9f1239' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: '1px solid rgba(148, 163, 184, 0.16)',
+        background: '#ffffff',
+        borderRadius: 24,
+        padding: '18px 18px',
+        display: 'grid',
+        gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+        alignItems: 'center',
+        gap: 14,
+        cursor: 'pointer',
+        textAlign: 'left',
+        boxShadow: '0 18px 34px rgba(15, 23, 42, 0.06)',
+        transition: 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease',
+      }}
+    >
+      <div
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 16,
+          display: 'grid',
+          placeItems: 'center',
+          background: accent === '#0f766e' ? 'rgba(15, 118, 110, 0.08)' : 'rgba(159, 18, 57, 0.08)',
+        }}
+      >
+        {icon}
+      </div>
+      <div
+        style={{
+          color: '#0f172a',
+          fontSize: 19,
+          fontWeight: 900,
+          lineHeight: 1.1,
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 999,
+          display: 'grid',
+          placeItems: 'center',
+          background: '#f8fafc',
+          border: '1px solid rgba(148, 163, 184, 0.14)',
+        }}
+      >
+        <ClubChevronIcon color={accent} />
+      </div>
+    </button>
+  );
+}
+
 export default function StoreRewardsSheet({
   open,
   currentUser,
@@ -568,19 +714,48 @@ export default function StoreRewardsSheet({
   onClose,
   onOpenAuth,
 }) {
+  const [activeView, setActiveView] = useState('home');
+  const [isCompactLayout, setIsCompactLayout] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 860 : false
+  );
   const pointsBalance = Number(account?.pointsBalance || 0);
   const rewardSummary = useMemo(
     () => buildCustomerRewardSummary(rewards, pointsBalance, cartAmount, settings),
     [rewards, pointsBalance, cartAmount, settings]
   );
-  const renderRewardCards = (rewardList = []) =>
-    rewardList.map((reward) => {
+  const rewardList = Array.isArray(rewards) ? rewards : [];
+  const transactionList = Array.isArray(transactions) ? transactions : [];
+  const viewOrder = ['home', 'rewards', 'transactions'];
+  const activeViewIndex = Math.max(0, viewOrder.indexOf(activeView));
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setActiveView('home');
+  }, [open]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleResize = () => {
+      setIsCompactLayout(window.innerWidth <= 860);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const renderRewardCards = (items = []) =>
+    items.map((reward) => {
       const status = getRewardDisplayStatus(reward, pointsBalance, cartAmount, settings);
       return (
         <RewardCard
           key={reward.id}
           reward={reward}
-          settings={settings}
           status={status}
           pointsBalance={pointsBalance}
           selectedReward={selectedReward}
@@ -591,6 +766,34 @@ export default function StoreRewardsSheet({
         />
       );
     });
+
+  const openView = (view) => setActiveView(view);
+  const goHome = () => setActiveView('home');
+
+  const getPaneStyle = (view) => {
+    const paneIndex = viewOrder.indexOf(view);
+    const isActive = paneIndex === activeViewIndex;
+    const offset = paneIndex < activeViewIndex ? -24 : 24;
+
+    return {
+      position: isActive ? 'relative' : 'absolute',
+      inset: 0,
+      opacity: isActive ? 1 : 0,
+      transform: isActive ? 'translateX(0)' : `translateX(${offset}px)`,
+      pointerEvents: isActive ? 'auto' : 'none',
+      transition: 'opacity 160ms ease, transform 160ms ease',
+      visibility: isActive ? 'visible' : 'hidden',
+      height: '100%',
+    };
+  };
+
+  const panelSurfaceStyle = {
+    borderRadius: isCompactLayout ? 24 : 28,
+    background: '#ffffff',
+    padding: isCompactLayout ? 16 : 22,
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+    boxShadow: '0 20px 38px rgba(15, 23, 42, 0.06)',
+  };
 
   if (!open) {
     return null;
@@ -605,213 +808,214 @@ export default function StoreRewardsSheet({
         zIndex: 130,
         background: 'rgba(7, 12, 20, 0.58)',
         backdropFilter: 'blur(18px)',
-        padding: 'clamp(14px, 3vw, 28px)',
+        padding: isCompactLayout ? 0 : 'clamp(14px, 3vw, 28px)',
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
+        alignItems: isCompactLayout ? 'stretch' : 'center',
       }}
     >
       <div
         onClick={(event) => event.stopPropagation()}
         style={{
-          width: 'min(1080px, 100%)',
-          maxHeight: 'min(92vh, 920px)',
-          overflowY: 'auto',
-          borderRadius: 34,
+          width: isCompactLayout ? '100%' : 'min(1080px, 100%)',
+          height: isCompactLayout ? '100dvh' : 'min(90vh, 920px)',
+          maxHeight: isCompactLayout ? '100dvh' : 'min(90vh, 920px)',
+          overflow: 'hidden',
+          borderRadius: isCompactLayout ? 0 : 34,
           background: 'linear-gradient(180deg, #f8fffc 0%, #f8fafc 100%)',
-          padding: 'clamp(16px, 3vw, 28px)',
+          padding: isCompactLayout ? '14px 14px 18px' : 'clamp(16px, 3vw, 28px)',
           boxShadow: '0 34px 80px rgba(15, 23, 42, 0.3)',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 18 }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 900, color: '#0f766e', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Club San Martin Granada
-            </div>
-            <h1 style={{ margin: '8px 0 0', fontSize: 34, color: '#0f172a', lineHeight: 1.05 }}>
-              Compra, acumula puntos y reclama premios.
-            </h1>
-            <p style={{ margin: '10px 0 0', color: '#475569', lineHeight: 1.6 }}>
-              Puedes canjear tu premio actual o seguir acumulando para reclamar uno mejor.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              border: 0,
-              borderRadius: 999,
-              background: '#ffffff',
-              color: '#0f172a',
-              width: 46,
-              height: 46,
-              fontSize: 24,
-              cursor: 'pointer',
-              boxShadow: '0 12px 26px rgba(15, 23, 42, 0.08)',
-            }}
-          >
-            ×
-          </button>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: activeView === 'home' ? 'flex-end' : 'space-between',
+            gap: 12,
+            alignItems: 'center',
+            marginBottom: 14,
+          }}
+        >
+          {activeView !== 'home' && (
+            <button
+              type="button"
+              onClick={goHome}
+              style={{
+                border: '1px solid rgba(148, 163, 184, 0.18)',
+                background: '#ffffff',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 14px 10px 12px',
+                borderRadius: 999,
+                fontWeight: 900,
+                fontSize: 17,
+                cursor: 'pointer',
+                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)',
+              }}
+            >
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'rgba(159, 18, 57, 0.08)',
+                }}
+              >
+                <ClubBackIcon />
+              </span>
+              <span>{activeView === 'rewards' ? 'Premios' : 'Movimientos'}</span>
+            </button>
+          )}
+
+          <SheetRoundButton onClick={onClose} ariaLabel="Cerrar Club San Martin">
+            <ClubCloseIcon />
+          </SheetRoundButton>
         </div>
 
         {!currentUser ? (
           <GuestRewardsPrompt onOpenAuth={onOpenAuth} />
         ) : (
-          <div style={{ display: 'grid', gap: 18 }}>
-            <RewardsProgressCard
-              settings={settings}
-              pointsBalance={pointsBalance}
-              closestReward={rewardSummary.closestReward}
-            />
+          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+            <div style={getPaneStyle('home')}>
+              <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 14 }}>
+                <RewardsProgressCard
+                  settings={settings}
+                  pointsBalance={pointsBalance}
+                  closestReward={rewardSummary.closestReward}
+                />
 
-            <section
-              style={{
-                borderRadius: 28,
-                background: '#ffffff',
-                padding: 22,
-                border: '1px solid rgba(148, 163, 184, 0.18)',
-                boxShadow: '0 20px 38px rgba(15, 23, 42, 0.06)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-                <div>
-                  <strong style={{ display: 'block', fontSize: 26, color: '#0f172a' }}>Mis premios</strong>
-                  <span style={{ color: '#475569', fontWeight: 700 }}>
-                    {rewardSummary.availableRewards.length > 0
-                      ? `Tienes ${rewardSummary.availableRewards.length} premio(s) disponibles.`
-                      : 'Sigue acumulando para desbloquear tu siguiente premio.'}
-                  </span>
-                </div>
-                {selectedReward && (
-                  <div
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: 18,
-                      background: 'rgba(22, 163, 74, 0.1)',
-                      color: '#166534',
-                      fontWeight: 900,
-                    }}
-                  >
-                    Premio listo para tu proximo pedido: {selectedReward.rewardName}
-                  </div>
-                )}
+                <SheetSectionShortcut
+                  title="Premios"
+                  icon={<ClubRewardsIcon />}
+                  onClick={() => openView('rewards')}
+                />
+
+                <SheetSectionShortcut
+                  title="Movimientos de puntos"
+                  icon={<ClubTransactionsIcon />}
+                  accent="#0f766e"
+                  onClick={() => openView('transactions')}
+                />
               </div>
+            </div>
 
-              <div style={{ display: 'grid', gap: 14, marginTop: 18 }}>
-                {rewardSummary.availableRewards.length > 0 && (
-                  <div style={{ display: 'grid', gap: 12 }}>
-                    <div>
-                      <strong style={{ display: 'block', fontSize: 18, color: '#0f172a' }}>Ya puedes reclamar</strong>
-                      <span style={{ color: '#64748b', fontWeight: 700 }}>
-                        Elige el premio que quieres usar en tu siguiente pedido.
-                      </span>
-                    </div>
-                    {renderRewardCards(rewardSummary.availableRewards)}
+            <div style={getPaneStyle('rewards')}>
+              <div style={{ height: '100%', overflowY: 'auto' }}>
+                <section style={panelSurfaceStyle}>
+                  <div style={{ marginBottom: 16 }}>
+                    <RewardsProgressCard
+                      settings={settings}
+                      pointsBalance={pointsBalance}
+                      closestReward={rewardSummary.closestReward}
+                    />
                   </div>
-                )}
 
-                {rewardSummary.upcomingRewards.length > 0 && (
-                  <div style={{ display: 'grid', gap: 12 }}>
-                    <div>
-                      <strong style={{ display: 'block', fontSize: 18, color: '#0f172a' }}>Sigue acumulando</strong>
-                      <span style={{ color: '#64748b', fontWeight: 700 }}>
-                        Estos son los premios que puedes desbloquear mas adelante.
-                      </span>
-                    </div>
-                    {renderRewardCards(rewardSummary.upcomingRewards)}
-                  </div>
-                )}
+                  <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: '#0f172a' }}>
+                    Premios
+                  </strong>
 
-                {rewardSummary.availableRewards.length === 0 && rewardSummary.upcomingRewards.length === 0 && (
-                  <div
-                    style={{
-                      padding: 18,
-                      borderRadius: 18,
-                      background: '#f8fafc',
-                      color: '#64748b',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Todavia no hay premios configurados.
+                  <div style={{ display: 'grid', gap: 14, marginTop: 16 }}>
+                    {rewardList.length > 0 ? (
+                      renderRewardCards(rewardList)
+                    ) : (
+                      <div
+                        style={{
+                          padding: 18,
+                          borderRadius: 18,
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Todavia no hay premios configurados.
+                      </div>
+                    )}
                   </div>
-                )}
+                </section>
               </div>
-            </section>
+            </div>
 
-            <section
-              style={{
-                borderRadius: 28,
-                background: '#ffffff',
-                padding: 22,
-                border: '1px solid rgba(148, 163, 184, 0.18)',
-                boxShadow: '0 20px 38px rgba(15, 23, 42, 0.06)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <div>
-                  <strong style={{ display: 'block', fontSize: 24, color: '#0f172a' }}>Movimientos de puntos</strong>
-                  <span style={{ color: '#475569', fontWeight: 700 }}>
-                    Historial de puntos ganados, canjeados y reversados.
-                  </span>
-                </div>
-                <div style={{ color: '#0f172a', fontWeight: 900 }}>
-                  Saldo actual: {pointsBalance} pts
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
-                {(Array.isArray(transactions) ? transactions : []).length === 0 ? (
-                  <div
-                    style={{
-                      padding: 18,
-                      borderRadius: 18,
-                      background: '#f8fafc',
-                      color: '#64748b',
-                      fontWeight: 700,
-                    }}
-                  >
-                    Todavia no tienes movimientos de puntos.
-                  </div>
-                ) : (
-                  transactions.map((transaction) => (
+            <div style={getPaneStyle('transactions')}>
+              <div style={{ height: '100%', overflowY: 'auto' }}>
+                <section style={panelSurfaceStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: '#0f172a' }}>
+                      Movimientos de puntos
+                    </strong>
                     <div
-                      key={transaction.id}
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'minmax(0, 1fr) auto',
-                        gap: 10,
-                        alignItems: 'center',
-                        padding: '14px 16px',
-                        borderRadius: 18,
+                        padding: '8px 12px',
+                        borderRadius: 999,
                         background: '#f8fafc',
+                        color: '#0f172a',
+                        fontWeight: 900,
                       }}
                     >
-                      <div>
-                        <strong style={{ color: '#0f172a' }}>
-                          {transaction.rewardName || transaction.orderKey || formatTransactionType(transaction)}
-                        </strong>
-                        <div style={{ marginTop: 4, color: '#475569' }}>{formatTransactionDate(transaction.createdAt)}</div>
-                        <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
-                          {transaction.note || formatTransactionType(transaction)}
-                        </div>
+                      {pointsBalance} pts
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+                    {transactionList.length === 0 ? (
+                      <div
+                        style={{
+                          padding: 18,
+                          borderRadius: 18,
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Todavia no tienes movimientos de puntos.
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <strong
+                    ) : (
+                      transactionList.map((transaction) => (
+                        <div
+                          key={transaction.id}
                           style={{
-                            display: 'block',
-                            fontSize: 22,
-                            color: Number(transaction.signedPoints || 0) >= 0 ? '#16a34a' : '#dc2626',
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(0, 1fr) auto',
+                            gap: 10,
+                            alignItems: 'center',
+                            padding: '14px 16px',
+                            borderRadius: 18,
+                            background: '#f8fafc',
                           }}
                         >
-                          {formatSignedPoints(transaction)}
-                        </strong>
-                        <span style={{ color: '#475569', fontWeight: 700 }}>{formatTransactionType(transaction)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
+                          <div>
+                            <strong style={{ color: '#0f172a' }}>
+                              {transaction.rewardName || transaction.orderKey || formatTransactionType(transaction)}
+                            </strong>
+                            <div style={{ marginTop: 4, color: '#475569' }}>{formatTransactionDate(transaction.createdAt)}</div>
+                            <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                              {transaction.note || formatTransactionType(transaction)}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <strong
+                              style={{
+                                display: 'block',
+                                fontSize: 22,
+                                color: Number(transaction.signedPoints || 0) >= 0 ? '#16a34a' : '#dc2626',
+                              }}
+                            >
+                              {formatSignedPoints(transaction)}
+                            </strong>
+                            <span style={{ color: '#475569', fontWeight: 700 }}>{formatTransactionType(transaction)}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
               </div>
-            </section>
+            </div>
           </div>
         )}
       </div>
