@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   buildCustomerRewardSummary,
-  calculateStoreRewardRequiredSpend,
   getRewardDisplayStatus,
   getStoreRewardChoiceGroups,
   getStoreRewardFixedItems,
@@ -39,6 +38,34 @@ const formatTransactionDate = (value) => {
     timeStyle: 'short',
   }).format(parsed);
 };
+
+function ClubSanMartinIcon({ size = 54 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 96 96" fill="none" aria-hidden="true">
+      <rect x="7" y="14" width="68" height="50" rx="12" fill="#fb7185" />
+      <path
+        d="M43 14h8a3 3 0 0 1 3 3v1a3 3 0 0 0 3 3h4"
+        stroke="#111827"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <circle cx="27" cy="38" r="13" fill="#fff" stroke="#111827" strokeWidth="4" />
+      <circle cx="27" cy="34" r="4.5" fill="#fed7aa" />
+      <path d="M18 48c1.8-4.5 5.2-7 9-7s7.2 2.5 9 7" fill="#22d3ee" stroke="#111827" strokeWidth="4" strokeLinecap="round" />
+      <rect x="48" y="27" width="20" height="8" rx="2" fill="#fff" stroke="#111827" strokeWidth="4" />
+      <path d="M49 43h18" stroke="#111827" strokeWidth="4" strokeLinecap="round" />
+      <path d="M49 51h9" stroke="#111827" strokeWidth="4" strokeLinecap="round" />
+      <circle cx="66" cy="61" r="17" fill="#22d3ee" stroke="#111827" strokeWidth="4" />
+      <path
+        d="M66 50.5l2.8 5.7 6.2.9-4.5 4.3 1.1 6.1-5.6-3-5.6 3 1.1-6.1-4.5-4.3 6.2-.9 2.8-5.7z"
+        fill="#facc15"
+        stroke="#111827"
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
   const targetPoints = Math.max(Number(closestReward?.pointsRequired || 0), 1);
@@ -117,7 +144,7 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700, fontSize: 13 }}>
           <span>{Number(pointsBalance || 0)} pts</span>
-          <span>{formatCurrency(calculateStoreRewardRequiredSpend(closestReward?.pointsRequired || 0, settings))} en compra acumulada</span>
+          <span>Meta: {targetPoints} pts</span>
         </div>
       </div>
     </section>
@@ -150,8 +177,6 @@ function RewardCard({
   const minPurchaseGap = Math.max(0, Number(reward.minPurchaseAmount || 0) - Number(cartAmount || 0));
   const isSelected = selectedReward?.rewardId === reward.id;
   const canRedeem = status.status === 'available';
-  const rewardSpend = calculateStoreRewardRequiredSpend(reward.pointsRequired, settings);
-
   const statusMeta = (() => {
     if (isSelected) {
       return { label: 'Seleccionado', tone: '#166534', bg: 'rgba(34, 197, 94, 0.12)', border: 'rgba(34, 197, 94, 0.22)' };
@@ -235,11 +260,6 @@ function RewardCard({
         {reward.description && (
           <p style={{ margin: 0, color: '#475569', lineHeight: 1.55 }}>{reward.description}</p>
         )}
-
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', color: '#334155', fontWeight: 700, fontSize: 13 }}>
-          <span>Compra acumulada: {formatCurrency(rewardSpend)}</span>
-          <span>Peso: {Number(reward.rewardWeightPercent || 0).toFixed(2)}%</span>
-        </div>
 
         {fixedItems.length > 0 && (
           <div style={{ display: 'grid', gap: 6 }}>
@@ -391,6 +411,15 @@ export function StoreRewardsSummaryCard({
 }) {
   const pointsBalance = Number(account?.pointsBalance || 0);
   const rewardSummary = buildCustomerRewardSummary(rewards, pointsBalance, cartAmount, settings);
+  const summaryText = currentUser
+    ? selectedReward
+      ? `Premio listo: ${selectedReward.rewardName}`
+      : rewardSummary.bestReward
+        ? `Ya puedes reclamar ${rewardSummary.bestReward.name}`
+        : rewardSummary.closestReward
+          ? `Siguiente premio: ${rewardSummary.closestReward.name}`
+          : 'Abre tu club para ver recompensas.'
+    : 'Inicia sesion para acumular y reclamar premios.';
 
   return (
     <button
@@ -407,45 +436,112 @@ export function StoreRewardsSummaryCard({
     >
       <div
         style={{
-          borderRadius: 26,
-          padding: 18,
+          borderRadius: 24,
+          padding: '14px 16px',
           background: selectedReward
-            ? 'linear-gradient(135deg, rgba(22, 163, 74, 0.12) 0%, rgba(15, 118, 110, 0.1) 100%)'
-            : 'linear-gradient(135deg, rgba(159, 18, 57, 0.08) 0%, rgba(239, 68, 68, 0.08) 100%)',
-          border: selectedReward ? '1px solid rgba(22, 163, 74, 0.18)' : '1px solid rgba(239, 68, 68, 0.14)',
-          boxShadow: '0 16px 34px rgba(15, 23, 42, 0.05)',
+            ? 'linear-gradient(135deg, rgba(22, 163, 74, 0.14) 0%, rgba(15, 118, 110, 0.12) 100%)'
+            : 'linear-gradient(135deg, rgba(255, 241, 242, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)',
+          border: selectedReward ? '1px solid rgba(22, 163, 74, 0.18)' : '1px solid rgba(251, 113, 133, 0.18)',
+          boxShadow: '0 14px 28px rgba(15, 23, 42, 0.06)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ color: '#9f1239', fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Club San Martin Granada
-            </div>
-            <strong style={{ display: 'block', marginTop: 6, fontSize: 22, color: '#0f172a' }}>
-              {currentUser ? `Tienes ${pointsBalance} puntos disponibles.` : 'Mis puntos y recompensas'}
-            </strong>
-            <span style={{ marginTop: 6, display: 'block', color: '#475569', fontWeight: 700 }}>
-              {selectedReward
-                ? `Premio seleccionado: ${selectedReward.rewardName}`
-                : rewardSummary.bestReward
-                  ? `Ya puedes reclamar: ${rewardSummary.bestReward.name}`
-                  : rewardSummary.closestReward
-                    ? `Siguiente premio: ${rewardSummary.closestReward.name}`
-                    : 'Abre el Club San Martin para ver tus recompensas.'}
-            </span>
-          </div>
-          <span
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+            gap: 14,
+            alignItems: 'center',
+          }}
+        >
+          <div
             style={{
-              padding: '10px 14px',
-              borderRadius: 999,
-              background: '#ffffff',
-              color: '#0f172a',
-              fontWeight: 900,
-              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+              width: 58,
+              height: 58,
+              borderRadius: 18,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,241,242,0.9) 100%)',
+              border: '1px solid rgba(251, 113, 133, 0.16)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.65)',
             }}
           >
-            {currentUser ? 'Ver recompensas' : 'Mis puntos'}
-          </span>
+            <ClubSanMartinIcon size={46} />
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <div style={{ color: '#9f1239', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Club San Martin Granada
+            </div>
+            <strong
+              style={{
+                display: 'block',
+                marginTop: 4,
+                fontSize: 16,
+                color: '#0f172a',
+                lineHeight: 1.15,
+              }}
+            >
+              {currentUser ? 'Puntos disponibles:' : 'Mis puntos y recompensas'}
+            </strong>
+            <span
+              style={{
+                marginTop: 4,
+                display: 'block',
+                color: '#64748b',
+                fontWeight: 700,
+                fontSize: 12,
+                lineHeight: 1.35,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {summaryText}
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', justifyItems: 'end', gap: 6 }}>
+            {currentUser ? (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 999,
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  fontWeight: 900,
+                  fontSize: 14,
+                  boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
+                }}
+              >
+                {pointsBalance} pts
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 999,
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  fontWeight: 900,
+                  fontSize: 13,
+                  boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
+                }}
+              >
+                Entrar
+              </div>
+            )}
+            <span
+              style={{
+                color: '#9f1239',
+                fontWeight: 900,
+                fontSize: 11,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              {currentUser ? 'Ver club' : 'Ver puntos'}
+            </span>
+          </div>
         </div>
       </div>
     </button>
