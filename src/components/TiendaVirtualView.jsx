@@ -22,6 +22,7 @@ import {
 import {
   calculateCouponDiscount,
   mergeStoreCoupons,
+  normalizeStoreCoupon,
   normalizeCouponUsageLimit,
   normalizeCouponCode,
   STORE_COUPONS_PATH,
