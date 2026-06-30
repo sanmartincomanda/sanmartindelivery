@@ -69,46 +69,9 @@ export const STORE_PROMOTIONS = [
   },
 ];
 
-export const STORE_COMBOS = [
-  {
-    code: '1001',
-    name: 'C1 TORTA HAMBURGUESA (100% RES)',
-    price: 730,
-    unit: 'unidad',
-    category: 'promociones',
-    subcategory: 'Combos',
-    active: true,
-    promo: true,
-    image: '/tienda/promos/promo-combo-1.jpg',
-    description: 'Combo SICAR C1. Torta hamburguesa 100% res.',
-  },
-  {
-    code: '1002',
-    name: 'C2 TORTA SABOR JALAPENO + CHIMICHURRI',
-    price: 660,
-    unit: 'unidad',
-    category: 'promociones',
-    subcategory: 'Combos',
-    active: true,
-    promo: true,
-    image: '/tienda/promos/promo-combo-2.jpg',
-    description: 'Combo SICAR C2. Torta sabor jalapeno + chimichurri.',
-  },
-  {
-    code: '1003',
-    name: 'C3 CORTES PARA PARRILLA',
-    price: 1020,
-    unit: 'unidad',
-    category: 'promociones',
-    subcategory: 'Combos',
-    active: true,
-    promo: true,
-    image: '/tienda/promos/promo-combo-3.jpg',
-    description: 'Combo SICAR C3. Cortes para parrilla.',
-  },
-];
+export const STORE_COMBOS = [];
 
-export const LEGACY_STORE_COMBO_CODES = ['COMBO-660', 'COMBO-730', 'COMBO-1020'];
+export const LEGACY_STORE_COMBO_CODES = ['1001', '1002', '1003', 'COMBO-660', 'COMBO-730', 'COMBO-1020'];
 
 export const STORE_PAYMENT_OPTIONS = ['TARJETA', 'TRANSFERENCIA', 'LINK DE PAGO', 'EFECTIVO'];
 
