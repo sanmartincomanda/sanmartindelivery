@@ -177,8 +177,8 @@ const getPaymentMeta = (payment) => {
   const meta = {
     TARJETA: {
       icon: 'card',
-      title: 'Tarjeta',
-      detail: 'POS / tarjeta',
+      title: 'POS / TARJETA',
+      detail: 'Pago con POS',
     },
     TRANSFERENCIA: {
       icon: 'bank',
@@ -7707,7 +7707,7 @@ function CheckoutSheet({
               <div className="store-status-pill">Miembro Gold</div>
               <h3 style={{ margin: '10px 0 4px' }}>
                 {currentUser
-                  ? `Con esta compra ganaras aproximadamente ${estimatedRewardPoints} puntos.`
+                  ? `Estas ganando ${estimatedRewardPoints} puntos en esta compra.`
                   : 'Inicia sesion para acumular puntos en cada compra.'}
               </h3>
               {!currentUser && (
@@ -7799,7 +7799,7 @@ function CheckoutSheet({
                 <h3 style={{ margin: '10px 0 4px' }}>
                   {selectedReward
                     ? `Premio elegido: ${selectedReward.rewardName}`
-                    : `Con esta compra ganaras aproximadamente ${estimatedRewardPoints} puntos.`}
+                    : `Estas ganando ${estimatedRewardPoints} puntos en esta compra.`}
                 </h3>
                 <p style={{ margin: 0 }}>
                   {selectedReward
