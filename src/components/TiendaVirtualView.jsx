@@ -914,6 +914,7 @@ export default function TiendaVirtualView({
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [rewardDefinitions, setRewardDefinitions] = useState({});
   const [rewardSettings, setRewardSettings] = useState(DEFAULT_STORE_REWARD_SETTINGS);
+  const [deliverySettings, setDeliverySettings] = useState(DEFAULT_STORE_DELIVERY_SETTINGS);
   const [rewardAccount, setRewardAccount] = useState(() => normalizeStoreRewardAccount({}, ''));
   const [rewardTransactions, setRewardTransactions] = useState([]);
   const [selectedRewardRedemption, setSelectedRewardRedemption] = useState(null);
@@ -996,6 +997,20 @@ export default function TiendaVirtualView({
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreDeliverySettings(
+      (settings) => {
+        setDeliverySettings(settings);
+      },
+      (error) => {
+        console.error('No se pudo cargar la configuracion de entrega:', error);
+        setDeliverySettings(DEFAULT_STORE_DELIVERY_SETTINGS);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -1564,6 +1579,11 @@ export default function TiendaVirtualView({
     [appliedCoupon, totalAmount]
   );
 
+  const discountedProductTotal = useMemo(
+    () => Number(Math.max(totalAmount - couponDiscount, 0).toFixed(2)),
+    [couponDiscount, totalAmount]
+  );
+
   const couponUsageByCode = useMemo(() => {
     const counts = {};
 
@@ -1705,16 +1725,6 @@ export default function TiendaVirtualView({
     return true;
   };
 
-  const approximateTotalAmount = useMemo(
-    () => Number(Math.max(totalAmount - couponDiscount, 0).toFixed(2)),
-    [couponDiscount, totalAmount]
-  );
-
-  const estimatedRewardPoints = useMemo(
-    () => calculateEarnedRewardPoints(approximateTotalAmount, rewardSettings),
-    [approximateTotalAmount, rewardSettings]
-  );
-
   const selectedRewardDefinition = useMemo(
     () =>
       storeRewards.find((reward) => reward.id === String(selectedRewardRedemption?.rewardId || '').trim()) || null,
@@ -1732,6 +1742,31 @@ export default function TiendaVirtualView({
 
   const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
   const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
+  const deliveryQuote = useMemo(
+    () =>
+      calculateStoreDeliveryQuote({
+        settings: deliverySettings,
+        destination: activeDeliveryAddress?.ubicacion,
+        fulfillmentType,
+      }),
+    [activeDeliveryAddress?.ubicacion, deliverySettings, fulfillmentType]
+  );
+  const deliverySummary = useMemo(() => buildStoreDeliverySummary(deliveryQuote), [deliveryQuote]);
+  const deliveryFeeAmount = useMemo(() => {
+    if (!deliveryQuote?.available || deliveryQuote.isPickup) {
+      return 0;
+    }
+
+    return Number(deliveryQuote.totalFee || 0);
+  }, [deliveryQuote]);
+  const approximateTotalAmount = useMemo(
+    () => Number((discountedProductTotal + deliveryFeeAmount).toFixed(2)),
+    [deliveryFeeAmount, discountedProductTotal]
+  );
+  const estimatedRewardPoints = useMemo(
+    () => calculateEarnedRewardPoints(discountedProductTotal, rewardSettings),
+    [discountedProductTotal, rewardSettings]
+  );
   const showPromotions =
     deferredQuery.trim().length === 0 &&
     activeCategory === 'todos' &&
@@ -2575,6 +2610,11 @@ export default function TiendaVirtualView({
       return;
     }
 
+    if (!pickupFlow && !deliveryQuote?.available) {
+      alert(deliverySummary.message || 'No pudimos calcular el servicio a domicilio para este pedido.');
+      return;
+    }
+
     if (appliedCoupon) {
       const usageMessage = getCouponUsageMessage(appliedCoupon);
       if (usageMessage) {
@@ -2617,7 +2657,7 @@ export default function TiendaVirtualView({
             choices: selectedRewardRedemption?.choiceSelections || {},
           },
           catalog: activeProducts,
-          cartAmount: approximateTotalAmount,
+          cartAmount: discountedProductTotal,
           settings: rewardSettings,
         });
       }
@@ -2635,6 +2675,12 @@ export default function TiendaVirtualView({
           items: cartItems,
           subtotalEstimado: totalAmount,
           descuentoCupon: couponDiscount,
+          deliveryFee: deliveryFeeAmount,
+          deliveryFeeBase: pickupFlow ? 0 : Number(deliveryQuote?.baseFee || 0),
+          deliveryFeeTax: pickupFlow ? 0 : Number(deliveryQuote?.taxAmount || 0),
+          deliveryDistanceKm: pickupFlow ? 0 : Number(deliveryQuote?.distanceKm || 0),
+          coverageRadiusKm: pickupFlow ? 0 : Number(deliveryQuote?.coverageRadiusKm || 0),
+          deliveryFeeBracket: pickupFlow ? '' : String(deliveryQuote?.feeKey || ''),
           cupon: appliedCoupon
             ? {
                 code: appliedCoupon.code,
@@ -5987,6 +6033,10 @@ export default function TiendaVirtualView({
           couponInput={couponInput}
           couponMessage={couponMessage}
           approximateTotalAmount={approximateTotalAmount}
+          discountedProductTotal={discountedProductTotal}
+          deliveryQuote={deliveryQuote}
+          deliverySummary={deliverySummary}
+          deliveryFeeAmount={deliveryFeeAmount}
           estimatedRewardPoints={estimatedRewardPoints}
           totalAmount={totalAmount}
           rewardSettings={rewardSettings}
@@ -7492,6 +7542,10 @@ function CheckoutSheet({
   couponInput,
   couponMessage,
   approximateTotalAmount,
+  discountedProductTotal,
+  deliveryQuote,
+  deliverySummary,
+  deliveryFeeAmount,
   estimatedRewardPoints,
   totalAmount,
   rewardSettings,
@@ -7524,6 +7578,7 @@ function CheckoutSheet({
   const paymentValue = normalizeCheckoutPayment(customer.metodoPago);
   const [checkoutStep, setCheckoutStep] = useState('cart');
   const isCartStep = checkoutStep === 'cart';
+  const canSubmitDelivery = pickupFlow || deliveryQuote?.available;
   const deliveryChoices = [
     {
       value: ORDER_FULFILLMENT_DELIVERY,
@@ -7637,12 +7692,24 @@ function CheckoutSheet({
             ))}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
-              <strong>Total</strong>
-              <strong>{formatCurrency(totalAmount)}</strong>
+              <strong>Total productos</strong>
+              <strong>{formatCurrency(discountedProductTotal)}</strong>
             </div>
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
+
+            <div className="store-status-card" style={{ marginTop: 0 }}>
+              <div className={`store-status-pill ${deliverySummary?.tone || ''}`}>{deliverySummary?.title || 'Servicio a domicilio'}</div>
+              <h3 style={{ margin: '10px 0 4px' }}>
+                {pickupFlow
+                  ? 'Sin costo de envio'
+                  : deliveryQuote?.available
+                    ? `${formatCurrency(deliveryFeeAmount)} por envio`
+                    : 'No disponible por ahora'}
+              </h3>
+              <p style={{ margin: 0 }}>{deliverySummary?.message}</p>
+            </div>
 
             {showWelcomeCouponCard && (
               <div className="store-status-card" style={{ marginTop: 0 }}>
@@ -7794,6 +7861,18 @@ function CheckoutSheet({
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
+
+            <div className="store-status-card" style={{ marginTop: 0 }}>
+              <div className={`store-status-pill ${deliverySummary?.tone || ''}`}>{deliverySummary?.title || 'Servicio a domicilio'}</div>
+              <h3 style={{ margin: '10px 0 4px' }}>
+                {pickupFlow
+                  ? 'Sin costo de envio'
+                  : deliveryQuote?.available
+                    ? `${formatCurrency(deliveryFeeAmount)} por envio`
+                    : 'No disponible por ahora'}
+              </h3>
+              <p style={{ margin: 0 }}>{deliverySummary?.message}</p>
+            </div>
 
             {showWelcomeCouponCard && (
               <div className="store-status-card" style={{ marginTop: 0 }}>
@@ -8050,7 +8129,7 @@ function CheckoutSheet({
               onChange={(event) => onNotesChange(event.target.value)}
               placeholder="Notas para tu pedido"
             />
-            <button type="submit" className="store-button" disabled={submitting}>
+            <button type="submit" className="store-button" disabled={submitting || !canSubmitDelivery}>
               {submitting ? 'Enviando...' : 'Realizar pedido en linea'}
             </button>
           </form>

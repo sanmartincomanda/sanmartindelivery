@@ -46,6 +46,14 @@ import {
   updateStorePromotion,
 } from '../services/storePromotions';
 import {
+  DEFAULT_STORE_DELIVERY_SETTINGS,
+  getStoreDeliveryFeeRows,
+  normalizeStoreDeliverySettings,
+  saveStoreDeliverySettings,
+  STORE_DELIVERY_FEE_BRACKETS,
+  subscribeStoreDeliverySettings,
+} from '../services/storeDeliverySettings';
+import {
   STORE_USERS_PATH,
   updateStoreUserPassword,
 } from '../services/storeUsers';
@@ -83,6 +91,15 @@ import {
   unwrapStoreCache,
   writeStoreVersionedCache,
 } from '../services/storeCache';
+import {
+  buildGoogleMapsAddressUrl,
+  buildGoogleMapsEmbedUrl,
+  buildGoogleMapsPlaceUrl,
+  getBrowserLocation,
+  normalizeLocation,
+  reverseGeocodeLocation,
+  searchLocationCandidates,
+} from '../services/geo';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 
 const COUPONS_PIN = '210397';
@@ -422,6 +439,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [promotionForm, setPromotionForm] = useState(emptyPromotion);
   const [driverForm, setDriverForm] = useState(emptyDriver);
   const [kitchenForm, setKitchenForm] = useState(emptyKitchenForm);
+  const [deliverySettings, setDeliverySettings] = useState(() =>
+    normalizeStoreDeliverySettings(DEFAULT_STORE_DELIVERY_SETTINGS)
+  );
   const [couponsUnlocked, setCouponsUnlocked] = useState(false);
   const [couponPin, setCouponPin] = useState('');
   const [passwordForms, setPasswordForms] = useState({});
@@ -431,6 +451,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [savingPromotion, setSavingPromotion] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
   const [savingKitchen, setSavingKitchen] = useState(false);
+  const [savingDeliverySettings, setSavingDeliverySettings] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [cleaningPromotions, setCleaningPromotions] = useState(false);
   const [syncingSicar, setSyncingSicar] = useState(false);
@@ -532,6 +553,25 @@ export default function ConfiguracionView({ mode = 'users' }) {
     cleanupExpiredStorePromotions().catch((error) => {
       console.error('No se pudieron limpiar las historias vencidas:', error);
     });
+
+    return () => unsubscribe();
+  }, [isStoreMode, section]);
+
+  useEffect(() => {
+    if (!isStoreMode || section !== 'entrega') {
+      return undefined;
+    }
+
+    const unsubscribe = subscribeStoreDeliverySettings(
+      (settings) => {
+        startTransition(() => {
+          setDeliverySettings(settings);
+        });
+      },
+      (error) => {
+        console.error('No se pudo cargar la configuracion de entrega:', error);
+      }
+    );
 
     return () => unsubscribe();
   }, [isStoreMode, section]);
@@ -1559,6 +1599,22 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const saveDeliveryConfig = async (nextSettings) => {
+    setSavingDeliverySettings(true);
+    setMessage('Guardando cobertura y tarifas de entrega...');
+
+    try {
+      const savedSettings = await saveStoreDeliverySettings(nextSettings);
+      setDeliverySettings(savedSettings);
+      setMessage('Configuracion de entrega guardada. La tienda ya usara este radio y estas tarifas.');
+    } catch (error) {
+      console.error('Error guardando configuracion de entrega:', error);
+      setMessage('No se pudo guardar la configuracion de entrega.');
+    } finally {
+      setSavingDeliverySettings(false);
+    }
+  };
+
   const sectionMeta = isStoreMode
     ? {
         categorias: {
@@ -1576,6 +1632,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
         recompensas: {
           path: 'Admintv / Tienda Virtual / Programa de Recompensas',
           title: 'Club San Martin Granada',
+        },
+        entrega: {
+          path: 'Admintv / Tienda Virtual / Entrega',
+          title: 'Entrega y cobertura',
         },
         promociones: {
           path: 'Admintv / Tienda Virtual / Historias',
@@ -1887,6 +1947,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('recompensas')}
             >
               Recompensas
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'entrega' ? 'active' : ''}`}
+              onClick={() => setSection('entrega')}
+            >
+              Entrega
             </button>
             <button
               type="button"
@@ -2330,6 +2397,12 @@ export default function ConfiguracionView({ mode = 'users' }) {
           </>
         ) : isStoreMode && section === 'recompensas' ? (
           <StoreRewardsAdminSection catalog={products} />
+        ) : isStoreMode && section === 'entrega' ? (
+          <DeliverySettingsManager
+            settings={deliverySettings}
+            saving={savingDeliverySettings}
+            onSave={saveDeliveryConfig}
+          />
         ) : isStoreMode && section === 'promociones' ? (
           <PromotionsManager
             promotions={promotions}
@@ -3052,6 +3125,377 @@ function DriversManager({
         </div>
       )}
     </div>
+  );
+}
+
+function DeliverySettingsManager({ settings, saving, onSave }) {
+  const [draft, setDraft] = useState(() =>
+    normalizeStoreDeliverySettings(settings, DEFAULT_STORE_DELIVERY_SETTINGS)
+  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchError, setSearchError] = useState('');
+  const [locating, setLocating] = useState(false);
+  const storeLocation = normalizeLocation(draft.storeLocation);
+  const feeRows = useMemo(() => getStoreDeliveryFeeRows(draft), [draft]);
+  const mapUrl = buildGoogleMapsPlaceUrl(storeLocation);
+  const embedUrl = buildGoogleMapsEmbedUrl(storeLocation);
+
+  useEffect(() => {
+    setDraft(normalizeStoreDeliverySettings(settings, DEFAULT_STORE_DELIVERY_SETTINGS));
+  }, [settings]);
+
+  useEffect(() => {
+    const trimmedQuery = searchQuery.trim();
+
+    if (trimmedQuery.length < 3) {
+      setSearchResults([]);
+      setSearchError('');
+      setSearching(false);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      setSearching(true);
+      setSearchError('');
+
+      try {
+        const results = await searchLocationCandidates(trimmedQuery, {
+          countryCode: 'ni',
+          limit: 10,
+          broad: true,
+        });
+        setSearchResults(results);
+        if (results.length === 0) {
+          setSearchError('No encontramos coincidencias. Prueba con barrio, calle, negocio o referencia.');
+        }
+      } catch (error) {
+        console.error('No se pudieron buscar ubicaciones para la tienda:', error);
+        setSearchResults([]);
+        setSearchError('No pudimos buscar ubicaciones en este momento.');
+      } finally {
+        setSearching(false);
+      }
+    }, 320);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  const updateDraft = (field, value) => {
+    setDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const updateStoreLocation = (updates) => {
+    setDraft((current) => ({
+      ...current,
+      storeLocation: {
+        ...(current.storeLocation || {}),
+        ...updates,
+      },
+    }));
+  };
+
+  const updateFee = (key, value) => {
+    setDraft((current) => ({
+      ...current,
+      fees: {
+        ...(current.fees || {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const useCurrentLocation = async () => {
+    setLocating(true);
+
+    try {
+      const currentLocation = await getBrowserLocation();
+      const resolvedLocation = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
+      updateStoreLocation({
+        ...(resolvedLocation || currentLocation),
+        label:
+          String(resolvedLocation?.label || '').trim() ||
+          String(draft.storeLocation?.label || '').trim() ||
+          'Carnes San Martin Granada',
+      });
+    } catch (error) {
+      console.error('No se pudo obtener la ubicacion actual de la tienda:', error);
+      alert('No pudimos tomar la ubicacion actual. Activa permisos o ingresa el punto manualmente.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const normalized = normalizeStoreDeliverySettings(draft, DEFAULT_STORE_DELIVERY_SETTINGS);
+
+    if (!normalizeLocation(normalized.storeLocation)) {
+      alert('Debes guardar una ubicacion valida para la tienda.');
+      return;
+    }
+
+    onSave(normalized);
+  };
+
+  return (
+    <form className="cfg-section-card" onSubmit={handleSubmit} style={{ display: 'grid', gap: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22 }}>Entrega y cobertura</h2>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+            Aqui defines el punto base de la tienda, el radio maximo de cobertura y el costo de envio por distancia.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span className="cfg-badge">Radio actual: {Number(draft.coverageRadiusKm || 0).toFixed(1)} km</span>
+          <span className="cfg-badge">IVA envio: {Number(draft.taxRate || 0).toFixed(0)}%</span>
+        </div>
+      </div>
+
+      <div
+        className="cfg-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.15fr) minmax(320px, 0.85fr)',
+          gap: 16,
+          alignItems: 'start',
+        }}
+      >
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              padding: 14,
+              background: '#ffffff',
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <div>
+              <strong style={{ fontSize: 18 }}>Punto base de la tienda</strong>
+              <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                Este punto se usa para medir la distancia al cliente y bloquear pedidos fuera de cobertura.
+              </div>
+            </div>
+
+            <input
+              className="cfg-input"
+              value={draft.storeLocation?.label || ''}
+              onChange={(event) => updateStoreLocation({ label: event.target.value })}
+              placeholder="Nombre o referencia del punto base"
+            />
+
+            <input
+              className="cfg-input"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Buscar ubicacion de la tienda"
+            />
+
+            {searching && <div style={{ color: '#475569', fontWeight: 700 }}>Buscando ubicaciones...</div>}
+            {searchError && <div style={{ color: '#b91c1c', fontWeight: 700 }}>{searchError}</div>}
+
+            {searchResults.length > 0 && (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {searchResults.map((result) => (
+                  <button
+                    key={`${result.placeId || result.label}-${result.lat}-${result.lng}`}
+                    type="button"
+                    className="cfg-button secondary"
+                    style={{ textAlign: 'left', justifyContent: 'flex-start' }}
+                    onClick={() => {
+                      updateStoreLocation({
+                        ...result,
+                        label: result.label || result.shortLabel || draft.storeLocation?.label || 'Carnes San Martin Granada',
+                      });
+                      setSearchQuery('');
+                      setSearchResults([]);
+                      setSearchError('');
+                    }}
+                  >
+                    {result.shortLabel || result.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {searchQuery.trim().length >= 3 && (
+              <a
+                href={buildGoogleMapsAddressUrl(searchQuery)}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: '#2563eb', fontWeight: 800, textDecoration: 'none' }}
+              >
+                Buscar esta direccion en Google Maps
+              </a>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <input
+                className="cfg-input"
+                type="number"
+                step="0.000001"
+                value={draft.storeLocation?.lat ?? ''}
+                onChange={(event) => updateStoreLocation({ lat: event.target.value })}
+                placeholder="Latitud"
+              />
+              <input
+                className="cfg-input"
+                type="number"
+                step="0.000001"
+                value={draft.storeLocation?.lng ?? ''}
+                onChange={(event) => updateStoreLocation({ lng: event.target.value })}
+                placeholder="Longitud"
+              />
+            </div>
+
+            <button type="button" className="cfg-button secondary" onClick={useCurrentLocation} disabled={locating}>
+              {locating ? 'Tomando ubicacion...' : 'Usar mi ubicacion actual'}
+            </button>
+
+            {storeLocation && (
+              <>
+                <div
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 10,
+                    padding: 12,
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontWeight: 700,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {storeLocation.label || 'Punto base guardado'}
+                  <br />
+                  {Number(storeLocation.lat || 0).toFixed(6)}, {Number(storeLocation.lng || 0).toFixed(6)}
+                </div>
+                <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #dbe3ef', background: '#e2e8f0' }}>
+                  <iframe
+                    title="Ubicacion base de la tienda"
+                    src={embedUrl}
+                    style={{ display: 'block', width: '100%', height: 260, border: 0 }}
+                    loading="lazy"
+                  />
+                </div>
+                <a href={mapUrl} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 800, textDecoration: 'none' }}>
+                  Abrir punto en Google Maps
+                </a>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              padding: 14,
+              background: '#ffffff',
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <strong style={{ fontSize: 18 }}>Cobertura</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#475569', fontWeight: 800 }}>Radio maximo (km)</span>
+                <input
+                  className="cfg-input"
+                  type="number"
+                  min="0.5"
+                  step="0.1"
+                  value={draft.coverageRadiusKm}
+                  onChange={(event) => updateDraft('coverageRadiusKm', event.target.value)}
+                />
+              </label>
+              <label style={{ display: 'grid', gap: 6 }}>
+                <span style={{ color: '#475569', fontWeight: 800 }}>IVA de envio (%)</span>
+                <input
+                  className="cfg-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={draft.taxRate}
+                  onChange={(event) => updateDraft('taxRate', event.target.value)}
+                />
+              </label>
+            </div>
+            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
+              Si el cliente esta mas lejos que este radio, la tienda no le permitira pedir a domicilio.
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              padding: 14,
+              background: '#ffffff',
+              display: 'grid',
+              gap: 12,
+            }}
+          >
+            <strong style={{ fontSize: 18 }}>Tarifas por distancia</strong>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {STORE_DELIVERY_FEE_BRACKETS.map((bracket, index) => {
+                const row = feeRows[index];
+                return (
+                  <div
+                    key={bracket.key}
+                    style={{
+                      border: '1px solid #edf2f7',
+                      borderRadius: 12,
+                      padding: 12,
+                      display: 'grid',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                      <strong>{bracket.label}</strong>
+                      <span className="cfg-badge">Total cliente: C$ {Number(row?.totalFee || 0).toFixed(2)}</span>
+                    </div>
+                    <input
+                      className="cfg-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={draft.fees?.[bracket.key] ?? ''}
+                      onChange={(event) => updateFee(bracket.key, event.target.value)}
+                      placeholder={`Costo base ${bracket.label}`}
+                    />
+                    <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700 }}>
+                      Base: C$ {Number(row?.baseFee || 0).toFixed(2)} | IVA: C$ {Number(row?.taxAmount || 0).toFixed(2)} | Total: C$ {Number(row?.totalFee || 0).toFixed(2)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="cfg-button secondary"
+          onClick={() => setDraft(normalizeStoreDeliverySettings(settings, DEFAULT_STORE_DELIVERY_SETTINGS))}
+          disabled={saving}
+        >
+          Restaurar desde actual
+        </button>
+        <button type="submit" className="cfg-button" disabled={saving}>
+          {saving ? 'Guardando...' : 'Guardar cobertura y tarifas'}
+        </button>
+      </div>
+    </form>
   );
 }
 
