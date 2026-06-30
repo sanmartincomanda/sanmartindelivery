@@ -1,0 +1,4792 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-30T22:11:56.243Z",
+  "source": "crm-analytics",
+  "defaultPeriod": "month",
+  "periodOrder": [
+    "today",
+    "week",
+    "month",
+    "mtd",
+    "quarter"
+  ],
+  "periods": {
+    "today": {
+      "key": "today",
+      "dateFrom": "2026-06-30",
+      "dateTo": "2026-06-30",
+      "dayCount": 1,
+      "online": {
+        "summary": {
+          "revenue": 1592.26,
+          "projectedRevenue": 1592.26,
+          "orderCount": 3,
+          "deliveredCount": 3,
+          "pendingCount": 0,
+          "canceledCount": 0,
+          "pickupCount": 2,
+          "deliveryCount": 1,
+          "uniqueCustomers": 1,
+          "rewardOrders": 0,
+          "couponOrders": 0,
+          "averageTicket": 530.75
+        },
+        "daily": [
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "orderCount": 3,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 1592.26,
+            "projectedRevenue": 1592.26
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "EFECTIVO",
+            "total": 1592.26,
+            "count": 3
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00023",
+            "name": "BISTEC POSTA DE CADERA SB VP   (E)",
+            "quantity": 1.96,
+            "revenue": 421.4,
+            "ordersCount": 1
+          },
+          {
+            "code": "210394",
+            "name": "ASADITO DE RES",
+            "quantity": 2.65,
+            "revenue": 357.75,
+            "ordersCount": 1
+          },
+          {
+            "code": "00443",
+            "name": "TRAS. CECINA (COLOCHO) VP   (E)",
+            "quantity": 1.4,
+            "revenue": 260.4,
+            "ordersCount": 1
+          },
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP   (E)",
+            "quantity": 1.1,
+            "revenue": 190.3,
+            "ordersCount": 1
+          },
+          {
+            "code": "00393",
+            "name": "BISTEC POSTA DE PIERNA VP (E)",
+            "quantity": 0.98,
+            "revenue": 178.36,
+            "ordersCount": 1
+          },
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 0.98,
+            "revenue": 132.3,
+            "ordersCount": 1
+          },
+          {
+            "code": "00247",
+            "name": "SERVICIO A DOMICILIO \"C\" (G)",
+            "quantity": 1,
+            "revenue": 51.75,
+            "ordersCount": 1
+          }
+        ],
+        "topCustomers": [
+          {
+            "key": "Jh6vqMK2YuXujHqSe7QUPrPfA1O2",
+            "code": "",
+            "name": "Luis Ignacio Saenz",
+            "revenue": 1592.26,
+            "ordersCount": 3
+          }
+        ],
+        "recentOrders": [
+          {
+            "orderKey": "2026-06-30-039",
+            "orderNumber": 39,
+            "dateTime": "2026-06-30T18:29:46.989Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 420.41,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-037",
+            "orderNumber": 37,
+            "dateTime": "2026-06-30T16:53:41.610Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 750.45,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-036",
+            "orderNumber": 36,
+            "dateTime": "2026-06-30T16:48:59.272Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 421.4,
+            "status": "Entregado"
+          }
+        ]
+      },
+      "sicar": {
+        "summary": {
+          "saleCount": 128,
+          "revenue": 88340.01,
+          "averageTicket": 690.16,
+          "uniqueCustomers": 54
+        },
+        "daily": [
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "saleCount": 128,
+            "revenue": 88340.01,
+            "averageTicket": 690.16
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "Efectivo",
+            "count": 91,
+            "total": 68083.45
+          },
+          {
+            "name": "Crédito",
+            "count": 16,
+            "total": 20508.27
+          },
+          {
+            "name": "Tarjeta",
+            "count": 16,
+            "total": 7560.48
+          },
+          {
+            "name": "Transferencia",
+            "count": 5,
+            "total": 5235.92
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP   (E)",
+            "quantity": 64.16,
+            "revenue": 10623.22,
+            "salesCount": 8
+          },
+          {
+            "code": "00032",
+            "name": "C. ENTRAÑA (E)",
+            "quantity": 59.2,
+            "revenue": 8524.8,
+            "salesCount": 1
+          },
+          {
+            "code": "00043",
+            "name": "BRISKET GF (E)",
+            "quantity": 51.4,
+            "revenue": 6943.28,
+            "salesCount": 2
+          },
+          {
+            "code": "00038",
+            "name": "MILANESA GF PETITE TENDER (E)",
+            "quantity": 21.2,
+            "revenue": 4452,
+            "salesCount": 5
+          },
+          {
+            "code": "00393",
+            "name": "BISTEC POSTA DE PIERNA VP (E)",
+            "quantity": 24.02,
+            "revenue": 4359.24,
+            "salesCount": 11
+          },
+          {
+            "code": "00023",
+            "name": "BISTEC POSTA DE CADERA SB VP   (E)",
+            "quantity": 19.88,
+            "revenue": 4218.76,
+            "salesCount": 8
+          },
+          {
+            "code": "00002",
+            "name": "MOLIDA MAGRA 0% GRASA (P)        (E)",
+            "quantity": 19,
+            "revenue": 3752.1,
+            "salesCount": 15
+          },
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 20.75,
+            "revenue": 2748.05,
+            "salesCount": 9
+          },
+          {
+            "code": "00394",
+            "name": "BISTEC POSTA DE CORONA (E)",
+            "quantity": 14.96,
+            "revenue": 2690.8,
+            "salesCount": 5
+          },
+          {
+            "code": "00022",
+            "name": "SELECT2.9  (E)",
+            "quantity": 13.32,
+            "revenue": 2557.44,
+            "salesCount": 1
+          }
+        ],
+        "topCustomers": [
+          {
+            "code": "",
+            "name": "Público en General",
+            "ordersCount": 69,
+            "revenue": 28720.99
+          },
+          {
+            "code": "",
+            "name": "MONISA",
+            "ordersCount": 1,
+            "revenue": 11778.66
+          },
+          {
+            "code": "",
+            "name": "CARNES AMPARITO",
+            "ordersCount": 1,
+            "revenue": 11082.24
+          },
+          {
+            "code": "",
+            "name": "HOTEL PALACIO REAL",
+            "ordersCount": 1,
+            "revenue": 2602.58
+          },
+          {
+            "code": "",
+            "name": "INVERSIONES GRANADA S.A",
+            "ordersCount": 2,
+            "revenue": 2323.26
+          },
+          {
+            "code": "",
+            "name": "FRITANGA LAS PALMERAS",
+            "ordersCount": 1,
+            "revenue": 2151.02
+          },
+          {
+            "code": "",
+            "name": "PURO SABOR",
+            "ordersCount": 1,
+            "revenue": 1695.76
+          },
+          {
+            "code": "",
+            "name": "ISABEL CHAVARRIA",
+            "ordersCount": 1,
+            "revenue": 1639.72
+          },
+          {
+            "code": "",
+            "name": "ASADOS CAÑA CASTILLA",
+            "ordersCount": 1,
+            "revenue": 1493.42
+          },
+          {
+            "code": "",
+            "name": "LECHE AGRIA EL CORRALITO",
+            "ordersCount": 1,
+            "revenue": 1436.22
+          }
+        ],
+        "recentSales": [
+          {
+            "saleId": 490624,
+            "dateTime": "2026-06-30 15:38:37",
+            "customer": "RESTAURANTE PAMPA",
+            "payment": "Crédito",
+            "total": 1268.96,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490623,
+            "dateTime": "2026-06-30 15:37:19",
+            "customer": "MAURICIO MORA",
+            "payment": "Efectivo",
+            "total": 188.1,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490622,
+            "dateTime": "2026-06-30 15:25:45",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 190,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490621,
+            "dateTime": "2026-06-30 15:23:25",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 198,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490620,
+            "dateTime": "2026-06-30 15:18:55",
+            "customer": "ASADOS CAÑA CASTILLA",
+            "payment": "Efectivo",
+            "total": 1493.42,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490619,
+            "dateTime": "2026-06-30 15:13:43",
+            "customer": "DANIA ESPINOZA",
+            "payment": "Efectivo",
+            "total": 32.4,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490618,
+            "dateTime": "2026-06-30 15:09:24",
+            "customer": "MOXIE S.A.",
+            "payment": "Tarjeta",
+            "total": 725,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490617,
+            "dateTime": "2026-06-30 14:43:04",
+            "customer": "NICOLE BARBOSA",
+            "payment": "Crédito",
+            "total": 25.5,
+            "status": "Procesada"
+          }
+        ]
+      },
+      "comparison": {
+        "onlineRevenueSharePct": 1.8
+      }
+    },
+    "week": {
+      "key": "week",
+      "dateFrom": "2026-06-24",
+      "dateTo": "2026-06-30",
+      "dayCount": 7,
+      "online": {
+        "summary": {
+          "revenue": 3416.76,
+          "projectedRevenue": 6964.26,
+          "orderCount": 7,
+          "deliveredCount": 5,
+          "pendingCount": 2,
+          "canceledCount": 2,
+          "pickupCount": 3,
+          "deliveryCount": 4,
+          "uniqueCustomers": 5,
+          "rewardOrders": 0,
+          "couponOrders": 0,
+          "averageTicket": 683.35
+        },
+        "daily": [
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 2475
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "orderCount": 2,
+            "deliveredCount": 2,
+            "canceledCount": 1,
+            "revenue": 1824.5,
+            "projectedRevenue": 1824.5
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 1072.5
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "orderCount": 3,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 1592.26,
+            "projectedRevenue": 1592.26
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "EFECTIVO",
+            "total": 3416.76,
+            "count": 5
+          },
+          {
+            "name": "LINK DE PAGO",
+            "total": 2475,
+            "count": 1
+          },
+          {
+            "name": "TARJETA",
+            "total": 1072.5,
+            "count": 1
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00034",
+            "name": "PUYAZO GF (E)",
+            "quantity": 2.5,
+            "revenue": 912.5,
+            "ordersCount": 1
+          },
+          {
+            "code": "7433200856017",
+            "name": "CHORIZO ARGENTINO LOS ARTESANOS",
+            "quantity": 3,
+            "revenue": 555,
+            "ordersCount": 1
+          },
+          {
+            "code": "00443",
+            "name": "TRAS. CECINA (COLOCHO) VP   (E)",
+            "quantity": 2.4,
+            "revenue": 452.4,
+            "ordersCount": 2
+          },
+          {
+            "code": "00023",
+            "name": "BISTEC POSTA DE CADERA SB VP   (E)",
+            "quantity": 1.96,
+            "revenue": 421.4,
+            "ordersCount": 1
+          },
+          {
+            "code": "210394",
+            "name": "ASADITO DE RES",
+            "quantity": 2.65,
+            "revenue": 357.75,
+            "ordersCount": 1
+          },
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP   (E)",
+            "quantity": 1.1,
+            "revenue": 190.3,
+            "ordersCount": 1
+          },
+          {
+            "code": "00393",
+            "name": "BISTEC POSTA DE PIERNA VP (E)",
+            "quantity": 0.98,
+            "revenue": 178.36,
+            "ordersCount": 1
+          },
+          {
+            "code": "00442",
+            "name": "MANO DE PIEDRA VP",
+            "quantity": 1,
+            "revenue": 165,
+            "ordersCount": 1
+          },
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 0.98,
+            "revenue": 132.3,
+            "ordersCount": 1
+          },
+          {
+            "code": "00247",
+            "name": "SERVICIO A DOMICILIO \"C\" (G)",
+            "quantity": 1,
+            "revenue": 51.75,
+            "ordersCount": 1
+          }
+        ],
+        "topCustomers": [
+          {
+            "key": "Jh6vqMK2YuXujHqSe7QUPrPfA1O2",
+            "code": "",
+            "name": "Luis Ignacio Saenz",
+            "revenue": 1592.26,
+            "ordersCount": 3
+          },
+          {
+            "key": "fuP7y0lSgdfm3rI8Li9WxOVjQGy2",
+            "code": "",
+            "name": "Luis Macanche",
+            "revenue": 1467.5,
+            "ordersCount": 1
+          },
+          {
+            "key": "4IDmDG3L7Fcn5rmp9BX8PumTnBx1",
+            "code": "",
+            "name": "Luis Manuel Saenz Roblero",
+            "revenue": 357,
+            "ordersCount": 1
+          }
+        ],
+        "recentOrders": [
+          {
+            "orderKey": "2026-06-30-039",
+            "orderNumber": 39,
+            "dateTime": "2026-06-30T18:29:46.989Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 420.41,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-037",
+            "orderNumber": 37,
+            "dateTime": "2026-06-30T16:53:41.610Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 750.45,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-036",
+            "orderNumber": 36,
+            "dateTime": "2026-06-30T16:48:59.272Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 421.4,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-28-050",
+            "orderNumber": 50,
+            "dateTime": "2026-06-28T21:44:39.169Z",
+            "customer": "Anita Sáenz",
+            "payment": "TARJETA",
+            "total": 1072.5,
+            "status": "Pendiente"
+          },
+          {
+            "orderKey": "2026-06-27-072",
+            "orderNumber": 72,
+            "dateTime": "2026-06-27T21:51:42.518Z",
+            "customer": "Luis Macanche",
+            "payment": "EFECTIVO",
+            "total": 1467.5,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-27-045",
+            "orderNumber": 45,
+            "dateTime": "2026-06-27T16:48:04.416Z",
+            "customer": "Luis Manuel Saenz Roblero",
+            "payment": "EFECTIVO",
+            "total": 357,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-25-025",
+            "orderNumber": 25,
+            "dateTime": "2026-06-25T19:52:44.657Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 2475,
+            "status": "Enviado"
+          }
+        ]
+      },
+      "sicar": {
+        "summary": {
+          "saleCount": 1245,
+          "revenue": 1670312.39,
+          "averageTicket": 1341.62,
+          "uniqueCustomers": 279
+        },
+        "daily": [
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "saleCount": 184,
+            "revenue": 312326.22,
+            "averageTicket": 1697.43
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "saleCount": 144,
+            "revenue": 294147.91,
+            "averageTicket": 2042.69
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "saleCount": 204,
+            "revenue": 260596.05,
+            "averageTicket": 1277.43
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "saleCount": 234,
+            "revenue": 290281.84,
+            "averageTicket": 1240.52
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "saleCount": 149,
+            "revenue": 171550.2,
+            "averageTicket": 1151.34
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "saleCount": 202,
+            "revenue": 253070.16,
+            "averageTicket": 1252.82
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "saleCount": 128,
+            "revenue": 88340.01,
+            "averageTicket": 690.16
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "Crédito",
+            "count": 166,
+            "total": 730881.8
+          },
+          {
+            "name": "Efectivo",
+            "count": 733,
+            "total": 571410.3
+          },
+          {
+            "name": "Tarjeta",
+            "count": 303,
+            "total": 385649.13
+          },
+          {
+            "name": "Transferencia",
+            "count": 48,
+            "total": 85673.12
+          },
+          {
+            "name": "Vales",
+            "count": 2,
+            "total": 1847.84
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 830.95,
+            "revenue": 104738.79,
+            "salesCount": 90
+          },
+          {
+            "code": "000201",
+            "name": "FILETE 3 UP (G)",
+            "quantity": 223.4,
+            "revenue": 82211.2,
+            "salesCount": 1
+          },
+          {
+            "code": "00028",
+            "name": "CORBATA (E)",
+            "quantity": 292.62,
+            "revenue": 50597.76,
+            "salesCount": 30
+          },
+          {
+            "code": "00023",
+            "name": "BISTEC POSTA DE CADERA SB VP   (E)",
+            "quantity": 231.78,
+            "revenue": 49679.58,
+            "salesCount": 86
+          },
+          {
+            "code": "00056",
+            "name": "CH-2 (CHURRASCO PARRILLERO) (E)",
+            "quantity": 186.42,
+            "revenue": 48584.52,
+            "salesCount": 30
+          },
+          {
+            "code": "000221",
+            "name": "FILETE 2/3 (G)",
+            "quantity": 185.98,
+            "revenue": 47190.44,
+            "salesCount": 4
+          },
+          {
+            "code": "00069",
+            "name": "HUESO CORRIENTE (E)",
+            "quantity": 3434.42,
+            "revenue": 46730.01,
+            "salesCount": 40
+          },
+          {
+            "code": "00036",
+            "name": "MFG - (E)",
+            "quantity": 155.3,
+            "revenue": 42432.72,
+            "salesCount": 11
+          },
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP   (E)",
+            "quantity": 249.67,
+            "revenue": 42247.58,
+            "salesCount": 80
+          },
+          {
+            "code": "00003",
+            "name": "MOLIDA ESPECIAL 80/20 (P)  (E)",
+            "quantity": 305.35,
+            "revenue": 41513.62,
+            "salesCount": 86
+          }
+        ],
+        "topCustomers": [
+          {
+            "code": "",
+            "name": "Público en General",
+            "ordersCount": 708,
+            "revenue": 406976.29
+          },
+          {
+            "code": "",
+            "name": "CARNES AMPARITO",
+            "ordersCount": 16,
+            "revenue": 202997.08
+          },
+          {
+            "code": "",
+            "name": "Desarrollos hoteleros de Nicaragua",
+            "ordersCount": 1,
+            "revenue": 96465.25
+          },
+          {
+            "code": "",
+            "name": "CEGUEL",
+            "ordersCount": 6,
+            "revenue": 43780.66
+          },
+          {
+            "code": "",
+            "name": "CASA RIVAS GURDIAN S.A",
+            "ordersCount": 2,
+            "revenue": 40582.47
+          },
+          {
+            "code": "",
+            "name": "ASADOS CAÑA CASTILLA",
+            "ordersCount": 13,
+            "revenue": 39205.22
+          },
+          {
+            "code": "",
+            "name": "FRITANGA LAS PALMERAS",
+            "ordersCount": 4,
+            "revenue": 33312.1
+          },
+          {
+            "code": "",
+            "name": "CHENG HUILEE",
+            "ordersCount": 1,
+            "revenue": 32120.78
+          },
+          {
+            "code": "",
+            "name": "LUISA GABRIELA",
+            "ordersCount": 5,
+            "revenue": 30130.14
+          },
+          {
+            "code": "",
+            "name": "SELINA OPERATION GRANADA",
+            "ordersCount": 3,
+            "revenue": 29024.19
+          }
+        ],
+        "recentSales": [
+          {
+            "saleId": 490624,
+            "dateTime": "2026-06-30 15:38:37",
+            "customer": "RESTAURANTE PAMPA",
+            "payment": "Crédito",
+            "total": 1268.96,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490623,
+            "dateTime": "2026-06-30 15:37:19",
+            "customer": "MAURICIO MORA",
+            "payment": "Efectivo",
+            "total": 188.1,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490622,
+            "dateTime": "2026-06-30 15:25:45",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 190,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490621,
+            "dateTime": "2026-06-30 15:23:25",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 198,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490620,
+            "dateTime": "2026-06-30 15:18:55",
+            "customer": "ASADOS CAÑA CASTILLA",
+            "payment": "Efectivo",
+            "total": 1493.42,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490619,
+            "dateTime": "2026-06-30 15:13:43",
+            "customer": "DANIA ESPINOZA",
+            "payment": "Efectivo",
+            "total": 32.4,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490618,
+            "dateTime": "2026-06-30 15:09:24",
+            "customer": "MOXIE S.A.",
+            "payment": "Tarjeta",
+            "total": 725,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490617,
+            "dateTime": "2026-06-30 14:43:04",
+            "customer": "NICOLE BARBOSA",
+            "payment": "Crédito",
+            "total": 25.5,
+            "status": "Procesada"
+          }
+        ]
+      },
+      "comparison": {
+        "onlineRevenueSharePct": 0.2
+      }
+    },
+    "month": {
+      "key": "month",
+      "dateFrom": "2026-06-01",
+      "dateTo": "2026-06-30",
+      "dayCount": 30,
+      "online": {
+        "summary": {
+          "revenue": 19225.05,
+          "projectedRevenue": 38090.55,
+          "orderCount": 35,
+          "deliveredCount": 22,
+          "pendingCount": 13,
+          "canceledCount": 3,
+          "pickupCount": 3,
+          "deliveryCount": 32,
+          "uniqueCustomers": 9,
+          "rewardOrders": 0,
+          "couponOrders": 3,
+          "averageTicket": 873.87
+        },
+        "daily": [
+          {
+            "date": "2026-06-01",
+            "label": "01-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-02",
+            "label": "02-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-03",
+            "label": "03-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-04",
+            "label": "04-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-05",
+            "label": "05-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-06",
+            "label": "06-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-07",
+            "label": "07-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-08",
+            "label": "08-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-09",
+            "label": "09-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-10",
+            "label": "10-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-11",
+            "label": "11-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-12",
+            "label": "12-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-13",
+            "label": "13-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-14",
+            "label": "14-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-15",
+            "label": "15-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-16",
+            "label": "16-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-17",
+            "label": "17-jun",
+            "orderCount": 4,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 4739
+          },
+          {
+            "date": "2026-06-18",
+            "label": "18-jun",
+            "orderCount": 17,
+            "deliveredCount": 12,
+            "canceledCount": 0,
+            "revenue": 12137.9,
+            "projectedRevenue": 20148.9
+          },
+          {
+            "date": "2026-06-19",
+            "label": "19-jun",
+            "orderCount": 1,
+            "deliveredCount": 1,
+            "canceledCount": 0,
+            "revenue": 660,
+            "projectedRevenue": 660
+          },
+          {
+            "date": "2026-06-20",
+            "label": "20-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-21",
+            "label": "21-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-22",
+            "label": "22-jun",
+            "orderCount": 4,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 2228.39,
+            "projectedRevenue": 2944.39
+          },
+          {
+            "date": "2026-06-23",
+            "label": "23-jun",
+            "orderCount": 2,
+            "deliveredCount": 1,
+            "canceledCount": 0,
+            "revenue": 782,
+            "projectedRevenue": 2634
+          },
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 2475
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "orderCount": 2,
+            "deliveredCount": 2,
+            "canceledCount": 1,
+            "revenue": 1824.5,
+            "projectedRevenue": 1824.5
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 1072.5
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "orderCount": 3,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 1592.26,
+            "projectedRevenue": 1592.26
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "POS BAC",
+            "total": 14927.39,
+            "count": 14
+          },
+          {
+            "name": "EFECTIVO",
+            "total": 12683.26,
+            "count": 14
+          },
+          {
+            "name": "LINK DE PAGO",
+            "total": 6652.5,
+            "count": 4
+          },
+          {
+            "name": "TRANSFERENCIA",
+            "total": 2754.9,
+            "count": 2
+          },
+          {
+            "name": "TARJETA",
+            "total": 1072.5,
+            "count": 1
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "1003",
+            "name": "C3 CORTES PARA PARRILLA",
+            "quantity": 3,
+            "revenue": 3060,
+            "ordersCount": 3
+          },
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP",
+            "quantity": 14.22,
+            "revenue": 2517.56,
+            "ordersCount": 4
+          },
+          {
+            "code": "00442",
+            "name": "MANO DE PIEDRA VP",
+            "quantity": 10.65,
+            "revenue": 1757.25,
+            "ordersCount": 5
+          },
+          {
+            "code": "00393",
+            "name": "BISTEC POSTA DE PIERNA VP",
+            "quantity": 8.98,
+            "revenue": 1634.36,
+            "ordersCount": 5
+          },
+          {
+            "code": "1002",
+            "name": "C2 TORTA SABOR JALAPENO + CHIMICHURRI",
+            "quantity": 2,
+            "revenue": 1320,
+            "ordersCount": 2
+          },
+          {
+            "code": "000322",
+            "name": "C3 CORTES PARA PARRILLA",
+            "quantity": 1,
+            "revenue": 1020,
+            "ordersCount": 1
+          },
+          {
+            "code": "00034",
+            "name": "PUYAZO GF (E)",
+            "quantity": 2.5,
+            "revenue": 912.5,
+            "ordersCount": 1
+          },
+          {
+            "code": "1001",
+            "name": "C1 TORTA HAMBURGUESA (100% RES)",
+            "quantity": 1,
+            "revenue": 730,
+            "ordersCount": 1
+          },
+          {
+            "code": "000562",
+            "name": "C2 HAMBURGUESA S/ JALAPE?O-CHIMI",
+            "quantity": 1,
+            "revenue": 660,
+            "ordersCount": 1
+          },
+          {
+            "code": "00041",
+            "name": "FLANK STEAK GF (VACIO) (E)",
+            "quantity": 3,
+            "revenue": 630,
+            "ordersCount": 1
+          }
+        ],
+        "topCustomers": [
+          {
+            "key": "76374257",
+            "code": "",
+            "name": "María Ruth",
+            "revenue": 13423.39,
+            "ordersCount": 14
+          },
+          {
+            "key": "Jh6vqMK2YuXujHqSe7QUPrPfA1O2",
+            "code": "",
+            "name": "Luis Ignacio Saenz",
+            "revenue": 1592.26,
+            "ordersCount": 3
+          },
+          {
+            "key": "fuP7y0lSgdfm3rI8Li9WxOVjQGy2",
+            "code": "",
+            "name": "Luis Macanche",
+            "revenue": 1467.5,
+            "ordersCount": 1
+          },
+          {
+            "key": "88537749",
+            "code": "",
+            "name": "Ana Catalina",
+            "revenue": 1269.9,
+            "ordersCount": 1
+          },
+          {
+            "key": "846657949",
+            "code": "",
+            "name": "Ana Belen",
+            "revenue": 1115,
+            "ordersCount": 2
+          },
+          {
+            "key": "4IDmDG3L7Fcn5rmp9BX8PumTnBx1",
+            "code": "",
+            "name": "Luis Manuel Saenz Roblero",
+            "revenue": 357,
+            "ordersCount": 1
+          }
+        ],
+        "recentOrders": [
+          {
+            "orderKey": "2026-06-30-039",
+            "orderNumber": 39,
+            "dateTime": "2026-06-30T18:29:46.989Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 420.41,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-037",
+            "orderNumber": 37,
+            "dateTime": "2026-06-30T16:53:41.610Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 750.45,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-036",
+            "orderNumber": 36,
+            "dateTime": "2026-06-30T16:48:59.272Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 421.4,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-28-050",
+            "orderNumber": 50,
+            "dateTime": "2026-06-28T21:44:39.169Z",
+            "customer": "Anita Sáenz",
+            "payment": "TARJETA",
+            "total": 1072.5,
+            "status": "Pendiente"
+          },
+          {
+            "orderKey": "2026-06-27-072",
+            "orderNumber": 72,
+            "dateTime": "2026-06-27T21:51:42.518Z",
+            "customer": "Luis Macanche",
+            "payment": "EFECTIVO",
+            "total": 1467.5,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-27-045",
+            "orderNumber": 45,
+            "dateTime": "2026-06-27T16:48:04.416Z",
+            "customer": "Luis Manuel Saenz Roblero",
+            "payment": "EFECTIVO",
+            "total": 357,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-25-025",
+            "orderNumber": 25,
+            "dateTime": "2026-06-25T19:52:44.657Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 2475,
+            "status": "Enviado"
+          },
+          {
+            "orderKey": "2026-06-23-064",
+            "orderNumber": 64,
+            "dateTime": "2026-06-24T03:04:11.266Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 1852,
+            "status": "Enviado"
+          }
+        ]
+      },
+      "sicar": {
+        "summary": {
+          "saleCount": 5571,
+          "revenue": 9013434.86,
+          "averageTicket": 1617.92,
+          "uniqueCustomers": 556
+        },
+        "daily": [
+          {
+            "date": "2026-06-01",
+            "label": "01-jun",
+            "saleCount": 190,
+            "revenue": 211025.25,
+            "averageTicket": 1110.66
+          },
+          {
+            "date": "2026-06-02",
+            "label": "02-jun",
+            "saleCount": 173,
+            "revenue": 373036.99,
+            "averageTicket": 2156.28
+          },
+          {
+            "date": "2026-06-03",
+            "label": "03-jun",
+            "saleCount": 176,
+            "revenue": 342882.6,
+            "averageTicket": 1948.2
+          },
+          {
+            "date": "2026-06-04",
+            "label": "04-jun",
+            "saleCount": 198,
+            "revenue": 815722.93,
+            "averageTicket": 4119.81
+          },
+          {
+            "date": "2026-06-05",
+            "label": "05-jun",
+            "saleCount": 218,
+            "revenue": 227877.04,
+            "averageTicket": 1045.31
+          },
+          {
+            "date": "2026-06-06",
+            "label": "06-jun",
+            "saleCount": 242,
+            "revenue": 343012,
+            "averageTicket": 1417.4
+          },
+          {
+            "date": "2026-06-07",
+            "label": "07-jun",
+            "saleCount": 156,
+            "revenue": 178576.76,
+            "averageTicket": 1144.72
+          },
+          {
+            "date": "2026-06-08",
+            "label": "08-jun",
+            "saleCount": 165,
+            "revenue": 285150.91,
+            "averageTicket": 1728.19
+          },
+          {
+            "date": "2026-06-09",
+            "label": "09-jun",
+            "saleCount": 171,
+            "revenue": 247733.81,
+            "averageTicket": 1448.74
+          },
+          {
+            "date": "2026-06-10",
+            "label": "10-jun",
+            "saleCount": 166,
+            "revenue": 337856.28,
+            "averageTicket": 2035.28
+          },
+          {
+            "date": "2026-06-11",
+            "label": "11-jun",
+            "saleCount": 179,
+            "revenue": 300573.79,
+            "averageTicket": 1679.18
+          },
+          {
+            "date": "2026-06-12",
+            "label": "12-jun",
+            "saleCount": 186,
+            "revenue": 457818.42,
+            "averageTicket": 2461.39
+          },
+          {
+            "date": "2026-06-13",
+            "label": "13-jun",
+            "saleCount": 217,
+            "revenue": 277269.29,
+            "averageTicket": 1277.74
+          },
+          {
+            "date": "2026-06-14",
+            "label": "14-jun",
+            "saleCount": 155,
+            "revenue": 175937.2,
+            "averageTicket": 1135.08
+          },
+          {
+            "date": "2026-06-15",
+            "label": "15-jun",
+            "saleCount": 199,
+            "revenue": 404315.01,
+            "averageTicket": 2031.73
+          },
+          {
+            "date": "2026-06-16",
+            "label": "16-jun",
+            "saleCount": 181,
+            "revenue": 209499.97,
+            "averageTicket": 1157.46
+          },
+          {
+            "date": "2026-06-17",
+            "label": "17-jun",
+            "saleCount": 184,
+            "revenue": 339660.75,
+            "averageTicket": 1845.98
+          },
+          {
+            "date": "2026-06-18",
+            "label": "18-jun",
+            "saleCount": 177,
+            "revenue": 316661.93,
+            "averageTicket": 1789.05
+          },
+          {
+            "date": "2026-06-19",
+            "label": "19-jun",
+            "saleCount": 182,
+            "revenue": 276462.92,
+            "averageTicket": 1519.03
+          },
+          {
+            "date": "2026-06-20",
+            "label": "20-jun",
+            "saleCount": 234,
+            "revenue": 489616.52,
+            "averageTicket": 2092.38
+          },
+          {
+            "date": "2026-06-21",
+            "label": "21-jun",
+            "saleCount": 166,
+            "revenue": 156439.52,
+            "averageTicket": 942.41
+          },
+          {
+            "date": "2026-06-22",
+            "label": "22-jun",
+            "saleCount": 186,
+            "revenue": 264539.2,
+            "averageTicket": 1422.25
+          },
+          {
+            "date": "2026-06-23",
+            "label": "23-jun",
+            "saleCount": 225,
+            "revenue": 311453.38,
+            "averageTicket": 1384.24
+          },
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "saleCount": 184,
+            "revenue": 312326.22,
+            "averageTicket": 1697.43
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "saleCount": 144,
+            "revenue": 294147.91,
+            "averageTicket": 2042.69
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "saleCount": 204,
+            "revenue": 260596.05,
+            "averageTicket": 1277.43
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "saleCount": 234,
+            "revenue": 290281.84,
+            "averageTicket": 1240.52
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "saleCount": 149,
+            "revenue": 171550.2,
+            "averageTicket": 1151.34
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "saleCount": 202,
+            "revenue": 253070.16,
+            "averageTicket": 1252.82
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "saleCount": 128,
+            "revenue": 88340.01,
+            "averageTicket": 690.16
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "Crédito",
+            "count": 735,
+            "total": 4764422.67
+          },
+          {
+            "name": "Efectivo",
+            "count": 3376,
+            "total": 2703663.64
+          },
+          {
+            "name": "Tarjeta",
+            "count": 1287,
+            "total": 1621266.73
+          },
+          {
+            "name": "Transferencia",
+            "count": 204,
+            "total": 407197.86
+          },
+          {
+            "name": "Vales",
+            "count": 19,
+            "total": 6848.7
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 5325.66,
+            "revenue": 674014.05,
+            "salesCount": 402
+          },
+          {
+            "code": "000201",
+            "name": "FILETE 3 UP (G)",
+            "quantity": 1313.91,
+            "revenue": 484773.61,
+            "salesCount": 11
+          },
+          {
+            "code": "000221",
+            "name": "FILETE 2/3 (G)",
+            "quantity": 1244.08,
+            "revenue": 320696.86,
+            "salesCount": 16
+          },
+          {
+            "code": "00056",
+            "name": "CH-2 (CHURRASCO PARRILLERO) (E)",
+            "quantity": 1072.66,
+            "revenue": 282294.36,
+            "salesCount": 194
+          },
+          {
+            "code": "00028",
+            "name": "CORBATA (E)",
+            "quantity": 1374.33,
+            "revenue": 235930.05,
+            "salesCount": 131
+          },
+          {
+            "code": "00069",
+            "name": "HUESO CORRIENTE (E)",
+            "quantity": 15449.22,
+            "revenue": 213766.27,
+            "salesCount": 198
+          },
+          {
+            "code": "00023",
+            "name": "BISTEC POSTA DE CADERA SB VP   (E)",
+            "quantity": 987.41,
+            "revenue": 210536.89,
+            "salesCount": 372
+          },
+          {
+            "code": "00073",
+            "name": "TRG (E)",
+            "quantity": 3108.4,
+            "revenue": 204572,
+            "salesCount": 30
+          },
+          {
+            "code": "00041",
+            "name": "FLANK STEAK GF (VACIO) (E)",
+            "quantity": 1047.35,
+            "revenue": 200685.13,
+            "salesCount": 37
+          },
+          {
+            "code": "00015",
+            "name": "IN ENTERA (POSTA PIERNA) (E)",
+            "quantity": 1353.31,
+            "revenue": 188999.33,
+            "salesCount": 12
+          }
+        ],
+        "topCustomers": [
+          {
+            "code": "",
+            "name": "Público en General",
+            "ordersCount": 3160,
+            "revenue": 1864684.13
+          },
+          {
+            "code": "",
+            "name": "CARNES AMPARITO",
+            "ordersCount": 74,
+            "revenue": 1815160.26
+          },
+          {
+            "code": "",
+            "name": "GRUPO AMANO INTERNACIONAL S.A",
+            "ordersCount": 7,
+            "revenue": 530015.05
+          },
+          {
+            "code": "",
+            "name": "Desarrollos hoteleros de Nicaragua",
+            "ordersCount": 4,
+            "revenue": 457170.9
+          },
+          {
+            "code": "",
+            "name": "CITSA",
+            "ordersCount": 4,
+            "revenue": 270231.3
+          },
+          {
+            "code": "",
+            "name": "Publico en General",
+            "ordersCount": 28,
+            "revenue": 203788.76
+          },
+          {
+            "code": "",
+            "name": "CASA RIVAS GURDIAN S.A",
+            "ordersCount": 7,
+            "revenue": 171152.32
+          },
+          {
+            "code": "",
+            "name": "CHENG HUILEE",
+            "ordersCount": 6,
+            "revenue": 151421.06
+          },
+          {
+            "code": "",
+            "name": "LUISA GABRIELA",
+            "ordersCount": 22,
+            "revenue": 148593.13
+          },
+          {
+            "code": "",
+            "name": "CEGUEL",
+            "ordersCount": 20,
+            "revenue": 137299.17
+          }
+        ],
+        "recentSales": [
+          {
+            "saleId": 490624,
+            "dateTime": "2026-06-30 15:38:37",
+            "customer": "RESTAURANTE PAMPA",
+            "payment": "Crédito",
+            "total": 1268.96,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490623,
+            "dateTime": "2026-06-30 15:37:19",
+            "customer": "MAURICIO MORA",
+            "payment": "Efectivo",
+            "total": 188.1,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490622,
+            "dateTime": "2026-06-30 15:25:45",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 190,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490621,
+            "dateTime": "2026-06-30 15:23:25",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 198,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490620,
+            "dateTime": "2026-06-30 15:18:55",
+            "customer": "ASADOS CAÑA CASTILLA",
+            "payment": "Efectivo",
+            "total": 1493.42,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490619,
+            "dateTime": "2026-06-30 15:13:43",
+            "customer": "DANIA ESPINOZA",
+            "payment": "Efectivo",
+            "total": 32.4,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490618,
+            "dateTime": "2026-06-30 15:09:24",
+            "customer": "MOXIE S.A.",
+            "payment": "Tarjeta",
+            "total": 725,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490617,
+            "dateTime": "2026-06-30 14:43:04",
+            "customer": "NICOLE BARBOSA",
+            "payment": "Crédito",
+            "total": 25.5,
+            "status": "Procesada"
+          }
+        ]
+      },
+      "comparison": {
+        "onlineRevenueSharePct": 0.2
+      }
+    },
+    "mtd": {
+      "key": "mtd",
+      "dateFrom": "2026-06-01",
+      "dateTo": "2026-06-30",
+      "dayCount": 30,
+      "online": {
+        "summary": {
+          "revenue": 19225.05,
+          "projectedRevenue": 38090.55,
+          "orderCount": 35,
+          "deliveredCount": 22,
+          "pendingCount": 13,
+          "canceledCount": 3,
+          "pickupCount": 3,
+          "deliveryCount": 32,
+          "uniqueCustomers": 9,
+          "rewardOrders": 0,
+          "couponOrders": 3,
+          "averageTicket": 873.87
+        },
+        "daily": [
+          {
+            "date": "2026-06-01",
+            "label": "01-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-02",
+            "label": "02-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-03",
+            "label": "03-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-04",
+            "label": "04-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-05",
+            "label": "05-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-06",
+            "label": "06-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-07",
+            "label": "07-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-08",
+            "label": "08-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-09",
+            "label": "09-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-10",
+            "label": "10-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-11",
+            "label": "11-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-12",
+            "label": "12-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-13",
+            "label": "13-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-14",
+            "label": "14-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-15",
+            "label": "15-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-16",
+            "label": "16-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-17",
+            "label": "17-jun",
+            "orderCount": 4,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 4739
+          },
+          {
+            "date": "2026-06-18",
+            "label": "18-jun",
+            "orderCount": 17,
+            "deliveredCount": 12,
+            "canceledCount": 0,
+            "revenue": 12137.9,
+            "projectedRevenue": 20148.9
+          },
+          {
+            "date": "2026-06-19",
+            "label": "19-jun",
+            "orderCount": 1,
+            "deliveredCount": 1,
+            "canceledCount": 0,
+            "revenue": 660,
+            "projectedRevenue": 660
+          },
+          {
+            "date": "2026-06-20",
+            "label": "20-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-21",
+            "label": "21-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-22",
+            "label": "22-jun",
+            "orderCount": 4,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 2228.39,
+            "projectedRevenue": 2944.39
+          },
+          {
+            "date": "2026-06-23",
+            "label": "23-jun",
+            "orderCount": 2,
+            "deliveredCount": 1,
+            "canceledCount": 0,
+            "revenue": 782,
+            "projectedRevenue": 2634
+          },
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 2475
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "orderCount": 2,
+            "deliveredCount": 2,
+            "canceledCount": 1,
+            "revenue": 1824.5,
+            "projectedRevenue": 1824.5
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 1072.5
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "orderCount": 3,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 1592.26,
+            "projectedRevenue": 1592.26
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "POS BAC",
+            "total": 14927.39,
+            "count": 14
+          },
+          {
+            "name": "EFECTIVO",
+            "total": 12683.26,
+            "count": 14
+          },
+          {
+            "name": "LINK DE PAGO",
+            "total": 6652.5,
+            "count": 4
+          },
+          {
+            "name": "TRANSFERENCIA",
+            "total": 2754.9,
+            "count": 2
+          },
+          {
+            "name": "TARJETA",
+            "total": 1072.5,
+            "count": 1
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "1003",
+            "name": "C3 CORTES PARA PARRILLA",
+            "quantity": 3,
+            "revenue": 3060,
+            "ordersCount": 3
+          },
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP",
+            "quantity": 14.22,
+            "revenue": 2517.56,
+            "ordersCount": 4
+          },
+          {
+            "code": "00442",
+            "name": "MANO DE PIEDRA VP",
+            "quantity": 10.65,
+            "revenue": 1757.25,
+            "ordersCount": 5
+          },
+          {
+            "code": "00393",
+            "name": "BISTEC POSTA DE PIERNA VP",
+            "quantity": 8.98,
+            "revenue": 1634.36,
+            "ordersCount": 5
+          },
+          {
+            "code": "1002",
+            "name": "C2 TORTA SABOR JALAPENO + CHIMICHURRI",
+            "quantity": 2,
+            "revenue": 1320,
+            "ordersCount": 2
+          },
+          {
+            "code": "000322",
+            "name": "C3 CORTES PARA PARRILLA",
+            "quantity": 1,
+            "revenue": 1020,
+            "ordersCount": 1
+          },
+          {
+            "code": "00034",
+            "name": "PUYAZO GF (E)",
+            "quantity": 2.5,
+            "revenue": 912.5,
+            "ordersCount": 1
+          },
+          {
+            "code": "1001",
+            "name": "C1 TORTA HAMBURGUESA (100% RES)",
+            "quantity": 1,
+            "revenue": 730,
+            "ordersCount": 1
+          },
+          {
+            "code": "000562",
+            "name": "C2 HAMBURGUESA S/ JALAPE?O-CHIMI",
+            "quantity": 1,
+            "revenue": 660,
+            "ordersCount": 1
+          },
+          {
+            "code": "00041",
+            "name": "FLANK STEAK GF (VACIO) (E)",
+            "quantity": 3,
+            "revenue": 630,
+            "ordersCount": 1
+          }
+        ],
+        "topCustomers": [
+          {
+            "key": "76374257",
+            "code": "",
+            "name": "María Ruth",
+            "revenue": 13423.39,
+            "ordersCount": 14
+          },
+          {
+            "key": "Jh6vqMK2YuXujHqSe7QUPrPfA1O2",
+            "code": "",
+            "name": "Luis Ignacio Saenz",
+            "revenue": 1592.26,
+            "ordersCount": 3
+          },
+          {
+            "key": "fuP7y0lSgdfm3rI8Li9WxOVjQGy2",
+            "code": "",
+            "name": "Luis Macanche",
+            "revenue": 1467.5,
+            "ordersCount": 1
+          },
+          {
+            "key": "88537749",
+            "code": "",
+            "name": "Ana Catalina",
+            "revenue": 1269.9,
+            "ordersCount": 1
+          },
+          {
+            "key": "846657949",
+            "code": "",
+            "name": "Ana Belen",
+            "revenue": 1115,
+            "ordersCount": 2
+          },
+          {
+            "key": "4IDmDG3L7Fcn5rmp9BX8PumTnBx1",
+            "code": "",
+            "name": "Luis Manuel Saenz Roblero",
+            "revenue": 357,
+            "ordersCount": 1
+          }
+        ],
+        "recentOrders": [
+          {
+            "orderKey": "2026-06-30-039",
+            "orderNumber": 39,
+            "dateTime": "2026-06-30T18:29:46.989Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 420.41,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-037",
+            "orderNumber": 37,
+            "dateTime": "2026-06-30T16:53:41.610Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 750.45,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-036",
+            "orderNumber": 36,
+            "dateTime": "2026-06-30T16:48:59.272Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 421.4,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-28-050",
+            "orderNumber": 50,
+            "dateTime": "2026-06-28T21:44:39.169Z",
+            "customer": "Anita Sáenz",
+            "payment": "TARJETA",
+            "total": 1072.5,
+            "status": "Pendiente"
+          },
+          {
+            "orderKey": "2026-06-27-072",
+            "orderNumber": 72,
+            "dateTime": "2026-06-27T21:51:42.518Z",
+            "customer": "Luis Macanche",
+            "payment": "EFECTIVO",
+            "total": 1467.5,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-27-045",
+            "orderNumber": 45,
+            "dateTime": "2026-06-27T16:48:04.416Z",
+            "customer": "Luis Manuel Saenz Roblero",
+            "payment": "EFECTIVO",
+            "total": 357,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-25-025",
+            "orderNumber": 25,
+            "dateTime": "2026-06-25T19:52:44.657Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 2475,
+            "status": "Enviado"
+          },
+          {
+            "orderKey": "2026-06-23-064",
+            "orderNumber": 64,
+            "dateTime": "2026-06-24T03:04:11.266Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 1852,
+            "status": "Enviado"
+          }
+        ]
+      },
+      "sicar": {
+        "summary": {
+          "saleCount": 5571,
+          "revenue": 9013434.86,
+          "averageTicket": 1617.92,
+          "uniqueCustomers": 556
+        },
+        "daily": [
+          {
+            "date": "2026-06-01",
+            "label": "01-jun",
+            "saleCount": 190,
+            "revenue": 211025.25,
+            "averageTicket": 1110.66
+          },
+          {
+            "date": "2026-06-02",
+            "label": "02-jun",
+            "saleCount": 173,
+            "revenue": 373036.99,
+            "averageTicket": 2156.28
+          },
+          {
+            "date": "2026-06-03",
+            "label": "03-jun",
+            "saleCount": 176,
+            "revenue": 342882.6,
+            "averageTicket": 1948.2
+          },
+          {
+            "date": "2026-06-04",
+            "label": "04-jun",
+            "saleCount": 198,
+            "revenue": 815722.93,
+            "averageTicket": 4119.81
+          },
+          {
+            "date": "2026-06-05",
+            "label": "05-jun",
+            "saleCount": 218,
+            "revenue": 227877.04,
+            "averageTicket": 1045.31
+          },
+          {
+            "date": "2026-06-06",
+            "label": "06-jun",
+            "saleCount": 242,
+            "revenue": 343012,
+            "averageTicket": 1417.4
+          },
+          {
+            "date": "2026-06-07",
+            "label": "07-jun",
+            "saleCount": 156,
+            "revenue": 178576.76,
+            "averageTicket": 1144.72
+          },
+          {
+            "date": "2026-06-08",
+            "label": "08-jun",
+            "saleCount": 165,
+            "revenue": 285150.91,
+            "averageTicket": 1728.19
+          },
+          {
+            "date": "2026-06-09",
+            "label": "09-jun",
+            "saleCount": 171,
+            "revenue": 247733.81,
+            "averageTicket": 1448.74
+          },
+          {
+            "date": "2026-06-10",
+            "label": "10-jun",
+            "saleCount": 166,
+            "revenue": 337856.28,
+            "averageTicket": 2035.28
+          },
+          {
+            "date": "2026-06-11",
+            "label": "11-jun",
+            "saleCount": 179,
+            "revenue": 300573.79,
+            "averageTicket": 1679.18
+          },
+          {
+            "date": "2026-06-12",
+            "label": "12-jun",
+            "saleCount": 186,
+            "revenue": 457818.42,
+            "averageTicket": 2461.39
+          },
+          {
+            "date": "2026-06-13",
+            "label": "13-jun",
+            "saleCount": 217,
+            "revenue": 277269.29,
+            "averageTicket": 1277.74
+          },
+          {
+            "date": "2026-06-14",
+            "label": "14-jun",
+            "saleCount": 155,
+            "revenue": 175937.2,
+            "averageTicket": 1135.08
+          },
+          {
+            "date": "2026-06-15",
+            "label": "15-jun",
+            "saleCount": 199,
+            "revenue": 404315.01,
+            "averageTicket": 2031.73
+          },
+          {
+            "date": "2026-06-16",
+            "label": "16-jun",
+            "saleCount": 181,
+            "revenue": 209499.97,
+            "averageTicket": 1157.46
+          },
+          {
+            "date": "2026-06-17",
+            "label": "17-jun",
+            "saleCount": 184,
+            "revenue": 339660.75,
+            "averageTicket": 1845.98
+          },
+          {
+            "date": "2026-06-18",
+            "label": "18-jun",
+            "saleCount": 177,
+            "revenue": 316661.93,
+            "averageTicket": 1789.05
+          },
+          {
+            "date": "2026-06-19",
+            "label": "19-jun",
+            "saleCount": 182,
+            "revenue": 276462.92,
+            "averageTicket": 1519.03
+          },
+          {
+            "date": "2026-06-20",
+            "label": "20-jun",
+            "saleCount": 234,
+            "revenue": 489616.52,
+            "averageTicket": 2092.38
+          },
+          {
+            "date": "2026-06-21",
+            "label": "21-jun",
+            "saleCount": 166,
+            "revenue": 156439.52,
+            "averageTicket": 942.41
+          },
+          {
+            "date": "2026-06-22",
+            "label": "22-jun",
+            "saleCount": 186,
+            "revenue": 264539.2,
+            "averageTicket": 1422.25
+          },
+          {
+            "date": "2026-06-23",
+            "label": "23-jun",
+            "saleCount": 225,
+            "revenue": 311453.38,
+            "averageTicket": 1384.24
+          },
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "saleCount": 184,
+            "revenue": 312326.22,
+            "averageTicket": 1697.43
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "saleCount": 144,
+            "revenue": 294147.91,
+            "averageTicket": 2042.69
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "saleCount": 204,
+            "revenue": 260596.05,
+            "averageTicket": 1277.43
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "saleCount": 234,
+            "revenue": 290281.84,
+            "averageTicket": 1240.52
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "saleCount": 149,
+            "revenue": 171550.2,
+            "averageTicket": 1151.34
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "saleCount": 202,
+            "revenue": 253070.16,
+            "averageTicket": 1252.82
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "saleCount": 128,
+            "revenue": 88340.01,
+            "averageTicket": 690.16
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "Crédito",
+            "count": 735,
+            "total": 4764422.67
+          },
+          {
+            "name": "Efectivo",
+            "count": 3376,
+            "total": 2703663.64
+          },
+          {
+            "name": "Tarjeta",
+            "count": 1287,
+            "total": 1621266.73
+          },
+          {
+            "name": "Transferencia",
+            "count": 204,
+            "total": 407197.86
+          },
+          {
+            "name": "Vales",
+            "count": 19,
+            "total": 6848.7
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 5325.66,
+            "revenue": 674014.05,
+            "salesCount": 402
+          },
+          {
+            "code": "000201",
+            "name": "FILETE 3 UP (G)",
+            "quantity": 1313.91,
+            "revenue": 484773.61,
+            "salesCount": 11
+          },
+          {
+            "code": "000221",
+            "name": "FILETE 2/3 (G)",
+            "quantity": 1244.08,
+            "revenue": 320696.86,
+            "salesCount": 16
+          },
+          {
+            "code": "00056",
+            "name": "CH-2 (CHURRASCO PARRILLERO) (E)",
+            "quantity": 1072.66,
+            "revenue": 282294.36,
+            "salesCount": 194
+          },
+          {
+            "code": "00028",
+            "name": "CORBATA (E)",
+            "quantity": 1374.33,
+            "revenue": 235930.05,
+            "salesCount": 131
+          },
+          {
+            "code": "00069",
+            "name": "HUESO CORRIENTE (E)",
+            "quantity": 15449.22,
+            "revenue": 213766.27,
+            "salesCount": 198
+          },
+          {
+            "code": "00023",
+            "name": "BISTEC POSTA DE CADERA SB VP   (E)",
+            "quantity": 987.41,
+            "revenue": 210536.89,
+            "salesCount": 372
+          },
+          {
+            "code": "00073",
+            "name": "TRG (E)",
+            "quantity": 3108.4,
+            "revenue": 204572,
+            "salesCount": 30
+          },
+          {
+            "code": "00041",
+            "name": "FLANK STEAK GF (VACIO) (E)",
+            "quantity": 1047.35,
+            "revenue": 200685.13,
+            "salesCount": 37
+          },
+          {
+            "code": "00015",
+            "name": "IN ENTERA (POSTA PIERNA) (E)",
+            "quantity": 1353.31,
+            "revenue": 188999.33,
+            "salesCount": 12
+          }
+        ],
+        "topCustomers": [
+          {
+            "code": "",
+            "name": "Público en General",
+            "ordersCount": 3160,
+            "revenue": 1864684.13
+          },
+          {
+            "code": "",
+            "name": "CARNES AMPARITO",
+            "ordersCount": 74,
+            "revenue": 1815160.26
+          },
+          {
+            "code": "",
+            "name": "GRUPO AMANO INTERNACIONAL S.A",
+            "ordersCount": 7,
+            "revenue": 530015.05
+          },
+          {
+            "code": "",
+            "name": "Desarrollos hoteleros de Nicaragua",
+            "ordersCount": 4,
+            "revenue": 457170.9
+          },
+          {
+            "code": "",
+            "name": "CITSA",
+            "ordersCount": 4,
+            "revenue": 270231.3
+          },
+          {
+            "code": "",
+            "name": "Publico en General",
+            "ordersCount": 28,
+            "revenue": 203788.76
+          },
+          {
+            "code": "",
+            "name": "CASA RIVAS GURDIAN S.A",
+            "ordersCount": 7,
+            "revenue": 171152.32
+          },
+          {
+            "code": "",
+            "name": "CHENG HUILEE",
+            "ordersCount": 6,
+            "revenue": 151421.06
+          },
+          {
+            "code": "",
+            "name": "LUISA GABRIELA",
+            "ordersCount": 22,
+            "revenue": 148593.13
+          },
+          {
+            "code": "",
+            "name": "CEGUEL",
+            "ordersCount": 20,
+            "revenue": 137299.17
+          }
+        ],
+        "recentSales": [
+          {
+            "saleId": 490624,
+            "dateTime": "2026-06-30 15:38:37",
+            "customer": "RESTAURANTE PAMPA",
+            "payment": "Crédito",
+            "total": 1268.96,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490623,
+            "dateTime": "2026-06-30 15:37:19",
+            "customer": "MAURICIO MORA",
+            "payment": "Efectivo",
+            "total": 188.1,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490622,
+            "dateTime": "2026-06-30 15:25:45",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 190,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490621,
+            "dateTime": "2026-06-30 15:23:25",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 198,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490620,
+            "dateTime": "2026-06-30 15:18:55",
+            "customer": "ASADOS CAÑA CASTILLA",
+            "payment": "Efectivo",
+            "total": 1493.42,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490619,
+            "dateTime": "2026-06-30 15:13:43",
+            "customer": "DANIA ESPINOZA",
+            "payment": "Efectivo",
+            "total": 32.4,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490618,
+            "dateTime": "2026-06-30 15:09:24",
+            "customer": "MOXIE S.A.",
+            "payment": "Tarjeta",
+            "total": 725,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490617,
+            "dateTime": "2026-06-30 14:43:04",
+            "customer": "NICOLE BARBOSA",
+            "payment": "Crédito",
+            "total": 25.5,
+            "status": "Procesada"
+          }
+        ]
+      },
+      "comparison": {
+        "onlineRevenueSharePct": 0.2
+      }
+    },
+    "quarter": {
+      "key": "quarter",
+      "dateFrom": "2026-04-02",
+      "dateTo": "2026-06-30",
+      "dayCount": 90,
+      "online": {
+        "summary": {
+          "revenue": 19225.05,
+          "projectedRevenue": 38090.55,
+          "orderCount": 35,
+          "deliveredCount": 22,
+          "pendingCount": 13,
+          "canceledCount": 3,
+          "pickupCount": 3,
+          "deliveryCount": 32,
+          "uniqueCustomers": 9,
+          "rewardOrders": 0,
+          "couponOrders": 3,
+          "averageTicket": 873.87
+        },
+        "daily": [
+          {
+            "date": "2026-04-02",
+            "label": "02-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-03",
+            "label": "03-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-04",
+            "label": "04-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-05",
+            "label": "05-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-06",
+            "label": "06-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-07",
+            "label": "07-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-08",
+            "label": "08-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-09",
+            "label": "09-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-10",
+            "label": "10-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-11",
+            "label": "11-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-12",
+            "label": "12-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-13",
+            "label": "13-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-14",
+            "label": "14-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-15",
+            "label": "15-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-16",
+            "label": "16-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-17",
+            "label": "17-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-18",
+            "label": "18-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-19",
+            "label": "19-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-20",
+            "label": "20-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-21",
+            "label": "21-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-22",
+            "label": "22-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-23",
+            "label": "23-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-24",
+            "label": "24-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-25",
+            "label": "25-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-26",
+            "label": "26-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-27",
+            "label": "27-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-28",
+            "label": "28-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-29",
+            "label": "29-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-04-30",
+            "label": "30-abr",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-01",
+            "label": "01-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-02",
+            "label": "02-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-03",
+            "label": "03-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-04",
+            "label": "04-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-05",
+            "label": "05-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-06",
+            "label": "06-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-07",
+            "label": "07-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-08",
+            "label": "08-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-09",
+            "label": "09-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-10",
+            "label": "10-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-11",
+            "label": "11-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-12",
+            "label": "12-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-13",
+            "label": "13-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-14",
+            "label": "14-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-15",
+            "label": "15-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-16",
+            "label": "16-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-17",
+            "label": "17-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-18",
+            "label": "18-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-19",
+            "label": "19-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-20",
+            "label": "20-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-21",
+            "label": "21-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-22",
+            "label": "22-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-23",
+            "label": "23-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-24",
+            "label": "24-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-25",
+            "label": "25-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-26",
+            "label": "26-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-27",
+            "label": "27-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-28",
+            "label": "28-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-29",
+            "label": "29-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-30",
+            "label": "30-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-05-31",
+            "label": "31-may",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-01",
+            "label": "01-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-02",
+            "label": "02-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-03",
+            "label": "03-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-04",
+            "label": "04-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-05",
+            "label": "05-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-06",
+            "label": "06-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-07",
+            "label": "07-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-08",
+            "label": "08-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-09",
+            "label": "09-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-10",
+            "label": "10-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-11",
+            "label": "11-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-12",
+            "label": "12-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-13",
+            "label": "13-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-14",
+            "label": "14-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-15",
+            "label": "15-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-16",
+            "label": "16-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-17",
+            "label": "17-jun",
+            "orderCount": 4,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 4739
+          },
+          {
+            "date": "2026-06-18",
+            "label": "18-jun",
+            "orderCount": 17,
+            "deliveredCount": 12,
+            "canceledCount": 0,
+            "revenue": 12137.9,
+            "projectedRevenue": 20148.9
+          },
+          {
+            "date": "2026-06-19",
+            "label": "19-jun",
+            "orderCount": 1,
+            "deliveredCount": 1,
+            "canceledCount": 0,
+            "revenue": 660,
+            "projectedRevenue": 660
+          },
+          {
+            "date": "2026-06-20",
+            "label": "20-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-21",
+            "label": "21-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-22",
+            "label": "22-jun",
+            "orderCount": 4,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 2228.39,
+            "projectedRevenue": 2944.39
+          },
+          {
+            "date": "2026-06-23",
+            "label": "23-jun",
+            "orderCount": 2,
+            "deliveredCount": 1,
+            "canceledCount": 0,
+            "revenue": 782,
+            "projectedRevenue": 2634
+          },
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 2475
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 1,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "orderCount": 2,
+            "deliveredCount": 2,
+            "canceledCount": 1,
+            "revenue": 1824.5,
+            "projectedRevenue": 1824.5
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "orderCount": 1,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 1072.5
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "orderCount": 0,
+            "deliveredCount": 0,
+            "canceledCount": 0,
+            "revenue": 0,
+            "projectedRevenue": 0
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "orderCount": 3,
+            "deliveredCount": 3,
+            "canceledCount": 0,
+            "revenue": 1592.26,
+            "projectedRevenue": 1592.26
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "POS BAC",
+            "total": 14927.39,
+            "count": 14
+          },
+          {
+            "name": "EFECTIVO",
+            "total": 12683.26,
+            "count": 14
+          },
+          {
+            "name": "LINK DE PAGO",
+            "total": 6652.5,
+            "count": 4
+          },
+          {
+            "name": "TRANSFERENCIA",
+            "total": 2754.9,
+            "count": 2
+          },
+          {
+            "name": "TARJETA",
+            "total": 1072.5,
+            "count": 1
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "1003",
+            "name": "C3 CORTES PARA PARRILLA",
+            "quantity": 3,
+            "revenue": 3060,
+            "ordersCount": 3
+          },
+          {
+            "code": "00444",
+            "name": "POSTA DE GALLINA VP",
+            "quantity": 14.22,
+            "revenue": 2517.56,
+            "ordersCount": 4
+          },
+          {
+            "code": "00442",
+            "name": "MANO DE PIEDRA VP",
+            "quantity": 10.65,
+            "revenue": 1757.25,
+            "ordersCount": 5
+          },
+          {
+            "code": "00393",
+            "name": "BISTEC POSTA DE PIERNA VP",
+            "quantity": 8.98,
+            "revenue": 1634.36,
+            "ordersCount": 5
+          },
+          {
+            "code": "1002",
+            "name": "C2 TORTA SABOR JALAPENO + CHIMICHURRI",
+            "quantity": 2,
+            "revenue": 1320,
+            "ordersCount": 2
+          },
+          {
+            "code": "000322",
+            "name": "C3 CORTES PARA PARRILLA",
+            "quantity": 1,
+            "revenue": 1020,
+            "ordersCount": 1
+          },
+          {
+            "code": "00034",
+            "name": "PUYAZO GF (E)",
+            "quantity": 2.5,
+            "revenue": 912.5,
+            "ordersCount": 1
+          },
+          {
+            "code": "1001",
+            "name": "C1 TORTA HAMBURGUESA (100% RES)",
+            "quantity": 1,
+            "revenue": 730,
+            "ordersCount": 1
+          },
+          {
+            "code": "000562",
+            "name": "C2 HAMBURGUESA S/ JALAPE?O-CHIMI",
+            "quantity": 1,
+            "revenue": 660,
+            "ordersCount": 1
+          },
+          {
+            "code": "00041",
+            "name": "FLANK STEAK GF (VACIO) (E)",
+            "quantity": 3,
+            "revenue": 630,
+            "ordersCount": 1
+          }
+        ],
+        "topCustomers": [
+          {
+            "key": "76374257",
+            "code": "",
+            "name": "María Ruth",
+            "revenue": 13423.39,
+            "ordersCount": 14
+          },
+          {
+            "key": "Jh6vqMK2YuXujHqSe7QUPrPfA1O2",
+            "code": "",
+            "name": "Luis Ignacio Saenz",
+            "revenue": 1592.26,
+            "ordersCount": 3
+          },
+          {
+            "key": "fuP7y0lSgdfm3rI8Li9WxOVjQGy2",
+            "code": "",
+            "name": "Luis Macanche",
+            "revenue": 1467.5,
+            "ordersCount": 1
+          },
+          {
+            "key": "88537749",
+            "code": "",
+            "name": "Ana Catalina",
+            "revenue": 1269.9,
+            "ordersCount": 1
+          },
+          {
+            "key": "846657949",
+            "code": "",
+            "name": "Ana Belen",
+            "revenue": 1115,
+            "ordersCount": 2
+          },
+          {
+            "key": "4IDmDG3L7Fcn5rmp9BX8PumTnBx1",
+            "code": "",
+            "name": "Luis Manuel Saenz Roblero",
+            "revenue": 357,
+            "ordersCount": 1
+          }
+        ],
+        "recentOrders": [
+          {
+            "orderKey": "2026-06-30-039",
+            "orderNumber": 39,
+            "dateTime": "2026-06-30T18:29:46.989Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 420.41,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-037",
+            "orderNumber": 37,
+            "dateTime": "2026-06-30T16:53:41.610Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 750.45,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-30-036",
+            "orderNumber": 36,
+            "dateTime": "2026-06-30T16:48:59.272Z",
+            "customer": "Luis Ignacio Saenz",
+            "payment": "EFECTIVO",
+            "total": 421.4,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-28-050",
+            "orderNumber": 50,
+            "dateTime": "2026-06-28T21:44:39.169Z",
+            "customer": "Anita Sáenz",
+            "payment": "TARJETA",
+            "total": 1072.5,
+            "status": "Pendiente"
+          },
+          {
+            "orderKey": "2026-06-27-072",
+            "orderNumber": 72,
+            "dateTime": "2026-06-27T21:51:42.518Z",
+            "customer": "Luis Macanche",
+            "payment": "EFECTIVO",
+            "total": 1467.5,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-27-045",
+            "orderNumber": 45,
+            "dateTime": "2026-06-27T16:48:04.416Z",
+            "customer": "Luis Manuel Saenz Roblero",
+            "payment": "EFECTIVO",
+            "total": 357,
+            "status": "Entregado"
+          },
+          {
+            "orderKey": "2026-06-25-025",
+            "orderNumber": 25,
+            "dateTime": "2026-06-25T19:52:44.657Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 2475,
+            "status": "Enviado"
+          },
+          {
+            "orderKey": "2026-06-23-064",
+            "orderNumber": 64,
+            "dateTime": "2026-06-24T03:04:11.266Z",
+            "customer": "María Ruth",
+            "payment": "LINK DE PAGO",
+            "total": 1852,
+            "status": "Enviado"
+          }
+        ]
+      },
+      "sicar": {
+        "summary": {
+          "saleCount": 16950,
+          "revenue": 29086816.08,
+          "averageTicket": 1716.04,
+          "uniqueCustomers": 903
+        },
+        "daily": [
+          {
+            "date": "2026-04-02",
+            "label": "02-abr",
+            "saleCount": 231,
+            "revenue": 521063.12,
+            "averageTicket": 2255.68
+          },
+          {
+            "date": "2026-04-03",
+            "label": "03-abr",
+            "saleCount": 4,
+            "revenue": 66070.57,
+            "averageTicket": 16517.64
+          },
+          {
+            "date": "2026-04-04",
+            "label": "04-abr",
+            "saleCount": 273,
+            "revenue": 538593.99,
+            "averageTicket": 1972.87
+          },
+          {
+            "date": "2026-04-05",
+            "label": "05-abr",
+            "saleCount": 177,
+            "revenue": 279026.6,
+            "averageTicket": 1576.42
+          },
+          {
+            "date": "2026-04-06",
+            "label": "06-abr",
+            "saleCount": 198,
+            "revenue": 481515.32,
+            "averageTicket": 2431.9
+          },
+          {
+            "date": "2026-04-07",
+            "label": "07-abr",
+            "saleCount": 185,
+            "revenue": 337823.32,
+            "averageTicket": 1826.07
+          },
+          {
+            "date": "2026-04-08",
+            "label": "08-abr",
+            "saleCount": 212,
+            "revenue": 272172.79,
+            "averageTicket": 1283.83
+          },
+          {
+            "date": "2026-04-09",
+            "label": "09-abr",
+            "saleCount": 222,
+            "revenue": 547215.43,
+            "averageTicket": 2464.93
+          },
+          {
+            "date": "2026-04-10",
+            "label": "10-abr",
+            "saleCount": 199,
+            "revenue": 404950.26,
+            "averageTicket": 2034.93
+          },
+          {
+            "date": "2026-04-11",
+            "label": "11-abr",
+            "saleCount": 270,
+            "revenue": 595308.04,
+            "averageTicket": 2204.84
+          },
+          {
+            "date": "2026-04-12",
+            "label": "12-abr",
+            "saleCount": 183,
+            "revenue": 281432.18,
+            "averageTicket": 1537.88
+          },
+          {
+            "date": "2026-04-13",
+            "label": "13-abr",
+            "saleCount": 199,
+            "revenue": 396206.9,
+            "averageTicket": 1990.99
+          },
+          {
+            "date": "2026-04-14",
+            "label": "14-abr",
+            "saleCount": 199,
+            "revenue": 340569.73,
+            "averageTicket": 1711.41
+          },
+          {
+            "date": "2026-04-15",
+            "label": "15-abr",
+            "saleCount": 192,
+            "revenue": 398986.46,
+            "averageTicket": 2078.05
+          },
+          {
+            "date": "2026-04-16",
+            "label": "16-abr",
+            "saleCount": 203,
+            "revenue": 400750.37,
+            "averageTicket": 1974.14
+          },
+          {
+            "date": "2026-04-17",
+            "label": "17-abr",
+            "saleCount": 232,
+            "revenue": 622538.56,
+            "averageTicket": 2683.36
+          },
+          {
+            "date": "2026-04-18",
+            "label": "18-abr",
+            "saleCount": 245,
+            "revenue": 385402.57,
+            "averageTicket": 1573.07
+          },
+          {
+            "date": "2026-04-19",
+            "label": "19-abr",
+            "saleCount": 169,
+            "revenue": 221255.69,
+            "averageTicket": 1309.21
+          },
+          {
+            "date": "2026-04-20",
+            "label": "20-abr",
+            "saleCount": 203,
+            "revenue": 331703.46,
+            "averageTicket": 1634.01
+          },
+          {
+            "date": "2026-04-21",
+            "label": "21-abr",
+            "saleCount": 158,
+            "revenue": 396638.08,
+            "averageTicket": 2510.37
+          },
+          {
+            "date": "2026-04-22",
+            "label": "22-abr",
+            "saleCount": 190,
+            "revenue": 553191.85,
+            "averageTicket": 2911.54
+          },
+          {
+            "date": "2026-04-23",
+            "label": "23-abr",
+            "saleCount": 190,
+            "revenue": 576596.51,
+            "averageTicket": 3034.72
+          },
+          {
+            "date": "2026-04-24",
+            "label": "24-abr",
+            "saleCount": 240,
+            "revenue": 409640.91,
+            "averageTicket": 1706.84
+          },
+          {
+            "date": "2026-04-25",
+            "label": "25-abr",
+            "saleCount": 237,
+            "revenue": 513964.19,
+            "averageTicket": 2168.63
+          },
+          {
+            "date": "2026-04-26",
+            "label": "26-abr",
+            "saleCount": 159,
+            "revenue": 220209.62,
+            "averageTicket": 1384.97
+          },
+          {
+            "date": "2026-04-27",
+            "label": "27-abr",
+            "saleCount": 190,
+            "revenue": 539546.4,
+            "averageTicket": 2839.72
+          },
+          {
+            "date": "2026-04-28",
+            "label": "28-abr",
+            "saleCount": 166,
+            "revenue": 501842.04,
+            "averageTicket": 3023.14
+          },
+          {
+            "date": "2026-04-29",
+            "label": "29-abr",
+            "saleCount": 185,
+            "revenue": 398967.37,
+            "averageTicket": 2156.58
+          },
+          {
+            "date": "2026-04-30",
+            "label": "30-abr",
+            "saleCount": 206,
+            "revenue": 441382.43,
+            "averageTicket": 2142.63
+          },
+          {
+            "date": "2026-05-01",
+            "label": "01-may",
+            "saleCount": 228,
+            "revenue": 528077.6,
+            "averageTicket": 2316.13
+          },
+          {
+            "date": "2026-05-02",
+            "label": "02-may",
+            "saleCount": 279,
+            "revenue": 421491.29,
+            "averageTicket": 1510.72
+          },
+          {
+            "date": "2026-05-03",
+            "label": "03-may",
+            "saleCount": 149,
+            "revenue": 202960.26,
+            "averageTicket": 1362.15
+          },
+          {
+            "date": "2026-05-04",
+            "label": "04-may",
+            "saleCount": 219,
+            "revenue": 413849.52,
+            "averageTicket": 1889.72
+          },
+          {
+            "date": "2026-05-05",
+            "label": "05-may",
+            "saleCount": 184,
+            "revenue": 398159.34,
+            "averageTicket": 2163.91
+          },
+          {
+            "date": "2026-05-06",
+            "label": "06-may",
+            "saleCount": 191,
+            "revenue": 368861.12,
+            "averageTicket": 1931.21
+          },
+          {
+            "date": "2026-05-07",
+            "label": "07-may",
+            "saleCount": 200,
+            "revenue": 440019.65,
+            "averageTicket": 2200.1
+          },
+          {
+            "date": "2026-05-08",
+            "label": "08-may",
+            "saleCount": 151,
+            "revenue": 246414.32,
+            "averageTicket": 1631.88
+          },
+          {
+            "date": "2026-05-09",
+            "label": "09-may",
+            "saleCount": 216,
+            "revenue": 373505.2,
+            "averageTicket": 1729.19
+          },
+          {
+            "date": "2026-05-10",
+            "label": "10-may",
+            "saleCount": 152,
+            "revenue": 209835.23,
+            "averageTicket": 1380.49
+          },
+          {
+            "date": "2026-05-11",
+            "label": "11-may",
+            "saleCount": 161,
+            "revenue": 157835.31,
+            "averageTicket": 980.34
+          },
+          {
+            "date": "2026-05-12",
+            "label": "12-may",
+            "saleCount": 144,
+            "revenue": 134362.48,
+            "averageTicket": 933.07
+          },
+          {
+            "date": "2026-05-13",
+            "label": "13-may",
+            "saleCount": 134,
+            "revenue": 121050.84,
+            "averageTicket": 903.36
+          },
+          {
+            "date": "2026-05-14",
+            "label": "14-may",
+            "saleCount": 163,
+            "revenue": 194472.98,
+            "averageTicket": 1193.09
+          },
+          {
+            "date": "2026-05-15",
+            "label": "15-may",
+            "saleCount": 201,
+            "revenue": 220554.71,
+            "averageTicket": 1097.29
+          },
+          {
+            "date": "2026-05-16",
+            "label": "16-may",
+            "saleCount": 217,
+            "revenue": 228751.27,
+            "averageTicket": 1054.15
+          },
+          {
+            "date": "2026-05-17",
+            "label": "17-may",
+            "saleCount": 165,
+            "revenue": 185485.54,
+            "averageTicket": 1124.15
+          },
+          {
+            "date": "2026-05-18",
+            "label": "18-may",
+            "saleCount": 164,
+            "revenue": 181049.97,
+            "averageTicket": 1103.96
+          },
+          {
+            "date": "2026-05-19",
+            "label": "19-may",
+            "saleCount": 163,
+            "revenue": 131955.96,
+            "averageTicket": 809.55
+          },
+          {
+            "date": "2026-05-20",
+            "label": "20-may",
+            "saleCount": 136,
+            "revenue": 149934.17,
+            "averageTicket": 1102.46
+          },
+          {
+            "date": "2026-05-21",
+            "label": "21-may",
+            "saleCount": 165,
+            "revenue": 188053.02,
+            "averageTicket": 1139.72
+          },
+          {
+            "date": "2026-05-22",
+            "label": "22-may",
+            "saleCount": 161,
+            "revenue": 181966.48,
+            "averageTicket": 1130.23
+          },
+          {
+            "date": "2026-05-23",
+            "label": "23-may",
+            "saleCount": 208,
+            "revenue": 210929.16,
+            "averageTicket": 1014.08
+          },
+          {
+            "date": "2026-05-24",
+            "label": "24-may",
+            "saleCount": 166,
+            "revenue": 194135.15,
+            "averageTicket": 1169.49
+          },
+          {
+            "date": "2026-05-25",
+            "label": "25-may",
+            "saleCount": 172,
+            "revenue": 227008.4,
+            "averageTicket": 1319.82
+          },
+          {
+            "date": "2026-05-26",
+            "label": "26-may",
+            "saleCount": 152,
+            "revenue": 218597.58,
+            "averageTicket": 1438.14
+          },
+          {
+            "date": "2026-05-27",
+            "label": "27-may",
+            "saleCount": 142,
+            "revenue": 287808.83,
+            "averageTicket": 2026.82
+          },
+          {
+            "date": "2026-05-28",
+            "label": "28-may",
+            "saleCount": 196,
+            "revenue": 251884.64,
+            "averageTicket": 1285.13
+          },
+          {
+            "date": "2026-05-29",
+            "label": "29-may",
+            "saleCount": 246,
+            "revenue": 406019.79,
+            "averageTicket": 1650.49
+          },
+          {
+            "date": "2026-05-30",
+            "label": "30-may",
+            "saleCount": 284,
+            "revenue": 403340.29,
+            "averageTicket": 1420.21
+          },
+          {
+            "date": "2026-05-31",
+            "label": "31-may",
+            "saleCount": 153,
+            "revenue": 220446.36,
+            "averageTicket": 1440.83
+          },
+          {
+            "date": "2026-06-01",
+            "label": "01-jun",
+            "saleCount": 190,
+            "revenue": 211025.25,
+            "averageTicket": 1110.66
+          },
+          {
+            "date": "2026-06-02",
+            "label": "02-jun",
+            "saleCount": 173,
+            "revenue": 373036.99,
+            "averageTicket": 2156.28
+          },
+          {
+            "date": "2026-06-03",
+            "label": "03-jun",
+            "saleCount": 176,
+            "revenue": 342882.6,
+            "averageTicket": 1948.2
+          },
+          {
+            "date": "2026-06-04",
+            "label": "04-jun",
+            "saleCount": 198,
+            "revenue": 815722.93,
+            "averageTicket": 4119.81
+          },
+          {
+            "date": "2026-06-05",
+            "label": "05-jun",
+            "saleCount": 218,
+            "revenue": 227877.04,
+            "averageTicket": 1045.31
+          },
+          {
+            "date": "2026-06-06",
+            "label": "06-jun",
+            "saleCount": 242,
+            "revenue": 343012,
+            "averageTicket": 1417.4
+          },
+          {
+            "date": "2026-06-07",
+            "label": "07-jun",
+            "saleCount": 156,
+            "revenue": 178576.76,
+            "averageTicket": 1144.72
+          },
+          {
+            "date": "2026-06-08",
+            "label": "08-jun",
+            "saleCount": 165,
+            "revenue": 285150.91,
+            "averageTicket": 1728.19
+          },
+          {
+            "date": "2026-06-09",
+            "label": "09-jun",
+            "saleCount": 171,
+            "revenue": 247733.81,
+            "averageTicket": 1448.74
+          },
+          {
+            "date": "2026-06-10",
+            "label": "10-jun",
+            "saleCount": 166,
+            "revenue": 337856.28,
+            "averageTicket": 2035.28
+          },
+          {
+            "date": "2026-06-11",
+            "label": "11-jun",
+            "saleCount": 179,
+            "revenue": 300573.79,
+            "averageTicket": 1679.18
+          },
+          {
+            "date": "2026-06-12",
+            "label": "12-jun",
+            "saleCount": 186,
+            "revenue": 457818.42,
+            "averageTicket": 2461.39
+          },
+          {
+            "date": "2026-06-13",
+            "label": "13-jun",
+            "saleCount": 217,
+            "revenue": 277269.29,
+            "averageTicket": 1277.74
+          },
+          {
+            "date": "2026-06-14",
+            "label": "14-jun",
+            "saleCount": 155,
+            "revenue": 175937.2,
+            "averageTicket": 1135.08
+          },
+          {
+            "date": "2026-06-15",
+            "label": "15-jun",
+            "saleCount": 199,
+            "revenue": 404315.01,
+            "averageTicket": 2031.73
+          },
+          {
+            "date": "2026-06-16",
+            "label": "16-jun",
+            "saleCount": 181,
+            "revenue": 209499.97,
+            "averageTicket": 1157.46
+          },
+          {
+            "date": "2026-06-17",
+            "label": "17-jun",
+            "saleCount": 184,
+            "revenue": 339660.75,
+            "averageTicket": 1845.98
+          },
+          {
+            "date": "2026-06-18",
+            "label": "18-jun",
+            "saleCount": 177,
+            "revenue": 316661.93,
+            "averageTicket": 1789.05
+          },
+          {
+            "date": "2026-06-19",
+            "label": "19-jun",
+            "saleCount": 182,
+            "revenue": 276462.92,
+            "averageTicket": 1519.03
+          },
+          {
+            "date": "2026-06-20",
+            "label": "20-jun",
+            "saleCount": 234,
+            "revenue": 489616.52,
+            "averageTicket": 2092.38
+          },
+          {
+            "date": "2026-06-21",
+            "label": "21-jun",
+            "saleCount": 166,
+            "revenue": 156439.52,
+            "averageTicket": 942.41
+          },
+          {
+            "date": "2026-06-22",
+            "label": "22-jun",
+            "saleCount": 186,
+            "revenue": 264539.2,
+            "averageTicket": 1422.25
+          },
+          {
+            "date": "2026-06-23",
+            "label": "23-jun",
+            "saleCount": 225,
+            "revenue": 311453.38,
+            "averageTicket": 1384.24
+          },
+          {
+            "date": "2026-06-24",
+            "label": "24-jun",
+            "saleCount": 184,
+            "revenue": 312326.22,
+            "averageTicket": 1697.43
+          },
+          {
+            "date": "2026-06-25",
+            "label": "25-jun",
+            "saleCount": 144,
+            "revenue": 294147.91,
+            "averageTicket": 2042.69
+          },
+          {
+            "date": "2026-06-26",
+            "label": "26-jun",
+            "saleCount": 204,
+            "revenue": 260596.05,
+            "averageTicket": 1277.43
+          },
+          {
+            "date": "2026-06-27",
+            "label": "27-jun",
+            "saleCount": 234,
+            "revenue": 290281.84,
+            "averageTicket": 1240.52
+          },
+          {
+            "date": "2026-06-28",
+            "label": "28-jun",
+            "saleCount": 149,
+            "revenue": 171550.2,
+            "averageTicket": 1151.34
+          },
+          {
+            "date": "2026-06-29",
+            "label": "29-jun",
+            "saleCount": 202,
+            "revenue": 253070.16,
+            "averageTicket": 1252.82
+          },
+          {
+            "date": "2026-06-30",
+            "label": "30-jun",
+            "saleCount": 128,
+            "revenue": 88340.01,
+            "averageTicket": 690.16
+          }
+        ],
+        "paymentMethods": [
+          {
+            "name": "Crédito",
+            "count": 2545,
+            "total": 14933188.26
+          },
+          {
+            "name": "Efectivo",
+            "count": 10167,
+            "total": 8979719.49
+          },
+          {
+            "name": "Tarjeta",
+            "count": 3688,
+            "total": 4765211.17
+          },
+          {
+            "name": "Transferencia",
+            "count": 653,
+            "total": 1837354.69
+          },
+          {
+            "name": "Cheque",
+            "count": 2,
+            "total": 51387.7
+          },
+          {
+            "name": "Vales",
+            "count": 219,
+            "total": 29533.83
+          },
+          {
+            "name": "Sin metodo",
+            "count": 1,
+            "total": 650
+          }
+        ],
+        "topProducts": [
+          {
+            "code": "00028",
+            "name": "CORBATA",
+            "quantity": 8693.41,
+            "revenue": 1495954.32,
+            "salesCount": 233
+          },
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO",
+            "quantity": 9379.62,
+            "revenue": 1193841.45,
+            "salesCount": 820
+          },
+          {
+            "code": "00097",
+            "name": "FILETE DE POLLO (G)",
+            "quantity": 5903.86,
+            "revenue": 748914.5,
+            "salesCount": 450
+          },
+          {
+            "code": "00015",
+            "name": "IN ENTERA",
+            "quantity": 4125.76,
+            "revenue": 580423.86,
+            "salesCount": 35
+          },
+          {
+            "code": "00020",
+            "name": "FILETE 3 UP-SELECT",
+            "quantity": 1482.68,
+            "revenue": 511822.26,
+            "salesCount": 47
+          },
+          {
+            "code": "00092",
+            "name": "POSTA DE CERDO",
+            "quantity": 6048.62,
+            "revenue": 508015.97,
+            "salesCount": 324
+          },
+          {
+            "code": "000201",
+            "name": "FILETE 3 UP (G)",
+            "quantity": 1320.45,
+            "revenue": 487392.5,
+            "salesCount": 13
+          },
+          {
+            "code": "00005",
+            "name": "FLAP/S",
+            "quantity": 2514.84,
+            "revenue": 469711.22,
+            "salesCount": 31
+          },
+          {
+            "code": "00056",
+            "name": "CH-2 (CHURRASCO PARRILLERO)",
+            "quantity": 1483.58,
+            "revenue": 414705.42,
+            "salesCount": 357
+          },
+          {
+            "code": "00003",
+            "name": "MOLIDA ESPECIAL 80/20 (P)",
+            "quantity": 2854.21,
+            "revenue": 389649.99,
+            "salesCount": 701
+          }
+        ],
+        "topCustomers": [
+          {
+            "code": "",
+            "name": "Público en General",
+            "ordersCount": 9144,
+            "revenue": 5312959.92
+          },
+          {
+            "code": "",
+            "name": "Publico en General",
+            "ordersCount": 484,
+            "revenue": 2447558.39
+          },
+          {
+            "code": "",
+            "name": "ASADOS CAÑA CASTILLA",
+            "ordersCount": 186,
+            "revenue": 1894585.79
+          },
+          {
+            "code": "",
+            "name": "CARNES AMPARITO",
+            "ordersCount": 74,
+            "revenue": 1815160.26
+          },
+          {
+            "code": "",
+            "name": "GRUPO AMANO INTERNACIONAL S.A",
+            "ordersCount": 13,
+            "revenue": 863856.23
+          },
+          {
+            "code": "",
+            "name": "Desarrollos hoteleros de Nicaragua",
+            "ordersCount": 10,
+            "revenue": 661664.41
+          },
+          {
+            "code": "",
+            "name": "LUISA GABRIELA",
+            "ordersCount": 79,
+            "revenue": 622667.2
+          },
+          {
+            "code": "",
+            "name": "CITSA",
+            "ordersCount": 10,
+            "revenue": 417306.68
+          },
+          {
+            "code": "",
+            "name": "DISTRIBUIDORA MASAYA GOLD",
+            "ordersCount": 20,
+            "revenue": 392554.4
+          },
+          {
+            "code": "",
+            "name": "CEGUEL",
+            "ordersCount": 55,
+            "revenue": 372439.28
+          }
+        ],
+        "recentSales": [
+          {
+            "saleId": 490624,
+            "dateTime": "2026-06-30 15:38:37",
+            "customer": "RESTAURANTE PAMPA",
+            "payment": "Crédito",
+            "total": 1268.96,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490623,
+            "dateTime": "2026-06-30 15:37:19",
+            "customer": "MAURICIO MORA",
+            "payment": "Efectivo",
+            "total": 188.1,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490622,
+            "dateTime": "2026-06-30 15:25:45",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 190,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490621,
+            "dateTime": "2026-06-30 15:23:25",
+            "customer": "Público en General",
+            "payment": "Efectivo",
+            "total": 198,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490620,
+            "dateTime": "2026-06-30 15:18:55",
+            "customer": "ASADOS CAÑA CASTILLA",
+            "payment": "Efectivo",
+            "total": 1493.42,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490619,
+            "dateTime": "2026-06-30 15:13:43",
+            "customer": "DANIA ESPINOZA",
+            "payment": "Efectivo",
+            "total": 32.4,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490618,
+            "dateTime": "2026-06-30 15:09:24",
+            "customer": "MOXIE S.A.",
+            "payment": "Tarjeta",
+            "total": 725,
+            "status": "Procesada"
+          },
+          {
+            "saleId": 490617,
+            "dateTime": "2026-06-30 14:43:04",
+            "customer": "NICOLE BARBOSA",
+            "payment": "Crédito",
+            "total": 25.5,
+            "status": "Procesada"
+          }
+        ]
+      },
+      "comparison": {
+        "onlineRevenueSharePct": 0.1
+      }
+    }
+  }
+}

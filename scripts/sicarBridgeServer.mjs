@@ -7,6 +7,7 @@ import { createSicarClientSyncManager } from './sicarClientSync.mjs';
 import { createOrderArchiveManager } from './orderArchiveManager.mjs';
 import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
 import { createStoreRewardsSyncManager } from './storeRewardsSync.mjs';
+import { getCrmDashboardSnapshot } from './crmAnalytics.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
   SICAR_SPECIAL_SKU_OVERRIDES,
@@ -752,6 +753,17 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       count: orders.length,
       orders,
     });
+  }
+
+  if (requestUrl.pathname === '/api/crm/dashboard') {
+    const payload = await getCrmDashboardSnapshot({
+      force:
+        String(requestUrl.searchParams.get('force') || '')
+          .trim()
+          .toLowerCase() === 'true',
+    });
+
+    return json(200, payload);
   }
 
   if (requestUrl.pathname === '/api/sicar/catalog') {

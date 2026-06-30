@@ -9,6 +9,7 @@
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
     "sicar:update:prices": "node scripts/updateSicarPrices.mjs",
+    "crm:publish": "node scripts/publishCrmAnalytics.mjs",
     "catalog:migrate:images": "node scripts/migrateCatalogImagesToStorage.mjs",
     "auth:bootstrap": "node scripts/bootstrapAuthUsers.mjs",
     "auth:cleanup:store-customers": "node scripts/cleanupLegacyStoreCustomers.mjs",

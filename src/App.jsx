@@ -29,6 +29,7 @@ const TiendaVirtualAdminView = lazy(() => import('./components/TiendaVirtualAdmi
 const ConfiguracionView = lazy(() => import('./components/ConfiguracionView'));
 const DriverView = lazy(() => import('./components/DriverView'));
 const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
+const CrmView = lazy(() => import('./components/CrmView'));
 
 const Icons = {
   plus: (
@@ -81,6 +82,7 @@ const PUBLIC_HOST_ROUTE_MAP = new Map([
   ['admintv.sanmartinsr.com', 'dashboard'],
   ['cocina.sanmartinsr.com', 'cocina'],
   ['driver.sanmartinsr.com', 'driver'],
+  ['crm.sanmartinsr.com', 'crm'],
 ]);
 const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const APP_THEME = SAN_MARTIN_THEME;
@@ -136,6 +138,7 @@ const getRouteFromLocation = () => {
   if (cleanedHash.startsWith('tienda')) return 'tienda';
   if (cleanedHash.startsWith('cocina')) return 'cocina';
   if (cleanedHash.startsWith('driver')) return 'driver';
+  if (cleanedHash.startsWith('crm')) return 'crm';
   if (cleanedHash.startsWith('admin') || cleanedHash.startsWith('administracion')) return 'dashboard';
   return 'dashboard';
 };
@@ -148,6 +151,8 @@ const getDocumentTitle = (route) => {
       return 'Carnes San Martin | Cocina';
     case 'driver':
       return 'Carnes San Martin | Driver';
+    case 'crm':
+      return 'Carnes San Martin | CRM';
     default:
       return 'Carnes San Martin | Comanda Digital';
   }
@@ -215,6 +220,7 @@ function App() {
   const isPublicStoreRoute = route === 'tienda';
   const isKitchenRoute = route === 'cocina';
   const isDriverRoute = route === 'driver';
+  const isCrmRoute = route === 'crm';
   const todayKey = hoyISO();
   const isAdminDashboard = dashboardRole === AUTH_ROLES.ADMIN;
   const isOperatorDashboard = dashboardRole === AUTH_ROLES.OPERATOR;
@@ -439,12 +445,13 @@ function App() {
     event.preventDefault();
 
     try {
+      const expectedRoles = isCrmRoute ? [AUTH_ROLES.ADMIN] : [AUTH_ROLES.ADMIN, AUTH_ROLES.OPERATOR];
       const authUser = await signInInternalUser({
         username: inputUser,
         password: inputPass,
         scope: 'admin',
       });
-      const roleRecord = await assertRole([AUTH_ROLES.ADMIN, AUTH_ROLES.OPERATOR], authUser.uid);
+      const roleRecord = await assertRole(expectedRoles, authUser.uid);
       setDashboardRole(roleRecord.role);
       setIsAuthenticated(true);
       setLoginError(false);
@@ -471,6 +478,25 @@ function App() {
     } catch (error) {
       console.error('Error iniciando sesion cocina:', error);
       setKitchenLoginError(true);
+      return false;
+    }
+  };
+
+  const handleCrmLogin = async ({ user, password }) => {
+    try {
+      const authUser = await signInInternalUser({
+        username: user,
+        password,
+        scope: 'admin',
+      });
+      const roleRecord = await assertRole(AUTH_ROLES.ADMIN, authUser.uid);
+      setDashboardRole(roleRecord.role);
+      setIsAuthenticated(true);
+      setLoginError(false);
+      return true;
+    } catch (error) {
+      console.error('Error iniciando sesion CRM:', error);
+      setLoginError(true);
       return false;
     }
   };
@@ -553,6 +579,26 @@ function App() {
     return (
       <Suspense fallback={<LazyViewFallback label="Cargando cocina..." />}>
         <KitchenView orders={orders} />
+      </Suspense>
+    );
+  }
+
+  if (isCrmRoute) {
+    if (!isAuthenticated || dashboardRole !== AUTH_ROLES.ADMIN) {
+      return (
+        <RoleLogin
+          title="CRM"
+          subtitle="Analitica online + SICAR"
+          userPlaceholder="Usuario administrador"
+          error={loginError}
+          onLogin={handleCrmLogin}
+        />
+      );
+    }
+
+    return (
+      <Suspense fallback={<LazyViewFallback label="Cargando CRM..." />}>
+        <CrmView />
       </Suspense>
     );
   }
