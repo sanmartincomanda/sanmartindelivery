@@ -5667,16 +5667,14 @@ export default function TiendaVirtualView({
               </div>
             </div>
             <div className="store-brand-actions">
-              {!isMobileLayout && hasTrackedOrder && (
-                <button
-                  type="button"
-                  className="store-order-status-button"
-                  title="Estado de mi pedido"
-                  onClick={openCustomerOrders}
-                >
-                  Mi pedido
-                </button>
-              )}
+              <button
+                type="button"
+                className="store-order-status-button"
+                title={currentUser ? 'Pedidos anteriores' : 'Inicia sesion para ver pedidos'}
+                onClick={openCustomerOrders}
+              >
+                {isMobileLayout ? 'Pedidos' : 'Pedidos anteriores'}
+              </button>
               <button
                 type="button"
                 className="store-icon-button store-profile-button"
