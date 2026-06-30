@@ -158,6 +158,11 @@
       ".indexOn": ["active", "sortOrder"]
     },
 
+    "storeDeliverySettings": {
+      ".read": true,
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
+    },
+
     "deliveryDrivers": {
       ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator')",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
