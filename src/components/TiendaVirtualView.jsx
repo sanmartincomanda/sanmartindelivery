@@ -147,6 +147,18 @@ const EMPTY_STORE_AUTH_FORM = {
   ubicacion: null,
 };
 
+const resolveStoreLoginCredentials = (value = '') => {
+  const cleanValue = String(value || '').trim();
+
+  if (!cleanValue) {
+    return { email: '', telefono: '' };
+  }
+
+  return cleanValue.includes('@')
+    ? { email: cleanValue, telefono: '' }
+    : { email: '', telefono: cleanValue };
+};
+
 const normalizeCheckoutPayment = (value) => {
   const cleanValue = String(value || '').trim().toUpperCase();
 
@@ -2233,9 +2245,10 @@ export default function TiendaVirtualView({
     setAuthNotice('');
 
     try {
+      const credentials = resolveStoreLoginCredentials(authForm.email);
       const user = await loginStoreUser({
-        email: authForm.email,
-        telefono: authForm.telefono,
+        email: credentials.email,
+        telefono: credentials.telefono,
         password: authForm.password,
       });
       setAuthProviderDraft(null);
@@ -2252,18 +2265,19 @@ export default function TiendaVirtualView({
       }));
     } catch (error) {
       console.error('Error iniciando sesion de tienda:', error);
-      setAuthError('Correo o contrasena incorrecta.');
+      setAuthError('Correo, telefono o contrasena incorrectos.');
     } finally {
       setAuthLoading(false);
     }
   };
 
   const handleStorePasswordReset = async () => {
-    const email = String(authForm.email || '').trim();
+    const credentials = resolveStoreLoginCredentials(authForm.email);
+    const email = String(credentials.email || '').trim();
 
     if (!email) {
       setAuthNotice('');
-      setAuthError('Escribe tu correo electronico para enviarte la recuperacion.');
+      setAuthError('Para recuperar tu contrasena, escribe tu correo electronico.');
       return;
     }
 
@@ -2277,7 +2291,7 @@ export default function TiendaVirtualView({
     } catch (error) {
       console.error('Error enviando recuperacion de contrasena:', error);
       if (error.code === 'EMAIL_REQUIRED') {
-        setAuthError('Escribe tu correo electronico para recuperar tu contrasena.');
+        setAuthError('Para recuperar tu contrasena, escribe tu correo electronico.');
       } else {
         setAuthError('No pudimos enviar la recuperacion. Revisa el correo e intenta de nuevo.');
       }
@@ -6268,7 +6282,7 @@ function StoreAuthView({
       <p style={{ margin: '0 0 16px', color: '#6b7280', fontWeight: 700 }}>
         {isRegister
           ? 'Usaremos estos datos para tus pedidos delivery.'
-          : 'Ingresa con tu correo y contrasena.'}
+          : 'Ingresa con tu correo o telefono y contrasena.'}
       </p>
 
       {authError && <div className="store-auth-error">{authError}</div>}
@@ -6298,11 +6312,12 @@ function StoreAuthView({
         )}
         <input
           className="store-field"
-          type="email"
+          type={isRegister ? 'email' : 'text'}
           value={authForm.email}
           onChange={(event) => onFormChange('email', event.target.value)}
-          placeholder="Correo electronico"
+          placeholder={isRegister ? 'Correo electronico' : 'Correo o telefono'}
           disabled={isGoogleProfileCompletion}
+          autoComplete={isRegister ? 'email' : 'username'}
           required
         />
         {isRegister && (
@@ -6329,14 +6344,6 @@ function StoreAuthView({
             />
             <span className="store-field-note">RECIBIRAS PREMIO ESPECIAL EN TU CUMPLEANOS</span>
           </label>
-        )}
-        {!isRegister && (
-          <input
-            className="store-field store-legacy-phone-field"
-            value={authForm.telefono}
-            onChange={(event) => onFormChange('telefono', event.target.value)}
-            placeholder="Telefono antiguo (opcional)"
-          />
         )}
         {!isGoogleProfileCompletion && (
           <>
@@ -7231,7 +7238,7 @@ function FloatingCart({
           <small>Total</small>
           {couponDiscount > 0 && <span>-{formatCurrency(couponDiscount)} en cupon</span>}
           <strong>{formatCurrency(approximateTotalAmount)}</strong>
-          <em>Precios incluyen IVA. Puede variar por pesos exactos.</em>
+          <em>Nota: Total puede variar por diferencia en pesos de sus productos.</em>
         </div>
         <button type="button" className="store-button" onClick={onCheckout}>
           Confirmar
@@ -7692,8 +7699,7 @@ function CheckoutSheet({
                 <strong>{formatCurrency(approximateTotalAmount)}</strong>
               </div>
               <p>
-                Precios incluyen <strong>IVA</strong>. Puede variar por los pesos exactos de los productos.
-                Se le actualizara el nuevo monto cuando este listo el pedido.
+                <strong>Nota:</strong> Total puede variar por diferencia en pesos de sus productos.
               </p>
             </div>
 
