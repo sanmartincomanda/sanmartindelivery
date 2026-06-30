@@ -1986,6 +1986,18 @@ export default function TiendaVirtualView({
     setAuthSheetOpen(true);
   };
 
+  const browseCatalogAsGuest = () => {
+    setAuthPromptDismissed(true);
+    setAuthSheetOpen(false);
+    if (pendingAuthIntent === 'checkout') {
+      setCheckoutOpen(false);
+    }
+    setPendingAuthIntent('');
+    setAuthProviderDraft(null);
+    setAuthError('');
+    setAuthNotice('');
+  };
+
   const closeAuthSheet = ({ force = false } = {}) => {
     if (!force && !currentUser && !isDashboard) {
       return;
@@ -5659,30 +5671,43 @@ export default function TiendaVirtualView({
 
         <header className="store-top">
           <div className="store-brand-row">
-            <div className="store-brand-main">
-              <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
-              <div className="store-brand-copy">
-                <span className="store-brand-kicker">Tu carne favorita, a un toque de distancia</span>
-                <div className="store-title">{STORE_BRAND_TITLE}</div>
-              </div>
+          <div className="store-brand-main">
+            <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
+            <div className="store-brand-copy">
+              <span className="store-brand-kicker">Tu carne favorita, a un toque de distancia</span>
+              <div className="store-title">{STORE_BRAND_TITLE}</div>
             </div>
-            <div className="store-brand-actions">
+          </div>
+          <div className="store-brand-actions">
+            {currentUser ? (
+              <>
+                <button
+                  type="button"
+                  className="store-order-status-button"
+                  title="Pedidos anteriores"
+                  onClick={openCustomerOrders}
+                >
+                  {isMobileLayout ? 'Pedidos' : 'Pedidos anteriores'}
+                </button>
+                <button
+                  type="button"
+                  className="store-icon-button store-profile-button"
+                  title="Mi perfil"
+                  onClick={openProfilePanel}
+                >
+                  <StoreProfileGlyph active={hasTrackedOrder} />
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
                 className="store-order-status-button"
-                title={currentUser ? 'Pedidos anteriores' : 'Inicia sesion para ver pedidos'}
-                onClick={openCustomerOrders}
+                title="Inicia sesion"
+                onClick={() => openAuthSheet('login', 'guest')}
               >
-                {isMobileLayout ? 'Pedidos' : 'Pedidos anteriores'}
+                Iniciar sesion
               </button>
-              <button
-                type="button"
-                className="store-icon-button store-profile-button"
-                title={currentUser ? 'Mi perfil' : 'Inicia sesion'}
-                onClick={openProfilePanel}
-              >
-                <StoreProfileGlyph active={hasTrackedOrder} />
-              </button>
+            )}
               <button
                 type="button"
                 className="store-icon-button"
@@ -6038,6 +6063,7 @@ export default function TiendaVirtualView({
           authProviderDraft={authProviderDraft}
           locked={!isDashboard && !currentUser}
           onClose={closeAuthSheet}
+          onBrowseCatalog={browseCatalogAsGuest}
           onAuthModeChange={(mode) => {
             setAuthMode(mode);
             if (mode !== 'register') {
@@ -6247,6 +6273,7 @@ function StoreAuthView({
   onGoogleLogin,
   onPasswordReset,
   onRegister,
+  onBrowseCatalog,
 }) {
   const isRegister = authMode === 'register';
   const isGoogleProfileCompletion = isRegister && authProviderDraft?.provider === 'google';
@@ -6412,6 +6439,14 @@ function StoreAuthView({
                 ? 'Crear cuenta y entrar'
                 : 'Entrar a la tienda'}
         </button>
+        {onBrowseCatalog && (
+          <>
+            <button type="button" className="store-button secondary" onClick={onBrowseCatalog} disabled={authLoading}>
+              Navegar catalogo
+            </button>
+            <div className="store-auth-inline-note">Puedes explorar y agregar productos al carrito como invitado.</div>
+          </>
+        )}
       </form>
     </section>
   );
@@ -7532,6 +7567,15 @@ function CheckoutSheet({
     setCheckoutStep('cart');
   }, [cartItems.length]);
 
+  const handleContinueCheckout = () => {
+    if (isGuestCheckout) {
+      onOpenLogin();
+      return;
+    }
+
+    setCheckoutStep('details');
+  };
+
   return (
     <div className="store-sheet-overlay">
       <div className="store-sheet store-checkout-sheet">
@@ -7737,7 +7781,7 @@ function CheckoutSheet({
               )}
             </div>
 
-            <button type="button" className="store-button" onClick={() => setCheckoutStep('details')}>
+            <button type="button" className="store-button" onClick={handleContinueCheckout}>
               Pedir en linea
             </button>
           </div>
