@@ -622,6 +622,7 @@ export async function reserveStoreRewardPoints({
   }
 
   const reservationId = createRewardReservationId();
+  await ensureStoreRewardAccount(cleanUserKey, { databaseInstance });
   const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
   let failureCode = '';
   let failureMessage = '';

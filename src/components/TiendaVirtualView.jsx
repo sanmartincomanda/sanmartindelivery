@@ -98,6 +98,7 @@ import {
   buildStoreRewardRedemptionSnapshot,
   calculateEarnedRewardPoints,
   DEFAULT_STORE_REWARD_SETTINGS,
+  ensureStoreRewardAccount,
   mergeStoreRewards,
   normalizeStoreRewardAccount,
   reserveStoreRewardPoints,
@@ -1227,6 +1228,10 @@ export default function TiendaVirtualView({
       setRewardAccount(normalizeStoreRewardAccount({}, ''));
       return undefined;
     }
+
+    ensureStoreRewardAccount(currentUser.key).catch((error) => {
+      console.error('No se pudo preparar la cuenta de Miembro Gold San Martin:', error);
+    });
 
     const unsubscribe = subscribeStoreRewardAccount(
       currentUser.key,
