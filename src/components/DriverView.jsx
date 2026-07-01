@@ -26,6 +26,15 @@ const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const DRIVER_THEME = SAN_MARTIN_THEME;
 
 const Icons = {
+  bike: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="18" r="3" />
+      <path d="M9 18h4l2-6h3" />
+      <path d="M12 9h3l2 3" />
+      <path d="M9 18 7 10h4" />
+    </svg>
+  ),
   route: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M6 18c0-2.2 1.8-4 4-4h4a4 4 0 100-8h-1" />
@@ -71,6 +80,13 @@ const Icons = {
   close: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
       <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  ),
+  alert: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3 2.8 19.2A1.3 1.3 0 0 0 4 21h16a1.3 1.3 0 0 0 1.2-1.8L12 3Z" />
+      <path d="M12 9v4.8" />
+      <path d="M12 18h.01" />
     </svg>
   ),
   spark: (
@@ -314,6 +330,22 @@ const getStatusMeta = (order = {}) => {
   };
 };
 
+const compareDriverPreviousOrders = (left = {}, right = {}) => {
+  const leftTime = isDeliveredOrder(left) ? getOrderDeliveredAt(left) : getOrderCreatedAt(left);
+  const rightTime = isDeliveredOrder(right) ? getOrderDeliveredAt(right) : getOrderCreatedAt(right);
+  const timeDiff = rightTime - leftTime;
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  const dateDiff = String(right.fecha || '').localeCompare(String(left.fecha || ''));
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  return Number(right.id || 0) - Number(left.id || 0);
+};
+
 export default function DriverView() {
   const todayKey = hoyISO();
   const [driver, setDriver] = useState(() => {
@@ -412,6 +444,19 @@ export default function DriverView() {
         .filter((order) => isDeliveredOrder(order))
         .sort((left, right) => getOrderDeliveredAt(right) - getOrderDeliveredAt(left)),
     [assignedOrders]
+  );
+
+  const deliveredTodayOrders = useMemo(
+    () =>
+      deliveredOrders.filter((order) => String(order.fecha || '') === todayKey),
+    [deliveredOrders, todayKey]
+  );
+
+  const previousOrders = useMemo(
+    () =>
+      [...hiddenLegacyAssignedOrders, ...deliveredOrders.filter((order) => String(order.fecha || '') !== todayKey)]
+        .sort(compareDriverPreviousOrders),
+    [deliveredOrders, hiddenLegacyAssignedOrders, todayKey]
   );
 
   useEffect(() => {
@@ -611,8 +656,10 @@ export default function DriverView() {
   const activeRouteOrders = routeOrders;
   const ordersWithLocation = activeRouteOrders.filter((order) => hasLocation(order.ubicacion));
   const ordersWithoutLocation = activeRouteOrders.filter((order) => !hasLocation(order.ubicacion));
-  const deliveredCount = deliveredOrders.length;
+  const deliveredCount = deliveredTodayOrders.length;
+  const previousCount = previousOrders.length;
   const enCaminoCount = activeRouteOrders.filter((order) => order.estado === 'Enviado').length;
+  const delayedCount = activeRouteOrders.filter((order) => getOrderAgeMeta(order, nowTick).key === 'critical').length;
   const visibleRouteOrders = routeOrders.filter((order) => {
     if (routeFilter === 'todos') return true;
     if (routeFilter === 'en_camino') return order.estado === 'Enviado';
@@ -630,9 +677,12 @@ export default function DriverView() {
       : routeFilter === 'sin_pin'
         ? 'Pedidos sin pin'
         : 'Pedidos por entregar';
-  const historySummary = deliveredOrders[0]?.timestampEntregado
-    ? `Ultima entrega ${deliveredOrders[0].timestampEntregado}`
-    : 'Revisa pedidos completados y sus detalles';
+  const deliveredSummary = deliveredTodayOrders[0]?.timestampEntregado
+    ? `Ultima entrega ${deliveredTodayOrders[0].timestampEntregado}`
+    : 'Revisa pedidos entregados de hoy.';
+  const previousSummary = previousOrders[0]?.fecha
+    ? `Movimientos anteriores desde ${previousOrders[0].fecha}`
+    : 'Aqui aparecen pedidos de dias anteriores.';
 
   const openOrderMap = (order) => {
     const navigationUrl = getOrderNavigationUrl(order);
@@ -706,6 +756,14 @@ export default function DriverView() {
             </div>
           </section>
 
+          {delayedCount > 0 && (
+            <div className="driver-delay-banner">
+              {Icons.alert}
+              <strong>PEDIDO RETRASADO</strong>
+              <span>{delayedCount} pedido{delayedCount === 1 ? '' : 's'} con mas de 1 hora en ruta.</span>
+            </div>
+          )}
+
           {hiddenLegacyAssignedOrders.length > 0 && (
             <div className="driver-inline-warning driver-inline-warning-legacy">
               <span>
@@ -739,25 +797,53 @@ export default function DriverView() {
             </main>
           )}
         </>
+      ) : driverSection === 'entregados' ? (
+        <>
+          <section className="driver-section-head">
+            <div>
+              <strong>Entregados</strong>
+              <span>{deliveredSummary}</span>
+            </div>
+          </section>
+
+          {deliveredTodayOrders.length === 0 ? (
+            <div className="driver-empty">
+              <DriverEmptyVector />
+              <strong>Aun no hay entregas completadas hoy.</strong>
+              <span>Cuando cierres pedidos entregados hoy apareceran aqui.</span>
+            </div>
+          ) : (
+            <main className="driver-grid history">
+              {deliveredTodayOrders.map((order) => (
+                <DriverHistoryCard
+                  key={getOrderKey(order)}
+                  order={order}
+                  onOpenDetails={setSelectedOrder}
+                  onOpenMap={openOrderMap}
+                />
+              ))}
+            </main>
+          )}
+        </>
       ) : (
         <>
           <section className="driver-section-head">
             <div>
-              <strong>Historial de entregas</strong>
-              <span>{historySummary}</span>
+              <strong>Pedidos anteriores</strong>
+              <span>{previousSummary}</span>
             </div>
           </section>
 
-          {deliveredOrders.length === 0 ? (
+          {previousOrders.length === 0 ? (
             <div className="driver-empty">
               <DriverEmptyVector />
-              <strong>Aun no hay entregas completadas.</strong>
-              <span>Cuando cierres pedidos entregados apareceran aqui.</span>
+              <strong>No hay pedidos anteriores para mostrar.</strong>
+              <span>Cuando pasen dias o haya entregas anteriores, apareceran aqui.</span>
             </div>
           ) : (
             <main className="driver-grid history">
-              {deliveredOrders.map((order) => (
-                <DriverHistoryCard
+              {previousOrders.map((order) => (
+                <DriverPreviousOrderCard
                   key={getOrderKey(order)}
                   order={order}
                   onOpenDetails={setSelectedOrder}
@@ -773,6 +859,7 @@ export default function DriverView() {
         section={driverSection}
         activeCount={activeRouteOrders.length}
         deliveredCount={deliveredCount}
+        previousCount={previousCount}
         onChangeSection={setDriverSection}
       />
 
@@ -823,7 +910,7 @@ function DriverProgress({ progress }) {
   );
 }
 
-function DriverBottomNav({ section, activeCount, deliveredCount, onChangeSection }) {
+function DriverBottomNav({ section, activeCount, deliveredCount, previousCount, onChangeSection }) {
   return (
     <nav className="driver-bottom-nav" aria-label="Menu principal driver">
       <button
@@ -831,18 +918,27 @@ function DriverBottomNav({ section, activeCount, deliveredCount, onChangeSection
         className={section === 'ruta' ? 'active' : ''}
         onClick={() => onChangeSection('ruta')}
       >
-        {Icons.route}
-        <span>Ruta</span>
+        {Icons.bike}
+        <span>En Ruta</span>
         <b>{activeCount}</b>
       </button>
       <button
         type="button"
-        className={section === 'historial' ? 'active' : ''}
-        onClick={() => onChangeSection('historial')}
+        className={section === 'entregados' ? 'active' : ''}
+        onClick={() => onChangeSection('entregados')}
+      >
+        {Icons.check}
+        <span>Entregados</span>
+        <b>{deliveredCount}</b>
+      </button>
+      <button
+        type="button"
+        className={section === 'anteriores' ? 'active' : ''}
+        onClick={() => onChangeSection('anteriores')}
       >
         {Icons.history}
-        <span>Historial</span>
-        <b>{deliveredCount}</b>
+        <span>Pedidos Ant.</span>
+        <b>{previousCount}</b>
       </button>
     </nav>
   );
@@ -852,14 +948,24 @@ function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, on
   const status = getStatusMeta(order);
   const delivered = isDeliveredOrder(order);
   const navigationUrl = getOrderNavigationUrl(order);
-  const whatsappLink = buildCustomerWhatsappLink(order);
   const hasMapPoint = hasLocation(order.ubicacion);
   const ageMeta = getOrderAgeMeta(order, nowMs);
+  const delayed = ageMeta.key === 'critical';
 
   return (
     <article className={`driver-order-card ${status.tone} age-${ageMeta.key}`}>
-      <div className="driver-order-main">
+      {delayed && (
+        <div className="driver-delay-alert">
+          {Icons.alert}
+          <strong>PEDIDO RETRASADO</strong>
+        </div>
+      )}
+
+      <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
         <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-card-vector" aria-hidden="true">
+          {Icons.bike}
+        </span>
         <span className="driver-order-info">
           <small>Pedido #{formatOrderNumber(order.id)}</small>
           <strong>{order.cliente}</strong>
@@ -868,7 +974,7 @@ function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, on
         <span className="driver-status-pill" style={{ color: status.accent }}>
           {status.label}
         </span>
-      </div>
+      </button>
 
       <div className="driver-card-meta">
         <span>{getOrderItemSummary(order)}</span>
@@ -878,7 +984,7 @@ function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, on
       </div>
 
       {!hasMapPoint && !delivered && (
-        <div className="driver-inline-warning compact">
+        <div className="driver-inline-warning compact driver-inline-warning-card">
           <span>Falta ubicacion exacta del cliente.</span>
           <button
             type="button"
@@ -895,24 +1001,18 @@ function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, on
       <div className="driver-card-actions">
         <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
           {Icons.map}
-          Mapa
+          <span>Mapa</span>
         </button>
-        {whatsappLink && (
-          <a href={whatsappLink} target="_blank" rel="noreferrer">
-            {Icons.phone}
-            Cliente
-          </a>
-        )}
         <button type="button" onClick={() => onOpenDetails(order)}>
           {Icons.receipt}
-          Mostrar detalle
+          <span>Detalle</span>
         </button>
         {delivered ? (
           <span className="driver-done-chip">Entregado {order.timestampEntregado || ''}</span>
         ) : (
           <button type="button" className="driver-deliver-action" onClick={() => onRequestDelivered(order)} disabled={delivering}>
             {Icons.check}
-            {delivering ? 'Guardando...' : 'Entregado'}
+            <span>{delivering ? 'Guardando...' : 'Entregado'}</span>
           </button>
         )}
       </div>
@@ -922,19 +1022,21 @@ function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, on
 
 function DriverHistoryCard({ order, onOpenDetails, onOpenMap }) {
   const navigationUrl = getOrderNavigationUrl(order);
-  const whatsappLink = buildCustomerWhatsappLink(order);
 
   return (
     <article className="driver-order-card delivered history">
-      <div className="driver-order-main">
+      <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
         <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-card-vector" aria-hidden="true">
+          {Icons.check}
+        </span>
         <span className="driver-order-info">
           <small>Pedido entregado</small>
           <strong>{order.cliente}</strong>
           <em>{getAddressPreview(order)}</em>
         </span>
         <span className="driver-status-pill delivered">Entregado</span>
-      </div>
+      </button>
 
       <div className="driver-card-meta">
         <span>{getOrderItemSummary(order)}</span>
@@ -946,19 +1048,59 @@ function DriverHistoryCard({ order, onOpenDetails, onOpenMap }) {
       <div className="driver-card-actions">
         <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
           {Icons.map}
-          Mapa
+          <span>Mapa</span>
         </button>
-        {whatsappLink && (
-          <a href={whatsappLink} target="_blank" rel="noreferrer">
-            {Icons.phone}
-            Cliente
-          </a>
-        )}
         <button type="button" onClick={() => onOpenDetails(order)}>
           {Icons.receipt}
-          Mostrar detalle
+          <span>Detalle</span>
         </button>
         <span className="driver-done-chip">Entregado {order.timestampEntregado || ''}</span>
+      </div>
+    </article>
+  );
+}
+
+function DriverPreviousOrderCard({ order, onOpenDetails, onOpenMap }) {
+  const delivered = isDeliveredOrder(order);
+  const navigationUrl = getOrderNavigationUrl(order);
+  const badgeLabel = delivered ? 'Entregado' : 'Pendiente';
+  const badgeClass = delivered ? 'driver-status-pill delivered' : 'driver-status-pill previous';
+  const timeLabel = delivered ? order.timestampEntregado || 'Sin hora' : order.timestampIngreso || 'Sin hora';
+
+  return (
+    <article className={`driver-order-card history previous ${delivered ? 'delivered' : 'pending'}`}>
+      <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
+        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-card-vector" aria-hidden="true">
+          {delivered ? Icons.check : Icons.history}
+        </span>
+        <span className="driver-order-info">
+          <small>{order.fecha || 'Fecha no disponible'}</small>
+          <strong>{order.cliente}</strong>
+          <em>{getAddressPreview(order)}</em>
+        </span>
+        <span className={badgeClass}>{badgeLabel}</span>
+      </button>
+
+      <div className="driver-card-meta">
+        <span>{getOrderItemSummary(order)}</span>
+        <span>{hasLocation(order.ubicacion) ? 'Con pin' : 'Sin pin'}</span>
+        <span>{timeLabel}</span>
+        <b>{formatCurrency(order.total)}</b>
+      </div>
+
+      <div className="driver-card-actions">
+        <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
+          {Icons.map}
+          <span>Mapa</span>
+        </button>
+        <button type="button" onClick={() => onOpenDetails(order)}>
+          {Icons.receipt}
+          <span>Detalle</span>
+        </button>
+        <span className="driver-done-chip">
+          {delivered ? `Entregado ${timeLabel}` : `Pendiente ${timeLabel}`}
+        </span>
       </div>
     </article>
   );
@@ -2367,6 +2509,9 @@ const driverStyles = `
   .driver-inline-warning.compact {
     padding: 10px 12px;
   }
+  .driver-inline-warning-card {
+    align-items: center;
+  }
   .driver-inline-warning-legacy {
     margin-bottom: 12px;
   }
@@ -2396,23 +2541,56 @@ const driverStyles = `
     font-size: 12px;
     font-weight: 800;
   }
+  .driver-delay-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 18px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, rgba(254, 242, 242, 0.98), rgba(255, 255, 255, 0.98));
+    box-shadow: 0 16px 28px rgba(220, 38, 38, 0.08);
+  }
+  .driver-delay-banner strong,
+  .driver-delay-alert strong {
+    color: #b91c1c;
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .driver-delay-banner span {
+    color: #7f1d1d;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.35;
+  }
+  .driver-delay-banner svg,
+  .driver-delay-alert svg {
+    width: 16px;
+    height: 16px;
+    color: #dc2626;
+    flex: 0 0 auto;
+  }
   .driver-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
     gap: 12px;
   }
   .driver-order-card {
-    gap: 10px;
+    gap: 9px;
     border-radius: 24px;
-    padding: 14px;
+    padding: 12px;
     box-shadow: 0 14px 32px rgba(17, 24, 39, 0.07);
   }
   .driver-order-card::after {
     display: none;
   }
   .driver-order-main {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
+    width: 100%;
+    grid-template-columns: 40px 40px minmax(0, 1fr) auto;
     gap: 10px;
-    align-items: start;
+    align-items: center;
   }
   .driver-route-badge {
     width: 40px;
@@ -2420,11 +2598,45 @@ const driverStyles = `
     border-radius: 14px;
     font-size: 14px;
   }
+  .driver-card-vector {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    background: ${DRIVER_THEME.blueDeep};
+  }
+  .driver-card-vector svg {
+    width: 20px;
+    height: 20px;
+  }
+  .driver-order-info strong {
+    font-size: 15px;
+  }
+  .driver-order-info em {
+    font-size: 12px;
+  }
   .driver-status-pill {
     grid-column: auto;
     padding: 6px 10px;
     background: #f8fafc;
+    justify-self: end;
     white-space: nowrap;
+  }
+  .driver-status-pill.previous {
+    background: #eef2ff;
+    color: #475569;
+  }
+  .driver-order-card.previous.pending {
+    border-color: rgba(71, 85, 105, 0.18);
+    background: linear-gradient(145deg, #f8fafc, #ffffff);
+  }
+  .driver-delay-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    border-radius: 999px;
+    padding: 5px 10px;
+    background: rgba(254, 226, 226, 0.96);
   }
   .driver-card-meta {
     align-items: center;
@@ -2441,9 +2653,13 @@ const driverStyles = `
     padding: 0 10px;
     background: #f8fafc;
     color: #6b7280;
+    font-size: 11px;
   }
   .driver-card-meta b {
     margin-left: auto;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
     color: #111827;
     font-size: 15px;
   }
@@ -2455,6 +2671,7 @@ const driverStyles = `
     min-height: 40px;
     border-radius: 16px;
     padding: 0 12px;
+    font-size: 11px;
   }
   .driver-detail-modal {
     width: min(680px, 100%);
@@ -2516,11 +2733,23 @@ const driverStyles = `
       font-size: 16px;
     }
     .driver-order-main {
-      grid-template-columns: 36px minmax(0, 1fr);
+      grid-template-columns: 34px 34px minmax(0, 1fr);
+      gap: 8px;
+    }
+    .driver-route-badge,
+    .driver-card-vector {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+    }
+    .driver-card-vector svg {
+      width: 18px;
+      height: 18px;
     }
     .driver-status-pill {
-      grid-column: 2;
+      grid-column: 2 / -1;
       justify-self: start;
+      margin-top: 2px;
     }
     .driver-card-meta b {
       margin-left: 0;
@@ -2546,7 +2775,7 @@ const driverStyles = `
     bottom: 12px;
     z-index: 1400;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
     padding: 10px;
     border: 1px solid rgba(255, 255, 255, 0.58);
@@ -2556,24 +2785,32 @@ const driverStyles = `
     backdrop-filter: blur(16px);
   }
   .driver-bottom-nav button {
-    min-height: 54px;
+    position: relative;
+    min-height: 62px;
     display: grid;
-    grid-template-columns: 20px 1fr auto;
-    align-items: center;
-    gap: 10px;
+    justify-items: center;
+    align-content: center;
+    gap: 4px;
     border: 0;
     border-radius: 18px;
-    padding: 0 14px;
+    padding: 8px 6px;
     background: transparent;
     color: rgba(255, 250, 245, 0.72);
     font: inherit;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 950;
     cursor: pointer;
+    text-align: center;
+  }
+  .driver-bottom-nav button span {
+    line-height: 1.05;
   }
   .driver-bottom-nav button b {
-    min-width: 26px;
-    height: 26px;
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    min-width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2587,9 +2824,12 @@ const driverStyles = `
     color: #fffaf5;
     box-shadow: 0 14px 26px rgba(123, 16, 34, 0.24);
   }
+  .driver-bottom-nav button.active b {
+    background: rgba(255, 255, 255, 0.18);
+  }
   .driver-bottom-nav svg {
-    width: 18px;
-    height: 18px;
+    width: 19px;
+    height: 19px;
   }
   .driver-age-chip {
     min-height: 28px;
@@ -2663,9 +2903,16 @@ const driverStyles = `
       border-radius: 22px;
     }
     .driver-bottom-nav button {
-      min-height: 50px;
-      padding: 0 12px;
-      font-size: 12px;
+      min-height: 56px;
+      padding: 8px 4px;
+      font-size: 10px;
+    }
+    .driver-bottom-nav button b {
+      top: 6px;
+      right: 6px;
+      min-width: 20px;
+      height: 20px;
+      font-size: 10px;
     }
     .driver-featured-meta span:last-child {
       width: 100%;
