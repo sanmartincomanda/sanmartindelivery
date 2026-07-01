@@ -25,6 +25,27 @@ const cleanDriverCode = (value) =>
     .toUpperCase()
     .replace(/\s+/g, '');
 
+const resolveDriverIdentity = (driver = {}, fallback = {}) => {
+  const source = driver || {};
+  const backup = fallback || {};
+  const code = cleanDriverCode(source.code ?? backup.code);
+  const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
+  const publicName = String(source.publicName ?? backup.publicName ?? source.name ?? backup.name ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const nameParts = name.split(/\s+/).filter(Boolean);
+  const firstName = nameParts[0] || code || 'driver';
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
+
+  return {
+    code,
+    name,
+    publicName,
+    firstName,
+    lastName,
+  };
+};
+
 export const normalizeDriverCode = cleanDriverCode;
 
 export const getDriverKey = (code) => cleanDriverCode(code).replace(/[.#$/[\]]/g, '_');
@@ -35,27 +56,18 @@ export const getDriverCodeSuffix = (code = '') => {
 };
 
 export const getDriverLoginUsername = (driver = {}) => {
-  const normalized = normalizeDriver(driver);
-  const [firstName = normalized.code || 'driver'] = String(normalized.name || '')
-    .split(/\s+/)
-    .filter(Boolean);
-
-  return `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(normalized.code)}`;
+  const identity = resolveDriverIdentity(driver);
+  return `${normalizeDriverLoginToken(identity.firstName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
 };
 
 export const getDriverLoginPassword = (driver = {}) => {
-  const normalized = normalizeDriver(driver);
-  const nameParts = String(normalized.name || '')
-    .split(/\s+/)
-    .filter(Boolean);
-  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0] || normalized.code || 'driver';
-
-  return `${normalizeDriverLoginToken(lastName) || 'driver'}${getDriverCodeSuffix(normalized.code)}`;
+  const identity = resolveDriverIdentity(driver);
+  return `${normalizeDriverLoginToken(identity.lastName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
 };
 
 export const getDriverPublicName = (driver = {}) => {
-  const normalized = normalizeDriver(driver);
-  return String(normalized.publicName || normalized.name || '').trim();
+  const identity = resolveDriverIdentity(driver);
+  return String(identity.publicName || identity.name || '').trim();
 };
 
 export const findDriverByLoginIdentifier = (identifier, drivers = []) => {
@@ -77,19 +89,15 @@ export const findDriverByLoginIdentifier = (identifier, drivers = []) => {
 export const normalizeDriver = (driver = {}, fallback = {}) => {
   const source = driver || {};
   const backup = fallback || {};
-  const code = cleanDriverCode(source.code ?? backup.code);
-  const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
-  const publicName = String(source.publicName ?? backup.publicName ?? source.name ?? backup.name ?? '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const identity = resolveDriverIdentity(source, backup);
   const loginUsername =
     String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
-    getDriverLoginUsername({ code, name });
+    `${normalizeDriverLoginToken(identity.firstName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
 
   return {
-    code,
-    name,
-    publicName,
+    code: identity.code,
+    name: identity.name,
+    publicName: identity.publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
