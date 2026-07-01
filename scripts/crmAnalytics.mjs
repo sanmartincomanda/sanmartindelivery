@@ -41,7 +41,6 @@ const EMBEDDED_PUBLIC_SNAPSHOT_PATH = resolve(repoRoot, 'public', 'crm', 'dashbo
 const STORE_CHANNEL = 'tienda_virtual';
 const CACHE_MAX_AGE_MS = 2 * 60 * 1000;
 const CUSTOMER_LOOKBACK_DAYS = 365;
-const CUSTOMER_DIRECTORY_LIMIT = 160;
 const CUSTOMER_LIST_LIMIT = 12;
 
 const cache = {
@@ -85,6 +84,11 @@ const normalizePaymentLabel = (value = '') => {
     return 'Sin metodo';
   }
   return normalized;
+};
+
+const isPublicoGeneralName = (value = '') => {
+  const normalized = normalizeText(value);
+  return normalized === 'publico en general' || normalized === 'publico general';
 };
 
 const formatDateKey = (date = new Date()) => {
@@ -779,6 +783,7 @@ const buildCustomerInsights = (transactions = [], period, options = {}) => {
       isDeclining,
       isGrowing,
       isVip,
+      isPublicoGeneral: isPublicoGeneralName(profile.name),
       revenueDelta,
       revenueChangePct,
       ordersDelta,
@@ -820,6 +825,7 @@ const buildCustomerInsights = (transactions = [], period, options = {}) => {
   const reactivatedCustomers = profilesWithShare.filter((profile) => profile.isReactivated);
   const newCustomers = profilesWithShare.filter((profile) => profile.isNew);
   const vipCustomers = profilesWithShare.filter((profile) => profile.isVip);
+  const publicoGeneralCustomers = profilesWithShare.filter((profile) => profile.isPublicoGeneral);
 
   const byRevenue = (left, right) =>
     Number(right.currentRevenue || right.previousRevenue || right.lifetimeRevenue || 0) -
@@ -859,8 +865,7 @@ const buildCustomerInsights = (transactions = [], period, options = {}) => {
         Number(right.lifetimeOrders || 0) - Number(left.lifetimeOrders || 0) ||
         String(left.name || '').localeCompare(String(right.name || ''))
       );
-    })
-    .slice(0, CUSTOMER_DIRECTORY_LIMIT);
+    });
 
   return {
     channel,
@@ -880,6 +885,22 @@ const buildCustomerInsights = (transactions = [], period, options = {}) => {
         activeCustomers.length > 0 ? roundPercent((repeatActiveCustomers.length / activeCustomers.length) * 100) : 0,
       churnRatePct:
         previousActiveCustomers.length > 0 ? roundPercent((lostCustomers.length / previousActiveCustomers.length) * 100) : 0,
+      lostRatePct:
+        previousActiveCustomers.length > 0 ? roundPercent((lostCustomers.length / previousActiveCustomers.length) * 100) : 0,
+      atRiskRatePct:
+        profilesWithShare.length > 0 ? roundPercent((atRiskCustomers.length / profilesWithShare.length) * 100) : 0,
+      decliningRatePct:
+        activeCustomers.length > 0 ? roundPercent((decliningCustomers.length / activeCustomers.length) * 100) : 0,
+      reactivatedRatePct:
+        activeCustomers.length > 0 ? roundPercent((reactivatedCustomers.length / activeCustomers.length) * 100) : 0,
+      newCustomersRatePct:
+        activeCustomers.length > 0 ? roundPercent((newCustomers.length / activeCustomers.length) * 100) : 0,
+      vipCustomersRatePct:
+        activeCustomers.length > 0 ? roundPercent((vipCustomers.length / activeCustomers.length) * 100) : 0,
+      publicoGeneralCount: publicoGeneralCustomers.length,
+      publicoGeneralRatePct:
+        profilesWithShare.length > 0 ? roundPercent((publicoGeneralCustomers.length / profilesWithShare.length) * 100) : 0,
+      totalProfiles: profilesWithShare.length,
       reactivatedCount: reactivatedCustomers.length,
       newCustomersCount: newCustomers.length,
       decliningCustomersCount: decliningCustomers.length,

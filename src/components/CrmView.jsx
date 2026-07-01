@@ -17,6 +17,11 @@ const CHANNEL_LABELS = {
   sicar: 'Cartera SICAR',
 };
 
+const VIEW_LABELS = {
+  overview: 'Vista general',
+  behavior: 'Analisis comportamiento de clientes',
+};
+
 const moneyFormatter = new Intl.NumberFormat('es-NI', {
   style: 'currency',
   currency: 'NIO',
@@ -120,6 +125,70 @@ const normalizeSearch = (value = '') =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+
+const BEHAVIOR_FILTERS = [
+  { key: 'all', label: 'Todos', tone: 'blue' },
+  { key: 'lost', label: 'Perdidos', tone: 'red' },
+  { key: 'atRisk', label: 'En riesgo', tone: 'amber' },
+  { key: 'declining', label: 'En caida', tone: 'orange' },
+  { key: 'reactivated', label: 'Reactivados', tone: 'teal' },
+  { key: 'publicoGeneral', label: 'Publico general', tone: 'indigo' },
+];
+
+const BEHAVIOR_FILTER_META = {
+  all: {
+    description: 'Toda la cartera disponible para esta ventana.',
+    rateKey: null,
+    countKey: 'totalProfiles',
+  },
+  lost: {
+    description: 'Compraron en la ventana anterior y en esta ya no aparecen.',
+    rateKey: 'lostRatePct',
+    countKey: 'lostCustomersCount',
+  },
+  atRisk: {
+    description: 'Clientes valiosos sin compra reciente segun su ritmo habitual.',
+    rateKey: 'atRiskRatePct',
+    countKey: 'atRiskCustomersCount',
+  },
+  declining: {
+    description: 'Siguen activos, pero estan comprando menos que antes.',
+    rateKey: 'decliningRatePct',
+    countKey: 'decliningCustomersCount',
+  },
+  reactivated: {
+    description: 'Volvieron a comprar despues de ausentarse en la ventana anterior.',
+    rateKey: 'reactivatedRatePct',
+    countKey: 'reactivatedCount',
+  },
+  publicoGeneral: {
+    description: 'Perfil Publico general para revisar el comportamiento que cae alli.',
+    rateKey: 'publicoGeneralRatePct',
+    countKey: 'publicoGeneralCount',
+  },
+};
+
+const matchesBehaviorFilter = (customer, filterKey) => {
+  if (!customer) {
+    return false;
+  }
+
+  switch (filterKey) {
+    case 'lost':
+      return customer.isLost;
+    case 'atRisk':
+      return customer.isAtRisk;
+    case 'declining':
+      return customer.isDeclining;
+    case 'reactivated':
+      return customer.isReactivated;
+    case 'publicoGeneral':
+      return customer.isPublicoGeneral;
+    case 'all':
+    default:
+      return true;
+  }
+};
 
 function DashboardShell({ children }) {
   return (
@@ -370,6 +439,36 @@ function PeriodSelector({ periodOrder, selectedPeriod, onSelectPeriod }) {
   );
 }
 
+function ViewSelector({ value, onChange }) {
+  return (
+    <div className="crm-section-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      {Object.entries(VIEW_LABELS).map(([viewKey, label]) => {
+        const active = value === viewKey;
+        return (
+          <button
+            key={viewKey}
+            type="button"
+            className="crm-channel-pill"
+            onClick={() => onChange(viewKey)}
+            style={{
+              border: active ? 'none' : `1px solid ${THEME.borderStrong}`,
+              background: active ? THEME.primaryGradient : 'white',
+              color: active ? 'white' : THEME.text,
+              minHeight: 40,
+              padding: '0 16px',
+              borderRadius: 999,
+              fontWeight: 900,
+              cursor: 'pointer',
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChannelSelector({ value, onChange }) {
   return (
     <div className="crm-section-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -393,6 +492,60 @@ function ChannelSelector({ value, onChange }) {
             }}
           >
             {CHANNEL_LABELS[channelKey]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function BehaviorFilterSelector({ value, onChange, summary = {} }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      {BEHAVIOR_FILTERS.map((filter) => {
+        const active = value === filter.key;
+        const countKey = BEHAVIOR_FILTER_META[filter.key]?.countKey;
+        const countValue = countKey ? Number(summary?.[countKey] || 0) : 0;
+
+        return (
+          <button
+            key={filter.key}
+            type="button"
+            className="crm-channel-pill"
+            onClick={() => onChange(filter.key)}
+            style={{
+              border: active ? 'none' : `1px solid ${THEME.borderStrong}`,
+              background: active ? THEME.primaryGradient : 'white',
+              color: active ? 'white' : THEME.text,
+              minHeight: 42,
+              padding: '0 16px',
+              borderRadius: 999,
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span>{filter.label}</span>
+            <span
+              style={{
+                minWidth: 28,
+                height: 28,
+                padding: '0 8px',
+                borderRadius: 999,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: active ? 'rgba(255,255,255,0.18)' : STATUS_STYLES[filter.tone]?.background || 'rgba(29, 116, 199, 0.12)',
+                color: active ? 'white' : STATUS_STYLES[filter.tone]?.color || THEME.blueDeep,
+                border: active ? '1px solid rgba(255,255,255,0.18)' : `1px solid ${STATUS_STYLES[filter.tone]?.borderColor || THEME.border}`,
+                fontSize: 12,
+                fontWeight: 900,
+              }}
+            >
+              {formatNumber(countValue)}
+            </span>
           </button>
         );
       })}
@@ -701,7 +854,7 @@ function RecentList({ items = [], type = 'online' }) {
   );
 }
 
-function CustomerDirectory({ customers = [], selectedKey, onSelectCustomer, query, onQueryChange }) {
+function CustomerDirectory({ customers = [], selectedKey, onSelectCustomer, query, onQueryChange, emptyLabel = 'No hay clientes para esta vista todavia.', maxHeight = 720 }) {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div
@@ -733,9 +886,9 @@ function CustomerDirectory({ customers = [], selectedKey, onSelectCustomer, quer
       </div>
 
       {!customers.length ? (
-        <EmptyList label="No hay clientes para esta vista todavia." />
+        <EmptyList label={emptyLabel} />
       ) : (
-        <div style={{ display: 'grid', gap: 10, maxHeight: 720, overflowY: 'auto', paddingRight: 4 }}>
+        <div style={{ display: 'grid', gap: 10, maxHeight, overflowY: 'auto', paddingRight: 4 }}>
           {customers.map((customer) => {
             const selected = customer.key === selectedKey;
             return (
@@ -855,8 +1008,10 @@ export default function CrmView() {
   const [source, setSource] = useState('');
   const [dashboard, setDashboard] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState('month');
+  const [activeView, setActiveView] = useState('overview');
   const [refreshTick, setRefreshTick] = useState(0);
   const [selectedCustomerChannel, setSelectedCustomerChannel] = useState('sicar');
+  const [behaviorFilter, setBehaviorFilter] = useState('all');
   const [customerQuery, setCustomerQuery] = useState('');
   const [selectedCustomerKey, setSelectedCustomerKey] = useState('');
 
@@ -914,22 +1069,40 @@ export default function CrmView() {
   const customerIntelligence = currentPeriod?.customerIntelligence?.[selectedCustomerChannel] || null;
   const customerSummary = customerIntelligence?.summary || {};
   const directory = Array.isArray(customerIntelligence?.customerDirectory) ? customerIntelligence.customerDirectory : [];
+  const behaviorMeta = BEHAVIOR_FILTER_META[behaviorFilter] || BEHAVIOR_FILTER_META.all;
 
-  const filteredCustomers = useMemo(() => {
-    const search = normalizeSearch(customerQuery);
-    if (!search) {
+  const customersScopedByBehavior = useMemo(() => {
+    if (behaviorFilter === 'all') {
       return directory;
     }
 
-    return directory.filter((customer) => {
+    return directory.filter((customer) => matchesBehaviorFilter(customer, behaviorFilter));
+  }, [behaviorFilter, directory]);
+
+  const filteredCustomers = useMemo(() => {
+    const search = normalizeSearch(customerQuery);
+    const baseCustomers = activeView === 'behavior' ? customersScopedByBehavior : directory;
+
+    if (!search) {
+      return baseCustomers;
+    }
+
+    return baseCustomers.filter((customer) => {
       const haystack = [customer.name, customer.code, customer.status].map(normalizeSearch).join(' ');
       return haystack.includes(search);
     });
-  }, [directory, customerQuery]);
+  }, [activeView, customerQuery, customersScopedByBehavior, directory]);
+
+  const customerBaseList = activeView === 'behavior' ? customersScopedByBehavior : directory;
 
   const selectedCustomer = useMemo(
-    () => filteredCustomers.find((customer) => customer.key === selectedCustomerKey) || directory.find((customer) => customer.key === selectedCustomerKey) || filteredCustomers[0] || directory[0] || null,
-    [directory, filteredCustomers, selectedCustomerKey]
+    () =>
+      filteredCustomers.find((customer) => customer.key === selectedCustomerKey) ||
+      customerBaseList.find((customer) => customer.key === selectedCustomerKey) ||
+      filteredCustomers[0] ||
+      customerBaseList[0] ||
+      null,
+    [customerBaseList, filteredCustomers, selectedCustomerKey]
   );
 
   useEffect(() => {
@@ -941,7 +1114,7 @@ export default function CrmView() {
   useEffect(() => {
     setCustomerQuery('');
     setSelectedCustomerKey('');
-  }, [selectedCustomerChannel, selectedPeriod]);
+  }, [selectedCustomerChannel, selectedPeriod, behaviorFilter, activeView]);
 
   if (loading) {
     return (
@@ -979,7 +1152,10 @@ export default function CrmView() {
             title="CRM Corporativo San Martin"
             subtitle="Vista ejecutiva de ingresos, clientes, retencion y oportunidad comercial."
             actions={
-              <PeriodSelector periodOrder={periodOrder} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />
+              <div style={{ display: 'grid', gap: 10 }}>
+                <PeriodSelector periodOrder={periodOrder} selectedPeriod={selectedPeriod} onSelectPeriod={setSelectedPeriod} />
+                <ViewSelector value={activeView} onChange={setActiveView} />
+              </div>
             }
           >
             <div style={{ display: 'grid', gap: 18 }}>
@@ -1060,191 +1236,281 @@ export default function CrmView() {
           </div>
         </SectionCard>
 
-        <SectionCard
-          title="Inteligencia de clientes"
-          subtitle="Aqui esta el verdadero valor del CRM: riesgo, caida, recuperacion y detalle accionable por cliente."
-          actions={<ChannelSelector value={selectedCustomerChannel} onChange={setSelectedCustomerChannel} />}
-        >
-          <div style={{ display: 'grid', gap: 18 }}>
-            <div className="crm-grid-four" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
-              <MetricMiniCard label="Activos" value={formatNumber(customerSummary.activeCustomers)} helper={`${formatMoney(customerSummary.currentRevenue)} en la ventana`} emphasis="blue" />
-              <MetricMiniCard label="Nuevos" value={formatNumber(customerSummary.newCustomersCount)} helper="Primera compra en el historial analizado" emphasis="teal" />
-              <MetricMiniCard label="VIP activos" value={formatNumber(customerSummary.vipCustomersCount)} helper="Clientes de alto valor actualmente comprando" emphasis="gold" />
-              <MetricMiniCard label="Ordenes por activo" value={formatNumber(customerSummary.averageOrdersPerActiveCustomer)} helper={`${formatNumber(customerSummary.averageDaysSinceLastPurchase)} dias desde ultima compra`} emphasis="default" />
-            </div>
-
-            <div className="crm-signal-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
-              <SignalPanel
-                title="Clientes perdidos"
-                subtitle="Compraron en la ventana anterior y en esta ya no."
-                count={customerSummary.lostCustomersCount}
-                tone="red"
-                items={customerIntelligence?.lostCustomers || []}
-                emptyLabel="No hay clientes perdidos en esta ventana."
-                renderMetric={(item) => formatMoney(item.previousRevenue)}
-                renderHelper={(item) => `Ultima compra ${formatShortDate(item.lastPurchaseDate)} | Caida ${formatSignedMoney(item.revenueDelta)}`}
-                onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
-              />
-              <SignalPanel
-                title="Clientes en riesgo"
-                subtitle="Clientes valiosos sin compra reciente."
-                count={customerSummary.atRiskCustomersCount}
-                tone="amber"
-                items={customerIntelligence?.atRiskCustomers || []}
-                emptyLabel="No hay clientes en riesgo ahora mismo."
-                renderMetric={(item) => formatMoney(item.lifetimeRevenue)}
-                renderHelper={(item) => `${formatNumber(item.daysSinceLastPurchase)} dias sin comprar | ticket ${formatMoney(item.currentTicket || item.previousTicket)}`}
-                onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
-              />
-              <SignalPanel
-                title="Clientes en caida"
-                subtitle="Siguen activos, pero con compra menor al periodo anterior."
-                count={customerSummary.decliningCustomersCount}
-                tone="orange"
-                items={customerIntelligence?.decliningCustomers || []}
-                emptyLabel="No hay clientes con caida relevante en esta ventana."
-                renderMetric={(item) => formatSignedMoney(item.revenueDelta)}
-                renderHelper={(item) => `${formatMoney(item.previousRevenue)} antes | ${formatMoney(item.currentRevenue)} ahora`}
-                onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
-              />
-              <SignalPanel
-                title="Clientes reactivados"
-                subtitle="Volvieron despues de ausentarse en la ventana anterior."
-                count={customerSummary.reactivatedCount}
-                tone="teal"
-                items={customerIntelligence?.reactivatedCustomers || []}
-                emptyLabel="No hay reactivaciones en esta ventana."
-                renderMetric={(item) => formatMoney(item.currentRevenue)}
-                renderHelper={(item) => `Volvio con ${formatNumber(item.currentOrders)} operaciones | ${item.preferredPayment}`}
-                onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
-              />
-            </div>
-
-            <div className="crm-customer-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.92fr) minmax(0, 1.08fr)', gap: 20 }}>
-              <SectionCard title="Directorio accionable" subtitle="Busca un cliente especifico y abre su radiografia completa.">
-                <CustomerDirectory
-                  customers={filteredCustomers}
-                  selectedKey={selectedCustomer?.key || ''}
-                  onSelectCustomer={(customer) => setSelectedCustomerKey(customer.key)}
-                  query={customerQuery}
-                  onQueryChange={setCustomerQuery}
-                />
-              </SectionCard>
-
-              <SectionCard title="Detalle del cliente" subtitle="Lectura rapida para vender mas, recuperar o proteger la cuenta.">
-                <CustomerDetailPanel customer={selectedCustomer} channel={selectedCustomerChannel} />
-              </SectionCard>
-            </div>
-
-            <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              <SectionCard title="Clientes VIP activos" subtitle="La cartera que mas peso tiene hoy en esta ventana.">
-                <RankedList
-                  title="Mayor valor actual"
-                  items={customerIntelligence?.vipCustomers || []}
-                  emptyLabel="Todavia no hay clientes VIP activos en esta ventana."
-                  subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.currentOrders)} ops | ${item.preferredPayment}`}
-                  renderMetric={(item) => formatMoney(item.currentRevenue)}
-                  onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
-                />
-              </SectionCard>
-
-              <SectionCard title="Clientes en crecimiento" subtitle="Cuentas que aceleraron respecto a la ventana anterior.">
-                <RankedList
-                  title="Mayor crecimiento"
-                  items={customerIntelligence?.growingCustomers || []}
-                  emptyLabel="No hay crecimientos fuertes en esta ventana."
-                  subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatMoney(item.previousRevenue)} antes`}
-                  renderMetric={(item) => formatSignedMoney(item.revenueDelta)}
-                  onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
-                />
-              </SectionCard>
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Tendencia diaria" subtitle="Ultimos 14 puntos para ver ritmo y despegues entre web y SICAR.">
-          <DailyTrend online={currentPeriod.online?.daily} sicar={currentPeriod.sicar?.daily} />
-        </SectionCard>
-
-        <div className="crm-channel-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-          <SectionCard title="Tienda en linea" subtitle="Conversion digital, fulfillment y mezcla comercial del canal web.">
-            <div style={{ display: 'grid', gap: 18 }}>
-              <div className="crm-grid-four" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
-                <MetricMiniCard label="Venta final" value={formatMoney(onlineSummary.revenue)} helper={`${formatMoney(onlineSummary.projectedRevenue)} proyectado activo`} emphasis="blue" />
-                <MetricMiniCard label="Clientes web" value={formatNumber(onlineSummary.uniqueCustomers)} helper={`${formatNumber(onlineSummary.deliveryCount || 0)} delivery | ${formatNumber(onlineSummary.pickupCount || 0)} pickup`} emphasis="default" />
-                <MetricMiniCard label="Promos" value={`${formatNumber(onlineSummary.rewardOrders || 0)} / ${formatNumber(onlineSummary.couponOrders || 0)}`} helper="Recompensas / cupones usados" emphasis="gold" />
-                <MetricMiniCard label="Ticket" value={formatMoney(onlineSummary.averageTicket)} helper={`${formatNumber(onlineSummary.orderCount || 0)} pedidos no cancelados`} emphasis="blue" />
+        {activeView === 'behavior' ? (
+          <SectionCard
+            title="Analisis comportamiento de clientes"
+            subtitle="Segmenta toda la cartera por riesgo, caida, perdida, reactivacion y Publico general dentro de la ventana elegida."
+            actions={
+              <div style={{ display: 'grid', gap: 10 }}>
+                <ChannelSelector value={selectedCustomerChannel} onChange={setSelectedCustomerChannel} />
+                <BehaviorFilterSelector value={behaviorFilter} onChange={setBehaviorFilter} summary={customerSummary} />
               </div>
-              <PaymentList items={currentPeriod.online?.paymentMethods || []} emptyLabel="Sin metodos de pago web en esta ventana." />
-            </div>
-          </SectionCard>
-
-          <SectionCard title="SICAR" subtitle="Venta consolidada real del negocio central.">
+            }
+          >
             <div style={{ display: 'grid', gap: 18 }}>
-              <div className="crm-grid-four" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
-                <MetricMiniCard label="Ingreso total" value={formatMoney(sicarSummary.revenue)} helper={`${formatNumber(sicarSummary.saleCount || 0)} transacciones`} emphasis="gold" />
-                <MetricMiniCard label="Clientes" value={formatNumber(sicarSummary.uniqueCustomers)} helper="Clientes unicos facturados" emphasis="default" />
-                <MetricMiniCard label="Ticket promedio" value={formatMoney(sicarSummary.averageTicket)} helper="Venta real consolidada" emphasis="blue" />
-                <MetricMiniCard label="Canal web share" value={formatPercent(comparison.onlineRevenueSharePct)} helper="Peso del canal digital dentro del negocio total" emphasis="blue" />
+              <div className="crm-grid-three" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+                <MetricMiniCard label="Perdidos" value={formatNumber(customerSummary.lostCustomersCount)} helper={`${formatPercent(customerSummary.lostRatePct)} de la cartera previa`} emphasis="red" />
+                <MetricMiniCard label="En riesgo" value={formatNumber(customerSummary.atRiskCustomersCount)} helper={`${formatPercent(customerSummary.atRiskRatePct)} del universo analizado`} emphasis="gold" />
+                <MetricMiniCard label="En caida" value={formatNumber(customerSummary.decliningCustomersCount)} helper={`${formatPercent(customerSummary.decliningRatePct)} de los clientes activos`} emphasis="red" />
+                <MetricMiniCard label="Reactivados" value={formatNumber(customerSummary.reactivatedCount)} helper={`${formatPercent(customerSummary.reactivatedRatePct)} de los clientes activos`} emphasis="teal" />
+                <MetricMiniCard label="Publico general" value={formatNumber(customerSummary.publicoGeneralCount)} helper={`${formatPercent(customerSummary.publicoGeneralRatePct)} del universo analizado`} emphasis="blue" />
+                <MetricMiniCard label="Base analizada" value={formatNumber(customerSummary.totalProfiles)} helper={`${CHANNEL_LABELS[selectedCustomerChannel]} | ${currentPeriod.dateFrom} al ${currentPeriod.dateTo}`} emphasis="default" />
               </div>
-              <PaymentList items={currentPeriod.sicar?.paymentMethods || []} emptyLabel="Sin metodos de pago SICAR en esta ventana." />
+
+              <div
+                style={{
+                  borderRadius: 20,
+                  padding: 18,
+                  border: `1px solid ${THEME.border}`,
+                  background: 'rgba(247, 251, 255, 0.94)',
+                  color: THEME.text,
+                  display: 'grid',
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 18, fontWeight: 900 }}>
+                  {behaviorFilter === 'all' ? 'Mostrando toda la cartera analizada' : `Filtro activo: ${BEHAVIOR_FILTERS.find((item) => item.key === behaviorFilter)?.label || 'Todos'}`}
+                </div>
+                <div style={{ color: THEME.textSoft, fontWeight: 700, lineHeight: 1.55 }}>
+                  {behaviorMeta.description} Resultado actual: {formatNumber(filteredCustomers.length)} cliente{filteredCustomers.length === 1 ? '' : 's'} visibles.
+                </div>
+              </div>
+
+              <div className="crm-customer-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.92fr) minmax(0, 1.08fr)', gap: 20 }}>
+                <SectionCard
+                  title="Listado filtrado"
+                  subtitle="Aqui puedes revisar a toditos los clientes del filtro elegido y buscarlos por nombre, codigo o estado."
+                >
+                  <CustomerDirectory
+                    customers={filteredCustomers}
+                    selectedKey={selectedCustomer?.key || ''}
+                    onSelectCustomer={(customer) => setSelectedCustomerKey(customer.key)}
+                    query={customerQuery}
+                    onQueryChange={setCustomerQuery}
+                    emptyLabel="No hay clientes para este filtro en la ventana actual."
+                    maxHeight={900}
+                  />
+                </SectionCard>
+
+                <SectionCard title="Detalle del cliente" subtitle="Ficha comercial completa para diagnosticar la cuenta elegida.">
+                  <CustomerDetailPanel customer={selectedCustomer} channel={selectedCustomerChannel} />
+                </SectionCard>
+              </div>
+
+              <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                <SectionCard title="Clientes VIP activos" subtitle="La cartera mas fuerte para proteger y desarrollar.">
+                  <RankedList
+                    title="Mayor valor actual"
+                    items={customerIntelligence?.vipCustomers || []}
+                    emptyLabel="Todavia no hay clientes VIP activos en esta ventana."
+                    subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.currentOrders)} ops | ${item.preferredPayment}`}
+                    renderMetric={(item) => formatMoney(item.currentRevenue)}
+                    onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                  />
+                </SectionCard>
+
+                <SectionCard title="Clientes en crecimiento" subtitle="Cuentas que vienen acelerando respecto al periodo anterior.">
+                  <RankedList
+                    title="Mayor crecimiento"
+                    items={customerIntelligence?.growingCustomers || []}
+                    emptyLabel="No hay crecimientos fuertes en esta ventana."
+                    subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatMoney(item.previousRevenue)} antes`}
+                    renderMetric={(item) => formatSignedMoney(item.revenueDelta)}
+                    onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                  />
+                </SectionCard>
+              </div>
             </div>
           </SectionCard>
-        </div>
+        ) : (
+          <>
+            <SectionCard
+              title="Inteligencia de clientes"
+              subtitle="Aqui esta el verdadero valor del CRM: riesgo, caida, recuperacion y detalle accionable por cliente."
+              actions={<ChannelSelector value={selectedCustomerChannel} onChange={setSelectedCustomerChannel} />}
+            >
+              <div style={{ display: 'grid', gap: 18 }}>
+                <div className="crm-grid-four" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+                  <MetricMiniCard label="Activos" value={formatNumber(customerSummary.activeCustomers)} helper={`${formatMoney(customerSummary.currentRevenue)} en la ventana`} emphasis="blue" />
+                  <MetricMiniCard label="Nuevos" value={formatNumber(customerSummary.newCustomersCount)} helper="Primera compra en el historial analizado" emphasis="teal" />
+                  <MetricMiniCard label="VIP activos" value={formatNumber(customerSummary.vipCustomersCount)} helper="Clientes de alto valor actualmente comprando" emphasis="gold" />
+                  <MetricMiniCard label="Ordenes por activo" value={formatNumber(customerSummary.averageOrdersPerActiveCustomer)} helper={`${formatNumber(customerSummary.averageDaysSinceLastPurchase)} dias desde ultima compra`} emphasis="default" />
+                </div>
 
-        <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-          <SectionCard title="Top productos web" subtitle="Los cortes y articulos que mas mueven la tienda.">
-            <RankedList
-              title="Mas vendidos por tienda"
-              items={currentPeriod.online?.topProducts || []}
-              emptyLabel="Todavia no hay productos web entregados en esta ventana."
-              subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.quantity)} uds | ${formatNumber(item.ordersCount)} pedidos`}
-              renderMetric={(item) => formatMoney(item.revenue)}
-            />
-          </SectionCard>
+                <div className="crm-signal-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                  <SignalPanel
+                    title="Clientes perdidos"
+                    subtitle="Compraron en la ventana anterior y en esta ya no."
+                    count={customerSummary.lostCustomersCount}
+                    tone="red"
+                    items={customerIntelligence?.lostCustomers || []}
+                    emptyLabel="No hay clientes perdidos en esta ventana."
+                    renderMetric={(item) => formatMoney(item.previousRevenue)}
+                    renderHelper={(item) => `Ultima compra ${formatShortDate(item.lastPurchaseDate)} | Caida ${formatSignedMoney(item.revenueDelta)}`}
+                    onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                  />
+                  <SignalPanel
+                    title="Clientes en riesgo"
+                    subtitle="Clientes valiosos sin compra reciente."
+                    count={customerSummary.atRiskCustomersCount}
+                    tone="amber"
+                    items={customerIntelligence?.atRiskCustomers || []}
+                    emptyLabel="No hay clientes en riesgo ahora mismo."
+                    renderMetric={(item) => formatMoney(item.lifetimeRevenue)}
+                    renderHelper={(item) => `${formatNumber(item.daysSinceLastPurchase)} dias sin comprar | ticket ${formatMoney(item.currentTicket || item.previousTicket)}`}
+                    onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                  />
+                  <SignalPanel
+                    title="Clientes en caida"
+                    subtitle="Siguen activos, pero con compra menor al periodo anterior."
+                    count={customerSummary.decliningCustomersCount}
+                    tone="orange"
+                    items={customerIntelligence?.decliningCustomers || []}
+                    emptyLabel="No hay clientes con caida relevante en esta ventana."
+                    renderMetric={(item) => formatSignedMoney(item.revenueDelta)}
+                    renderHelper={(item) => `${formatMoney(item.previousRevenue)} antes | ${formatMoney(item.currentRevenue)} ahora`}
+                    onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                  />
+                  <SignalPanel
+                    title="Clientes reactivados"
+                    subtitle="Volvieron despues de ausentarse en la ventana anterior."
+                    count={customerSummary.reactivatedCount}
+                    tone="teal"
+                    items={customerIntelligence?.reactivatedCustomers || []}
+                    emptyLabel="No hay reactivaciones en esta ventana."
+                    renderMetric={(item) => formatMoney(item.currentRevenue)}
+                    renderHelper={(item) => `Volvio con ${formatNumber(item.currentOrders)} operaciones | ${item.preferredPayment}`}
+                    onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                  />
+                </div>
 
-          <SectionCard title="Top productos SICAR" subtitle="Lo que realmente mas factura en el sistema central.">
-            <RankedList
-              title="Mas vendidos por SICAR"
-              items={currentPeriod.sicar?.topProducts || []}
-              emptyLabel="Todavia no hay productos SICAR en esta ventana."
-              subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.quantity)} uds | ${formatNumber(item.salesCount)} ventas`}
-              renderMetric={(item) => formatMoney(item.revenue)}
-            />
-          </SectionCard>
-        </div>
+                <div className="crm-customer-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.92fr) minmax(0, 1.08fr)', gap: 20 }}>
+                  <SectionCard title="Directorio accionable" subtitle="Busca un cliente especifico y abre su radiografia completa.">
+                    <CustomerDirectory
+                      customers={filteredCustomers}
+                      selectedKey={selectedCustomer?.key || ''}
+                      onSelectCustomer={(customer) => setSelectedCustomerKey(customer.key)}
+                      query={customerQuery}
+                      onQueryChange={setCustomerQuery}
+                    />
+                  </SectionCard>
 
-        <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-          <SectionCard title="Top clientes web" subtitle="Quienes mas compran dentro del canal digital.">
-            <RankedList
-              title="Clientes de tienda"
-              items={currentPeriod.online?.topCustomers || []}
-              emptyLabel="Todavia no hay clientes web con compras entregadas."
-              subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.ordersCount)} pedidos`}
-              renderMetric={(item) => formatMoney(item.revenue)}
-            />
-          </SectionCard>
+                  <SectionCard title="Detalle del cliente" subtitle="Lectura rapida para vender mas, recuperar o proteger la cuenta.">
+                    <CustomerDetailPanel customer={selectedCustomer} channel={selectedCustomerChannel} />
+                  </SectionCard>
+                </div>
 
-          <SectionCard title="Top clientes SICAR" subtitle="Quienes mas pesan en la venta total del negocio.">
-            <RankedList
-              title="Clientes de SICAR"
-              items={currentPeriod.sicar?.topCustomers || []}
-              emptyLabel="Todavia no hay clientes SICAR en esta ventana."
-              subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.ordersCount)} ventas`}
-              renderMetric={(item) => formatMoney(item.revenue)}
-            />
-          </SectionCard>
-        </div>
+                <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <SectionCard title="Clientes VIP activos" subtitle="La cartera que mas peso tiene hoy en esta ventana.">
+                    <RankedList
+                      title="Mayor valor actual"
+                      items={customerIntelligence?.vipCustomers || []}
+                      emptyLabel="Todavia no hay clientes VIP activos en esta ventana."
+                      subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.currentOrders)} ops | ${item.preferredPayment}`}
+                      renderMetric={(item) => formatMoney(item.currentRevenue)}
+                      onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                    />
+                  </SectionCard>
 
-        <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-          <SectionCard title="Actividad reciente web" subtitle="Ultimos pedidos que ya impactan la operacion digital.">
-            <RecentList items={currentPeriod.online?.recentOrders || []} type="online" />
-          </SectionCard>
+                  <SectionCard title="Clientes en crecimiento" subtitle="Cuentas que aceleraron respecto a la ventana anterior.">
+                    <RankedList
+                      title="Mayor crecimiento"
+                      items={customerIntelligence?.growingCustomers || []}
+                      emptyLabel="No hay crecimientos fuertes en esta ventana."
+                      subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatMoney(item.previousRevenue)} antes`}
+                      renderMetric={(item) => formatSignedMoney(item.revenueDelta)}
+                      onSelectCustomer={(item) => setSelectedCustomerKey(item.key)}
+                    />
+                  </SectionCard>
+                </div>
+              </div>
+            </SectionCard>
 
-          <SectionCard title="Actividad reciente SICAR" subtitle="Ultimas transacciones procesadas por el sistema central.">
-            <RecentList items={currentPeriod.sicar?.recentSales || []} type="sicar" />
-          </SectionCard>
-        </div>
+            <SectionCard title="Tendencia diaria" subtitle="Ultimos 14 puntos para ver ritmo y despegues entre web y SICAR.">
+              <DailyTrend online={currentPeriod.online?.daily} sicar={currentPeriod.sicar?.daily} />
+            </SectionCard>
+
+            <div className="crm-channel-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
+              <SectionCard title="Tienda en linea" subtitle="Conversion digital, fulfillment y mezcla comercial del canal web.">
+                <div style={{ display: 'grid', gap: 18 }}>
+                  <div className="crm-grid-four" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+                    <MetricMiniCard label="Venta final" value={formatMoney(onlineSummary.revenue)} helper={`${formatMoney(onlineSummary.projectedRevenue)} proyectado activo`} emphasis="blue" />
+                    <MetricMiniCard label="Clientes web" value={formatNumber(onlineSummary.uniqueCustomers)} helper={`${formatNumber(onlineSummary.deliveryCount || 0)} delivery | ${formatNumber(onlineSummary.pickupCount || 0)} pickup`} emphasis="default" />
+                    <MetricMiniCard label="Promos" value={`${formatNumber(onlineSummary.rewardOrders || 0)} / ${formatNumber(onlineSummary.couponOrders || 0)}`} helper="Recompensas / cupones usados" emphasis="gold" />
+                    <MetricMiniCard label="Ticket" value={formatMoney(onlineSummary.averageTicket)} helper={`${formatNumber(onlineSummary.orderCount || 0)} pedidos no cancelados`} emphasis="blue" />
+                  </div>
+                  <PaymentList items={currentPeriod.online?.paymentMethods || []} emptyLabel="Sin metodos de pago web en esta ventana." />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="SICAR" subtitle="Venta consolidada real del negocio central.">
+                <div style={{ display: 'grid', gap: 18 }}>
+                  <div className="crm-grid-four" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+                    <MetricMiniCard label="Ingreso total" value={formatMoney(sicarSummary.revenue)} helper={`${formatNumber(sicarSummary.saleCount || 0)} transacciones`} emphasis="gold" />
+                    <MetricMiniCard label="Clientes" value={formatNumber(sicarSummary.uniqueCustomers)} helper="Clientes unicos facturados" emphasis="default" />
+                    <MetricMiniCard label="Ticket promedio" value={formatMoney(sicarSummary.averageTicket)} helper="Venta real consolidada" emphasis="blue" />
+                    <MetricMiniCard label="Canal web share" value={formatPercent(comparison.onlineRevenueSharePct)} helper="Peso del canal digital dentro del negocio total" emphasis="blue" />
+                  </div>
+                  <PaymentList items={currentPeriod.sicar?.paymentMethods || []} emptyLabel="Sin metodos de pago SICAR en esta ventana." />
+                </div>
+              </SectionCard>
+            </div>
+
+            <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
+              <SectionCard title="Top productos web" subtitle="Los cortes y articulos que mas mueven la tienda.">
+                <RankedList
+                  title="Mas vendidos por tienda"
+                  items={currentPeriod.online?.topProducts || []}
+                  emptyLabel="Todavia no hay productos web entregados en esta ventana."
+                  subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.quantity)} uds | ${formatNumber(item.ordersCount)} pedidos`}
+                  renderMetric={(item) => formatMoney(item.revenue)}
+                />
+              </SectionCard>
+
+              <SectionCard title="Top productos SICAR" subtitle="Lo que realmente mas factura en el sistema central.">
+                <RankedList
+                  title="Mas vendidos por SICAR"
+                  items={currentPeriod.sicar?.topProducts || []}
+                  emptyLabel="Todavia no hay productos SICAR en esta ventana."
+                  subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.quantity)} uds | ${formatNumber(item.salesCount)} ventas`}
+                  renderMetric={(item) => formatMoney(item.revenue)}
+                />
+              </SectionCard>
+            </div>
+
+            <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
+              <SectionCard title="Top clientes web" subtitle="Quienes mas compran dentro del canal digital.">
+                <RankedList
+                  title="Clientes de tienda"
+                  items={currentPeriod.online?.topCustomers || []}
+                  emptyLabel="Todavia no hay clientes web con compras entregadas."
+                  subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.ordersCount)} pedidos`}
+                  renderMetric={(item) => formatMoney(item.revenue)}
+                />
+              </SectionCard>
+
+              <SectionCard title="Top clientes SICAR" subtitle="Quienes mas pesan en la venta total del negocio.">
+                <RankedList
+                  title="Clientes de SICAR"
+                  items={currentPeriod.sicar?.topCustomers || []}
+                  emptyLabel="Todavia no hay clientes SICAR en esta ventana."
+                  subtitleResolver={(item) => `${item.code ? `${item.code} | ` : ''}${formatNumber(item.ordersCount)} ventas`}
+                  renderMetric={(item) => formatMoney(item.revenue)}
+                />
+              </SectionCard>
+            </div>
+
+            <div className="crm-list-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
+              <SectionCard title="Actividad reciente web" subtitle="Ultimos pedidos que ya impactan la operacion digital.">
+                <RecentList items={currentPeriod.online?.recentOrders || []} type="online" />
+              </SectionCard>
+
+              <SectionCard title="Actividad reciente SICAR" subtitle="Ultimas transacciones procesadas por el sistema central.">
+                <RecentList items={currentPeriod.sicar?.recentSales || []} type="sicar" />
+              </SectionCard>
+            </div>
+          </>
+        )}
       </div>
     </DashboardShell>
   );
