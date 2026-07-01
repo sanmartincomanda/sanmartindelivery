@@ -134,33 +134,26 @@ const isDeliveredOrder = (order) => order?.estado === 'Entregado';
 
 const cleanPhone = (phone) => String(phone || '').replace(/\D/g, '');
 
-const buildCustomerWhatsappPhone = (phone) => {
+const buildCustomerCallPhone = (phone) => {
   const cleaned = cleanPhone(phone);
   if (!cleaned) {
     return '';
   }
 
   if (cleaned.startsWith('505') && cleaned.length >= 11) {
-    return cleaned;
+    return `+${cleaned}`;
   }
 
-  return `505${cleaned.slice(-8)}`;
+  return cleaned.slice(-8);
 };
 
-const buildDriverCustomerMessage = (order = {}) =>
-  [
-    `Hola ${order.cliente || ''}.`.trim(),
-    `Soy ${String(order.repartidorPublico || order.repartidor || '').trim() || 'tu entregador'} de Carnes San Martin Granada del pedido #${formatOrderNumber(order.id)}.`,
-    'Te escribo para coordinar la entrega.',
-  ].join('\n');
-
-const buildCustomerWhatsappLink = (order = {}) => {
-  const phone = buildCustomerWhatsappPhone(order.telefono);
+const buildCustomerCallLink = (order = {}) => {
+  const phone = buildCustomerCallPhone(order.telefono);
   if (!phone) {
     return '';
   }
 
-  return `https://wa.me/${phone}?text=${encodeURIComponent(buildDriverCustomerMessage(order))}`;
+  return `tel:${phone}`;
 };
 
 const getOrderKey = (order = {}) => order.firebaseKey || order.id || `${order.cliente || 'pedido'}-${order.timestamp || 0}`;
@@ -1282,7 +1275,7 @@ function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, on
   const delivered = isDeliveredOrder(order);
   const address = getWrittenAddress(order);
   const navigationUrl = getOrderNavigationUrl(order);
-  const whatsappLink = buildCustomerWhatsappLink(order);
+  const callLink = buildCustomerCallLink(order);
   const hasMapPoint = hasLocation(order.ubicacion);
   const ageMeta = getOrderAgeMeta(order);
 
@@ -1372,10 +1365,10 @@ function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, on
             {Icons.map}
             Abrir mapa
           </button>
-          {whatsappLink && (
-            <a href={whatsappLink} target="_blank" rel="noreferrer">
+          {callLink && (
+            <a href={callLink} aria-label={`Llamar a ${order.cliente || 'cliente'}`}>
               {Icons.phone}
-              WhatsApp cliente
+              Llamar cliente
             </a>
           )}
           {!delivered && (
