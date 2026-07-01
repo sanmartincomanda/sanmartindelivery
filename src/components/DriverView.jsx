@@ -688,35 +688,6 @@ export default function DriverView() {
         </div>
       )}
 
-      <section className="driver-hero driver-hero-compact">
-        <div className="driver-hero-copy">
-          <span className="driver-kicker">Driver app</span>
-          <h1>{driver.name}</h1>
-          <p>{driver.code} | {activeRouteOrders.length} por entregar hoy | {enCaminoCount} en ruta</p>
-        </div>
-        <div className="driver-hero-actions">
-          <button
-            type="button"
-            className="driver-primary-action"
-            onClick={optimizeRoute}
-            disabled={optimizing || ordersWithLocation.length === 0}
-          >
-            {Icons.route}
-            {optimizing ? 'Optimizando...' : 'Optimizar'}
-          </button>
-          <button type="button" className="driver-ghost-action" onClick={logout}>
-            Salir
-          </button>
-        </div>
-      </section>
-
-      <section className="driver-summary">
-        <DriverStatCard label="Pendientes" value={activeRouteOrders.length} tone="wine" />
-        <DriverStatCard label="Sin pin" value={ordersWithoutLocation.length} tone="orange" />
-        <DriverStatCard label="En camino" value={enCaminoCount} tone="blue" />
-        <DriverStatCard label="Entregados" value={deliveredCount} tone="green" />
-      </section>
-
       {driverSection === 'ruta' ? (
         <>
           <section className="driver-section-head">
