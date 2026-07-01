@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
-import { DRIVERS_PATH, mergeDrivers } from '../services/drivers';
+import { DRIVERS_PATH, getDriverPublicName, mergeDrivers } from '../services/drivers';
 import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
@@ -220,6 +220,7 @@ export default function ListaPedidos({ pedidos = [] }) {
 
     update(ref(database, `${getBasePath()}/${firebaseKey}`), {
       repartidor: repartidor.name,
+      repartidorPublico: getDriverPublicName(repartidor) || repartidor.name,
       repartidorCodigo: repartidor.code,
       estado: 'Enviado',
       timestampEnviado: now,
@@ -242,6 +243,7 @@ export default function ListaPedidos({ pedidos = [] }) {
     update(ref(database, `${getBasePath()}/${firebaseKey}`), {
       estado: 'Preparado',
       repartidor: null,
+      repartidorPublico: null,
       repartidorCodigo: null,
       timestampEnviado: null,
       timestampAsignado: null,
@@ -265,6 +267,7 @@ export default function ListaPedidos({ pedidos = [] }) {
     update(ref(database, `${getBasePath()}/${pedido.firebaseKey}`), {
       estado: 'Entregado',
       repartidor: null,
+      repartidorPublico: null,
       repartidorCodigo: null,
       entregadoPor: 'Pickup en tienda',
       entregadoPorCodigo: 'pickup',
@@ -295,6 +298,7 @@ export default function ListaPedidos({ pedidos = [] }) {
       estado: 'Cancelado',
       canceladoPor: 'Administracion - lista de pedidos',
       repartidor: null,
+      repartidorPublico: null,
       repartidorCodigo: null,
       timestampAsignado: null,
       timestampCancelado: now,

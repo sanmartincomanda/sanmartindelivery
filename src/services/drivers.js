@@ -8,7 +8,7 @@ export const DEFAULT_DRIVERS = [
   { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
   { code: 'E-002', name: 'NOEL', phone: '', active: true, sortOrder: 20 },
   { code: 'E-003', name: 'CARLOS MORA', phone: '', active: true, sortOrder: 30 },
-  { code: 'E-004', name: 'CHIMI', phone: '', active: true, sortOrder: 40 },
+  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', active: true, sortOrder: 40 },
 ];
 
 const normalizeDriverLoginToken = (value = '') =>
@@ -53,6 +53,11 @@ export const getDriverLoginPassword = (driver = {}) => {
   return `${normalizeDriverLoginToken(lastName) || 'driver'}${getDriverCodeSuffix(normalized.code)}`;
 };
 
+export const getDriverPublicName = (driver = {}) => {
+  const normalized = normalizeDriver(driver);
+  return String(normalized.publicName || normalized.name || '').trim();
+};
+
 export const findDriverByLoginIdentifier = (identifier, drivers = []) => {
   const rawIdentifier = String(identifier || '').trim();
   if (!rawIdentifier) {
@@ -74,6 +79,9 @@ export const normalizeDriver = (driver = {}, fallback = {}) => {
   const backup = fallback || {};
   const code = cleanDriverCode(source.code ?? backup.code);
   const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
+  const publicName = String(source.publicName ?? backup.publicName ?? source.name ?? backup.name ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   const loginUsername =
     String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
     getDriverLoginUsername({ code, name });
@@ -81,6 +89,7 @@ export const normalizeDriver = (driver = {}, fallback = {}) => {
   return {
     code,
     name,
+    publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
@@ -166,7 +175,8 @@ export async function fetchDriverByCode(code) {
   }
 
   const snapshot = await get(ref(database, `${DRIVERS_PATH}/${driverKey}`));
-  return snapshot.exists() ? normalizeDriver(snapshot.val()) : null;
+  const fallbackDriver = DEFAULT_DRIVERS.find((driver) => driver.code === cleanDriverCode(code));
+  return snapshot.exists() ? normalizeDriver(snapshot.val(), fallbackDriver) : fallbackDriver ? normalizeDriver(fallbackDriver) : null;
 }
 
 export async function fetchDrivers() {

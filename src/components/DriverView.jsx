@@ -11,7 +11,7 @@ import {
   normalizeLocation,
   optimizeStopsByNearest,
 } from '../services/geo';
-import { fetchDriverByCode } from '../services/drivers';
+import { fetchDriverByCode, getDriverPublicName } from '../services/drivers';
 import { formatOrderNumber, subscribeOrdersForDriverCode } from '../services/orders';
 import {
   assertRole,
@@ -150,7 +150,7 @@ const buildCustomerWhatsappPhone = (phone) => {
 const buildDriverCustomerMessage = (order = {}) =>
   [
     `Hola ${order.cliente || ''}.`.trim(),
-    `Soy tu entregador de Carnes San Martin Granada del pedido #${formatOrderNumber(order.id)}.`,
+    `Soy ${String(order.repartidorPublico || order.repartidor || '').trim() || 'tu entregador'} de Carnes San Martin Granada del pedido #${formatOrderNumber(order.id)}.`,
     'Te escribo para coordinar la entrega.',
   ].join('\n');
 
@@ -387,6 +387,38 @@ export default function DriverView() {
   const [driverSection, setDriverSection] = useState('ruta');
   const [notice, setNotice] = useState('');
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const driverDisplayName = useMemo(() => getDriverPublicName(driver), [driver]);
+
+  useEffect(() => {
+    if (!driver?.code) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    fetchDriverByCode(driver.code)
+      .then((latestDriver) => {
+        if (cancelled || !latestDriver?.code) {
+          return;
+        }
+
+        const currentSnapshot = JSON.stringify(driver);
+        const latestSnapshot = JSON.stringify(latestDriver);
+        if (currentSnapshot === latestSnapshot) {
+          return;
+        }
+
+        setDriver(latestDriver);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(latestDriver));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [driver]);
 
   useEffect(() => {
     if (!driver?.code) {
@@ -577,7 +609,7 @@ export default function DriverView() {
       const now = Date.now();
       const updates = {
         [`orders/${order.firebaseKey}/ubicacion`]: location,
-        [`orders/${order.firebaseKey}/ubicacionCapturadaPor`]: driver.name,
+        [`orders/${order.firebaseKey}/ubicacionCapturadaPor`]: driverDisplayName || driver.name,
         [`orders/${order.firebaseKey}/ubicacionCapturadaPorCodigo`]: driver.code,
         [`orders/${order.firebaseKey}/timestampUbicacionCliente`]: formatTimeLabel(),
         [`orders/${order.firebaseKey}/timestamp`]: now,
@@ -586,7 +618,7 @@ export default function DriverView() {
       const clientKey = findClientKeyForOrder(order);
       if (clientKey) {
         updates[`clients/${clientKey}/ubicacion`] = location;
-        updates[`clients/${clientKey}/ubicacionActualizadaPor`] = driver.name;
+        updates[`clients/${clientKey}/ubicacionActualizadaPor`] = driverDisplayName || driver.name;
         updates[`clients/${clientKey}/ubicacionActualizadaPorCodigo`] = driver.code;
         updates[`clients/${clientKey}/ubicacionActualizadaAt`] = now;
       }
@@ -625,7 +657,9 @@ export default function DriverView() {
         timestampEntregado: now,
         timestampEntregadoMs: nowMs,
         timestampFinalizado: nowMs,
-        entregadoPor: driver.name,
+        entregadoPor: driverDisplayName || driver.name,
+        entregadoPorPublico: driverDisplayName || driver.name,
+        entregadoPorAlias: driver.name,
         entregadoPorCodigo: driver.code,
         timestamp: nowMs,
       });
@@ -855,7 +889,7 @@ export default function DriverView() {
           <section className={`driver-profile-hero ${motivationTone}`}>
             <div className="driver-profile-identity">
               <span>Perfil del driver</span>
-              <strong>{driver.name}</strong>
+              <strong>{driverDisplayName || driver.name}</strong>
               <small>{driver.code}</small>
             </div>
             <div className="driver-profile-score">

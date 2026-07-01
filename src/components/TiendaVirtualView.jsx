@@ -631,9 +631,14 @@ const getShortPersonName = (name, fallback) => {
   return firstName || fallback;
 };
 
+const getCustomerDriverName = (order = {}, fallback = 'Por asignar') => {
+  const publicName = String(order.repartidorPublico || order.entregadoPorPublico || order.repartidor || '').trim();
+  return publicName || fallback;
+};
+
 const getCustomerStatusMeta = (order = {}) => {
   const statusKey = normalizeCustomerOrderStatus(order.estado);
-  const riderName = getShortPersonName(order.repartidor, 'Jordin');
+  const riderName = getCustomerDriverName(order, 'Jordin');
   const pickupOrder = isPickupOrder(order);
 
   const statusMeta = {
@@ -697,7 +702,7 @@ const getCustomerStatusMeta = (order = {}) => {
 const getCustomerStatusMetaV2 = (order = {}) => {
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const pickupOrder = isPickupOrder(order);
-  const riderName = getShortPersonName(order.repartidor, 'Por asignar');
+  const riderName = getCustomerDriverName(order, 'Por asignar');
   const preparingMeta = {
     accent: '#9f1239',
     soft: '#fff1f2',
@@ -8669,8 +8674,8 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
   const orderNumber = formatOrderNumber(order.id);
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const pickupOrder = isPickupOrder(order);
-  const riderName = order.repartidor
-    ? getShortPersonName(order.repartidor, order.repartidor)
+  const riderName = (order.repartidorPublico || order.repartidor)
+    ? getCustomerDriverName(order, getCustomerDriverName(order))
     : pickupOrder
       ? 'No aplica'
       : 'Por asignar';

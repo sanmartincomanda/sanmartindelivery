@@ -55,6 +55,9 @@ const normalizeDriverRecord = (driver = {}, fallback = {}) => {
   const backup = fallback || {};
   const code = normalizeDriverCode(source.code ?? backup.code);
   const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
+  const publicName = String(source.publicName ?? backup.publicName ?? source.name ?? backup.name ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   const nameParts = name.split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] || code || 'driver';
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
@@ -68,6 +71,7 @@ const normalizeDriverRecord = (driver = {}, fallback = {}) => {
     ...source,
     code,
     name,
+    publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
@@ -105,7 +109,7 @@ const DEFAULT_DRIVERS = [
   { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
   { code: 'E-002', name: 'NOEL', phone: '', active: true, sortOrder: 20 },
   { code: 'E-003', name: 'CARLOS MORA', phone: '', active: true, sortOrder: 30 },
-  { code: 'E-004', name: 'CHIMI', phone: '', active: true, sortOrder: 40 },
+  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', active: true, sortOrder: 40 },
 ];
 
 const INTERNAL_USERS = [

@@ -2,6 +2,7 @@
 import { get, onValue, ref, update } from 'firebase/database';
 import { Suspense, lazy } from 'react';
 import { database } from './firebase';
+import { getDriverPublicName } from './services/drivers';
 import './App.css';
 import { SAN_MARTIN_THEME } from './styles/sanMartinTheme';
 
@@ -514,6 +515,7 @@ function App() {
     update(ref(database, `orders/${order.firebaseKey}`), {
       estado: 'Enviado',
       repartidor,
+      repartidorPublico: getDriverPublicName(repartidor) || repartidor?.name || repartidor,
       timestampEnviado: new Date().toLocaleTimeString('es-NI'),
       timestamp: Date.now(),
     });

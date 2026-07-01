@@ -12,7 +12,7 @@ const DEFAULT_DRIVERS = [
   { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
   { code: 'E-002', name: 'NOEL', phone: '', active: true, sortOrder: 20 },
   { code: 'E-003', name: 'CARLOS MORA', phone: '', active: true, sortOrder: 30 },
-  { code: 'E-004', name: 'CHIMI', phone: '', active: true, sortOrder: 40 },
+  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', active: true, sortOrder: 40 },
 ];
 
 const normalizeDriverLoginToken = (value = '') =>
@@ -57,6 +57,9 @@ const normalizeDriver = (driver = {}, fallback = {}) => {
   const backup = fallback || {};
   const code = normalizeDriverCode(source.code ?? backup.code);
   const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
+  const publicName = String(source.publicName ?? backup.publicName ?? source.name ?? backup.name ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   const [firstName = code || 'driver'] = name.split(/\s+/).filter(Boolean);
   const lastName = name.split(/\s+/).filter(Boolean).at(-1) || code || 'driver';
   const loginUsername =
@@ -69,6 +72,7 @@ const normalizeDriver = (driver = {}, fallback = {}) => {
     ...source,
     code,
     name,
+    publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
@@ -282,6 +286,7 @@ async function main() {
       {
         code: driver.code,
         name: driver.name,
+        publicName: driver.publicName || driver.name,
         phone: driver.phone,
         active: driver.active,
         sortOrder: driver.sortOrder,

@@ -169,6 +169,7 @@ const emptyPromotion = {
 const emptyDriver = {
   code: '',
   name: '',
+  publicName: '',
   phone: '',
   active: true,
   sortOrder: '',
@@ -885,6 +886,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
     setDriverForm({
       code: driver.code || '',
       name: driver.name || '',
+      publicName: driver.publicName || '',
       phone: driver.phone || '',
       active: driver.active !== false,
       sortOrder: driver.sortOrder ?? '',
@@ -897,6 +899,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
       ...current,
       code: driver.code || '',
       name: driver.name || '',
+      publicName: driver.publicName || current.publicName || '',
       phone: driver.phone || current.phone || '',
       active: driver.active !== false,
       sortOrder: driver.sortOrder ?? current.sortOrder,
@@ -2932,6 +2935,9 @@ function DriversManager({
                 <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
                   {driver.code} {driver.phone ? `| ${driver.phone}` : ''}
                 </div>
+                <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                  Publico: {driver.publicName || driver.name}
+                </div>
                 <div style={{ color: '#1e3a8a', marginTop: 6, fontWeight: 800 }}>
                   Usuario: {getDriverLoginUsername(driver)} | Clave: {getDriverLoginPassword(driver)}
                 </div>
@@ -2998,8 +3004,8 @@ function DriversManager({
           }}
         >
           <div>1. Crea un codigo nuevo para el entregador o carga uno existente.</div>
-          <div>2. Define nombre y telefono. El sistema genera el usuario automaticamente.</div>
-          <div>3. Usuario: primer nombre + 3 numeros. Clave: apellido + 3 numeros.</div>
+          <div>2. Define alias interno, nombre publico y telefono. El sistema genera el usuario automaticamente.</div>
+          <div>3. Usuario: primer nombre del alias + 3 numeros. Clave: apellido del alias + 3 numeros.</div>
           <div>4. Ese mismo codigo aparecera luego para asignarlo en Lista de Pedidos.</div>
         </div>
 
@@ -3037,7 +3043,13 @@ function DriversManager({
           className="cfg-input"
           value={driverForm.name}
           onChange={(event) => updateDriverForm('name', event.target.value.toUpperCase())}
-          placeholder="Nombre"
+          placeholder="Alias interno. Ej: CHIMI"
+        />
+        <input
+          className="cfg-input"
+          value={driverForm.publicName}
+          onChange={(event) => updateDriverForm('publicName', event.target.value)}
+          placeholder="Nombre publico. Ej: Noel Hernandez"
         />
         <input
           className="cfg-input"
