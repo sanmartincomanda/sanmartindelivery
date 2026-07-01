@@ -135,6 +135,8 @@ const QUANTITY_EPSILON = 0.00001;
 const STORE_STORY_DURATION_MS = 10000;
 const STORE_GROUP_PAGE_SIZE = 5;
 const STORE_CASH_PAYMENT = 'EFECTIVO';
+const STORE_MOBILE_NAV_BREAKPOINT = 820;
+const STORE_MOBILE_SCROLL_OFFSET = 96;
 const EMPTY_STORE_AUTH_FORM = {
   nombre: '',
   email: '',
@@ -868,6 +870,9 @@ export default function TiendaVirtualView({
   const [isMobileLayout, setIsMobileLayout] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 1180 : false
   );
+  const [isPhoneLayout, setIsPhoneLayout] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= STORE_MOBILE_NAV_BREAKPOINT : false
+  );
   const [currentUser, setCurrentUser] = useState(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -921,12 +926,16 @@ export default function TiendaVirtualView({
   const [rewardActionBusy, setRewardActionBusy] = useState(false);
   const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
+  const [mobileNavSection, setMobileNavSection] = useState('home');
   const quantityNoticeTimeoutRef = useRef(null);
   const autoAppliedCouponRef = useRef('');
+  const pageTopRef = useRef(null);
+  const filtersPanelRef = useRef(null);
 
   const deferredQuery = useDeferredValue(query);
   const isDashboard = mode === 'dashboard';
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
+  const showMobileBottomNav = isPhoneLayout && !isDashboard;
 
   useEffect(() => {
     let cancelled = false;
@@ -1135,12 +1144,37 @@ export default function TiendaVirtualView({
 
     const handleResize = () => {
       setIsMobileLayout(window.innerWidth <= 1180);
+      setIsPhoneLayout(window.innerWidth <= STORE_MOBILE_NAV_BREAKPOINT);
     };
 
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !showMobileBottomNav) {
+      return undefined;
+    }
+
+    const updateMobileNavSection = () => {
+      const filtersTop = filtersPanelRef.current
+        ? filtersPanelRef.current.getBoundingClientRect().top
+        : Number.POSITIVE_INFINITY;
+
+      const nextSection =
+        activeCategory !== 'todos' || activeSubcategory !== 'todas' || filtersTop <= 128
+          ? 'categories'
+          : 'home';
+
+      setMobileNavSection((current) => (current === nextSection ? current : nextSection));
+    };
+
+    updateMobileNavSection();
+    window.addEventListener('scroll', updateMobileNavSection, { passive: true });
+
+    return () => window.removeEventListener('scroll', updateMobileNavSection);
+  }, [activeCategory, activeSubcategory, showMobileBottomNav]);
 
   useEffect(
     () => () => {
@@ -2480,6 +2514,24 @@ export default function TiendaVirtualView({
     }
   };
 
+  const scrollToStoreRef = (targetRef) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const targetNode = targetRef?.current;
+    if (!targetNode) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const targetTop = targetNode.getBoundingClientRect().top + window.scrollY - STORE_MOBILE_SCROLL_OFFSET;
+    window.scrollTo({
+      top: Math.max(0, targetTop),
+      behavior: 'smooth',
+    });
+  };
+
   const openCustomerOrders = () => {
     if (!currentUser) {
       openAuthSheet('login', 'orders');
@@ -2564,6 +2616,34 @@ export default function TiendaVirtualView({
     setRewardsReturnTarget('');
     if (shouldReturnToCheckout) {
       setCheckoutOpen(true);
+    }
+  };
+
+  const handleMobileBottomNav = (target) => {
+    if (target === 'home') {
+      setMobileNavSection('home');
+      scrollToStoreRef(pageTopRef);
+      return;
+    }
+
+    if (target === 'categories') {
+      setMobileNavSection('categories');
+      scrollToStoreRef(filtersPanelRef);
+      return;
+    }
+
+    if (target === 'orders') {
+      openCustomerOrders();
+      return;
+    }
+
+    if (target === 'rewards') {
+      openRewardsPanel();
+      return;
+    }
+
+    if (target === 'account') {
+      openProfilePanel();
     }
   };
 
@@ -2784,8 +2864,19 @@ export default function TiendaVirtualView({
     );
   };
 
+  const mobileOverlayOpen =
+    selectedProduct ||
+    checkoutOpen ||
+    ordersOpen ||
+    profileOpen ||
+    rewardsOpen ||
+    authSheetOpen ||
+    orderSuccessOpen ||
+    welcomeCouponOpen ||
+    selectedPromotionIndex !== null;
+
   return (
-    <div className="store-shell">
+    <div className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''}`}>
       <style>{`
         .store-shell {
           ${SAN_MARTIN_STORE_CSS_VARS}
@@ -2820,6 +2911,9 @@ export default function TiendaVirtualView({
           max-width: 1180px;
           margin: 0 auto;
           padding: ${isDashboard ? '18px' : '12px'} 18px 108px;
+        }
+        .store-page.with-mobile-nav {
+          padding-bottom: 212px;
         }
         .store-page.with-floating-cart {
           max-width: 1500px;
@@ -5018,6 +5112,106 @@ export default function TiendaVirtualView({
           font-weight: 950;
           white-space: nowrap;
         }
+        .store-mobile-bottom-nav {
+          position: fixed;
+          left: 14px;
+          right: 14px;
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+          z-index: 140;
+          max-width: 520px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 8px;
+          padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
+          border-radius: 28px;
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 249, 255, 0.98) 100%);
+          box-shadow:
+            0 22px 50px rgba(10, 42, 78, 0.18),
+            inset 0 1px 0 rgba(255, 255, 255, 0.72);
+          backdrop-filter: blur(16px);
+        }
+        .store-mobile-nav-button {
+          position: relative;
+          min-width: 0;
+          border: 0;
+          background: transparent;
+          color: #7b8ba2;
+          display: grid;
+          justify-items: center;
+          gap: 5px;
+          padding: 8px 4px 6px;
+          border-radius: 18px;
+          font: inherit;
+          transition: transform 0.18s ease, color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+        }
+        .store-mobile-nav-button.active {
+          color: var(--sm-blue-deep);
+          background: linear-gradient(180deg, rgba(12, 77, 136, 0.12), rgba(59, 130, 246, 0.08));
+          box-shadow: inset 0 0 0 1px rgba(12, 77, 136, 0.08);
+        }
+        .store-mobile-nav-button:active {
+          transform: translateY(1px) scale(0.98);
+        }
+        .store-mobile-nav-icon {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 14px;
+          background: rgba(12, 77, 136, 0.08);
+        }
+        .store-mobile-nav-button.active .store-mobile-nav-icon {
+          background: linear-gradient(135deg, rgba(12, 77, 136, 0.16), rgba(220, 38, 38, 0.12));
+        }
+        .store-mobile-nav-label {
+          display: block;
+          font-size: 10px;
+          line-height: 1.1;
+          font-weight: 900;
+          letter-spacing: 0.01em;
+          text-align: center;
+          text-wrap: balance;
+        }
+        .store-mobile-nav-badge {
+          position: absolute;
+          top: 5px;
+          right: calc(50% - 18px);
+          min-width: 16px;
+          height: 16px;
+          padding: 0 5px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #dc2626, #ef4444);
+          color: #ffffff;
+          font-size: 9px;
+          font-weight: 950;
+          box-shadow: 0 8px 18px rgba(220, 38, 38, 0.26);
+        }
+        .store-mobile-nav-badge.dot {
+          min-width: 10px;
+          width: 10px;
+          height: 10px;
+          padding: 0;
+          right: calc(50% - 12px);
+        }
+        .store-shell-mobile-nav .store-mobile-cart {
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+        }
+        .store-shell-mobile-nav .store-order-bubble {
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+        }
+        .store-shell-mobile-nav .store-order-bubble.elevated {
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 180px);
+        }
+        .store-shell-mobile-nav .store-quantity-notice {
+          bottom: 190px;
+        }
         .store-order-bubble {
           position: fixed;
           right: 14px;
@@ -5405,6 +5599,9 @@ export default function TiendaVirtualView({
             padding-right: 14px;
             padding-bottom: 180px;
           }
+          .store-page.with-mobile-nav {
+            padding-bottom: 228px;
+          }
           .store-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 14px 12px;
@@ -5650,6 +5847,23 @@ export default function TiendaVirtualView({
           .store-mobile-cart {
             bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
           }
+          .store-mobile-bottom-nav {
+            left: 12px;
+            right: 12px;
+            gap: 6px;
+            padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 8px);
+            border-radius: 24px;
+          }
+          .store-mobile-nav-button {
+            padding: 7px 2px 5px;
+          }
+          .store-mobile-nav-icon {
+            width: 24px;
+            height: 24px;
+          }
+          .store-mobile-nav-label {
+            font-size: 9px;
+          }
           .store-auth-page {
             padding: 24px 14px;
           }
@@ -5696,7 +5910,12 @@ export default function TiendaVirtualView({
         }
       `}</style>
 
-      <div className={`store-page ${cartItems.length > 0 ? 'with-floating-cart' : ''}`}>
+      <div
+        ref={pageTopRef}
+        className={`store-page ${cartItems.length > 0 ? 'with-floating-cart' : ''} ${
+          showMobileBottomNav ? 'with-mobile-nav' : ''
+        }`}
+      >
         {isDashboard && (
           <div className="store-admin-bar">
             <strong>{STORE_BRAND_TITLE}</strong>
@@ -5794,7 +6013,7 @@ export default function TiendaVirtualView({
         )}
 
         <main>
-          <section className="store-filters-panel">
+          <section ref={filtersPanelRef} className="store-filters-panel">
             <div className="store-filter-strip">
               <div>
                 <strong>{activeFilterSummary.title}</strong>
@@ -5952,6 +6171,16 @@ export default function TiendaVirtualView({
           )}
         </main>
       </div>
+
+      {showMobileBottomNav && !mobileOverlayOpen && (
+        <StoreMobileBottomNav
+          activeKey={mobileNavSection}
+          currentUser={currentUser}
+          rewardPoints={Number(rewardAccount?.pointsBalance || 0)}
+          hasTrackedOrder={hasTrackedOrder}
+          onSelect={handleMobileBottomNav}
+        />
+      )}
 
       {cartItems.length > 0 && !selectedProduct && !checkoutOpen && !ordersOpen && !profileOpen && (
         isMobileLayout ? (
@@ -7348,6 +7577,53 @@ function MobileCartBar({ cartCount, approximateTotalAmount, hidden, onOpen }) {
   );
 }
 
+function StoreMobileBottomNav({
+  activeKey = 'home',
+  currentUser = null,
+  rewardPoints = 0,
+  hasTrackedOrder = false,
+  onSelect,
+}) {
+  const rewardBadge =
+    currentUser && Number(rewardPoints || 0) > 0
+      ? `${Math.min(99, Number(rewardPoints || 0))}${Number(rewardPoints || 0) > 99 ? '+' : ''}`
+      : '';
+
+  const items = [
+    { key: 'home', label: 'Inicio', icon: 'home' },
+    { key: 'categories', label: 'Categorias', icon: 'categories' },
+    { key: 'orders', label: 'Mis pedidos', icon: 'orders', badge: hasTrackedOrder ? 'dot' : '' },
+    { key: 'rewards', label: 'Premios', icon: 'reward', badge: rewardBadge },
+    { key: 'account', label: currentUser ? 'Mi cuenta' : 'Ingresar', icon: 'account' },
+  ];
+
+  return (
+    <nav className="store-mobile-bottom-nav" aria-label="Navegacion movil de tienda">
+      {items.map((item) => {
+        const active = activeKey === item.key;
+        const badgeClass =
+          item.badge === 'dot' ? 'store-mobile-nav-badge dot' : 'store-mobile-nav-badge';
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            className={`store-mobile-nav-button ${active ? 'active' : ''}`}
+            aria-pressed={active}
+            onClick={() => onSelect?.(item.key)}
+          >
+            <span className="store-mobile-nav-icon">
+              <StoreCheckoutIcon name={item.icon} />
+            </span>
+            {item.badge ? <span className={badgeClass}>{item.badge === 'dot' ? '' : item.badge}</span> : null}
+            <span className="store-mobile-nav-label">{item.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQuantityChange }) {
   const subtotal = Number(quantity || 0) * Number(product.price || 0);
   const step = getQuantityStep(product);
@@ -7479,6 +7755,33 @@ function StoreCheckoutIcon({ name }) {
         <path d="M4 11 12 4l8 7" />
         <path d="M6 10v10h12V10" />
         <path d="M10 20v-5h4v5" />
+      </svg>
+    ),
+    categories: (
+      <svg {...commonProps}>
+        <rect x="4" y="4" width="6" height="6" rx="1.5" />
+        <rect x="14" y="4" width="6" height="6" rx="1.5" />
+        <rect x="4" y="14" width="6" height="6" rx="1.5" />
+        <rect x="14" y="14" width="6" height="6" rx="1.5" />
+      </svg>
+    ),
+    orders: (
+      <svg {...commonProps}>
+        <path d="M7 4h10" />
+        <path d="M7 8h10" />
+        <path d="M7 12h6" />
+        <path d="M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
+      </svg>
+    ),
+    reward: (
+      <svg {...commonProps}>
+        <path d="m12 4 2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7Z" />
+      </svg>
+    ),
+    account: (
+      <svg {...commonProps}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
       </svg>
     ),
     pin: (

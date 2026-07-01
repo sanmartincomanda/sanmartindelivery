@@ -17,10 +17,12 @@ import {
 } from './firebaseScriptAuth.mjs';
 
 const CLIENTS_PATH = 'clients';
+const CLIENT_DIRECTORY_PATH = 'clientDirectory';
 const STORE_USERS_PATH = 'storeUsers';
 const STORE_USER_CODE_PREFIX = 'TV-';
-const POLL_INTERVAL_MS = 5 * 60 * 1000;
+const POLL_INTERVAL_MS = 60 * 1000;
 const FULL_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const STORE_USERS_BACKSTOP_SYNC_MS = 60 * 60 * 1000;
 const UPDATE_BATCH_SIZE = 400;
 
 const normalizeText = (value = '') =>
@@ -164,10 +166,23 @@ const buildFirebaseClientPatchFromSicar = (client, syncedAt) => ({
   sicarLastSyncedAt: syncedAt,
 });
 
+const buildClientDirectoryPatchFromSicar = (client, syncedAtMs) => ({
+  codigo: client.code,
+  nombre: client.name,
+  direccion: client.address,
+  telefono: client.phone,
+  origen: 'sicar',
+  updatedAt: normalizeNumber(syncedAtMs, Date.now()),
+});
+
 const getChangedPatch = (existingRecord = {}, desiredPatch = {}) => {
   const changedPatch = {};
 
   Object.entries(desiredPatch).forEach(([field, value]) => {
+    if (field === 'sicarLastSyncedAt') {
+      return;
+    }
+
     if (toComparableValue(existingRecord?.[field]) !== toComparableValue(value)) {
       changedPatch[field] = value;
     }
@@ -607,6 +622,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
         const firebaseIndexes = buildFirebaseIndexes(firebaseSnapshot.val() || {});
         const updates = {};
         const syncedAt = new Date().toISOString();
+        const syncedAtMs = Date.now();
         const duplicateCodes = new Set();
         let createdCount = 0;
         let updatedCount = 0;
@@ -629,7 +645,13 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
           const desiredPatch = buildFirebaseClientPatchFromSicar(client, syncedAt);
 
           if (!candidate) {
-            appendPatchToUpdates(updates, `${CLIENTS_PATH}/${getDeterministicClientKey(client.code)}`, desiredPatch);
+            const clientKey = getDeterministicClientKey(client.code);
+            appendPatchToUpdates(updates, `${CLIENTS_PATH}/${clientKey}`, desiredPatch);
+            appendPatchToUpdates(
+              updates,
+              `${CLIENT_DIRECTORY_PATH}/${clientKey}`,
+              buildClientDirectoryPatchFromSicar(client, syncedAtMs)
+            );
             createdCount += 1;
             return;
           }
@@ -637,6 +659,11 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
           const changedPatch = getChangedPatch(candidate, desiredPatch);
           if (Object.keys(changedPatch).length) {
             appendPatchToUpdates(updates, `${CLIENTS_PATH}/${candidate.firebaseKey}`, changedPatch);
+            appendPatchToUpdates(
+              updates,
+              `${CLIENT_DIRECTORY_PATH}/${candidate.firebaseKey}`,
+              buildClientDirectoryPatchFromSicar(client, syncedAtMs)
+            );
             updatedCount += 1;
           }
         });
@@ -692,6 +719,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
 
     const sicarClients = await readActiveSicarClients(state.lastSeenCliId);
     const syncedAt = new Date().toISOString();
+    const syncedAtMs = Date.now();
     let createdCount = 0;
     let updatedCount = 0;
     let maxCliId = normalizeNumber(state.lastSeenCliId, 0);
@@ -705,7 +733,13 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
 
       if (!candidate) {
         const rootUpdates = {};
-        appendPatchToUpdates(rootUpdates, `${CLIENTS_PATH}/${getDeterministicClientKey(client.code)}`, desiredPatch);
+        const clientKey = getDeterministicClientKey(client.code);
+        appendPatchToUpdates(rootUpdates, `${CLIENTS_PATH}/${clientKey}`, desiredPatch);
+        appendPatchToUpdates(
+          rootUpdates,
+          `${CLIENT_DIRECTORY_PATH}/${clientKey}`,
+          buildClientDirectoryPatchFromSicar(client, syncedAtMs)
+        );
         await flushRootUpdates(rootUpdates);
         createdCount += 1;
         continue;
@@ -715,6 +749,11 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
       if (Object.keys(changedPatch).length) {
         const rootUpdates = {};
         appendPatchToUpdates(rootUpdates, `${CLIENTS_PATH}/${candidate.firebaseKey}`, changedPatch);
+        appendPatchToUpdates(
+          rootUpdates,
+          `${CLIENT_DIRECTORY_PATH}/${candidate.firebaseKey}`,
+          buildClientDirectoryPatchFromSicar(client, syncedAtMs)
+        );
         await flushRootUpdates(rootUpdates);
         updatedCount += 1;
       }
@@ -909,7 +948,12 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
 
     try {
       await pollNewActiveSicarClientsOnce();
-      await syncStoreUsersToSicar({ incremental: true });
+      if (
+        !storeUsersRealtimeListenerStarted ||
+        isPastSyncStale(state.lastStoreUserIncrementalSyncAt || state.lastStoreUserFullSyncAt, STORE_USERS_BACKSTOP_SYNC_MS)
+      ) {
+        await syncStoreUsersToSicar({ incremental: true });
+      }
     } finally {
       state.polling = false;
     }
