@@ -78,6 +78,7 @@ const Icons = {
 
 const STORE_CANONICAL_ORIGIN = 'https://tienda.sanmartinsr.com';
 const STORE_HOSTS = new Set(['tienda.sanmartinsr.com']);
+const CHUNK_RECOVERY_FLAG = 'sanmartin_chunk_recovery_once';
 const PUBLIC_HOST_ROUTE_MAP = new Map([
   ['tienda.sanmartinsr.com', 'tienda'],
   ['admintv.sanmartinsr.com', 'dashboard'],
@@ -256,6 +257,14 @@ function App() {
     const handleHashChange = () => setRoute(getRouteFromLocation());
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.sessionStorage.removeItem(CHUNK_RECOVERY_FLAG);
   }, []);
 
   useEffect(() => {
