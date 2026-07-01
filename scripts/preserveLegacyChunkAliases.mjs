@@ -70,6 +70,17 @@ const LEGACY_CHUNK_ALIASES = {
   sicarCatalog: [
     'sicarCatalog-BMRRnQIA.js',
   ],
+  index: [
+    'index-YnJNeJfG.js',
+    'index-CoOHaIDK.js',
+    'index-DhtaOwU8.js',
+    'index-D0zz5xdi.js',
+    'index-DQqLl5Ki.js',
+    'index-D389tvB7.js',
+    'index-Ci4x7oe3.js',
+    'index-ZfKy3csY.js',
+    'index-CU9Q52aZ.js',
+  ],
 };
 
 const findCurrentChunkByPrefix = async (prefix) => {

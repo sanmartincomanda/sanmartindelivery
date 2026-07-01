@@ -1,6 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { get, onValue, ref, update } from 'firebase/database';
-import { Suspense, lazy } from 'react';
 import { database } from './firebase';
 import { getDriverPublicName } from './services/drivers';
 import './App.css';
@@ -22,15 +21,15 @@ import {
 } from './services/systemUsers';
 import { CLIENT_DIRECTORY_PATH } from './services/clientDirectory';
 
-const OrderForm = lazy(() => import('./components/OrderForm'));
-const KitchenView = lazy(() => import('./components/KitchenView'));
-const ListaPedidos = lazy(() => import('./components/ListaPedidos'));
-const TiendaVirtualView = lazy(() => import('./components/TiendaVirtualView'));
-const TiendaVirtualAdminView = lazy(() => import('./components/TiendaVirtualAdminView'));
-const ConfiguracionView = lazy(() => import('./components/ConfiguracionView'));
-const DriverView = lazy(() => import('./components/DriverView'));
-const BaseDatosView = lazy(() => import('./components/BaseDatosView'));
-const CrmView = lazy(() => import('./components/CrmView'));
+import OrderForm from './components/OrderForm';
+import KitchenView from './components/KitchenView';
+import ListaPedidos from './components/ListaPedidos';
+import TiendaVirtualView from './components/TiendaVirtualView';
+import TiendaVirtualAdminView from './components/TiendaVirtualAdminView';
+import ConfiguracionView from './components/ConfiguracionView';
+import DriverView from './components/DriverView';
+import BaseDatosView from './components/BaseDatosView';
+import CrmView from './components/CrmView';
 
 const Icons = {
   plus: (
@@ -159,42 +158,6 @@ const getDocumentTitle = (route) => {
       return 'Carnes San Martin | Comanda Digital';
   }
 };
-
-function LazyViewFallback({ label = 'Cargando modulo...' }) {
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: APP_THEME.blueSoftAlt,
-        flexDirection: 'column',
-        gap: '18px',
-      }}
-    >
-      <div
-        style={{
-          width: '60px',
-          height: '60px',
-          borderRadius: '18px',
-          background: APP_THEME.heroGradient,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: `0 16px 36px ${APP_THEME.shadowStrong}`,
-        }}
-      >
-        <img
-          src={BRAND_LOGO_PATH}
-          alt="Logo"
-          style={{ width: '42px', height: '42px', objectFit: 'contain' }}
-        />
-      </div>
-      <div style={{ fontSize: '17px', fontWeight: 700, color: APP_THEME.textSoft }}>{label}</div>
-    </div>
-  );
-}
 
 function App() {
   const [route, setRoute] = useState(() => getRouteFromLocation());
@@ -554,24 +517,18 @@ function App() {
 
   if (isPublicStoreRoute) {
     return (
-      <Suspense fallback={<LazyViewFallback label="Cargando tienda..." />}>
-        <TiendaVirtualView
-          onCreateOrder={addOrder}
-          nextOrderNumber={nextOrderNumber}
-          remainingOrders={remainingOrders}
-          publicStoreUrl={publicStoreUrl}
-          mode="public"
-        />
-      </Suspense>
+      <TiendaVirtualView
+        onCreateOrder={addOrder}
+        nextOrderNumber={nextOrderNumber}
+        remainingOrders={remainingOrders}
+        publicStoreUrl={publicStoreUrl}
+        mode="public"
+      />
     );
   }
 
   if (isDriverRoute) {
-    return (
-      <Suspense fallback={<LazyViewFallback label="Cargando driver..." />}>
-        <DriverView />
-      </Suspense>
-    );
+    return <DriverView />;
   }
 
   if (isKitchenRoute) {
@@ -587,11 +544,7 @@ function App() {
       );
     }
 
-    return (
-      <Suspense fallback={<LazyViewFallback label="Cargando cocina..." />}>
-        <KitchenView orders={orders} />
-      </Suspense>
-    );
+    return <KitchenView orders={orders} />;
   }
 
   if (isCrmRoute) {
@@ -607,11 +560,7 @@ function App() {
       );
     }
 
-    return (
-      <Suspense fallback={<LazyViewFallback label="Cargando CRM..." />}>
-        <CrmView />
-      </Suspense>
-    );
+    return <CrmView />;
   }
 
   if (!isAuthenticated) {
@@ -986,27 +935,25 @@ function App() {
         </header>
 
         <div className="animate-fadeIn" style={{ flex: 1 }}>
-          <Suspense fallback={<LazyViewFallback label="Cargando modulo..." />}>
-            {view === 'ingreso' && (
-              <OrderForm
-                onAddOrder={addOrder}
-                clientes={clientes}
-                allowClientDirectory={isAdminDashboard || isOperatorDashboard}
-                nextOrderNumber={nextOrderNumber}
-                remainingOrders={remainingOrders}
-              />
-            )}
+          {view === 'ingreso' && (
+            <OrderForm
+              onAddOrder={addOrder}
+              clientes={clientes}
+              allowClientDirectory={isAdminDashboard || isOperatorDashboard}
+              nextOrderNumber={nextOrderNumber}
+              remainingOrders={remainingOrders}
+            />
+          )}
 
-            {view === 'cocina' && <KitchenView orders={orders} allowRuta={isAdminDashboard} />}
+          {view === 'cocina' && <KitchenView orders={orders} allowRuta={isAdminDashboard} />}
 
-            {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
+          {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
 
-            {view === 'tienda_virtual' && isAdminDashboard && <TiendaVirtualAdminView />}
+          {view === 'tienda_virtual' && isAdminDashboard && <TiendaVirtualAdminView />}
 
-            {view === 'configuracion' && isAdminDashboard && <ConfiguracionView mode="users" />}
+          {view === 'configuracion' && isAdminDashboard && <ConfiguracionView mode="users" />}
 
-            {view === 'basedatos' && isAdminDashboard && <BaseDatosView clientes={clientes} />}
-          </Suspense>
+          {view === 'basedatos' && isAdminDashboard && <BaseDatosView clientes={clientes} />}
         </div>
       </main>
     </div>
