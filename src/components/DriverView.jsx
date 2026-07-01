@@ -369,7 +369,6 @@ export default function DriverView() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [confirmDeliveryOrder, setConfirmDeliveryOrder] = useState(null);
   const [driverSection, setDriverSection] = useState('ruta');
-  const [routeFilter, setRouteFilter] = useState('todos');
   const [notice, setNotice] = useState('');
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -660,23 +659,8 @@ export default function DriverView() {
   const previousCount = previousOrders.length;
   const enCaminoCount = activeRouteOrders.filter((order) => order.estado === 'Enviado').length;
   const delayedCount = activeRouteOrders.filter((order) => getOrderAgeMeta(order, nowTick).key === 'critical').length;
-  const visibleRouteOrders = routeOrders.filter((order) => {
-    if (routeFilter === 'todos') return true;
-    if (routeFilter === 'en_camino') return order.estado === 'Enviado';
-    if (routeFilter === 'sin_pin') return !hasLocation(order.ubicacion);
-    return true;
-  });
-  const routeFilters = [
-    { key: 'todos', label: 'Todos', count: activeRouteOrders.length },
-    { key: 'en_camino', label: 'En ruta', count: enCaminoCount },
-    { key: 'sin_pin', label: 'Sin pin', count: ordersWithoutLocation.length },
-  ];
-  const routeListTitle =
-    routeFilter === 'en_camino'
-      ? 'Pedidos en ruta'
-      : routeFilter === 'sin_pin'
-        ? 'Pedidos sin pin'
-        : 'Pedidos por entregar';
+  const visibleRouteOrders = routeOrders;
+  const routeListTitle = 'Pedidos por entregar';
   const deliveredSummary = deliveredTodayOrders[0]?.timestampEntregado
     ? `Ultima entrega ${deliveredTodayOrders[0].timestampEntregado}`
     : 'Revisa pedidos entregados de hoy.';
@@ -735,20 +719,6 @@ export default function DriverView() {
 
       {driverSection === 'ruta' ? (
         <>
-          <nav className="driver-filter-row" aria-label="Filtros de ruta">
-            {routeFilters.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                className={routeFilter === filter.key ? 'active' : ''}
-                onClick={() => setRouteFilter(filter.key)}
-              >
-                {filter.label}
-                <span>{filter.count}</span>
-              </button>
-            ))}
-          </nav>
-
           <section className="driver-section-head">
             <div>
               <strong>{routeListTitle}</strong>
@@ -1867,47 +1837,6 @@ const driverStyles = `
   .driver-next-card b {
     color: ${DRIVER_THEME.blueDeep};
     font-size: 16px;
-  }
-  .driver-filter-row {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    padding: 16px 2px 12px;
-    scrollbar-width: none;
-  }
-  .driver-filter-row::-webkit-scrollbar {
-    display: none;
-  }
-  .driver-filter-row button {
-    min-height: 42px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid #ead8da;
-    border-radius: 999px;
-    padding: 0 14px;
-    background: rgba(255, 255, 255, 0.82);
-    color: #374151;
-    font: inherit;
-    font-size: 13px;
-    font-weight: 950;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-  .driver-filter-row button.active {
-    border-color: ${DRIVER_THEME.blueDeep};
-    background: ${DRIVER_THEME.black};
-    color: #fffaf5;
-  }
-  .driver-filter-row span {
-    min-width: 24px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    background: rgba(123, 16, 34, 0.1);
-    font-size: 12px;
   }
   .driver-grid {
     display: grid;
