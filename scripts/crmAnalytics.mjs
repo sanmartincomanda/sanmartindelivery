@@ -40,6 +40,9 @@ const LOCAL_BACKUP_PATH = resolve(repoRoot, 'sync-backups', 'crm', 'dashboard.js
 const EMBEDDED_PUBLIC_SNAPSHOT_PATH = resolve(repoRoot, 'public', 'crm', 'dashboard.json');
 const STORE_CHANNEL = 'tienda_virtual';
 const CACHE_MAX_AGE_MS = 2 * 60 * 1000;
+const CUSTOMER_LOOKBACK_DAYS = 365;
+const CUSTOMER_DIRECTORY_LIMIT = 160;
+const CUSTOMER_LIST_LIMIT = 12;
 
 const cache = {
   payload: null,
@@ -50,6 +53,7 @@ const cache = {
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 const roundQuantity = (value) => Number(Number(value || 0).toFixed(3));
 const roundPercent = (value) => Number(Number(value || 0).toFixed(1));
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const normalizeText = (value = '') =>
   String(value || '')
@@ -97,6 +101,49 @@ const formatDateTime = (date = new Date()) => {
   ).padStart(2, '0')}:${String(safeDate.getSeconds()).padStart(2, '0')}`;
 };
 
+const getDayDistance = (dateFrom, dateTo) => {
+  const start = new Date(`${dateFrom}T12:00:00`);
+  const end = new Date(`${dateTo}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
+};
+
+const calculatePercentChange = (currentValue, previousValue) => {
+  const current = Number(currentValue || 0);
+  const previous = Number(previousValue || 0);
+
+  if (previous <= 0) {
+    return current > 0 ? 100 : 0;
+  }
+
+  return roundPercent(((current - previous) / previous) * 100);
+};
+
+const getQuantile = (values = [], quantile = 0.5) => {
+  const cleaned = (Array.isArray(values) ? values : [])
+    .map((value) => Number(value || 0))
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
+
+  if (!cleaned.length) {
+    return 0;
+  }
+
+  if (cleaned.length === 1) {
+    return cleaned[0];
+  }
+
+  const position = clamp(Number(quantile || 0), 0, 1) * (cleaned.length - 1);
+  const baseIndex = Math.floor(position);
+  const rest = position - baseIndex;
+  const current = cleaned[baseIndex];
+  const next = cleaned[Math.min(cleaned.length - 1, baseIndex + 1)];
+  return current + (next - current) * rest;
+};
+
 const formatShortDate = (dateKey = '') => {
   const date = new Date(`${dateKey}T12:00:00`);
   if (Number.isNaN(date.getTime())) {
@@ -122,6 +169,29 @@ const addDays = (date, amount) => {
   const nextDate = new Date(date.getTime());
   nextDate.setDate(nextDate.getDate() + Number(amount || 0));
   return nextDate;
+};
+
+const buildPreviousPeriod = (period) => {
+  const dayCount = Math.max(1, getDaysBetween(period?.dateFrom, period?.dateTo));
+  const currentStart = new Date(`${String(period?.dateFrom || '').trim()}T12:00:00`);
+  if (Number.isNaN(currentStart.getTime())) {
+    return {
+      key: `${String(period?.key || 'period')}-previous`,
+      dateFrom: '',
+      dateTo: '',
+      dayCount,
+    };
+  }
+
+  const previousEnd = addDays(currentStart, -1);
+  const previousStart = addDays(previousEnd, -(dayCount - 1));
+
+  return {
+    key: `${String(period?.key || 'period')}-previous`,
+    dateFrom: formatDateKey(previousStart),
+    dateTo: formatDateKey(previousEnd),
+    dayCount,
+  };
 };
 
 const buildPeriodDefinitions = (now = new Date()) => {
@@ -351,6 +421,16 @@ const normalizeStoreOrdersForAnalytics = (orders = []) =>
       const status = normalizeStoreOrderStatus(order?.estado || '');
       const finalAmount = resolveStoreFinalAmount(order);
       const pickup = String(order?.fulfillmentType || order?.deliveryMode || '').trim().toLowerCase() === 'pickup';
+      const customerName = String(order?.cliente || '').trim() || 'Cliente sin nombre';
+      const customerCode = String(order?.clienteCodigo || '').trim();
+      const customerPhone = String(order?.telefono || '').trim();
+      const customerKey =
+        String(order?.storeUserKey || '').trim() ||
+        String(order?.clienteFirebaseKey || '').trim() ||
+        customerCode ||
+        customerPhone ||
+        normalizeText(customerName) ||
+        String(order?.firebaseKey || '').trim();
 
       return {
         orderKey: String(order?.firebaseKey || '').trim(),
@@ -359,18 +439,18 @@ const normalizeStoreOrdersForAnalytics = (orders = []) =>
         dateTime: order?.timestampIngresoMs
           ? new Date(Number(order.timestampIngresoMs)).toISOString()
           : `${String(order?.fecha || '').trim()}T12:00:00`,
-        customerKey:
-          String(order?.storeUserKey || '').trim() ||
-          String(order?.clienteFirebaseKey || '').trim() ||
-          String(order?.telefono || '').trim() ||
-          String(order?.cliente || '').trim(),
-        customerName: String(order?.cliente || '').trim() || 'Cliente sin nombre',
+        customerKey,
+        customerCode,
+        customerPhone,
+        customerName,
         paymentMethod: normalizePaymentLabel(order?.metodoPago),
         status,
         finalAmount,
         pickup,
         rewardUsed: Boolean(order?.rewardRedemption?.rewardId),
+        rewardId: String(order?.rewardRedemption?.rewardId || '').trim(),
         couponUsed: Boolean(String(order?.cupon?.code || '').trim()),
+        couponCode: String(order?.cupon?.code || '').trim(),
         items: normalizeStoreOrderItems(order?.items),
       };
     });
@@ -535,10 +615,360 @@ const aggregateStorePeriod = (orders = [], period) => {
   };
 };
 
+const buildCustomerInsights = (transactions = [], period, options = {}) => {
+  const channel = String(options.channel || '').trim() || 'general';
+  const dateFrom = String(period?.dateFrom || '').trim();
+  const dateTo = String(period?.dateTo || '').trim();
+  const dayCount = Math.max(1, getDaysBetween(dateFrom, dateTo));
+  const previousPeriod = buildPreviousPeriod(period);
+  const previousDateFrom = String(previousPeriod.dateFrom || '').trim();
+  const previousDateTo = String(previousPeriod.dateTo || '').trim();
+  const normalizedTransactions = (Array.isArray(transactions) ? transactions : [])
+    .map((transaction) => ({
+      customerKey: String(transaction?.customerKey || '').trim(),
+      customerCode: String(transaction?.customerCode || '').trim(),
+      customerName: String(transaction?.customerName || '').trim() || 'Cliente sin nombre',
+      date: String(transaction?.date || '').trim(),
+      dateTime: String(transaction?.dateTime || '').trim() || `${String(transaction?.date || '').trim()}T12:00:00`,
+      total: roundMoney(transaction?.total || 0),
+      paymentMethod: normalizePaymentLabel(transaction?.paymentMethod),
+      rewardUsed: Boolean(transaction?.rewardUsed),
+      couponUsed: Boolean(transaction?.couponUsed),
+    }))
+    .filter((transaction) => transaction.customerKey && transaction.date);
+
+  const customerMap = new Map();
+  normalizedTransactions.forEach((transaction) => {
+    const currentCustomer = customerMap.get(transaction.customerKey) || {
+      key: transaction.customerKey,
+      code: transaction.customerCode,
+      name: transaction.customerName,
+      transactions: [],
+    };
+
+    currentCustomer.code = currentCustomer.code || transaction.customerCode;
+    currentCustomer.name = currentCustomer.name || transaction.customerName;
+    currentCustomer.transactions.push(transaction);
+    customerMap.set(transaction.customerKey, currentCustomer);
+  });
+
+  const draftProfiles = Array.from(customerMap.values()).map((customer) => {
+    const rows = customer.transactions
+      .slice()
+      .sort(
+        (left, right) =>
+          String(left.dateTime || left.date).localeCompare(String(right.dateTime || right.date)) ||
+          String(left.date || '').localeCompare(String(right.date || ''))
+      );
+
+    const currentTransactions = rows.filter((row) => row.date >= dateFrom && row.date <= dateTo);
+    const previousTransactions = rows.filter((row) => row.date >= previousDateFrom && row.date <= previousDateTo);
+    const beforeCurrentTransactions = rows.filter((row) => row.date < dateFrom);
+    const beforePreviousTransactions = rows.filter((row) => row.date < previousDateFrom);
+    const currentRevenue = roundMoney(currentTransactions.reduce((total, row) => total + Number(row.total || 0), 0));
+    const previousRevenue = roundMoney(previousTransactions.reduce((total, row) => total + Number(row.total || 0), 0));
+    const lifetimeRevenue = roundMoney(rows.reduce((total, row) => total + Number(row.total || 0), 0));
+    const paymentCounts = new Map();
+
+    rows.forEach((row) => {
+      const paymentKey = row.paymentMethod || 'Sin metodo';
+      paymentCounts.set(paymentKey, Number(paymentCounts.get(paymentKey) || 0) + 1);
+    });
+
+    const preferredPayment = Array.from(paymentCounts.entries()).sort((left, right) => right[1] - left[1])[0]?.[0] || 'Sin metodo';
+    const gapDays = [];
+    for (let index = 1; index < rows.length; index += 1) {
+      gapDays.push(getDayDistance(rows[index - 1].date, rows[index].date));
+    }
+
+    return {
+      key: customer.key,
+      code: customer.code,
+      name: customer.name,
+      channel,
+      currentRevenue,
+      previousRevenue,
+      lifetimeRevenue,
+      currentOrders: currentTransactions.length,
+      previousOrders: previousTransactions.length,
+      lifetimeOrders: rows.length,
+      currentTicket: currentTransactions.length > 0 ? roundMoney(currentRevenue / currentTransactions.length) : 0,
+      previousTicket: previousTransactions.length > 0 ? roundMoney(previousRevenue / previousTransactions.length) : 0,
+      rewardOrders: currentTransactions.filter((row) => row.rewardUsed).length,
+      couponOrders: currentTransactions.filter((row) => row.couponUsed).length,
+      firstPurchaseDate: rows[0]?.date || '',
+      lastPurchaseDate: rows[rows.length - 1]?.date || '',
+      lastPurchaseDateTime: rows[rows.length - 1]?.dateTime || '',
+      daysSinceLastPurchase: rows.length ? getDayDistance(rows[rows.length - 1].date, dateTo) : 0,
+      averageGapDays:
+        gapDays.length > 0 ? roundMoney(gapDays.reduce((total, value) => total + value, 0) / gapDays.length) : 0,
+      beforeCurrentTransactionsCount: beforeCurrentTransactions.length,
+      beforePreviousTransactionsCount: beforePreviousTransactions.length,
+      preferredPayment,
+    };
+  });
+
+  const activeRevenueValues = draftProfiles.filter((profile) => profile.currentRevenue > 0).map((profile) => profile.currentRevenue);
+  const lifetimeRevenueValues = draftProfiles.map((profile) => profile.lifetimeRevenue);
+  const vipRevenueThreshold = getQuantile(activeRevenueValues.length ? activeRevenueValues : lifetimeRevenueValues, 0.75);
+  const strategicRevenueThreshold = getQuantile(lifetimeRevenueValues, 0.8);
+  const defaultAtRiskDays = Math.max(14, Math.round(dayCount * 0.8));
+
+  const profiles = draftProfiles.map((profile) => {
+    const repeatCustomer = profile.lifetimeOrders > 1;
+    const isActive = profile.currentOrders > 0;
+    const hadPreviousActivity = profile.previousOrders > 0;
+    const isNew = isActive && profile.beforeCurrentTransactionsCount === 0;
+    const isReactivated = isActive && !hadPreviousActivity && profile.beforePreviousTransactionsCount > 0;
+    const isLost = !isActive && hadPreviousActivity;
+    const expectedGap = Math.max(defaultAtRiskDays, Math.round(Number(profile.averageGapDays || 0) * 1.35));
+    const isAtRisk =
+      !isActive &&
+      !isLost &&
+      repeatCustomer &&
+      profile.daysSinceLastPurchase >= expectedGap &&
+      profile.lifetimeRevenue >= strategicRevenueThreshold;
+    const revenueDelta = roundMoney(profile.currentRevenue - profile.previousRevenue);
+    const ordersDelta = profile.currentOrders - profile.previousOrders;
+    const revenueChangePct = calculatePercentChange(profile.currentRevenue, profile.previousRevenue);
+    const ordersChangePct = calculatePercentChange(profile.currentOrders, profile.previousOrders);
+    const isDeclining = isActive && profile.previousRevenue > 0 && profile.currentRevenue <= profile.previousRevenue * 0.8;
+    const isGrowing = isActive && profile.previousRevenue > 0 && profile.currentRevenue >= profile.previousRevenue * 1.2;
+    const isVip =
+      isActive &&
+      repeatCustomer &&
+      (profile.currentRevenue >= vipRevenueThreshold || profile.lifetimeRevenue >= strategicRevenueThreshold);
+
+    let status = 'Dormido';
+    let tone = 'slate';
+    if (isLost) {
+      status = 'Perdido';
+      tone = 'red';
+    } else if (isAtRisk) {
+      status = 'En riesgo';
+      tone = 'amber';
+    } else if (isDeclining) {
+      status = 'En caida';
+      tone = 'orange';
+    } else if (isReactivated) {
+      status = 'Reactivado';
+      tone = 'teal';
+    } else if (isNew) {
+      status = 'Nuevo';
+      tone = 'blue';
+    } else if (isVip) {
+      status = 'VIP';
+      tone = 'indigo';
+    } else if (isActive && repeatCustomer) {
+      status = 'Frecuente';
+      tone = 'green';
+    } else if (isActive) {
+      status = 'Activo';
+      tone = 'sky';
+    }
+
+    return {
+      ...profile,
+      repeatCustomer,
+      isActive,
+      hadPreviousActivity,
+      isNew,
+      isReactivated,
+      isLost,
+      isAtRisk,
+      isDeclining,
+      isGrowing,
+      isVip,
+      revenueDelta,
+      revenueChangePct,
+      ordersDelta,
+      ordersChangePct,
+      status,
+      tone,
+      summaryNote:
+        isLost
+          ? 'Compraba en la ventana anterior y en esta no aparece.'
+          : isAtRisk
+            ? 'Cliente valioso con inactividad superior a su ritmo habitual.'
+            : isDeclining
+              ? 'Sigue activo, pero compro menos que en la ventana anterior.'
+              : isReactivated
+                ? 'Regreso despues de estar ausente en la ventana anterior.'
+                : isNew
+                  ? 'Primera compra dentro del historial analizado.'
+                  : isVip
+                    ? 'Cliente de alto valor activo en esta ventana.'
+                    : isActive
+                      ? 'Cliente activo dentro de la ventana actual.'
+                      : 'Sin actividad en la ventana actual.',
+    };
+  });
+
+  const currentRevenueTotal = roundMoney(profiles.reduce((total, profile) => total + Number(profile.currentRevenue || 0), 0));
+  const profilesWithShare = profiles.map((profile) => ({
+    ...profile,
+    currentRevenueSharePct: currentRevenueTotal > 0 ? roundPercent((profile.currentRevenue / currentRevenueTotal) * 100) : 0,
+  }));
+
+  const activeCustomers = profilesWithShare.filter((profile) => profile.isActive);
+  const previousActiveCustomers = profilesWithShare.filter((profile) => profile.hadPreviousActivity);
+  const retainedCustomers = profilesWithShare.filter((profile) => profile.isActive && profile.hadPreviousActivity);
+  const lostCustomers = profilesWithShare.filter((profile) => profile.isLost);
+  const atRiskCustomers = profilesWithShare.filter((profile) => profile.isAtRisk);
+  const decliningCustomers = profilesWithShare.filter((profile) => profile.isDeclining);
+  const growingCustomers = profilesWithShare.filter((profile) => profile.isGrowing);
+  const reactivatedCustomers = profilesWithShare.filter((profile) => profile.isReactivated);
+  const newCustomers = profilesWithShare.filter((profile) => profile.isNew);
+  const vipCustomers = profilesWithShare.filter((profile) => profile.isVip);
+
+  const byRevenue = (left, right) =>
+    Number(right.currentRevenue || right.previousRevenue || right.lifetimeRevenue || 0) -
+      Number(left.currentRevenue || left.previousRevenue || left.lifetimeRevenue || 0) ||
+    Number(right.lifetimeOrders || 0) - Number(left.lifetimeOrders || 0) ||
+    String(left.name || '').localeCompare(String(right.name || ''));
+
+  const revenueSortedActive = activeCustomers.slice().sort((left, right) => Number(right.currentRevenue || 0) - Number(left.currentRevenue || 0));
+  const top5Revenue = roundMoney(revenueSortedActive.slice(0, 5).reduce((total, profile) => total + Number(profile.currentRevenue || 0), 0));
+  const top10Revenue = roundMoney(revenueSortedActive.slice(0, 10).reduce((total, profile) => total + Number(profile.currentRevenue || 0), 0));
+  const repeatActiveCustomers = activeCustomers.filter((profile) => profile.repeatCustomer);
+  const averageGapProfiles = profilesWithShare.filter((profile) => Number(profile.averageGapDays || 0) > 0);
+  const recencyProfiles = activeCustomers.filter((profile) => Number(profile.daysSinceLastPurchase || 0) >= 0);
+
+  const directory = profilesWithShare
+    .slice()
+    .sort((left, right) => {
+      const leftPriority =
+        (left.isLost ? 6 : 0) +
+        (left.isAtRisk ? 5 : 0) +
+        (left.isDeclining ? 4 : 0) +
+        (left.isVip ? 3 : 0) +
+        (left.isReactivated ? 2 : 0) +
+        (left.isNew ? 1 : 0);
+      const rightPriority =
+        (right.isLost ? 6 : 0) +
+        (right.isAtRisk ? 5 : 0) +
+        (right.isDeclining ? 4 : 0) +
+        (right.isVip ? 3 : 0) +
+        (right.isReactivated ? 2 : 0) +
+        (right.isNew ? 1 : 0);
+
+      return (
+        rightPriority - leftPriority ||
+        Number(right.currentRevenue || right.previousRevenue || right.lifetimeRevenue || 0) -
+          Number(left.currentRevenue || left.previousRevenue || left.lifetimeRevenue || 0) ||
+        Number(right.lifetimeOrders || 0) - Number(left.lifetimeOrders || 0) ||
+        String(left.name || '').localeCompare(String(right.name || ''))
+      );
+    })
+    .slice(0, CUSTOMER_DIRECTORY_LIMIT);
+
+  return {
+    channel,
+    currentPeriod: {
+      dateFrom,
+      dateTo,
+      dayCount,
+    },
+    previousPeriod,
+    summary: {
+      activeCustomers: activeCustomers.length,
+      previousActiveCustomers: previousActiveCustomers.length,
+      retainedCustomers: retainedCustomers.length,
+      retentionRatePct:
+        previousActiveCustomers.length > 0 ? roundPercent((retainedCustomers.length / previousActiveCustomers.length) * 100) : 0,
+      repeatPurchaseRatePct:
+        activeCustomers.length > 0 ? roundPercent((repeatActiveCustomers.length / activeCustomers.length) * 100) : 0,
+      churnRatePct:
+        previousActiveCustomers.length > 0 ? roundPercent((lostCustomers.length / previousActiveCustomers.length) * 100) : 0,
+      reactivatedCount: reactivatedCustomers.length,
+      newCustomersCount: newCustomers.length,
+      decliningCustomersCount: decliningCustomers.length,
+      growingCustomersCount: growingCustomers.length,
+      atRiskCustomersCount: atRiskCustomers.length,
+      lostCustomersCount: lostCustomers.length,
+      vipCustomersCount: vipCustomers.length,
+      revenuePerActiveCustomer:
+        activeCustomers.length > 0 ? roundMoney(currentRevenueTotal / activeCustomers.length) : 0,
+      averageOrdersPerActiveCustomer:
+        activeCustomers.length > 0
+          ? roundMoney(activeCustomers.reduce((total, profile) => total + Number(profile.currentOrders || 0), 0) / activeCustomers.length)
+          : 0,
+      averageGapDays:
+        averageGapProfiles.length > 0
+          ? roundMoney(
+              averageGapProfiles.reduce((total, profile) => total + Number(profile.averageGapDays || 0), 0) / averageGapProfiles.length
+            )
+          : 0,
+      averageDaysSinceLastPurchase:
+        recencyProfiles.length > 0
+          ? roundMoney(
+              recencyProfiles.reduce((total, profile) => total + Number(profile.daysSinceLastPurchase || 0), 0) / recencyProfiles.length
+            )
+          : 0,
+      top5RevenueSharePct: currentRevenueTotal > 0 ? roundPercent((top5Revenue / currentRevenueTotal) * 100) : 0,
+      top10RevenueSharePct: currentRevenueTotal > 0 ? roundPercent((top10Revenue / currentRevenueTotal) * 100) : 0,
+      currentRevenue: currentRevenueTotal,
+      previousRevenue: roundMoney(previousActiveCustomers.reduce((total, profile) => total + Number(profile.previousRevenue || 0), 0)),
+    },
+    vipCustomers: vipCustomers.slice().sort(byRevenue).slice(0, CUSTOMER_LIST_LIMIT),
+    lostCustomers: lostCustomers.slice().sort(byRevenue).slice(0, CUSTOMER_LIST_LIMIT),
+    atRiskCustomers: atRiskCustomers.slice().sort(byRevenue).slice(0, CUSTOMER_LIST_LIMIT),
+    decliningCustomers: decliningCustomers
+      .slice()
+      .sort((left, right) => Number(left.revenueDelta || 0) - Number(right.revenueDelta || 0))
+      .slice(0, CUSTOMER_LIST_LIMIT),
+    growingCustomers: growingCustomers
+      .slice()
+      .sort((left, right) => Number(right.revenueDelta || 0) - Number(left.revenueDelta || 0))
+      .slice(0, CUSTOMER_LIST_LIMIT),
+    reactivatedCustomers: reactivatedCustomers.slice().sort(byRevenue).slice(0, CUSTOMER_LIST_LIMIT),
+    newCustomers: newCustomers.slice().sort(byRevenue).slice(0, CUSTOMER_LIST_LIMIT),
+    customerDirectory: directory,
+  };
+};
+
 const buildSicarDateFilter = (dateFrom, dateTo) => {
   const cleanFrom = String(dateFrom || '').trim();
   const cleanTo = String(dateTo || '').trim();
   return `v.status = 1 AND v.total > 0 AND v.fecha >= '${cleanFrom} 00:00:00' AND v.fecha < DATE_ADD('${cleanTo}', INTERVAL 1 DAY)`;
+};
+
+const loadSicarCustomerTransactions = async (dateFrom, dateTo) => {
+  const whereClause = buildSicarDateFilter(dateFrom, dateTo);
+  const rows = await runMysqlQuery(`
+    SELECT
+      DATE_FORMAT(v.fecha, '%Y-%m-%d'),
+      DATE_FORMAT(v.fecha, '%Y-%m-%d %H:%i:%s'),
+      v.ven_id,
+      COALESCE(c.clave, ''),
+      COALESCE(NULLIF(TRIM(c.nombre), ''), 'Publico en General'),
+      ROUND(v.total, 2),
+      COALESCE(GROUP_CONCAT(DISTINCT COALESCE(tp.nombre, 'Sin metodo') ORDER BY tp.nombre SEPARATOR ', '), 'Sin metodo')
+    FROM venta v
+    LEFT JOIN ticket t ON t.tic_id = v.tic_id
+    LEFT JOIN cliente c ON c.cli_id = t.cli_id
+    LEFT JOIN ventatipopago vtp ON vtp.ven_id = v.ven_id
+    LEFT JOIN tipopago tp ON tp.tpa_id = vtp.tpa_id
+    WHERE ${whereClause}
+    GROUP BY v.ven_id, v.fecha, c.clave, c.nombre, v.total
+    ORDER BY v.fecha ASC, v.ven_id ASC;
+  `);
+
+  return rows.map((row) => {
+    const customerCode = String(row[3] || '').trim();
+    const customerName = String(row[4] || '').trim() || 'Publico en General';
+
+    return {
+      saleId: Number(row[2] || 0),
+      date: String(row[0] || '').trim(),
+      dateTime: String(row[1] || '').trim(),
+      customerCode,
+      customerName,
+      customerKey: customerCode || normalizeText(customerName) || `venta-${String(row[2] || '').trim()}`,
+      total: roundMoney(row[5] || 0),
+      paymentMethod: String(row[6] || '').trim() || 'Sin metodo',
+    };
+  });
 };
 
 const loadSicarPeriod = async (period) => {
@@ -692,15 +1122,21 @@ const loadSicarPeriod = async (period) => {
 const buildComparison = (onlinePeriod = {}, sicarPeriod = {}) => {
   const onlineRevenue = Number(onlinePeriod?.summary?.revenue || 0);
   const sicarRevenue = Number(sicarPeriod?.summary?.revenue || 0);
+  const onlineTicket = Number(onlinePeriod?.summary?.averageTicket || 0);
+  const sicarTicket = Number(sicarPeriod?.summary?.averageTicket || 0);
+  const onlineCustomers = Number(onlinePeriod?.summary?.uniqueCustomers || 0);
+  const sicarCustomers = Number(sicarPeriod?.summary?.uniqueCustomers || 0);
 
   return {
     onlineRevenueSharePct: sicarRevenue > 0 ? roundPercent((onlineRevenue / sicarRevenue) * 100) : 0,
+    onlineTicketVsSicarPct: sicarTicket > 0 ? roundPercent((onlineTicket / sicarTicket) * 100) : 0,
+    onlineCustomerReachPct: sicarCustomers > 0 ? roundPercent((onlineCustomers / sicarCustomers) * 100) : 0,
   };
 };
 
 const buildDashboardPayload = async () => {
   const periodDefinitions = buildPeriodDefinitions(new Date());
-  const maxLookbackDate = periodDefinitions.reduce(
+  const minPeriodDate = periodDefinitions.reduce(
     (current, period) => (!current || period.dateFrom < current ? period.dateFrom : current),
     ''
   );
@@ -708,13 +1144,36 @@ const buildDashboardPayload = async () => {
     (current, period) => (!current || period.dateTo > current ? period.dateTo : current),
     ''
   );
+  const customerLookbackStart = formatDateKey(addDays(new Date(`${maxDate}T12:00:00`), -(CUSTOMER_LOOKBACK_DAYS - 1)));
+  const fullLookbackDate = !minPeriodDate || customerLookbackStart < minPeriodDate ? customerLookbackStart : minPeriodDate;
 
-  const storeOrders = normalizeStoreOrdersForAnalytics(await loadStoreOrders(maxLookbackDate, maxDate));
+  const [storeOrders, sicarCustomerTransactions] = await Promise.all([
+    loadStoreOrders(fullLookbackDate, maxDate).then((rows) => normalizeStoreOrdersForAnalytics(rows)),
+    loadSicarCustomerTransactions(fullLookbackDate, maxDate),
+  ]);
+
+  const deliveredStoreTransactions = storeOrders
+    .filter((order) => order.status === 'entregado')
+    .map((order) => ({
+      customerKey: order.customerKey,
+      customerCode: order.customerCode,
+      customerName: order.customerName,
+      date: order.date,
+      dateTime: order.dateTime,
+      total: order.finalAmount,
+      paymentMethod: order.paymentMethod,
+      rewardUsed: order.rewardUsed,
+      couponUsed: order.couponUsed,
+    }));
+
   const periods = {};
 
   for (const period of periodDefinitions) {
     const online = aggregateStorePeriod(storeOrders, period);
     const sicar = await loadSicarPeriod(period);
+    const onlineCustomerHealth = buildCustomerInsights(deliveredStoreTransactions, period, { channel: 'online' });
+    const sicarCustomerHealth = buildCustomerInsights(sicarCustomerTransactions, period, { channel: 'sicar' });
+
     periods[period.key] = {
       key: period.key,
       dateFrom: period.dateFrom,
@@ -722,6 +1181,10 @@ const buildDashboardPayload = async () => {
       dayCount: getDaysBetween(period.dateFrom, period.dateTo),
       online,
       sicar,
+      customerIntelligence: {
+        online: onlineCustomerHealth,
+        sicar: sicarCustomerHealth,
+      },
       comparison: buildComparison(online, sicar),
     };
   }
