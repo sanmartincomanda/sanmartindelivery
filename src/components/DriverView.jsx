@@ -102,6 +102,12 @@ const Icons = {
       <path d="M12 7v5l3 2" />
     </svg>
   ),
+  profile: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20 21a8 8 0 0 0-16 0" />
+      <circle cx="12" cy="8" r="4" />
+    </svg>
+  ),
 };
 
 const normalizeName = (value) =>
@@ -231,6 +237,16 @@ const getOrderCreatedAt = (order = {}) =>
 
 const getOrderDeliveredAt = (order = {}) =>
   Number(order.timestampEntregadoMs || order.timestampFinalizado || order.timestamp || 0);
+
+const getOrderLeadMinutes = (order = {}, fallbackNow = Date.now()) => {
+  const createdAt = getOrderCreatedAt(order);
+  const finishedAt = isDeliveredOrder(order) ? getOrderDeliveredAt(order) : fallbackNow;
+  if (!createdAt || !finishedAt) {
+    return 0;
+  }
+
+  return Math.max(0, Math.round((finishedAt - createdAt) / 60000));
+};
 
 const compareDriverActiveOrders = (left = {}, right = {}) => {
   const dateDiff = String(left.fecha || '').localeCompare(String(right.fecha || ''));
@@ -654,11 +670,12 @@ export default function DriverView() {
 
   const activeRouteOrders = routeOrders;
   const ordersWithLocation = activeRouteOrders.filter((order) => hasLocation(order.ubicacion));
-  const ordersWithoutLocation = activeRouteOrders.filter((order) => !hasLocation(order.ubicacion));
   const deliveredCount = deliveredTodayOrders.length;
   const previousCount = previousOrders.length;
-  const enCaminoCount = activeRouteOrders.filter((order) => order.estado === 'Enviado').length;
-  const delayedCount = activeRouteOrders.filter((order) => getOrderAgeMeta(order, nowTick).key === 'critical').length;
+  const delayedActiveOrders = activeRouteOrders
+    .filter((order) => getOrderAgeMeta(order, nowTick).key === 'critical')
+    .sort(compareDriverActiveOrders);
+  const delayedCount = delayedActiveOrders.length;
   const visibleRouteOrders = routeOrders;
   const routeListTitle = 'Pedidos por entregar';
   const deliveredSummary = deliveredTodayOrders[0]?.timestampEntregado
@@ -667,6 +684,44 @@ export default function DriverView() {
   const previousSummary = previousOrders[0]?.fecha
     ? `Movimientos anteriores desde ${previousOrders[0].fecha}`
     : 'Aqui aparecen pedidos de dias anteriores.';
+  const totalTodayAssignments = activeRouteOrders.length + deliveredTodayOrders.length;
+  const deliveredTodayLeadMinutes = deliveredTodayOrders
+    .map((order) => getOrderLeadMinutes(order, nowTick))
+    .filter((minutes) => minutes > 0);
+  const deliveredLateCount = deliveredTodayLeadMinutes.filter((minutes) => minutes >= 60).length;
+  const onTimeDeliveredCount = Math.max(0, deliveredTodayOrders.length - deliveredLateCount);
+  const punctualityRate = deliveredTodayOrders.length
+    ? Math.round((onTimeDeliveredCount / deliveredTodayOrders.length) * 100)
+    : 100;
+  const completionRate = totalTodayAssignments
+    ? Math.round((deliveredTodayOrders.length / totalTodayAssignments) * 100)
+    : 0;
+  const locationCoverageRate = activeRouteOrders.length
+    ? Math.round((ordersWithLocation.length / activeRouteOrders.length) * 100)
+    : 100;
+  const averageDeliveryMinutes = deliveredTodayLeadMinutes.length
+    ? Math.round(
+        deliveredTodayLeadMinutes.reduce((total, minutes) => total + minutes, 0) / deliveredTodayLeadMinutes.length
+      )
+    : 0;
+  const motivationTone =
+    delayedCount > 0 ? 'alert' : punctualityRate >= 90 && completionRate >= 60 ? 'excellent' : deliveredCount > 0 ? 'good' : 'start';
+  const motivationTitle =
+    motivationTone === 'alert'
+      ? 'Atiende los retrasos'
+      : motivationTone === 'excellent'
+        ? 'Ritmo excelente'
+        : motivationTone === 'good'
+          ? 'Buen avance'
+          : 'Listo para arrancar';
+  const motivationMessage =
+    motivationTone === 'alert'
+      ? `Tienes ${delayedCount} pedido${delayedCount === 1 ? '' : 's'} retrasado${delayedCount === 1 ? '' : 's'}. Dale prioridad a esa ruta.`
+      : motivationTone === 'excellent'
+        ? `Llevas ${deliveredCount} entrega${deliveredCount === 1 ? '' : 's'} hoy y ${punctualityRate}% de puntualidad.`
+        : motivationTone === 'good'
+          ? `Vas ${completionRate}% completado hoy. Mantener ese ritmo te deja cerrar fuerte el turno.`
+          : 'Aun no hay entregas cerradas hoy. En cuanto arranques, aqui veras tu rendimiento.';
 
   const openOrderMap = (order) => {
     const navigationUrl = getOrderNavigationUrl(order);
@@ -766,7 +821,7 @@ export default function DriverView() {
             </main>
           )}
         </>
-      ) : (
+      ) : driverSection === 'anteriores' ? (
         <>
           <section className="driver-section-head">
             <div>
@@ -794,6 +849,103 @@ export default function DriverView() {
             </main>
           )}
         </>
+      ) : (
+        <>
+          <section className={`driver-profile-hero ${motivationTone}`}>
+            <div className="driver-profile-identity">
+              <span>Perfil del driver</span>
+              <strong>{driver.name}</strong>
+              <small>{driver.code}</small>
+            </div>
+            <div className="driver-profile-score">
+              <span>Rendimiento</span>
+              <strong>{completionRate}%</strong>
+            </div>
+          </section>
+
+          <section className="driver-profile-summary">
+            <DriverProfileMetricCard
+              label="Entregados hoy"
+              value={deliveredCount}
+              detail={`${totalTodayAssignments} pedidos asignados hoy`}
+              tone="green"
+            />
+            <DriverProfileMetricCard
+              label="Puntualidad"
+              value={`${punctualityRate}%`}
+              detail={`${onTimeDeliveredCount} entrega${onTimeDeliveredCount === 1 ? '' : 's'} a tiempo`}
+              tone="blue"
+            />
+            <DriverProfileMetricCard
+              label="Retrasados activos"
+              value={delayedCount}
+              detail={`${deliveredLateCount} entrega${deliveredLateCount === 1 ? '' : 's'} tardia${deliveredLateCount === 1 ? '' : 's'} hoy`}
+              tone={delayedCount > 0 ? 'red' : 'orange'}
+            />
+            <DriverProfileMetricCard
+              label="Promedio entrega"
+              value={averageDeliveryMinutes > 0 ? formatElapsedMinutes(averageDeliveryMinutes) : '--'}
+              detail={`${locationCoverageRate}% de pedidos con pin`}
+              tone="wine"
+            />
+          </section>
+
+          <section className="driver-profile-panel">
+            <div className="driver-profile-panel-head">
+              <div>
+                <strong>{motivationTitle}</strong>
+                <span>{motivationMessage}</span>
+              </div>
+              <span className="driver-profile-chip">{completionRate}% del dia</span>
+            </div>
+            <div className="driver-profile-progress">
+              <span style={{ width: `${Math.min(100, Math.max(8, completionRate))}%` }} />
+            </div>
+          </section>
+
+          <section className="driver-profile-panel">
+            <div className="driver-profile-panel-head">
+              <div>
+                <strong>Pedidos retrasados</strong>
+                <span>Revisa rapido los que ya superaron la hora.</span>
+              </div>
+              <span className={`driver-profile-chip ${delayedCount > 0 ? 'alert' : ''}`}>{delayedCount}</span>
+            </div>
+            {delayedActiveOrders.length === 0 ? (
+              <div className="driver-profile-empty">
+                No tienes pedidos retrasados activos. Buen trabajo manteniendo la ruta limpia.
+              </div>
+            ) : (
+              <div className="driver-profile-list">
+                {delayedActiveOrders.map((order) => (
+                  <DriverProfileDelayedOrder
+                    key={getOrderKey(order)}
+                    order={order}
+                    nowMs={nowTick}
+                    onOpenDetails={setSelectedOrder}
+                    onOpenMap={openOrderMap}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="driver-profile-actions">
+            <button
+              type="button"
+              className="driver-primary-action"
+              onClick={optimizeRoute}
+              disabled={optimizing || ordersWithLocation.length === 0}
+            >
+              {Icons.route}
+              {optimizing ? 'Optimizando...' : 'Optimizar ruta'}
+            </button>
+            <button type="button" className="driver-ghost-action dark" onClick={logout}>
+              {Icons.close}
+              Cerrar sesion
+            </button>
+          </section>
+        </>
       )}
 
       <DriverBottomNav
@@ -801,6 +953,7 @@ export default function DriverView() {
         activeCount={activeRouteOrders.length}
         deliveredCount={deliveredCount}
         previousCount={previousCount}
+        profileBadge={delayedCount > 0 ? delayedCount : ''}
         onChangeSection={setDriverSection}
       />
 
@@ -828,15 +981,6 @@ export default function DriverView() {
   );
 }
 
-function DriverStatCard({ label, value, tone }) {
-  return (
-    <div className={`driver-stat ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function DriverProgress({ progress }) {
   const steps = ['Listo', 'Ruta', 'Entregado'];
 
@@ -851,7 +995,49 @@ function DriverProgress({ progress }) {
   );
 }
 
-function DriverBottomNav({ section, activeCount, deliveredCount, previousCount, onChangeSection }) {
+function DriverProfileMetricCard({ label, value, detail, tone }) {
+  return (
+    <article className={`driver-profile-metric ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </article>
+  );
+}
+
+function DriverProfileDelayedOrder({ order, nowMs, onOpenDetails, onOpenMap }) {
+  const navigationUrl = getOrderNavigationUrl(order);
+  const ageMeta = getOrderAgeMeta(order, nowMs);
+
+  return (
+    <article className="driver-profile-order">
+      <div className="driver-profile-order-head">
+        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <div className="driver-profile-order-copy">
+          <strong>{order.cliente}</strong>
+          <small>{getAddressPreview(order, 54)}</small>
+        </div>
+        <span className={`driver-age-chip ${ageMeta.key}`}>{ageMeta.label}</span>
+      </div>
+      <div className="driver-profile-order-meta">
+        <span>{getOrderItemSummary(order)}</span>
+        <span>{hasLocation(order.ubicacion) ? 'Con pin' : 'Sin pin'}</span>
+      </div>
+      <div className="driver-profile-order-actions">
+        <button type="button" onClick={() => onOpenDetails(order)}>
+          {Icons.receipt}
+          Detalle
+        </button>
+        <button type="button" onClick={() => onOpenMap(order)} disabled={!navigationUrl}>
+          {Icons.map}
+          Mapa
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function DriverBottomNav({ section, activeCount, deliveredCount, previousCount, profileBadge, onChangeSection }) {
   return (
     <nav className="driver-bottom-nav" aria-label="Menu principal driver">
       <button
@@ -880,6 +1066,15 @@ function DriverBottomNav({ section, activeCount, deliveredCount, previousCount, 
         {Icons.history}
         <span>Pedidos Ant.</span>
         <b>{previousCount}</b>
+      </button>
+      <button
+        type="button"
+        className={section === 'perfil' ? 'active' : ''}
+        onClick={() => onChangeSection('perfil')}
+      >
+        {Icons.profile}
+        <span>Perfil</span>
+        {profileBadge ? <b>{profileBadge}</b> : null}
       </button>
     </nav>
   );
@@ -2441,6 +2636,233 @@ const driverStyles = `
     font-size: 12px;
     font-weight: 800;
   }
+  .driver-profile-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 12px;
+    border-radius: 26px;
+    padding: 16px;
+    color: #fffaf5;
+    background: linear-gradient(135deg, #0b1220, #0c4b85 58%, #dc2626);
+    box-shadow: 0 18px 42px rgba(10, 42, 78, 0.18);
+  }
+  .driver-profile-hero.alert {
+    background: linear-gradient(135deg, #3f0d16, #8b1e2d 58%, #dc2626);
+  }
+  .driver-profile-hero.excellent {
+    background: linear-gradient(135deg, #061a2f, #0c4b85 54%, #1d78d6);
+  }
+  .driver-profile-identity span,
+  .driver-profile-score span {
+    display: block;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.82;
+  }
+  .driver-profile-identity strong,
+  .driver-profile-score strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 950;
+  }
+  .driver-profile-identity small {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 800;
+    opacity: 0.9;
+  }
+  .driver-profile-score {
+    min-width: 118px;
+    text-align: right;
+  }
+  .driver-profile-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .driver-profile-metric {
+    border: 1px solid rgba(234, 216, 218, 0.9);
+    border-radius: 22px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 14px 32px rgba(17, 24, 39, 0.06);
+  }
+  .driver-profile-metric span {
+    display: block;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .driver-profile-metric strong {
+    display: block;
+    margin-top: 6px;
+    color: #111827;
+    font-size: 28px;
+    line-height: 1;
+  }
+  .driver-profile-metric small {
+    display: block;
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+  .driver-profile-metric.blue { color: #0c4b85; }
+  .driver-profile-metric.green { color: #15803d; }
+  .driver-profile-metric.orange { color: #c2410c; }
+  .driver-profile-metric.red { color: #b91c1c; }
+  .driver-profile-metric.wine { color: ${DRIVER_THEME.blueDeep}; }
+  .driver-profile-panel {
+    margin-bottom: 12px;
+    border: 1px solid rgba(234, 216, 218, 0.9);
+    border-radius: 24px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 16px 34px rgba(17, 24, 39, 0.06);
+  }
+  .driver-profile-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .driver-profile-panel-head strong {
+    display: block;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 950;
+  }
+  .driver-profile-panel-head span {
+    display: block;
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+  .driver-profile-chip {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0 12px;
+    background: #eff6ff;
+    color: #0c4b85;
+    font-size: 12px;
+    font-weight: 950;
+    white-space: nowrap;
+  }
+  .driver-profile-chip.alert {
+    background: rgba(254, 226, 226, 0.96);
+    color: #b91c1c;
+  }
+  .driver-profile-progress {
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e5eef8;
+  }
+  .driver-profile-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(135deg, #0c4b85, #dc2626);
+  }
+  .driver-profile-empty {
+    border-radius: 18px;
+    padding: 14px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.45;
+  }
+  .driver-profile-list {
+    display: grid;
+    gap: 10px;
+  }
+  .driver-profile-order {
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 12px;
+    background: #fbfdff;
+  }
+  .driver-profile-order-head {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .driver-profile-order-copy strong {
+    display: block;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 950;
+  }
+  .driver-profile-order-copy small {
+    display: block;
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .driver-profile-order-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .driver-profile-order-meta span {
+    min-height: 26px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0 10px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .driver-profile-order-actions,
+  .driver-profile-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .driver-profile-order-actions {
+    margin-top: 10px;
+  }
+  .driver-profile-order-actions button {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 0;
+    border-radius: 14px;
+    background: #f8fafc;
+    color: #111827;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 950;
+    cursor: pointer;
+  }
+  .driver-profile-actions {
+    margin-bottom: 8px;
+  }
   .driver-delay-banner {
     display: flex;
     align-items: center;
@@ -2608,6 +3030,24 @@ const driverStyles = `
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
+    .driver-profile-hero {
+      grid-template-columns: 1fr;
+      padding: 14px;
+      border-radius: 22px;
+    }
+    .driver-profile-score {
+      min-width: 0;
+      text-align: left;
+    }
+    .driver-profile-summary,
+    .driver-profile-order-actions,
+    .driver-profile-actions {
+      grid-template-columns: 1fr;
+    }
+    .driver-profile-panel-head {
+      flex-direction: column;
+      align-items: stretch;
+    }
     .driver-featured-head {
       grid-template-columns: 48px minmax(0, 1fr);
     }
@@ -2675,7 +3115,7 @@ const driverStyles = `
     bottom: 12px;
     z-index: 1400;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
     padding: 10px;
     border: 1px solid rgba(255, 255, 255, 0.58);
@@ -2805,14 +3245,14 @@ const driverStyles = `
     .driver-bottom-nav button {
       min-height: 56px;
       padding: 8px 4px;
-      font-size: 10px;
+      font-size: 9px;
     }
     .driver-bottom-nav button b {
       top: 6px;
       right: 6px;
-      min-width: 20px;
-      height: 20px;
-      font-size: 10px;
+      min-width: 18px;
+      height: 18px;
+      font-size: 9px;
     }
     .driver-featured-meta span:last-child {
       width: 100%;

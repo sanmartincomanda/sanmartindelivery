@@ -454,7 +454,7 @@ const isValidQuantityStep = (value, product) => {
 const formatStoreQuantity = (quantity, unit) =>
   String(unit).toLowerCase() === 'unidad' ? String(Number(quantity || 0)) : formatWeight(quantity);
 
-const getQuickQuantities = (product) => {
+const getQuickQuantities = (product, currentQuantity = 0) => {
   if (!product) {
     return QUICK_WEIGHTS;
   }
@@ -462,8 +462,14 @@ const getQuickQuantities = (product) => {
   const minQuantity = getMinQuantity(product);
   const step = getQuantityStep(product);
   const totalOptions = isUnitProduct(product) ? 4 : 5;
+  const normalizedCurrentQuantity = clampQuantity(currentQuantity, product);
+  const currentIndex =
+    normalizedCurrentQuantity > 0
+      ? Math.max(0, Math.round((normalizedCurrentQuantity - minQuantity) / step))
+      : 0;
+  const lastIndex = Math.max(totalOptions - 1, currentIndex);
 
-  return Array.from({ length: totalOptions }, (_, index) =>
+  return Array.from({ length: lastIndex + 1 }, (_, index) =>
     Number((minQuantity + index * step).toFixed(3))
   );
 };
@@ -3401,6 +3407,11 @@ export default function TiendaVirtualView({
           color: #ffffff;
           border-color: transparent;
           box-shadow: 0 16px 28px rgba(10, 42, 78, 0.22);
+        }
+        .store-chip.store-chip-more {
+          border-style: dashed;
+          color: var(--sm-blue-deep);
+          background: linear-gradient(180deg, #ffffff 0%, #eef6ff 100%);
         }
         .store-filter-chip {
           display: flex;
@@ -7628,6 +7639,8 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
   const subtotal = Number(quantity || 0) * Number(product.price || 0);
   const step = getQuantityStep(product);
   const minQuantity = getMinQuantity(product);
+  const quickQuantities = getQuickQuantities(product, quantity);
+  const nextQuickQuantity = Number(((quickQuantities[quickQuantities.length - 1] || minQuantity) + step).toFixed(3));
 
   return (
     <div className="store-sheet-overlay product-overlay">
@@ -7660,7 +7673,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
             )}
 
             <div className="store-qty-row">
-              {getQuickQuantities(product).map((weight) => (
+              {quickQuantities.map((weight) => (
                 <button
                   key={weight}
                   type="button"
@@ -7670,6 +7683,13 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                   {formatStoreQuantity(weight, product.unit)} {product.unit}
                 </button>
               ))}
+              <button
+                type="button"
+                className="store-chip store-chip-more"
+                onClick={() => onQuantityChange(nextQuickQuantity)}
+              >
+                + {formatStoreQuantity(nextQuickQuantity, product.unit)} {product.unit}
+              </button>
             </div>
 
             <div className="store-stepper">
