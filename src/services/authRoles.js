@@ -52,7 +52,7 @@ export const buildInternalEmail = (username, scope = 'internal') => {
   return `${cleanUsername || 'usuario'}@${cleanScope}.${AUTH_DOMAIN}`;
 };
 
-export const buildDriverEmail = (driverCode) => buildInternalEmail(driverCode, 'drivers');
+export const buildDriverEmail = (driverIdentifier) => buildInternalEmail(driverIdentifier, 'drivers');
 
 export const getCurrentAuthUser = () => auth.currentUser;
 
@@ -122,11 +122,12 @@ export async function signInInternalUser({ username, password, scope = 'internal
 }
 
 export async function signInDriverAuth({ code, password }) {
+  const driverIdentifier = String(code || '').trim();
   const rawPassword = String(password || '');
   const authPassword = rawPassword.length < 6 ? `${rawPassword}26` : rawPassword;
   const credential = await signInWithEmailAndPassword(
     auth,
-    buildDriverEmail(code),
+    buildDriverEmail(driverIdentifier),
     authPassword
   );
 

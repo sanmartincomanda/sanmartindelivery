@@ -59,6 +59,8 @@ import {
 } from '../services/storeUsers';
 import {
   DRIVERS_PATH,
+  getDriverLoginPassword,
+  getDriverLoginUsername,
   mergeDrivers,
   saveDriver,
   seedDefaultDriversIfEmpty,
@@ -170,7 +172,6 @@ const emptyDriver = {
   phone: '',
   active: true,
   sortOrder: '',
-  password: '',
 };
 
 const emptyKitchenForm = {
@@ -1165,7 +1166,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
         sortOrder: driverForm.sortOrder === '' ? drivers.length * 10 : Number(driverForm.sortOrder || 0),
       });
       setDriverForm(emptyDriver);
-      setMessage('Entregador y acceso Driver guardados.');
+      setMessage('Entregador guardado con su acceso estandar de Driver.');
     } catch (error) {
       console.error('Error guardando entregador:', error);
       setMessage('No se pudo guardar el entregador.');
@@ -2851,6 +2852,16 @@ function DriversManager({
     () => drivers.some((driver) => driver.code === driverForm.code),
     [drivers, driverForm.code]
   );
+  const previewDriverCredentials = useMemo(
+    () =>
+      driverForm.code || driverForm.name
+        ? {
+            username: getDriverLoginUsername(driverForm),
+            password: getDriverLoginPassword(driverForm),
+          }
+        : null,
+    [driverForm]
+  );
 
   const chooseDriver = (driver) => {
     setSelectedDriverCode(driver.code);
@@ -2921,13 +2932,14 @@ function DriversManager({
                 <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
                   {driver.code} {driver.phone ? `| ${driver.phone}` : ''}
                 </div>
+                <div style={{ color: '#1e3a8a', marginTop: 6, fontWeight: 800 }}>
+                  Usuario: {getDriverLoginUsername(driver)} | Clave: {getDriverLoginPassword(driver)}
+                </div>
                 <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <span className={`cfg-badge ${driver.active === false ? 'off' : ''}`}>
                     {driver.active === false ? 'Inactivo' : 'Activo'}
                   </span>
-                  <span className={`cfg-badge ${driver.passwordHash ? '' : 'off'}`}>
-                    {driver.passwordHash ? 'Con contrasena' : 'Clave inicial: codigo'}
-                  </span>
+                  <span className="cfg-badge">Acceso estandar</span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -2986,8 +2998,9 @@ function DriversManager({
           }}
         >
           <div>1. Crea un codigo nuevo para el entregador o carga uno existente.</div>
-          <div>2. Define nombre, telefono y, si quieres, una contrasena para entrar al Driver.</div>
-          <div>3. Ese mismo codigo aparecera luego para asignarlo en Lista de Pedidos.</div>
+          <div>2. Define nombre y telefono. El sistema genera el usuario automaticamente.</div>
+          <div>3. Usuario: primer nombre + 3 numeros. Clave: apellido + 3 numeros.</div>
+          <div>4. Ese mismo codigo aparecera luego para asignarlo en Lista de Pedidos.</div>
         </div>
 
         {driverForm.code && (
@@ -3049,17 +3062,25 @@ function DriversManager({
             <option value="inactivo">Inactivo</option>
           </select>
         </div>
-        <input
-          className="cfg-input"
-          type="password"
-          value={driverForm.password}
-          onChange={(event) => updateDriverForm('password', event.target.value)}
-          placeholder="Contrasena para entrar al Driver"
-        />
+        {previewDriverCredentials && (
+          <div
+            style={{
+              border: '1px solid #dbeafe',
+              borderRadius: 12,
+              padding: 12,
+              background: '#eff6ff',
+              color: '#1e3a8a',
+              display: 'grid',
+              gap: 4,
+              fontWeight: 800,
+            }}
+          >
+            <div>Usuario Driver: {previewDriverCredentials.username}</div>
+            <div>Clave inicial: {previewDriverCredentials.password}</div>
+          </div>
+        )}
         <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>
-          Si guardas con una contrasena, el entregador ya queda listo para iniciar sesion en Driver.
-          Si la dejas vacia, se mantiene la actual. Para los entregadores base sin contrasena, la
-          clave inicial es su mismo codigo.
+          El acceso de Driver queda estandarizado para todos los repartidores con este formato.
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="submit" className="cfg-button" disabled={savingDriver}>

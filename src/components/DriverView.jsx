@@ -510,7 +510,7 @@ export default function DriverView() {
       setLoginForm({ code: '', password: '' });
     } catch (error) {
       console.error('Error iniciando sesion driver:', error);
-      setLoginError('Codigo o contrasena incorrecta.');
+      setLoginError('Usuario o contrasena incorrecta.');
     }
   };
 
@@ -647,13 +647,14 @@ export default function DriverView() {
         <form className="driver-login-card" onSubmit={handleLogin}>
           <img src={BRAND_LOGO_PATH} alt="Carnes San Martin" />
           <h1>Driver</h1>
-          <p>Ingresa con tu codigo de entregador.</p>
+          <p>Ingresa con tu usuario de entregador.</p>
           {loginError && <div className="driver-error">{loginError}</div>}
           <input
             value={loginForm.code}
             onChange={(event) => setLoginForm((current) => ({ ...current, code: event.target.value }))}
-            placeholder="Codigo. Ej: E-001"
-            autoCapitalize="characters"
+            placeholder="Usuario. Ej: carlos003"
+            autoCapitalize="none"
+            autoCorrect="off"
           />
           <input
             type="password"
@@ -662,7 +663,7 @@ export default function DriverView() {
             placeholder="Contrasena"
           />
           <button type="submit">Entrar</button>
-          <small>Clave inicial de entregadores base: su mismo codigo.</small>
+          <small>Clave inicial: apellido + 3 numeros. Ej: mora003.</small>
         </form>
       </div>
     );

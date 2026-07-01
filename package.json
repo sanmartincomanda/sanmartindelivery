@@ -12,6 +12,7 @@
     "crm:publish": "node scripts/publishCrmAnalytics.mjs",
     "catalog:migrate:images": "node scripts/migrateCatalogImagesToStorage.mjs",
     "auth:bootstrap": "node scripts/bootstrapAuthUsers.mjs",
+    "auth:drivers:sync": "node scripts/syncDriverAuthCredentials.mjs",
     "auth:cleanup:store-customers": "node scripts/cleanupLegacyStoreCustomers.mjs",
     "clients:sync-directory": "node scripts/syncClientDirectory.mjs",
     "firebase:login": "npx firebase-tools login",

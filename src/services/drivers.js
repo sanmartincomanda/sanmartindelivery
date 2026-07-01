@@ -11,6 +11,14 @@ export const DEFAULT_DRIVERS = [
   { code: 'E-004', name: 'CHIMI', phone: '', active: true, sortOrder: 40 },
 ];
 
+const normalizeDriverLoginToken = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+
 const cleanDriverCode = (value) =>
   String(value || '')
     .trim()
@@ -21,17 +29,62 @@ export const normalizeDriverCode = cleanDriverCode;
 
 export const getDriverKey = (code) => cleanDriverCode(code).replace(/[.#$/[\]]/g, '_');
 
+export const getDriverCodeSuffix = (code = '') => {
+  const match = String(code || '').match(/(\d{1,})$/);
+  return String(match?.[1] || '').padStart(3, '0').slice(-3);
+};
+
+export const getDriverLoginUsername = (driver = {}) => {
+  const normalized = normalizeDriver(driver);
+  const [firstName = normalized.code || 'driver'] = String(normalized.name || '')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(normalized.code)}`;
+};
+
+export const getDriverLoginPassword = (driver = {}) => {
+  const normalized = normalizeDriver(driver);
+  const nameParts = String(normalized.name || '')
+    .split(/\s+/)
+    .filter(Boolean);
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0] || normalized.code || 'driver';
+
+  return `${normalizeDriverLoginToken(lastName) || 'driver'}${getDriverCodeSuffix(normalized.code)}`;
+};
+
+export const findDriverByLoginIdentifier = (identifier, drivers = []) => {
+  const rawIdentifier = String(identifier || '').trim();
+  if (!rawIdentifier) {
+    return null;
+  }
+
+  const normalizedCode = normalizeDriverCode(rawIdentifier);
+  const normalizedLogin = normalizeDriverLoginToken(rawIdentifier);
+
+  return (
+    drivers.find((driver) => driver?.code === normalizedCode) ||
+    drivers.find((driver) => getDriverLoginUsername(driver) === normalizedLogin) ||
+    null
+  );
+};
+
 export const normalizeDriver = (driver = {}, fallback = {}) => {
   const source = driver || {};
   const backup = fallback || {};
   const code = cleanDriverCode(source.code ?? backup.code);
+  const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
+  const loginUsername =
+    String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
+    getDriverLoginUsername({ code, name });
 
   return {
     code,
-    name: String(source.name ?? backup.name ?? '').trim().toUpperCase(),
+    name,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
+    loginUsername,
     passwordHash: String(source.passwordHash ?? backup.passwordHash ?? '').trim(),
     createdAt: Number(source.createdAt ?? backup.createdAt ?? Date.now()),
     updatedAt: Number(source.updatedAt ?? backup.updatedAt ?? Date.now()),
@@ -114,6 +167,11 @@ export async function fetchDriverByCode(code) {
 
   const snapshot = await get(ref(database, `${DRIVERS_PATH}/${driverKey}`));
   return snapshot.exists() ? normalizeDriver(snapshot.val()) : null;
+}
+
+export async function fetchDrivers() {
+  const snapshot = await get(ref(database, DRIVERS_PATH));
+  return mergeDrivers(snapshot.val());
 }
 
 export async function seedDefaultDriversIfEmpty() {

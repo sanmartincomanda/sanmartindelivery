@@ -27,7 +27,15 @@ const resolveAuthPassword = (password) => {
   return rawPassword.length < 6 ? `${rawPassword}26` : rawPassword;
 };
 
-const buildDriverEmail = (driverCode) => buildInternalEmail(driverCode, 'drivers');
+const buildDriverEmail = (driverIdentifier) => buildInternalEmail(driverIdentifier, 'drivers');
+
+const normalizeDriverLoginToken = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
 
 const normalizeDriverCode = (value = '') =>
   String(value || '')
@@ -36,6 +44,62 @@ const normalizeDriverCode = (value = '') =>
     .replace(/\s+/g, '');
 
 const getDriverKey = (code) => normalizeDriverCode(code).replace(/[.#$/[\]]/g, '_');
+
+const getDriverCodeSuffix = (code = '') => {
+  const match = String(code || '').match(/(\d{1,})$/);
+  return String(match?.[1] || '').padStart(3, '0').slice(-3);
+};
+
+const normalizeDriverRecord = (driver = {}, fallback = {}) => {
+  const source = driver || {};
+  const backup = fallback || {};
+  const code = normalizeDriverCode(source.code ?? backup.code);
+  const name = String(source.name ?? backup.name ?? '').trim().toUpperCase();
+  const nameParts = name.split(/\s+/).filter(Boolean);
+  const firstName = nameParts[0] || code || 'driver';
+  const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
+  const loginUsername =
+    String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
+    `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(code)}`;
+  const loginPassword = `${normalizeDriverLoginToken(lastName) || 'driver'}${getDriverCodeSuffix(code)}`;
+
+  return {
+    ...backup,
+    ...source,
+    code,
+    name,
+    phone: String(source.phone ?? backup.phone ?? '').trim(),
+    active: source.active ?? backup.active ?? true,
+    sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
+    loginUsername,
+    loginPassword,
+    authUid: String(source.authUid ?? backup.authUid ?? '').trim(),
+  };
+};
+
+const mergeDrivers = (remoteDrivers = {}) => {
+  const byCode = new Map();
+
+  DEFAULT_DRIVERS.forEach((driver) => {
+    const normalized = normalizeDriverRecord(driver);
+    byCode.set(normalized.code, normalized);
+  });
+
+  Object.values(remoteDrivers || {})
+    .filter(Boolean)
+    .forEach((driver) => {
+      const normalized = normalizeDriverRecord(driver, byCode.get(normalizeDriverCode(driver?.code)));
+      if (normalized.code) {
+        byCode.set(normalized.code, normalized);
+      }
+    });
+
+  return Array.from(byCode.values()).sort(
+    (left, right) =>
+      Number(left.sortOrder || 0) - Number(right.sortOrder || 0) ||
+      String(left.code || '').localeCompare(String(right.code || ''))
+  );
+};
 
 const DEFAULT_DRIVERS = [
   { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
@@ -81,12 +145,11 @@ const db = getDatabase();
 async function upsertAuthUser({ email, password, displayName }) {
   try {
     const existing = await auth.getUserByEmail(email);
-    await auth.updateUser(existing.uid, {
+    return auth.updateUser(existing.uid, {
       password,
       displayName,
       disabled: false,
     });
-    return existing;
   } catch (error) {
     if (error.code !== 'auth/user-not-found') {
       throw error;
@@ -100,6 +163,39 @@ async function upsertAuthUser({ email, password, displayName }) {
       disabled: false,
     });
   }
+}
+
+async function resolveDriverAuthUser(driver, email) {
+  if (driver.authUid) {
+    try {
+      return await auth.getUser(driver.authUid);
+    } catch (error) {
+      if (error.code !== 'auth/user-not-found') {
+        throw error;
+      }
+    }
+  }
+
+  try {
+    return await auth.getUserByEmail(email);
+  } catch (error) {
+    if (error.code !== 'auth/user-not-found') {
+      throw error;
+    }
+  }
+
+  const legacyEmail = buildDriverEmail(driver.code);
+  if (legacyEmail !== email) {
+    try {
+      return await auth.getUserByEmail(legacyEmail);
+    } catch (error) {
+      if (error.code !== 'auth/user-not-found') {
+        throw error;
+      }
+    }
+  }
+
+  return null;
 }
 
 async function writeRole(uid, payload) {
@@ -131,19 +227,32 @@ async function seedInternalUsers() {
 }
 
 async function seedDrivers() {
-  for (const driver of DEFAULT_DRIVERS) {
-    const code = normalizeDriverCode(driver.code);
-    const email = buildDriverEmail(code);
-    const defaultPassword = `${code}26`;
-    const authUser = await upsertAuthUser({
-      email,
-      password: process.env[`DRIVER_${code.replace(/[^A-Z0-9]/g, '_')}_PASSWORD`] || defaultPassword,
-      displayName: driver.name,
-    });
+  const snapshot = await db.ref('deliveryDrivers').get();
+  const drivers = mergeDrivers(snapshot.val());
+
+  for (const driverRecord of drivers) {
+    const driver = normalizeDriverRecord(driverRecord);
+    const code = driver.code;
+    const email = buildDriverEmail(driver.loginUsername);
+    const defaultPassword = driver.loginPassword;
+    const existingAuthUser = await resolveDriverAuthUser(driver, email);
+    const authUser = existingAuthUser
+      ? await auth.updateUser(existingAuthUser.uid, {
+          email,
+          password: process.env[`DRIVER_${code.replace(/[^A-Z0-9]/g, '_')}_PASSWORD`] || defaultPassword,
+          displayName: driver.name,
+          disabled: driver.active === false,
+        })
+      : await upsertAuthUser({
+          email,
+          password: process.env[`DRIVER_${code.replace(/[^A-Z0-9]/g, '_')}_PASSWORD`] || defaultPassword,
+          displayName: driver.name,
+        });
 
     await writeRole(authUser.uid, {
       role: 'driver',
       driverCode: code,
+      driverUsername: driver.loginUsername,
       email,
       displayName: driver.name,
     });
@@ -151,11 +260,12 @@ async function seedDrivers() {
     await db.ref(`deliveryDrivers/${getDriverKey(code)}`).update({
       ...driver,
       code,
+      loginUsername: driver.loginUsername,
       authUid: authUser.uid,
       updatedAt: Date.now(),
     });
 
-    console.log(`OK driver ${code}: ${email}`);
+    console.log(`OK driver ${code}: ${driver.loginUsername}`);
   }
 }
 
