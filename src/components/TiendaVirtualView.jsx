@@ -56,9 +56,11 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import {
+  buildStoreOperationClosedMessage,
   calculateStoreDeliveryQuote,
   DEFAULT_STORE_DELIVERY_SETTINGS,
   formatStoreDeliveryDistance,
+  getStoreOperationStatus,
   subscribeStoreDeliverySettings,
 } from '../services/storeDeliverySettings';
 import {
@@ -1802,6 +1804,14 @@ export default function TiendaVirtualView({
     [activeDeliveryAddress?.ubicacion, deliverySettings, fulfillmentType]
   );
   const deliverySummary = useMemo(() => buildStoreDeliverySummary(deliveryQuote), [deliveryQuote]);
+  const storeOperationStatus = useMemo(
+    () => getStoreOperationStatus(deliverySettings),
+    [deliverySettings]
+  );
+  const storeClosedMessage = useMemo(
+    () => buildStoreOperationClosedMessage(deliverySettings),
+    [deliverySettings]
+  );
   const deliveryFeeAmount = useMemo(() => {
     if (!deliveryQuote?.available || deliveryQuote.isPickup) {
       return 0;
@@ -2685,6 +2695,11 @@ export default function TiendaVirtualView({
 
   const submitOrder = async (event) => {
     event.preventDefault();
+
+    if (!storeOperationStatus.open) {
+      alert(storeClosedMessage);
+      return;
+    }
 
     if (!currentUser) {
       openAuthSheet('login', 'checkout');
@@ -6288,6 +6303,8 @@ export default function TiendaVirtualView({
           deliverySummary={deliverySummary}
           deliveryFeeAmount={deliveryFeeAmount}
           estimatedRewardPoints={estimatedRewardPoints}
+          storeOperationStatus={storeOperationStatus}
+          storeClosedMessage={storeClosedMessage}
           totalAmount={totalAmount}
           rewardSettings={rewardSettings}
           selectedReward={selectedRewardRedemption}
@@ -7880,6 +7897,8 @@ function CheckoutSheet({
   deliverySummary,
   deliveryFeeAmount,
   estimatedRewardPoints,
+  storeOperationStatus,
+  storeClosedMessage,
   totalAmount,
   rewardSettings,
   selectedReward,
@@ -7912,6 +7931,7 @@ function CheckoutSheet({
   const [checkoutStep, setCheckoutStep] = useState('cart');
   const isCartStep = checkoutStep === 'cart';
   const canSubmitDelivery = pickupFlow || deliveryQuote?.available;
+  const storeClosed = storeOperationStatus?.open === false;
   const deliveryChoices = [
     {
       value: ORDER_FULFILLMENT_DELIVERY,
@@ -7956,6 +7976,11 @@ function CheckoutSheet({
   }, [cartItems.length]);
 
   const handleContinueCheckout = () => {
+    if (storeClosed) {
+      alert(storeClosedMessage || 'Tienda se encuentra cerrada.');
+      return;
+    }
+
     if (isGuestCheckout) {
       onOpenLogin();
       return;
@@ -8031,6 +8056,14 @@ function CheckoutSheet({
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
+
+            {storeClosed && (
+              <div className="store-status-card" style={{ marginTop: 0, borderColor: 'rgba(185, 28, 28, 0.18)' }}>
+                <div className="store-status-pill error">Tienda cerrada</div>
+                <h3 style={{ margin: '10px 0 4px' }}>No se pueden enviar pedidos en este momento</h3>
+                <p style={{ margin: 0 }}>{storeClosedMessage}</p>
+              </div>
+            )}
 
             <div className="store-status-card" style={{ marginTop: 0 }}>
               <div className={`store-status-pill ${deliverySummary?.tone || ''}`}>{deliverySummary?.title || 'Servicio a domicilio'}</div>
@@ -8182,7 +8215,7 @@ function CheckoutSheet({
             </div>
 
             <button type="button" className="store-button" onClick={handleContinueCheckout}>
-              Pedir en linea
+              {storeClosed ? 'Tienda cerrada' : 'Pedir en linea'}
             </button>
           </div>
         ) : (
@@ -8194,6 +8227,14 @@ function CheckoutSheet({
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
+
+            {storeClosed && (
+              <div className="store-status-card" style={{ marginTop: 0, borderColor: 'rgba(185, 28, 28, 0.18)' }}>
+                <div className="store-status-pill error">Tienda cerrada</div>
+                <h3 style={{ margin: '10px 0 4px' }}>No se pueden enviar pedidos en este momento</h3>
+                <p style={{ margin: 0 }}>{storeClosedMessage}</p>
+              </div>
+            )}
 
             <div className="store-status-card" style={{ marginTop: 0 }}>
               <div className={`store-status-pill ${deliverySummary?.tone || ''}`}>{deliverySummary?.title || 'Servicio a domicilio'}</div>
@@ -8462,8 +8503,8 @@ function CheckoutSheet({
               onChange={(event) => onNotesChange(event.target.value)}
               placeholder="Notas para tu pedido"
             />
-            <button type="submit" className="store-button" disabled={submitting || !canSubmitDelivery}>
-              {submitting ? 'Enviando...' : 'Realizar pedido en linea'}
+            <button type="submit" className="store-button" disabled={submitting || !canSubmitDelivery || storeClosed}>
+              {submitting ? 'Enviando...' : storeClosed ? 'Tienda cerrada' : 'Realizar pedido en linea'}
             </button>
           </form>
         )}

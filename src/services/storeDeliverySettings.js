@@ -12,6 +12,33 @@ export const STORE_DELIVERY_FEE_BRACKETS = [
   { key: 'under6km', label: '< 6 km', maxDistanceKm: 6 },
   { key: 'above6km', label: '+ 6 km', maxDistanceKm: Number.POSITIVE_INFINITY },
 ];
+export const STORE_OPERATION_DAY_ORDER = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+export const STORE_OPERATION_DAY_LABELS = {
+  monday: 'Lunes',
+  tuesday: 'Martes',
+  wednesday: 'Miercoles',
+  thursday: 'Jueves',
+  friday: 'Viernes',
+  saturday: 'Sabado',
+  sunday: 'Domingo',
+};
+export const DEFAULT_STORE_OPERATION_HOURS = {
+  monday: { enabled: true, open: '06:45', close: '17:15' },
+  tuesday: { enabled: true, open: '06:45', close: '17:15' },
+  wednesday: { enabled: true, open: '06:45', close: '17:15' },
+  thursday: { enabled: true, open: '06:45', close: '17:15' },
+  friday: { enabled: true, open: '06:45', close: '17:15' },
+  saturday: { enabled: true, open: '06:45', close: '17:15' },
+  sunday: { enabled: true, open: '07:00', close: '14:00' },
+};
 
 export const DEFAULT_STORE_DELIVERY_SETTINGS = {
   taxRate: STORE_DELIVERY_TAX_RATE,
@@ -29,6 +56,7 @@ export const DEFAULT_STORE_DELIVERY_SETTINGS = {
     under6km: 60,
     above6km: 100,
   },
+  operationHours: DEFAULT_STORE_OPERATION_HOURS,
   updatedAt: 0,
 };
 
@@ -42,6 +70,216 @@ const normalizePositiveNumber = (value, fallback) => {
   }
 
   return roundMoney(fallback);
+};
+
+const normalizeTimeString = (value, fallback = '06:45') => {
+  const cleanValue = String(value || '').trim();
+  const match = /^(\d{1,2}):(\d{2})$/.exec(cleanValue);
+
+  if (!match) {
+    return fallback;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return fallback;
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+const timeToMinutes = (value) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || '').trim());
+  if (!match) {
+    return Number.NaN;
+  }
+
+  return Number(match[1]) * 60 + Number(match[2]);
+};
+
+const normalizeStoreOperationDay = (day = {}, fallback = {}) => {
+  const defaultDay = {
+    enabled: true,
+    open: '06:45',
+    close: '17:15',
+    ...(fallback || {}),
+  };
+  const open = normalizeTimeString(day.open, defaultDay.open);
+  const close = normalizeTimeString(day.close, defaultDay.close);
+
+  return {
+    enabled: day.enabled !== undefined ? day.enabled !== false : defaultDay.enabled !== false,
+    open,
+    close,
+  };
+};
+
+export const normalizeStoreOperationHours = (hours = {}, fallback = {}) =>
+  STORE_OPERATION_DAY_ORDER.reduce((accumulator, dayKey) => {
+    accumulator[dayKey] = normalizeStoreOperationDay(
+      hours?.[dayKey],
+      fallback?.[dayKey] ?? DEFAULT_STORE_OPERATION_HOURS[dayKey]
+    );
+    return accumulator;
+  }, {});
+
+export const formatStoreOperationTime = (value) => {
+  const normalized = normalizeTimeString(value, '');
+  if (!normalized) {
+    return '';
+  }
+
+  const [hoursText, minutesText] = normalized.split(':');
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  const suffix = hours >= 12 ? 'p.m.' : 'a.m.';
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, '0')} ${suffix}`;
+};
+
+const formatStoreDayRange = (dayStart, dayEnd) => {
+  const startLabel = STORE_OPERATION_DAY_LABELS[dayStart] || dayStart;
+  const endLabel = STORE_OPERATION_DAY_LABELS[dayEnd] || dayEnd;
+
+  if (dayStart === dayEnd) {
+    return startLabel;
+  }
+
+  return `${startLabel} a ${endLabel}`;
+};
+
+export const buildStoreOperationScheduleSummary = (settings = DEFAULT_STORE_DELIVERY_SETTINGS) => {
+  const operationHours = normalizeStoreOperationHours(
+    settings?.operationHours,
+    DEFAULT_STORE_OPERATION_HOURS
+  );
+  const groups = [];
+  let currentGroup = null;
+
+  STORE_OPERATION_DAY_ORDER.forEach((dayKey) => {
+    const day = operationHours[dayKey];
+    const signature = `${day.enabled ? 1 : 0}|${day.open}|${day.close}`;
+
+    if (!currentGroup || currentGroup.signature !== signature) {
+      if (currentGroup) {
+        groups.push(currentGroup);
+      }
+
+      currentGroup = {
+        signature,
+        dayStart: dayKey,
+        dayEnd: dayKey,
+        ...day,
+      };
+      return;
+    }
+
+    currentGroup.dayEnd = dayKey;
+  });
+
+  if (currentGroup) {
+    groups.push(currentGroup);
+  }
+
+  return groups
+    .map((group) => {
+      const dayLabel = formatStoreDayRange(group.dayStart, group.dayEnd);
+      if (group.enabled === false) {
+        return `${dayLabel} Cerrado`;
+      }
+
+      return `${dayLabel} ${formatStoreOperationTime(group.open)} - ${formatStoreOperationTime(group.close)}`;
+    })
+    .join(' | ');
+};
+
+export const validateStoreOperationHours = (settings = DEFAULT_STORE_DELIVERY_SETTINGS) => {
+  const operationHours = normalizeStoreOperationHours(
+    settings?.operationHours,
+    DEFAULT_STORE_OPERATION_HOURS
+  );
+
+  for (const dayKey of STORE_OPERATION_DAY_ORDER) {
+    const day = operationHours[dayKey];
+    if (day.enabled === false) {
+      continue;
+    }
+
+    const openMinutes = timeToMinutes(day.open);
+    const closeMinutes = timeToMinutes(day.close);
+    if (!Number.isFinite(openMinutes) || !Number.isFinite(closeMinutes) || closeMinutes <= openMinutes) {
+      return `Revisa el horario de ${STORE_OPERATION_DAY_LABELS[dayKey] || dayKey}. La hora de cierre debe ser mayor que la apertura.`;
+    }
+  }
+
+  return '';
+};
+
+const getDayKeyFromDate = (date = new Date()) => {
+  const baseDate = date instanceof Date ? date : new Date(date);
+  const dayIndex = Number.isNaN(baseDate.getTime()) ? new Date().getDay() : baseDate.getDay();
+
+  switch (dayIndex) {
+    case 0:
+      return 'sunday';
+    case 1:
+      return 'monday';
+    case 2:
+      return 'tuesday';
+    case 3:
+      return 'wednesday';
+    case 4:
+      return 'thursday';
+    case 5:
+      return 'friday';
+    case 6:
+      return 'saturday';
+    default:
+      return 'monday';
+  }
+};
+
+export const buildStoreOperationClosedMessage = (
+  settings = DEFAULT_STORE_DELIVERY_SETTINGS,
+  now = new Date()
+) => {
+  const summary = buildStoreOperationScheduleSummary(settings);
+  const currentDayKey = getDayKeyFromDate(now);
+  const currentDayLabel = STORE_OPERATION_DAY_LABELS[currentDayKey] || 'Hoy';
+  return `Tienda se encuentra cerrada. Horario de atencion: ${summary}. (${currentDayLabel})`;
+};
+
+export const getStoreOperationStatus = (
+  settings = DEFAULT_STORE_DELIVERY_SETTINGS,
+  now = new Date()
+) => {
+  const normalizedSettings = normalizeStoreDeliverySettings(settings);
+  const currentDate = now instanceof Date ? now : new Date(now);
+  const currentDayKey = getDayKeyFromDate(currentDate);
+  const currentSchedule =
+    normalizedSettings.operationHours?.[currentDayKey] || DEFAULT_STORE_OPERATION_HOURS[currentDayKey];
+  const currentMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
+  const openMinutes = timeToMinutes(currentSchedule.open);
+  const closeMinutes = timeToMinutes(currentSchedule.close);
+  const isOpen =
+    currentSchedule.enabled !== false &&
+    Number.isFinite(openMinutes) &&
+    Number.isFinite(closeMinutes) &&
+    currentMinutes >= openMinutes &&
+    currentMinutes <= closeMinutes;
+
+  return {
+    open: isOpen,
+    dayKey: currentDayKey,
+    dayLabel: STORE_OPERATION_DAY_LABELS[currentDayKey] || currentDayKey,
+    schedule: currentSchedule,
+    summary: buildStoreOperationScheduleSummary(normalizedSettings),
+    statusLabel: isOpen ? 'Abierta' : 'Cerrada',
+    message: isOpen
+      ? `Abierta hoy hasta ${formatStoreOperationTime(currentSchedule.close)}.`
+      : buildStoreOperationClosedMessage(normalizedSettings, currentDate),
+  };
 };
 
 export const normalizeStoreDeliveryFees = (fees = {}, fallback = {}) => {
@@ -83,6 +321,10 @@ export const normalizeStoreDeliverySettings = (settings = {}, fallback = {}) => 
       normalizeLocation(backup.storeLocation) ||
       DEFAULT_STORE_DELIVERY_SETTINGS.storeLocation,
     fees: normalizeStoreDeliveryFees(source.fees, backup.fees),
+    operationHours: normalizeStoreOperationHours(
+      source.operationHours,
+      backup.operationHours ?? DEFAULT_STORE_DELIVERY_SETTINGS.operationHours
+    ),
     updatedAt: Number(source.updatedAt ?? backup.updatedAt ?? 0) || 0,
   };
 };

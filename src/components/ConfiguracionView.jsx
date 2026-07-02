@@ -1,5 +1,5 @@
 import React, { startTransition, useEffect, useMemo, useState } from 'react';
-import { onValue, ref } from 'firebase/database';
+import { onValue, orderByChild, query, ref, startAt } from 'firebase/database';
 import { database } from '../firebase';
 import {
   applySicarPriceUpdatesWithOptions,
@@ -47,11 +47,16 @@ import {
 } from '../services/storePromotions';
 import {
   DEFAULT_STORE_DELIVERY_SETTINGS,
+  buildStoreOperationScheduleSummary,
   getStoreDeliveryFeeRows,
+  getStoreOperationStatus,
   normalizeStoreDeliverySettings,
   saveStoreDeliverySettings,
   STORE_DELIVERY_FEE_BRACKETS,
+  STORE_OPERATION_DAY_LABELS,
+  STORE_OPERATION_DAY_ORDER,
   subscribeStoreDeliverySettings,
+  validateStoreOperationHours,
 } from '../services/storeDeliverySettings';
 import {
   STORE_USERS_PATH,
@@ -72,7 +77,8 @@ import {
   saveKitchenUser,
   SYSTEM_USERS_PATH,
 } from '../services/systemUsers';
-import { cleanupExpiredStoreOrders } from '../services/orders';
+import { cleanupExpiredStoreOrders, formatOrderNumber, STORE_CHANNEL } from '../services/orders';
+import { getOrderHistoryRetentionStartDate, sortOrdersByDateAndNumberDesc } from '../services/orderArchive';
 import {
   compressImportedCatalogImage,
   fetchSicarCatalogSelection,
@@ -219,6 +225,20 @@ const formatAdminDateTime = (value) => {
     timeStyle: 'short',
   }).format(parsed);
 };
+
+const formatCurrencyAmount = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+
+const normalizeAdminStatusText = (value = '') =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const isDeliveredAdminOrder = (status = '') => normalizeAdminStatusText(status).includes('entregado');
+const isCanceledAdminOrder = (status = '') =>
+  normalizeAdminStatusText(status).includes('cancel') ||
+  normalizeAdminStatusText(status).includes('anulad');
 
 const toDateTimeInputValue = (value) => {
   if (!value) {
@@ -444,6 +464,8 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [deliverySettings, setDeliverySettings] = useState(() =>
     normalizeStoreDeliverySettings(DEFAULT_STORE_DELIVERY_SETTINGS)
   );
+  const [storeOrders, setStoreOrders] = useState([]);
+  const [storeOrdersLoading, setStoreOrdersLoading] = useState(false);
   const [couponsUnlocked, setCouponsUnlocked] = useState(false);
   const [couponPin, setCouponPin] = useState('');
   const [passwordForms, setPasswordForms] = useState({});
@@ -572,6 +594,39 @@ export default function ConfiguracionView({ mode = 'users' }) {
       },
       (error) => {
         console.error('No se pudo cargar la configuracion de entrega:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isStoreMode, section]);
+
+  useEffect(() => {
+    if (!isStoreMode || section !== 'pedidos') {
+      return undefined;
+    }
+
+    setStoreOrdersLoading(true);
+    const retentionStartDate = getOrderHistoryRetentionStartDate(new Date());
+    const ordersQuery = query(ref(database, 'orders'), orderByChild('fecha'), startAt(retentionStartDate));
+
+    const unsubscribe = onValue(
+      ordersQuery,
+      (snapshot) => {
+        const nextOrders = Object.entries(snapshot.val() || {})
+          .map(([firebaseKey, value]) => ({
+            firebaseKey,
+            ...value,
+          }))
+          .filter((order) => order.canal === STORE_CHANNEL);
+
+        startTransition(() => {
+          setStoreOrders(sortOrdersByDateAndNumberDesc(nextOrders));
+          setStoreOrdersLoading(false);
+        });
+      },
+      (error) => {
+        console.error('No se pudieron cargar los pedidos de tienda virtual:', error);
+        setStoreOrdersLoading(false);
       }
     );
 
@@ -1605,12 +1660,12 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
   const saveDeliveryConfig = async (nextSettings) => {
     setSavingDeliverySettings(true);
-    setMessage('Guardando cobertura y tarifas de entrega...');
+    setMessage('Guardando cobertura, tarifas y horario de entrega...');
 
     try {
       const savedSettings = await saveStoreDeliverySettings(nextSettings);
       setDeliverySettings(savedSettings);
-      setMessage('Configuracion de entrega guardada. La tienda ya usara este radio y estas tarifas.');
+      setMessage('Configuracion de entrega guardada. La tienda ya usara este radio, estas tarifas y el nuevo horario.');
     } catch (error) {
       console.error('Error guardando configuracion de entrega:', error);
       setMessage('No se pudo guardar la configuracion de entrega.');
@@ -1640,6 +1695,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
         entrega: {
           path: 'Admintv / Tienda Virtual / Entrega',
           title: 'Entrega y cobertura',
+        },
+        pedidos: {
+          path: 'Admintv / Tienda Virtual / Pedidos',
+          title: 'Pedidos de tienda virtual',
         },
         promociones: {
           path: 'Admintv / Tienda Virtual / Historias',
@@ -1958,6 +2017,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('entrega')}
             >
               Entrega
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'pedidos' ? 'active' : ''}`}
+              onClick={() => setSection('pedidos')}
+            >
+              Pedidos
             </button>
             <button
               type="button"
@@ -2407,6 +2473,8 @@ export default function ConfiguracionView({ mode = 'users' }) {
             saving={savingDeliverySettings}
             onSave={saveDeliveryConfig}
           />
+        ) : isStoreMode && section === 'pedidos' ? (
+          <StoreOrdersAdminSection orders={storeOrders} loading={storeOrdersLoading} />
         ) : isStoreMode && section === 'promociones' ? (
           <PromotionsManager
             promotions={promotions}
@@ -3172,6 +3240,8 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
   const [locating, setLocating] = useState(false);
   const storeLocation = normalizeLocation(draft.storeLocation);
   const feeRows = useMemo(() => getStoreDeliveryFeeRows(draft), [draft]);
+  const operationStatus = useMemo(() => getStoreOperationStatus(draft), [draft]);
+  const scheduleSummary = useMemo(() => buildStoreOperationScheduleSummary(draft), [draft]);
   const mapUrl = buildGoogleMapsPlaceUrl(storeLocation);
   const embedUrl = buildGoogleMapsEmbedUrl(storeLocation);
 
@@ -3242,6 +3312,19 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
     }));
   };
 
+  const updateOperationDay = (dayKey, field, value) => {
+    setDraft((current) => ({
+      ...current,
+      operationHours: {
+        ...(current.operationHours || {}),
+        [dayKey]: {
+          ...(current.operationHours?.[dayKey] || {}),
+          [field]: field === 'enabled' ? value === true : value,
+        },
+      },
+    }));
+  };
+
   const useCurrentLocation = async () => {
     setLocating(true);
 
@@ -3266,9 +3349,15 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
   const handleSubmit = (event) => {
     event.preventDefault();
     const normalized = normalizeStoreDeliverySettings(draft, DEFAULT_STORE_DELIVERY_SETTINGS);
+    const scheduleError = validateStoreOperationHours(normalized);
 
     if (!normalizeLocation(normalized.storeLocation)) {
       alert('Debes guardar una ubicacion valida para la tienda.');
+      return;
+    }
+
+    if (scheduleError) {
+      alert(scheduleError);
       return;
     }
 
@@ -3287,6 +3376,9 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span className="cfg-badge">Radio actual: {Number(draft.coverageRadiusKm || 0).toFixed(1)} km</span>
           <span className="cfg-badge">IVA envio: {Number(draft.taxRate || 0).toFixed(0)}%</span>
+          <span className={`cfg-badge ${operationStatus.open ? '' : 'off'}`}>
+            Horario: {operationStatus.statusLabel}
+          </span>
         </div>
       </div>
 
@@ -3476,6 +3568,95 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
               gap: 12,
             }}
           >
+            <div>
+              <strong style={{ fontSize: 18 }}>Horario de operaciones</strong>
+              <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700, lineHeight: 1.5 }}>
+                Si la tienda esta cerrada, la tienda virtual no permitira enviar pedidos y mostrara el horario de atencion.
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: '1px solid #dbe3ef',
+                borderRadius: 12,
+                padding: 12,
+                background: operationStatus.open ? '#ecfdf5' : '#fff7ed',
+                color: operationStatus.open ? '#047857' : '#9a3412',
+                fontWeight: 800,
+                lineHeight: 1.5,
+              }}
+            >
+              {operationStatus.message}
+              <br />
+              <span style={{ fontWeight: 700, color: '#475569' }}>{scheduleSummary}</span>
+            </div>
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              {STORE_OPERATION_DAY_ORDER.map((dayKey) => {
+                const dayConfig = draft.operationHours?.[dayKey] || {};
+                return (
+                  <div
+                    key={dayKey}
+                    style={{
+                      border: '1px solid #edf2f7',
+                      borderRadius: 12,
+                      padding: 12,
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1fr) repeat(2, minmax(110px, 140px))',
+                      gap: 10,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        fontWeight: 900,
+                        color: '#0f172a',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={dayConfig.enabled !== false}
+                        onChange={(event) => updateOperationDay(dayKey, 'enabled', event.target.checked)}
+                      />
+                      {STORE_OPERATION_DAY_LABELS[dayKey] || dayKey}
+                    </label>
+                    <input
+                      className="cfg-input"
+                      type="time"
+                      value={dayConfig.open || '06:45'}
+                      onChange={(event) => updateOperationDay(dayKey, 'open', event.target.value)}
+                      disabled={dayConfig.enabled === false}
+                    />
+                    <input
+                      className="cfg-input"
+                      type="time"
+                      value={dayConfig.close || '17:15'}
+                      onChange={(event) => updateOperationDay(dayKey, 'close', event.target.value)}
+                      disabled={dayConfig.enabled === false}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
+              Resumen publico: {scheduleSummary}
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              padding: 14,
+              background: '#ffffff',
+              display: 'grid',
+              gap: 12,
+            }}
+          >
             <strong style={{ fontSize: 18 }}>Tarifas por distancia</strong>
             <div style={{ display: 'grid', gap: 10 }}>
               {STORE_DELIVERY_FEE_BRACKETS.map((bracket, index) => {
@@ -3529,6 +3710,468 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function StoreOrdersAdminSection({ orders, loading }) {
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [selectedOrderKey, setSelectedOrderKey] = useState('');
+
+  const summary = useMemo(() => {
+    const allOrders = Array.isArray(orders) ? orders : [];
+    return {
+      total: allOrders.length,
+      abiertos: allOrders.filter((order) => !isDeliveredAdminOrder(order.estado) && !isCanceledAdminOrder(order.estado)).length,
+      entregados: allOrders.filter((order) => isDeliveredAdminOrder(order.estado)).length,
+      pickup: allOrders.filter((order) => String(order.fulfillmentType || '').trim().toLowerCase() === 'pickup').length,
+      conCupon: allOrders.filter((order) => String(order?.cupon?.code || '').trim()).length,
+    };
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    const queryText = search.trim().toLowerCase();
+
+    return (Array.isArray(orders) ? orders : []).filter((order) => {
+      if (filter === 'abiertos' && (isDeliveredAdminOrder(order.estado) || isCanceledAdminOrder(order.estado))) {
+        return false;
+      }
+
+      if (filter === 'entregados' && !isDeliveredAdminOrder(order.estado)) {
+        return false;
+      }
+
+      if (filter === 'pickup' && String(order.fulfillmentType || '').trim().toLowerCase() !== 'pickup') {
+        return false;
+      }
+
+      if (filter === 'cupon' && !String(order?.cupon?.code || '').trim()) {
+        return false;
+      }
+
+      if (!queryText) {
+        return true;
+      }
+
+      return [
+        order.id,
+        order.cliente,
+        order.telefono,
+        order.direccion,
+        order.estado,
+        order.cupon?.code,
+        order.rewardRedemption?.rewardName,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(queryText);
+    });
+  }, [filter, orders, search]);
+
+  useEffect(() => {
+    if (!selectedOrderKey) {
+      return;
+    }
+
+    const exists = (Array.isArray(orders) ? orders : []).some((order) => order.firebaseKey === selectedOrderKey);
+    if (!exists) {
+      setSelectedOrderKey('');
+    }
+  }, [orders, selectedOrderKey]);
+
+  const selectedOrder = useMemo(
+    () => (Array.isArray(orders) ? orders : []).find((order) => order.firebaseKey === selectedOrderKey) || null,
+    [orders, selectedOrderKey]
+  );
+
+  const buildStatusBadgeStyle = (status) => {
+    if (isCanceledAdminOrder(status)) {
+      return { background: '#fee2e2', color: '#b91c1c' };
+    }
+
+    if (isDeliveredAdminOrder(status)) {
+      return { background: '#dcfce7', color: '#166534' };
+    }
+
+    if (normalizeAdminStatusText(status).includes('camino') || normalizeAdminStatusText(status).includes('ruta')) {
+      return { background: '#dbeafe', color: '#1d4ed8' };
+    }
+
+    return { background: '#fef3c7', color: '#92400e' };
+  };
+
+  const getQuoteLabel = (order) => {
+    if (order?.sicarQuote?.cotId) {
+      return `Cotizacion SICAR #${order.sicarQuote.cotId}`;
+    }
+
+    if (order?.sicarQuote?.status === 'error') {
+      return 'Cotizacion con error';
+    }
+
+    if (order?.sicarQuote?.status === 'done') {
+      return 'Cotizacion sincronizada';
+    }
+
+    return 'Cotizacion en cola';
+  };
+
+  return (
+    <section className="cfg-section-card" style={{ display: 'grid', gap: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22 }}>Pedidos de tienda virtual</h2>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+            Monitorea pedidos en linea, cupones aplicados, recompensas canjeadas y el avance hacia SICAR.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span className="cfg-badge">Total: {summary.total}</span>
+          <span className="cfg-badge">Abiertos: {summary.abiertos}</span>
+          <span className="cfg-badge">Entregados: {summary.entregados}</span>
+          <span className="cfg-badge">Pickup: {summary.pickup}</span>
+          <span className="cfg-badge">Cupon: {summary.conCupon}</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          className="cfg-input"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Buscar por numero, cliente, telefono, cupon o premio"
+          style={{ maxWidth: 420 }}
+        />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {[
+            { key: 'all', label: 'Todos' },
+            { key: 'abiertos', label: 'Abiertos' },
+            { key: 'entregados', label: 'Entregados' },
+            { key: 'pickup', label: 'Pickup' },
+            { key: 'cupon', label: 'Con cupon' },
+          ].map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={`cfg-tab ${filter === option.key ? 'active' : ''}`}
+              onClick={() => setFilter(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div
+          style={{
+            padding: 26,
+            borderRadius: 14,
+            border: '1px dashed #cbd5e1',
+            color: '#64748b',
+            fontWeight: 800,
+            textAlign: 'center',
+          }}
+        >
+          Cargando pedidos de tienda virtual...
+        </div>
+      ) : filteredOrders.length === 0 ? (
+        <div
+          style={{
+            padding: 26,
+            borderRadius: 14,
+            border: '1px dashed #cbd5e1',
+            color: '#64748b',
+            fontWeight: 800,
+            textAlign: 'center',
+          }}
+        >
+          No encontramos pedidos de tienda virtual con esos filtros.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {filteredOrders.map((order) => {
+            const statusStyle = buildStatusBadgeStyle(order.estado);
+            const hasCoupon = Boolean(String(order?.cupon?.code || '').trim());
+            const hasReward = Boolean(String(order?.rewardRedemption?.rewardName || '').trim());
+
+            return (
+              <article
+                key={order.firebaseKey}
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 18,
+                  padding: 16,
+                  background: '#fff',
+                  display: 'grid',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <strong style={{ fontSize: 18 }}>Pedido #{formatOrderNumber(order.id)}</strong>
+                    <div style={{ color: '#64748b', fontWeight: 700, marginTop: 4 }}>
+                      {order.cliente || 'Cliente sin nombre'} | {order.telefono || 'Sin telefono'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        borderRadius: 999,
+                        padding: '6px 10px',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        ...statusStyle,
+                      }}
+                    >
+                      {order.estado || 'Pendiente'}
+                    </span>
+                    <span className="cfg-badge">{order.fulfillmentLabel || 'Delivery'}</span>
+                    <span className={`cfg-badge ${order?.sicarQuote?.status === 'error' ? 'off' : ''}`}>
+                      {getQuoteLabel(order)}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: 10,
+                  }}
+                >
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                      Fecha
+                    </div>
+                    <div style={{ fontWeight: 800 }}>{formatAdminDateTime(order.timestampIngresoMs || order.timestamp)}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                      Total
+                    </div>
+                    <div style={{ fontWeight: 800 }}>{formatCurrencyAmount(order.total)}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                      Pago
+                    </div>
+                    <div style={{ fontWeight: 800 }}>{order.metodoPago || 'Sin definir'}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                      Envio
+                    </div>
+                    <div style={{ fontWeight: 800 }}>{formatCurrencyAmount(order.deliveryFee)}</div>
+                  </div>
+                </div>
+
+                <div style={{ color: '#475569', fontWeight: 700, lineHeight: 1.5 }}>
+                  {order.direccion || 'Sin direccion'}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {hasCoupon && <span className="cfg-badge">Cupon {order.cupon.code}</span>}
+                  {hasReward && <span className="cfg-badge">Premio {order.rewardRedemption.rewardName}</span>}
+                  {Number(order.descuentoCupon || 0) > 0 && (
+                    <span className="cfg-badge">Descuento {formatCurrencyAmount(order.descuentoCupon)}</span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+                  <button type="button" className="cfg-button secondary" onClick={() => setSelectedOrderKey(order.firebaseKey)}>
+                    Ver detalle
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {selectedOrder && (
+        <div
+          className="cfg-driver-modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedOrderKey('');
+            }
+          }}
+        >
+          <div
+            className="cfg-driver-modal"
+            style={{ width: 'min(920px, 100%)', display: 'grid', gap: 18 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+                  Pedido tienda virtual
+                </div>
+                <h2 style={{ margin: '6px 0 0', fontSize: 30 }}>
+                  #{formatOrderNumber(selectedOrder.id)} | {selectedOrder.cliente}
+                </h2>
+              </div>
+              <button type="button" className="cfg-button secondary" onClick={() => setSelectedOrderKey('')}>
+                Cerrar
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 12,
+              }}
+            >
+              {[
+                ['Estado', selectedOrder.estado || 'Pendiente'],
+                ['Tipo entrega', selectedOrder.fulfillmentLabel || 'Delivery'],
+                ['Metodo pago', selectedOrder.metodoPago || 'Sin definir'],
+                ['Fecha ingreso', formatAdminDateTime(selectedOrder.timestampIngresoMs || selectedOrder.timestamp)],
+                ['Subtotal', formatCurrencyAmount(selectedOrder.subtotalEstimado)],
+                ['Descuento cupon', formatCurrencyAmount(selectedOrder.descuentoCupon)],
+                ['Envio', formatCurrencyAmount(selectedOrder.deliveryFee)],
+                ['Total', formatCurrencyAmount(selectedOrder.total)],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    padding: 12,
+                    background: '#f8fafc',
+                  }}
+                >
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>
+                    {label}
+                  </div>
+                  <div style={{ marginTop: 6, fontWeight: 900 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: 14,
+              }}
+            >
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: 14,
+                  background: '#ffffff',
+                  display: 'grid',
+                  gap: 10,
+                }}
+              >
+                <strong style={{ fontSize: 18 }}>Cliente y entrega</strong>
+                <div style={{ color: '#334155', fontWeight: 700, lineHeight: 1.55 }}>
+                  <strong>{selectedOrder.cliente}</strong>
+                  <br />
+                  Codigo cliente: {selectedOrder.clienteCodigo || '-'}
+                  <br />
+                  Telefono: {selectedOrder.telefono || '-'}
+                  <br />
+                  Direccion: {selectedOrder.direccion || '-'}
+                  <br />
+                  Referencia: {selectedOrder.referencia || '-'}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: 14,
+                  background: '#ffffff',
+                  display: 'grid',
+                  gap: 10,
+                }}
+              >
+                <strong style={{ fontSize: 18 }}>Promociones y SICAR</strong>
+                <div style={{ color: '#334155', fontWeight: 700, lineHeight: 1.55 }}>
+                  Cupon: {selectedOrder?.cupon?.code || 'Sin cupon'}
+                  <br />
+                  Premio: {selectedOrder?.rewardRedemption?.rewardName || 'Sin premio'}
+                  <br />
+                  Cotizacion: {getQuoteLabel(selectedOrder)}
+                  <br />
+                  Estado puntos: {selectedOrder?.rewardPoints?.status || 'Sin movimiento'}
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 14,
+                padding: 14,
+                background: '#ffffff',
+                display: 'grid',
+                gap: 12,
+              }}
+            >
+              <strong style={{ fontSize: 18 }}>Detalle del pedido</strong>
+              {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 ? (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {selectedOrder.items.map((item, index) => (
+                    <div
+                      key={`${selectedOrder.firebaseKey}-item-${item.codigo || item.nombre}-${index}`}
+                      style={{
+                        border: '1px solid #edf2f7',
+                        borderRadius: 12,
+                        padding: 12,
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1fr) auto',
+                        gap: 10,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <strong>{item.nombre}</strong>
+                        <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
+                          {item.codigo || '-'} | {Number(item.cantidad || 0)} {item.unidad || 'lb'}
+                        </div>
+                        {item.descripcion && (
+                          <div style={{ color: '#94a3b8', marginTop: 4, fontSize: 13 }}>{item.descripcion}</div>
+                        )}
+                      </div>
+                      <strong>{formatCurrencyAmount(item.subtotal)}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: '#64748b', fontWeight: 800 }}>Este pedido no trae items estructurados.</div>
+              )}
+            </div>
+
+            {selectedOrder.observaciones && (
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: 14,
+                  background: '#ffffff',
+                  display: 'grid',
+                  gap: 10,
+                }}
+              >
+                <strong style={{ fontSize: 18 }}>Notas del cliente</strong>
+                <div style={{ color: '#334155', fontWeight: 700, whiteSpace: 'pre-wrap' }}>
+                  {selectedOrder.observaciones}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
