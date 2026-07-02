@@ -115,6 +115,7 @@ const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
 const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_SESSION_KEY = 'sanmartin_store_user';
+const STORE_ORDER_UPDATE_ACK_KEY = 'sanmartin_store_order_update_ack';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const ORDER_PROGRESS_STEPS = [
   { key: 'preparando', label: 'Preparando', icon: 'prep' },
@@ -832,6 +833,103 @@ const buildOrderWhatsAppLink = (order, currentUser) =>
     buildOrderWhatsAppMessage(order, currentUser)
   )}`;
 
+const readStoreOrderUpdateAcknowledgements = () => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(STORE_ORDER_UPDATE_ACK_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (error) {
+    console.error('No se pudieron leer las aceptaciones de actualizacion del pedido:', error);
+    return {};
+  }
+};
+
+const writeStoreOrderUpdateAcknowledgements = (acknowledgements = {}) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      STORE_ORDER_UPDATE_ACK_KEY,
+      JSON.stringify(acknowledgements && typeof acknowledgements === 'object' ? acknowledgements : {})
+    );
+  } catch (error) {
+    console.error('No se pudieron guardar las aceptaciones de actualizacion del pedido:', error);
+  }
+};
+
+const getStoreOrderUpdateRevision = (order = {}) => {
+  const explicitRevision = String(
+    order?.sicarQuote?.lastAppliedAt ||
+      order?.totalActualizadoAt ||
+      ''
+  ).trim();
+
+  if (explicitRevision) {
+    return explicitRevision;
+  }
+
+  if (order?.totalAproximado === false) {
+    return JSON.stringify({
+      total: Number(order?.total || 0).toFixed(2),
+      subtotal: Number(order?.subtotalEstimado || 0).toFixed(2),
+      items: (Array.isArray(order?.items) ? order.items : []).map((item) => ({
+        code: String(item?.codigo || item?.nombre || '').trim(),
+        qty: Number(item?.cantidad || 0).toFixed(2),
+        subtotal: Number(item?.subtotal || 0).toFixed(2),
+      })),
+    });
+  }
+
+  return '';
+};
+
+const buildStoreOrderUpdateAckKey = (order = {}) =>
+  String(order?.firebaseKey || order?.id || '').trim();
+
+const hasPendingStoreOrderUpdateReview = (order = {}, acknowledgements = {}) => {
+  if (!order || order.totalAproximado !== false || isFinalCustomerOrder(order)) {
+    return false;
+  }
+
+  const revision = getStoreOrderUpdateRevision(order);
+  const ackKey = buildStoreOrderUpdateAckKey(order);
+  if (!revision || !ackKey) {
+    return false;
+  }
+
+  return String(acknowledgements?.[ackKey] || '').trim() !== revision;
+};
+
+const buildOrderUpdateReviewWhatsAppMessage = (order = {}, currentUser = {}) => {
+  const orderNumber = formatOrderNumber(order.id);
+  const customerName = currentUser?.nombre || order.cliente || 'Cliente';
+  const lines = [
+    'Hola Carnes San Martin Granada.',
+    `No acepto el cambio del pedido #${orderNumber}.`,
+    `Cliente: ${customerName}`,
+    '',
+    'Detalle actualizado recibido:',
+    buildOrderItemsMessage(order),
+    '',
+    `Total actualizado: ${formatCurrency(order.total)}`,
+    '',
+    'Necesito revisar este pedido, por favor.',
+  ];
+
+  return lines.filter(Boolean).join('\n');
+};
+
+const buildOrderUpdateReviewWhatsAppLink = (order = {}, currentUser = {}) =>
+  `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+    buildOrderUpdateReviewWhatsAppMessage(order, currentUser)
+  )}`;
+
 export default function TiendaVirtualView({
   onCreateOrder,
   mode = 'public',
@@ -887,6 +985,10 @@ export default function TiendaVirtualView({
   const [isPhoneLayout, setIsPhoneLayout] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= STORE_MOBILE_NAV_BREAKPOINT : false
   );
+  const [acceptedOrderUpdateRevisions, setAcceptedOrderUpdateRevisions] = useState(() =>
+    readStoreOrderUpdateAcknowledgements()
+  );
+  const [dismissedOrderUpdateRevision, setDismissedOrderUpdateRevision] = useState('');
   const [currentUser, setCurrentUser] = useState(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -1596,8 +1698,53 @@ export default function TiendaVirtualView({
     () => resolveActiveStoreCustomerOrder(customerOrders, createdOrder),
     [createdOrder, customerOrders]
   );
+  const activeCustomerOrderUpdateRevision = useMemo(
+    () => getStoreOrderUpdateRevision(activeCustomerOrder),
+    [activeCustomerOrder]
+  );
+  const pendingOrderUpdateReview = useMemo(() => {
+    if (
+      !activeCustomerOrder ||
+      !hasPendingStoreOrderUpdateReview(activeCustomerOrder, acceptedOrderUpdateRevisions)
+    ) {
+      return null;
+    }
+
+    if (
+      dismissedOrderUpdateRevision &&
+      dismissedOrderUpdateRevision === activeCustomerOrderUpdateRevision
+    ) {
+      return null;
+    }
+
+    return activeCustomerOrder;
+  }, [
+    acceptedOrderUpdateRevisions,
+    activeCustomerOrder,
+    activeCustomerOrderUpdateRevision,
+    dismissedOrderUpdateRevision,
+  ]);
 
   const hasTrackedOrder = Boolean(activeCustomerOrder);
+
+  useEffect(() => {
+    if (!pendingOrderUpdateReview) {
+      return;
+    }
+
+    setOrdersOpen(true);
+  }, [pendingOrderUpdateReview]);
+
+  useEffect(() => {
+    if (!activeCustomerOrderUpdateRevision) {
+      setDismissedOrderUpdateRevision('');
+      return;
+    }
+
+    if (dismissedOrderUpdateRevision && dismissedOrderUpdateRevision !== activeCustomerOrderUpdateRevision) {
+      setDismissedOrderUpdateRevision('');
+    }
+  }, [activeCustomerOrderUpdateRevision, dismissedOrderUpdateRevision]);
 
   const cartItems = useMemo(
     () =>
@@ -2580,6 +2727,39 @@ export default function TiendaVirtualView({
     setOrderSuccessOpen(false);
     if (createdOrder) {
       setOrdersOpen(true);
+    }
+  };
+
+  const acceptPendingOrderUpdate = () => {
+    if (!pendingOrderUpdateReview) {
+      return;
+    }
+
+    const ackKey = buildStoreOrderUpdateAckKey(pendingOrderUpdateReview);
+    const revision = getStoreOrderUpdateRevision(pendingOrderUpdateReview);
+    if (!ackKey || !revision) {
+      return;
+    }
+
+    setAcceptedOrderUpdateRevisions((current) => {
+      const next = {
+        ...(current || {}),
+        [ackKey]: revision,
+      };
+      writeStoreOrderUpdateAcknowledgements(next);
+      return next;
+    });
+    setDismissedOrderUpdateRevision('');
+  };
+
+  const handleRejectPendingOrderUpdate = () => {
+    if (!pendingOrderUpdateReview) {
+      return;
+    }
+
+    const revision = getStoreOrderUpdateRevision(pendingOrderUpdateReview);
+    if (revision) {
+      setDismissedOrderUpdateRevision(revision);
     }
   };
 
@@ -6343,6 +6523,15 @@ export default function TiendaVirtualView({
         />
       )}
 
+      {pendingOrderUpdateReview && (
+        <OrderUpdateReviewModal
+          order={pendingOrderUpdateReview}
+          currentUser={currentUser}
+          onAccept={acceptPendingOrderUpdate}
+          onReject={handleRejectPendingOrderUpdate}
+        />
+      )}
+
       {profileOpen && currentUser && (
         <ProfileSheet
           user={currentUser}
@@ -8582,6 +8771,175 @@ function OrderSuccessSheet({ onClose }) {
         <button type="button" className="store-button" onClick={onClose}>
           Ver estado del pedido
         </button>
+      </div>
+    </div>
+  );
+}
+
+function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
+  const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
+  const whatsappLink = buildOrderUpdateReviewWhatsAppLink(order, currentUser);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 96,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+        background: 'rgba(15, 23, 42, 0.54)',
+        backdropFilter: 'blur(7px)',
+      }}
+    >
+      <div
+        style={{
+          width: 'min(620px, 100%)',
+          maxHeight: 'min(84vh, 780px)',
+          overflowY: 'auto',
+          borderRadius: 28,
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          background: '#ffffff',
+          boxShadow: '0 32px 90px rgba(15, 23, 42, 0.28)',
+          padding: isPickupOrder(order) ? '22px 22px 20px' : '22px 22px 20px',
+          display: 'grid',
+          gap: 16,
+        }}
+      >
+        <div style={{ display: 'grid', gap: 6 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 52,
+              height: 52,
+              borderRadius: 18,
+              background: 'linear-gradient(135deg, rgba(15, 59, 130, 0.12) 0%, rgba(33, 102, 217, 0.2) 100%)',
+              color: '#0f3b82',
+              fontSize: 28,
+              fontWeight: 900,
+            }}
+          >
+            !
+          </div>
+          <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+            Pedido #{formatOrderNumber(order.id)}
+          </div>
+          <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.05, color: '#0f172a' }}>
+            Tu pedido ha sido actualizado
+          </h2>
+          <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.55 }}>
+            Revisa los pesos actualizados por SICAR antes de continuar con tu pedido.
+          </p>
+        </div>
+
+        <div
+          style={{
+            borderRadius: 20,
+            border: '1px solid rgba(15, 59, 130, 0.08)',
+            background: 'linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)',
+            padding: 16,
+            display: 'grid',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'grid', gap: 10 }}>
+            {(Array.isArray(order.items) ? order.items : []).map((item) => (
+              <div
+                key={`${order.firebaseKey || order.id}-updated-${item.codigo || item.nombre}`}
+                style={{
+                  borderRadius: 16,
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  padding: 12,
+                  display: 'grid',
+                  gap: 4,
+                }}
+              >
+                <strong style={{ color: '#0f172a' }}>
+                  {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
+                </strong>
+                {item.codigo && (
+                  <div style={{ color: '#64748b', fontSize: 13, fontWeight: 800 }}>
+                    {item.codigo}
+                  </div>
+                )}
+                {item.descripcion && (
+                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
+                    {item.descripcion}
+                  </div>
+                )}
+                <div style={{ color: '#0f3b82', fontSize: 13, fontWeight: 900 }}>
+                  {formatCurrency(item.subtotal)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              borderRadius: 18,
+              background: 'linear-gradient(135deg, #0f3b82 0%, #2166d9 100%)',
+              color: '#ffffff',
+              padding: 16,
+              display: 'grid',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 800 }}>
+              <span>Subtotal actualizado</span>
+              <span>{formatCurrency(order.subtotalEstimado)}</span>
+            </div>
+            {Number(order.descuentoCupon || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 800 }}>
+                <span>Descuento</span>
+                <span>-{formatCurrency(order.descuentoCupon)}</span>
+              </div>
+            )}
+            {Number(order.deliveryFee || 0) > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 800 }}>
+                <span>Servicio a domicilio</span>
+                <span>{formatCurrency(order.deliveryFee)}</span>
+              </div>
+            )}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 10,
+                paddingTop: 8,
+                borderTop: '1px solid rgba(255,255,255,0.2)',
+                fontSize: '1.03rem',
+                fontWeight: 900,
+              }}
+            >
+              <span>{totalLabel}</span>
+              <span>{formatCurrency(order.total)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 10 }}>
+          <button type="button" className="store-button" onClick={onAccept}>
+            ACEPTAR CAMBIO
+          </button>
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noreferrer"
+            className="store-button secondary"
+            onClick={onReject}
+            style={{
+              textDecoration: 'none',
+              textAlign: 'center',
+            }}
+          >
+            Si quieres rechazar cambio contactanos por WhatsApp
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -109,6 +109,12 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
+import {
+  buildDefaultStoreWelcomeCouponCampaign,
+  normalizeStoreWelcomeCouponCampaign,
+  saveStoreWelcomeCouponCampaign,
+  subscribeStoreWelcomeCouponCampaign,
+} from '../services/storeWelcomeCoupon';
 
 const COUPONS_PIN = '210397';
 
@@ -464,6 +470,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [deliverySettings, setDeliverySettings] = useState(() =>
     normalizeStoreDeliverySettings(DEFAULT_STORE_DELIVERY_SETTINGS)
   );
+  const [welcomeCouponCampaign, setWelcomeCouponCampaign] = useState(() =>
+    normalizeStoreWelcomeCouponCampaign(buildDefaultStoreWelcomeCouponCampaign())
+  );
   const [storeOrders, setStoreOrders] = useState([]);
   const [storeOrdersLoading, setStoreOrdersLoading] = useState(false);
   const [couponsUnlocked, setCouponsUnlocked] = useState(false);
@@ -476,6 +485,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [savingDriver, setSavingDriver] = useState(false);
   const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingDeliverySettings, setSavingDeliverySettings] = useState(false);
+  const [savingWelcomeCouponCampaign, setSavingWelcomeCouponCampaign] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [cleaningPromotions, setCleaningPromotions] = useState(false);
   const [syncingSicar, setSyncingSicar] = useState(false);
@@ -538,7 +548,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
       return undefined;
     }
 
-    const unsubscribe = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
+    const unsubscribeCoupons = onValue(ref(database, STORE_COUPONS_PATH), (snapshot) => {
       const remoteCoupons = snapshot.val() || {};
       writeStoreVersionedCache(
         STORE_COUPONS_CACHE_KEY,
@@ -550,7 +560,21 @@ export default function ConfiguracionView({ mode = 'users' }) {
       });
     });
 
-    return () => unsubscribe();
+    const unsubscribeWelcomeCampaign = subscribeStoreWelcomeCouponCampaign(
+      (campaign) => {
+        startTransition(() => {
+          setWelcomeCouponCampaign(campaign);
+        });
+      },
+      (error) => {
+        console.error('No se pudo cargar la campana del cupon de bienvenida:', error);
+      }
+    );
+
+    return () => {
+      unsubscribeCoupons();
+      unsubscribeWelcomeCampaign();
+    };
   }, [isStoreMode, section]);
 
   useEffect(() => {
@@ -1161,6 +1185,27 @@ export default function ConfiguracionView({ mode = 'users' }) {
       setMessage('No se pudo guardar el cupon. Revisa codigo y valor.');
     } finally {
       setSavingCoupon(false);
+    }
+  };
+
+  const saveWelcomeCouponCampaignConfig = async (campaignDraft) => {
+    setSavingWelcomeCouponCampaign(true);
+    setMessage('');
+
+    try {
+      const savedCampaign = await saveStoreWelcomeCouponCampaign({
+        ...welcomeCouponCampaign,
+        ...campaignDraft,
+        assignments: welcomeCouponCampaign.assignments || {},
+        assignedCount: Number(welcomeCouponCampaign.assignedCount || 0),
+      });
+      setWelcomeCouponCampaign(savedCampaign);
+      setMessage('Campana de bienvenida actualizada.');
+    } catch (error) {
+      console.error('No se pudo guardar la campana de bienvenida:', error);
+      setMessage('No se pudo guardar la campana de bienvenida.');
+    } finally {
+      setSavingWelcomeCouponCampaign(false);
     }
   };
 
@@ -2497,10 +2542,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
             couponPin={couponPin}
             couponForm={couponForm}
             savingCoupon={savingCoupon}
+            welcomeCouponCampaign={welcomeCouponCampaign}
+            savingWelcomeCouponCampaign={savingWelcomeCouponCampaign}
             setCouponPin={setCouponPin}
             unlockCoupons={unlockCoupons}
             updateCouponForm={updateCouponForm}
             saveCoupon={saveCoupon}
+            saveWelcomeCouponCampaignConfig={saveWelcomeCouponCampaignConfig}
             editCoupon={editCoupon}
             toggleCoupon={toggleCoupon}
             resetCouponForm={() => setCouponForm(emptyCoupon)}
@@ -4407,14 +4455,38 @@ function CouponsManager({
   couponPin,
   couponForm,
   savingCoupon,
+  welcomeCouponCampaign,
+  savingWelcomeCouponCampaign,
   setCouponPin,
   unlockCoupons,
   updateCouponForm,
   saveCoupon,
+  saveWelcomeCouponCampaignConfig,
   editCoupon,
   toggleCoupon,
   resetCouponForm,
 }) {
+  const [campaignDraft, setCampaignDraft] = useState(() => ({
+    limit: String(welcomeCouponCampaign?.limit || ''),
+    amount: String(welcomeCouponCampaign?.amount || ''),
+    minimumPurchase: String(welcomeCouponCampaign?.minimumPurchase || ''),
+    active: welcomeCouponCampaign?.active !== false,
+  }));
+
+  useEffect(() => {
+    setCampaignDraft({
+      limit: String(welcomeCouponCampaign?.limit || ''),
+      amount: String(welcomeCouponCampaign?.amount || ''),
+      minimumPurchase: String(welcomeCouponCampaign?.minimumPurchase || ''),
+      active: welcomeCouponCampaign?.active !== false,
+    });
+  }, [
+    welcomeCouponCampaign?.active,
+    welcomeCouponCampaign?.amount,
+    welcomeCouponCampaign?.limit,
+    welcomeCouponCampaign?.minimumPurchase,
+  ]);
+
   const formatCouponValue = (coupon) =>
     coupon.type === 'amount' ? `C$ ${Number(coupon.value || 0).toFixed(2)}` : `${Number(coupon.value || 0)}%`;
   const formatCouponUsageLimit = (coupon) => {
@@ -4424,6 +4496,29 @@ function CouponsManager({
     }
 
     return limit === 1 ? '1 uso por usuario' : `${limit} usos por usuario`;
+  };
+  const campaignAssignments = useMemo(
+    () =>
+      Object.entries(welcomeCouponCampaign?.assignments || {})
+        .map(([userKey, assignment]) => ({
+          userKey,
+          ...assignment,
+        }))
+        .sort((left, right) => Number(right.assignedAt || 0) - Number(left.assignedAt || 0)),
+    [welcomeCouponCampaign?.assignments]
+  );
+  const assignedCount = Math.max(0, Number(welcomeCouponCampaign?.assignedCount || 0));
+  const campaignLimit = Math.max(0, Number(welcomeCouponCampaign?.limit || 0));
+  const remainingCount = Math.max(0, campaignLimit - assignedCount);
+  const handleSaveCampaign = async (event) => {
+    event.preventDefault();
+    const nextLimit = Math.max(assignedCount, 1, Math.trunc(Number(campaignDraft.limit || 0)));
+    await saveWelcomeCouponCampaignConfig({
+      limit: nextLimit,
+      amount: Math.max(0, Number(campaignDraft.amount || 0)),
+      minimumPurchase: Math.max(0, Number(campaignDraft.minimumPurchase || 0)),
+      active: campaignDraft.active !== false,
+    });
   };
 
   if (!couponsUnlocked) {
@@ -4545,94 +4640,286 @@ function CouponsManager({
             ))}
           </div>
         )}
+
+        <div
+          style={{
+            marginTop: 18,
+            borderTop: '1px solid #e2e8f0',
+            paddingTop: 18,
+            display: 'grid',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 22 }}>Campana de bienvenida</h2>
+              <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+                Aqui controlas cuantos usuarios nuevos reciben el cupon automatico, cuantos ya se otorgaron y cuantos cupos siguen disponibles.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span className={`cfg-badge ${welcomeCouponCampaign?.active === false ? 'off' : ''}`}>
+                {welcomeCouponCampaign?.active === false ? 'Inactiva' : 'Activa'}
+              </span>
+              <span className="cfg-badge">Otorgados: {assignedCount}</span>
+              <span className={`cfg-badge ${remainingCount <= 0 ? 'off' : ''}`}>Faltan: {remainingCount}</span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 10,
+            }}
+          >
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Limite actual</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{campaignLimit}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Monto</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>C$ {Number(welcomeCouponCampaign?.amount || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Compra minima</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>C$ {Number(welcomeCouponCampaign?.minimumPurchase || 0).toFixed(2)}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Restantes</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{remainingCount}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <strong style={{ fontSize: 18 }}>Detalle de cupones otorgados</strong>
+            {campaignAssignments.length === 0 ? (
+              <div
+                style={{
+                  padding: 18,
+                  borderRadius: 12,
+                  border: '1px dashed #cbd5e1',
+                  color: '#64748b',
+                  fontWeight: 800,
+                  textAlign: 'center',
+                }}
+              >
+                Aun no se ha otorgado ningun cupon de bienvenida.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {campaignAssignments.map((assignment) => (
+                  <div
+                    key={`${assignment.userKey}-${assignment.slotNumber}`}
+                    style={{
+                      border: '1px solid #edf2f7',
+                      borderRadius: 12,
+                      padding: 12,
+                      display: 'grid',
+                      gridTemplateColumns: 'auto minmax(0, 1fr)',
+                      gap: 12,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 999,
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                      }}
+                    >
+                      {String(assignment.slotNumber || '').padStart(2, '0')}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 900, color: '#0f172a' }}>
+                        {assignment.customerName || 'Cliente sin nombre'} {assignment.phoneSuffix ? `| Tel. ${assignment.phoneSuffix}` : ''}
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
+                        {assignment.userKey}
+                        {assignment.assignedAt ? ` | ${formatAdminDateTime(assignment.assignedAt)}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
-      <form
-        onSubmit={saveCoupon}
-        style={{
-          background: '#fff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          padding: 16,
-          display: 'grid',
-          gap: 10,
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 22 }}>Cupon</h2>
-        <input
-          className="cfg-input"
-          value={couponForm.code}
-          onChange={(event) => updateCouponForm('code', event.target.value.toUpperCase())}
-          placeholder="Codigo. Ej: GRANADA10"
-        />
-        <input
-          className="cfg-input"
-          value={couponForm.title}
-          onChange={(event) => updateCouponForm('title', event.target.value)}
-          placeholder="Descripcion corta"
-        />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <select
-            className="cfg-select"
-            value={couponForm.type}
-            onChange={(event) => updateCouponForm('type', event.target.value)}
-          >
-            <option value="percent">Porcentaje</option>
-            <option value="amount">Monto fijo</option>
-          </select>
-          <select
-            className="cfg-select"
-            value={couponForm.active ? 'activo' : 'inactivo'}
-            onChange={(event) => updateCouponForm('active', event.target.value === 'activo')}
-          >
-            <option value="activo">Activo</option>
-            <option value="inactivo">Inactivo</option>
-          </select>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 18 }}>
+        <form
+          onSubmit={handleSaveCampaign}
+          style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            padding: 16,
+            display: 'grid',
+            gap: 10,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 22 }}>Editar campana de bienvenida</h2>
+          <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
+            Si quieres agregar mas cupos, aumenta el limite total. El sistema nunca dejara el limite por debajo de los cupones ya otorgados.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <input
+              className="cfg-input"
+              type="number"
+              min="1"
+              step="1"
+              value={campaignDraft.limit}
+              onChange={(event) => setCampaignDraft((current) => ({ ...current, limit: event.target.value }))}
+              placeholder="Limite total de cupones"
+            />
+            <select
+              className="cfg-select"
+              value={campaignDraft.active ? 'activo' : 'inactivo'}
+              onChange={(event) =>
+                setCampaignDraft((current) => ({ ...current, active: event.target.value === 'activo' }))
+              }
+            >
+              <option value="activo">Activa</option>
+              <option value="inactivo">Inactiva</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <input
+              className="cfg-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={campaignDraft.amount}
+              onChange={(event) => setCampaignDraft((current) => ({ ...current, amount: event.target.value }))}
+              placeholder="Monto del cupon"
+            />
+            <input
+              className="cfg-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={campaignDraft.minimumPurchase}
+              onChange={(event) =>
+                setCampaignDraft((current) => ({ ...current, minimumPurchase: event.target.value }))
+              }
+              placeholder="Compra minima"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="submit" className="cfg-button" disabled={savingWelcomeCouponCampaign}>
+              {savingWelcomeCouponCampaign ? 'Guardando...' : 'Guardar campana'}
+            </button>
+            <button
+              type="button"
+              className="cfg-button secondary"
+              onClick={() =>
+                setCampaignDraft({
+                  limit: String(welcomeCouponCampaign?.limit || ''),
+                  amount: String(welcomeCouponCampaign?.amount || ''),
+                  minimumPurchase: String(welcomeCouponCampaign?.minimumPurchase || ''),
+                  active: welcomeCouponCampaign?.active !== false,
+                })
+              }
+            >
+              Restaurar valores
+            </button>
+          </div>
+        </form>
+
+        <form
+          onSubmit={saveCoupon}
+          style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            padding: 16,
+            display: 'grid',
+            gap: 10,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 22 }}>Cupon</h2>
+          <input
+            className="cfg-input"
+            value={couponForm.code}
+            onChange={(event) => updateCouponForm('code', event.target.value.toUpperCase())}
+            placeholder="Codigo. Ej: GRANADA10"
+          />
+          <input
+            className="cfg-input"
+            value={couponForm.title}
+            onChange={(event) => updateCouponForm('title', event.target.value)}
+            placeholder="Descripcion corta"
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <select
+              className="cfg-select"
+              value={couponForm.type}
+              onChange={(event) => updateCouponForm('type', event.target.value)}
+            >
+              <option value="percent">Porcentaje</option>
+              <option value="amount">Monto fijo</option>
+            </select>
+            <select
+              className="cfg-select"
+              value={couponForm.active ? 'activo' : 'inactivo'}
+              onChange={(event) => updateCouponForm('active', event.target.value === 'activo')}
+            >
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <input
+              className="cfg-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={couponForm.value}
+              onChange={(event) => updateCouponForm('value', event.target.value)}
+              placeholder={couponForm.type === 'amount' ? 'Monto C$' : 'Porcentaje'}
+            />
+            <input
+              className="cfg-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={couponForm.minimum}
+              onChange={(event) => updateCouponForm('minimum', event.target.value)}
+              placeholder="Minimo de compra"
+            />
+          </div>
           <input
             className="cfg-input"
             type="number"
             min="0"
-            step="0.01"
-            value={couponForm.value}
-            onChange={(event) => updateCouponForm('value', event.target.value)}
-            placeholder={couponForm.type === 'amount' ? 'Monto C$' : 'Porcentaje'}
+            step="1"
+            value={couponForm.maxUsesPerUser}
+            onChange={(event) => updateCouponForm('maxUsesPerUser', event.target.value)}
+            placeholder="Usos maximos por usuario (0 = sin limite)"
           />
-          <input
-            className="cfg-input"
-            type="number"
-            min="0"
-            step="0.01"
-            value={couponForm.minimum}
-            onChange={(event) => updateCouponForm('minimum', event.target.value)}
-            placeholder="Minimo de compra"
+          <textarea
+            className="cfg-textarea"
+            value={couponForm.notes}
+            onChange={(event) => updateCouponForm('notes', event.target.value)}
+            placeholder="Notas internas"
           />
-        </div>
-        <input
-          className="cfg-input"
-          type="number"
-          min="0"
-          step="1"
-          value={couponForm.maxUsesPerUser}
-          onChange={(event) => updateCouponForm('maxUsesPerUser', event.target.value)}
-          placeholder="Usos maximos por usuario (0 = sin limite)"
-        />
-        <textarea
-          className="cfg-textarea"
-          value={couponForm.notes}
-          onChange={(event) => updateCouponForm('notes', event.target.value)}
-          placeholder="Notas internas"
-        />
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button type="submit" className="cfg-button" disabled={savingCoupon}>
-            {savingCoupon ? 'Guardando...' : 'Guardar cupon'}
-          </button>
-          <button type="button" className="cfg-button secondary" onClick={resetCouponForm}>
-            Nuevo
-          </button>
-        </div>
-      </form>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button type="submit" className="cfg-button" disabled={savingCoupon}>
+              {savingCoupon ? 'Guardando...' : 'Guardar cupon'}
+            </button>
+            <button type="button" className="cfg-button secondary" onClick={resetCouponForm}>
+              Nuevo
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

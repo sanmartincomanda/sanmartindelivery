@@ -1,4 +1,4 @@
-import { get, ref, runTransaction, update } from 'firebase/database';
+import { get, onValue, ref, runTransaction, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { normalizeStoreCoupon } from './storeCoupons';
 
@@ -17,6 +17,129 @@ const normalizeCodeText = (value = '') =>
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
 
+const normalizeInteger = (value, fallback = 0, minimum = 0) => {
+  const numeric = Math.trunc(Number(value));
+  if (Number.isFinite(numeric)) {
+    return Math.max(minimum, numeric);
+  }
+
+  return Math.max(minimum, Math.trunc(Number(fallback) || 0));
+};
+
+const normalizeMoney = (value, fallback = 0) => {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return Math.max(0, Number(numeric.toFixed(2)));
+  }
+
+  return Math.max(0, Number(Number(fallback || 0).toFixed(2)));
+};
+
+export const buildDefaultStoreWelcomeCouponCampaign = (overrides = {}) => ({
+  campaignId: STORE_WELCOME_COUPON_CAMPAIGN_ID,
+  limit: STORE_WELCOME_COUPON_LIMIT,
+  amount: STORE_WELCOME_COUPON_AMOUNT,
+  minimumPurchase: STORE_WELCOME_COUPON_MINIMUM,
+  active: true,
+  assignedCount: 0,
+  createdAt: 0,
+  updatedAt: 0,
+  assignments: {},
+  ...(overrides || {}),
+});
+
+export const normalizeStoreWelcomeCouponCampaign = (value = {}, fallback = {}) => {
+  const source = value && typeof value === 'object' ? value : {};
+  const backup = fallback && typeof fallback === 'object' ? fallback : {};
+  const defaults = buildDefaultStoreWelcomeCouponCampaign();
+  const rawAssignments =
+    source.assignments && typeof source.assignments === 'object'
+      ? source.assignments
+      : backup.assignments && typeof backup.assignments === 'object'
+        ? backup.assignments
+        : defaults.assignments;
+  const assignments = Object.entries(rawAssignments || {}).reduce((accumulator, [userKey, assignment]) => {
+    const cleanUserKey = String(userKey || '').trim();
+    if (!cleanUserKey) {
+      return accumulator;
+    }
+
+    accumulator[cleanUserKey] = {
+      slotNumber: normalizeInteger(assignment?.slotNumber ?? assignment?.slot, 0, 0),
+      assignedAt: Math.max(0, Number(assignment?.assignedAt || 0)),
+      customerName: String(assignment?.customerName || '').trim(),
+      phoneSuffix: String(assignment?.phoneSuffix || '').trim(),
+    };
+    return accumulator;
+  }, {});
+  const fallbackAssignedCount = Object.values(assignments).reduce(
+    (maxValue, assignment) => Math.max(maxValue, normalizeInteger(assignment.slotNumber, 0, 0)),
+    0
+  );
+
+  return {
+    campaignId:
+      String(source.campaignId || backup.campaignId || defaults.campaignId).trim() ||
+      STORE_WELCOME_COUPON_CAMPAIGN_ID,
+    limit: normalizeInteger(source.limit, backup.limit ?? defaults.limit, 1),
+    amount: normalizeMoney(source.amount, backup.amount ?? defaults.amount),
+    minimumPurchase: normalizeMoney(
+      source.minimumPurchase,
+      backup.minimumPurchase ?? defaults.minimumPurchase
+    ),
+    active: source.active !== undefined ? source.active !== false : backup.active !== false,
+    assignedCount: normalizeInteger(
+      source.assignedCount,
+      backup.assignedCount ?? fallbackAssignedCount,
+      0
+    ),
+    createdAt: Math.max(0, Number(source.createdAt ?? backup.createdAt ?? defaults.createdAt ?? 0)),
+    updatedAt: Math.max(0, Number(source.updatedAt ?? backup.updatedAt ?? defaults.updatedAt ?? 0)),
+    assignments,
+  };
+};
+
+export const subscribeStoreWelcomeCouponCampaign = (
+  onData,
+  onError,
+  databaseInstance = database
+) =>
+  onValue(
+    ref(databaseInstance, STORE_WELCOME_COUPON_CAMPAIGN_PATH),
+    (snapshot) => {
+      onData(
+        normalizeStoreWelcomeCouponCampaign(
+          snapshot.val() || {},
+          buildDefaultStoreWelcomeCouponCampaign()
+        )
+      );
+    },
+    onError
+  );
+
+export async function saveStoreWelcomeCouponCampaign(campaign = {}, databaseInstance = database) {
+  const now = Date.now();
+  const normalized = normalizeStoreWelcomeCouponCampaign(
+    {
+      ...campaign,
+      updatedAt: now,
+    },
+    buildDefaultStoreWelcomeCouponCampaign({
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  const persistedCampaign = {
+    ...normalized,
+    createdAt: Number(normalized.createdAt || now),
+    updatedAt: now,
+  };
+
+  await set(ref(databaseInstance, STORE_WELCOME_COUPON_CAMPAIGN_PATH), persistedCampaign);
+  return persistedCampaign;
+}
+
 const buildWelcomeCouponCode = ({ slotNumber = 0, phone = '', userKey = '' }) => {
   const slotToken = String(Math.max(1, Number(slotNumber || 0))).padStart(2, '0');
   const phoneToken = cleanPhoneDigits(phone).slice(-4) || 'WEB0';
@@ -24,18 +147,25 @@ const buildWelcomeCouponCode = ({ slotNumber = 0, phone = '', userKey = '' }) =>
   return `TV200-${slotToken}${phoneToken}-${userToken}`;
 };
 
-const buildWelcomeCouponPayload = ({ slotNumber = 0, userKey = '', phone = '' }) =>
+const buildWelcomeCouponPayload = ({
+  slotNumber = 0,
+  userKey = '',
+  phone = '',
+  amount = STORE_WELCOME_COUPON_AMOUNT,
+  minimumPurchase = STORE_WELCOME_COUPON_MINIMUM,
+  campaignId = STORE_WELCOME_COUPON_CAMPAIGN_ID,
+} = {}) =>
   normalizeStoreCoupon({
     code: buildWelcomeCouponCode({ slotNumber, phone, userKey }),
     title: 'Cupon bienvenida C$200',
     type: 'amount',
-    value: STORE_WELCOME_COUPON_AMOUNT,
-    minimum: STORE_WELCOME_COUPON_MINIMUM,
+    value: amount,
+    minimum: minimumPurchase,
     maxUsesPerUser: 1,
     active: true,
     notes: 'Valido para tu siguiente compra minima de C$700.',
     assignedUserKey: String(userKey || '').trim(),
-    campaignId: STORE_WELCOME_COUPON_CAMPAIGN_ID,
+    campaignId,
     autoApply: true,
     personal: true,
     welcomeCoupon: true,
@@ -107,50 +237,62 @@ export async function ensureStoreWelcomeCouponForUser({
     return existingWelcomeCoupon;
   }
 
-  let assignedSlotNumber = 0;
   const now = Date.now();
   const campaignRef = ref(databaseInstance, STORE_WELCOME_COUPON_CAMPAIGN_PATH);
+  const campaignSnapshot = await get(campaignRef);
+  const currentCampaign = normalizeStoreWelcomeCouponCampaign(
+    campaignSnapshot.val() || {},
+    buildDefaultStoreWelcomeCouponCampaign({
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+  const existingAssignment = currentCampaign.assignments?.[cleanUserKey] || null;
 
+  if (existingAssignment?.slotNumber) {
+    const welcomeCoupon = normalizeStoreWelcomeCoupon({
+      campaignId: currentCampaign.campaignId,
+      slotNumber: existingAssignment.slotNumber,
+      assignedUserKey: cleanUserKey,
+      assignedAt: Number(existingAssignment.assignedAt || now),
+      claimedAt: 0,
+      usedAt: 0,
+      status: 'available',
+      amount: currentCampaign.amount,
+      minimumPurchase: currentCampaign.minimumPurchase,
+      coupon: buildWelcomeCouponPayload({
+        slotNumber: existingAssignment.slotNumber,
+        userKey: cleanUserKey,
+        phone,
+        amount: currentCampaign.amount,
+        minimumPurchase: currentCampaign.minimumPurchase,
+        campaignId: currentCampaign.campaignId,
+      }),
+    });
+
+    await update(userRef, {
+      welcomeCoupon,
+    });
+
+    return welcomeCoupon;
+  }
+
+  let assignedSlotNumber = 0;
   const transactionResult = await runTransaction(campaignRef, (currentValue) => {
-    const currentCampaign = currentValue && typeof currentValue === 'object' ? currentValue : {};
-    const assignments =
-      currentCampaign.assignments && typeof currentCampaign.assignments === 'object'
-        ? { ...currentCampaign.assignments }
-        : {};
-    const existingAssignment = assignments[cleanUserKey];
-
-    if (existingAssignment) {
-      assignedSlotNumber = Math.max(
-        0,
-        Math.trunc(Number(existingAssignment.slotNumber || existingAssignment.slot || 0))
-      );
-      return {
-        campaignId: STORE_WELCOME_COUPON_CAMPAIGN_ID,
-        limit: STORE_WELCOME_COUPON_LIMIT,
-        amount: STORE_WELCOME_COUPON_AMOUNT,
-        minimumPurchase: STORE_WELCOME_COUPON_MINIMUM,
-        active: currentCampaign.active !== false,
-        assignedCount: Math.max(assignedSlotNumber, Math.trunc(Number(currentCampaign.assignedCount || 0))),
-        createdAt: Number(currentCampaign.createdAt || now),
+    const liveCampaign = normalizeStoreWelcomeCouponCampaign(
+      currentValue || {},
+      buildDefaultStoreWelcomeCouponCampaign({
+        createdAt: now,
         updatedAt: now,
-        assignments,
-      };
-    }
+      })
+    );
+    const assignments = { ...(liveCampaign.assignments || {}) };
+    const active = liveCampaign.active !== false;
+    const assignedCount = Math.max(0, Math.trunc(Number(liveCampaign.assignedCount || 0)));
+    const limit = Math.max(1, Math.trunc(Number(liveCampaign.limit || STORE_WELCOME_COUPON_LIMIT)));
 
-    const active = currentCampaign.active !== false;
-    const assignedCount = Math.max(0, Math.trunc(Number(currentCampaign.assignedCount || 0)));
-    if (!active || assignedCount >= STORE_WELCOME_COUPON_LIMIT) {
-      return {
-        campaignId: STORE_WELCOME_COUPON_CAMPAIGN_ID,
-        limit: STORE_WELCOME_COUPON_LIMIT,
-        amount: STORE_WELCOME_COUPON_AMOUNT,
-        minimumPurchase: STORE_WELCOME_COUPON_MINIMUM,
-        active,
-        assignedCount,
-        createdAt: Number(currentCampaign.createdAt || now),
-        updatedAt: now,
-        assignments,
-      };
+    if (!active || assignedCount >= limit) {
+      return liveCampaign;
     }
 
     assignedSlotNumber = assignedCount + 1;
@@ -162,19 +304,25 @@ export async function ensureStoreWelcomeCouponForUser({
     };
 
     return {
-      campaignId: STORE_WELCOME_COUPON_CAMPAIGN_ID,
-      limit: STORE_WELCOME_COUPON_LIMIT,
-      amount: STORE_WELCOME_COUPON_AMOUNT,
-      minimumPurchase: STORE_WELCOME_COUPON_MINIMUM,
+      campaignId: liveCampaign.campaignId || STORE_WELCOME_COUPON_CAMPAIGN_ID,
+      limit,
+      amount: liveCampaign.amount,
+      minimumPurchase: liveCampaign.minimumPurchase,
       active,
       assignedCount: assignedSlotNumber,
-      createdAt: Number(currentCampaign.createdAt || now),
+      createdAt: Number(liveCampaign.createdAt || now),
       updatedAt: now,
       assignments,
     };
   });
 
-  const campaignValue = transactionResult.snapshot.val() || {};
+  const campaignValue = normalizeStoreWelcomeCouponCampaign(
+    transactionResult.snapshot.val() || {},
+    buildDefaultStoreWelcomeCouponCampaign({
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
   const assignedEntry = campaignValue.assignments?.[cleanUserKey];
   const slotNumber = Math.max(
     0,
@@ -186,19 +334,22 @@ export async function ensureStoreWelcomeCouponForUser({
   }
 
   const welcomeCoupon = normalizeStoreWelcomeCoupon({
-    campaignId: STORE_WELCOME_COUPON_CAMPAIGN_ID,
+    campaignId: campaignValue.campaignId || STORE_WELCOME_COUPON_CAMPAIGN_ID,
     slotNumber,
     assignedUserKey: cleanUserKey,
     assignedAt: Number(assignedEntry?.assignedAt || now),
     claimedAt: 0,
     usedAt: 0,
     status: 'available',
-    amount: STORE_WELCOME_COUPON_AMOUNT,
-    minimumPurchase: STORE_WELCOME_COUPON_MINIMUM,
+    amount: campaignValue.amount,
+    minimumPurchase: campaignValue.minimumPurchase,
     coupon: buildWelcomeCouponPayload({
       slotNumber,
       userKey: cleanUserKey,
       phone,
+      amount: campaignValue.amount,
+      minimumPurchase: campaignValue.minimumPurchase,
+      campaignId: campaignValue.campaignId,
     }),
   });
 
