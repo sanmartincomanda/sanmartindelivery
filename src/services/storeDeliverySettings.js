@@ -149,7 +149,7 @@ const formatStoreDayRange = (dayStart, dayEnd) => {
   return `${startLabel} a ${endLabel}`;
 };
 
-export const buildStoreOperationScheduleSummary = (settings = DEFAULT_STORE_DELIVERY_SETTINGS) => {
+export const buildStoreOperationScheduleRows = (settings = DEFAULT_STORE_DELIVERY_SETTINGS) => {
   const operationHours = normalizeStoreOperationHours(
     settings?.operationHours,
     DEFAULT_STORE_OPERATION_HOURS
@@ -182,15 +182,23 @@ export const buildStoreOperationScheduleSummary = (settings = DEFAULT_STORE_DELI
     groups.push(currentGroup);
   }
 
-  return groups
-    .map((group) => {
-      const dayLabel = formatStoreDayRange(group.dayStart, group.dayEnd);
-      if (group.enabled === false) {
-        return `${dayLabel} Cerrado`;
-      }
+  return groups.map((group) => {
+    const dayLabel = formatStoreDayRange(group.dayStart, group.dayEnd);
+    return {
+      key: `${group.dayStart}-${group.dayEnd}`,
+      label: dayLabel,
+      enabled: group.enabled !== false,
+      summary:
+        group.enabled === false
+          ? 'Cerrado'
+          : `${formatStoreOperationTime(group.open)} - ${formatStoreOperationTime(group.close)}`,
+    };
+  });
+};
 
-      return `${dayLabel} ${formatStoreOperationTime(group.open)} - ${formatStoreOperationTime(group.close)}`;
-    })
+export const buildStoreOperationScheduleSummary = (settings = DEFAULT_STORE_DELIVERY_SETTINGS) => {
+  return buildStoreOperationScheduleRows(settings)
+    .map((group) => `${group.label} ${group.summary}`)
     .join(' | ');
 };
 

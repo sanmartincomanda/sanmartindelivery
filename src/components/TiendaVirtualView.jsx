@@ -57,6 +57,7 @@ import {
 } from '../services/geo';
 import {
   buildStoreOperationClosedMessage,
+  buildStoreOperationScheduleRows,
   calculateStoreDeliveryQuote,
   DEFAULT_STORE_DELIVERY_SETTINGS,
   formatStoreDeliveryDistance,
@@ -1036,11 +1037,14 @@ export default function TiendaVirtualView({
   const [rewardDefinitions, setRewardDefinitions] = useState({});
   const [rewardSettings, setRewardSettings] = useState(DEFAULT_STORE_REWARD_SETTINGS);
   const [deliverySettings, setDeliverySettings] = useState(DEFAULT_STORE_DELIVERY_SETTINGS);
+  const [deliverySettingsReady, setDeliverySettingsReady] = useState(false);
   const [rewardAccount, setRewardAccount] = useState(() => normalizeStoreRewardAccount({}, ''));
   const [rewardTransactions, setRewardTransactions] = useState([]);
   const [selectedRewardRedemption, setSelectedRewardRedemption] = useState(null);
   const [rewardActionBusy, setRewardActionBusy] = useState(false);
   const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
+  const [storeClosedNoticeOpen, setStoreClosedNoticeOpen] = useState(false);
+  const [storeClosedNoticeDismissed, setStoreClosedNoticeDismissed] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
   const quantityNoticeTimeoutRef = useRef(null);
@@ -1128,10 +1132,12 @@ export default function TiendaVirtualView({
     const unsubscribe = subscribeStoreDeliverySettings(
       (settings) => {
         setDeliverySettings(settings);
+        setDeliverySettingsReady(true);
       },
       (error) => {
         console.error('No se pudo cargar la configuracion de entrega:', error);
         setDeliverySettings(DEFAULT_STORE_DELIVERY_SETTINGS);
+        setDeliverySettingsReady(true);
       }
     );
 
@@ -1959,6 +1965,10 @@ export default function TiendaVirtualView({
     () => buildStoreOperationClosedMessage(deliverySettings),
     [deliverySettings]
   );
+  const storeOperationScheduleRows = useMemo(
+    () => buildStoreOperationScheduleRows(deliverySettings),
+    [deliverySettings]
+  );
   const deliveryFeeAmount = useMemo(() => {
     if (!deliveryQuote?.available || deliveryQuote.isPickup) {
       return 0;
@@ -1979,6 +1989,22 @@ export default function TiendaVirtualView({
     activeCategory === 'todos' &&
     activeSubcategory === 'todas' &&
     activePromotions.length > 0;
+
+  useEffect(() => {
+    if (!deliverySettingsReady) {
+      return;
+    }
+
+    if (storeOperationStatus?.open === false && !storeClosedNoticeDismissed) {
+      setStoreClosedNoticeOpen(true);
+      return;
+    }
+
+    if (storeOperationStatus?.open !== false) {
+      setStoreClosedNoticeOpen(false);
+      setStoreClosedNoticeDismissed(false);
+    }
+  }, [deliverySettingsReady, storeClosedNoticeDismissed, storeOperationStatus?.open]);
 
   useEffect(() => {
     if (selectedPromotionIndex === null) {
@@ -2877,7 +2903,7 @@ export default function TiendaVirtualView({
     event.preventDefault();
 
     if (!storeOperationStatus.open) {
-      alert(storeClosedMessage);
+      setStoreClosedNoticeOpen(true);
       return;
     }
 
@@ -6509,6 +6535,7 @@ export default function TiendaVirtualView({
           onClaimWelcomeCoupon={handleClaimWelcomeCoupon}
           onClearSelectedReward={clearSelectedReward}
           onRemoveCoupon={removeCoupon}
+          onStoreClosed={() => setStoreClosedNoticeOpen(true)}
           onSubmit={submitOrder}
         />
       )}
@@ -6529,6 +6556,16 @@ export default function TiendaVirtualView({
           currentUser={currentUser}
           onAccept={acceptPendingOrderUpdate}
           onReject={handleRejectPendingOrderUpdate}
+        />
+      )}
+
+      {storeClosedNoticeOpen && (
+        <StoreClosedNoticeModal
+          scheduleRows={storeOperationScheduleRows}
+          onClose={() => {
+            setStoreClosedNoticeDismissed(true);
+            setStoreClosedNoticeOpen(false);
+          }}
         />
       )}
 
@@ -8112,6 +8149,7 @@ function CheckoutSheet({
   onClearSelectedReward,
   onQuantityChange,
   onRemoveCoupon,
+  onStoreClosed,
   onSubmit,
 }) {
   const isGuestCheckout = !currentUser;
@@ -8166,7 +8204,7 @@ function CheckoutSheet({
 
   const handleContinueCheckout = () => {
     if (storeClosed) {
-      alert(storeClosedMessage || 'Tienda se encuentra cerrada.');
+      onStoreClosed?.();
       return;
     }
 
@@ -8770,6 +8808,92 @@ function OrderSuccessSheet({ onClose }) {
         <p>Tu pedido ya entro al sistema. Enseguida te mostramos el estado para que le des seguimiento.</p>
         <button type="button" className="store-button" onClick={onClose}>
           Ver estado del pedido
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 240,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+        background: 'rgba(15, 23, 42, 0.56)',
+        backdropFilter: 'blur(8px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: 'min(460px, 100%)',
+          borderRadius: 28,
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          background: '#ffffff',
+          boxShadow: '0 32px 90px rgba(15, 23, 42, 0.28)',
+          padding: '24px 22px 20px',
+          display: 'grid',
+          gap: 16,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 54,
+              height: 54,
+              borderRadius: 20,
+              background: 'linear-gradient(135deg, rgba(190, 24, 93, 0.12) 0%, rgba(239, 68, 68, 0.22) 100%)',
+              color: '#b91c1c',
+              fontSize: 28,
+              fontWeight: 900,
+            }}
+          >
+            !
+          </div>
+          <h2 style={{ margin: 0, fontSize: '1.8rem', lineHeight: 1, color: '#0f172a' }}>Tienda Cerrada</h2>
+          <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.55 }}>
+            Horario de atencion:
+          </p>
+        </div>
+
+        <div
+          style={{
+            borderRadius: 20,
+            border: '1px solid rgba(15, 59, 130, 0.08)',
+            background: 'linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)',
+            padding: 16,
+            display: 'grid',
+            gap: 10,
+          }}
+        >
+          {scheduleRows.map((row) => (
+            <div
+              key={row.key}
+              style={{
+                display: 'grid',
+                gap: 4,
+                paddingBottom: 10,
+                borderBottom: '1px solid #e2e8f0',
+              }}
+            >
+              <strong style={{ color: '#0f172a', fontSize: 15 }}>{row.label}:</strong>
+              <span style={{ color: '#0f3b82', fontWeight: 900 }}>{row.summary}</span>
+            </div>
+          ))}
+        </div>
+
+        <button type="button" className="store-button" onClick={onClose}>
+          Navegar tienda
         </button>
       </div>
     </div>
