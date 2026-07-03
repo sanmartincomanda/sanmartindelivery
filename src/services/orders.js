@@ -25,6 +25,28 @@ const removeTextAccents = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+const normalizePaymentMethodLabel = (value = '') => {
+  const normalized = removeTextAccents(value || '');
+
+  if (normalized.includes('efectivo')) {
+    return 'EFECTIVO';
+  }
+
+  if (normalized.includes('pos') || normalized.includes('tarjeta')) {
+    return 'POS / TARJETA';
+  }
+
+  if (normalized.includes('link')) {
+    return 'LINK DE PAGO';
+  }
+
+  if (normalized.includes('transfer')) {
+    return 'TRANSFERENCIA';
+  }
+
+  return String(value || '').trim().toUpperCase() || 'METODO DE PAGO';
+};
+
 const normalizeOrderStatus = (status) => removeTextAccents(status || 'Pendiente');
 
 export const normalizeOrderFulfillmentType = (value = '') => {
@@ -192,8 +214,17 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   const total = Number(summary.total ?? subtotal);
   const deliveryFee = Math.max(0, Number(summary.deliveryFee || 0));
   const deliveryDistanceKm = Math.max(0, Number(summary.deliveryDistanceKm || 0));
-  const lines = normalizedItems.map(
-    (item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim()
+  const discount = Math.max(0, Number(summary.discount || summary.couponDiscount || 0));
+  const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
+  const lines = [];
+
+  if (discount > 0) {
+    lines.push(`ALERTA APLICA CUPON C$${formatAmount(discount)}`);
+    lines.push('');
+  }
+
+  lines.push(
+    ...normalizedItems.map((item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim())
   );
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
 
@@ -210,6 +241,10 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
         ? `Servicio a domicilio (${formatDistanceAmount(deliveryDistanceKm)} km)`
         : 'Servicio a domicilio';
       lines.push(`${deliveryLabel}: C$${formatAmount(deliveryFee)}`);
+    }
+    if (discount > 0) {
+      lines.push(`Cupon aplicado: -C$${formatAmount(discount)}`);
+      lines.push(`Metodo de pago: ${paymentMethodLabel}`);
     }
     lines.push(`${totalLabel}: C$${formatAmount(total)}`);
   }
@@ -372,9 +407,11 @@ export async function createOrder(payload, options = {}) {
   const generatedKitchenPedidoTexto = buildStoreKitchenOrderText(normalizedItems, {
     couponCode: coupon?.code,
     subtotal,
+    discount: couponDiscount,
     deliveryFee,
     deliveryDistanceKm,
     total,
+    metodoPago: payload.metodoPago,
     observaciones: payload.observaciones,
     rewardRedemption: payload.rewardRedemption,
   });

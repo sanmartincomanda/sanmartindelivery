@@ -279,11 +279,20 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   const deliveryFee = roundMoney(summary.deliveryFee || 0);
   const deliveryDistanceKm = Number(summary.deliveryDistanceKm || 0);
   const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
-  const lines = normalizedItems.map(
-    (item) => `- ${formatStoreQuantityLabel(item.quantity, item.unit)} ${item.unit} ${item.name}`.trim()
-  );
+  const lines = [];
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
   const cleanNotes = normalizeText(notes || summary.notes || '');
+
+  if (discount > 0) {
+    lines.push(`ALERTA APLICA CUPON C$${formatMoney(discount)}`);
+    lines.push('');
+  }
+
+  lines.push(
+    ...normalizedItems.map(
+      (item) => `- ${formatStoreQuantityLabel(item.quantity, item.unit)} ${item.unit} ${item.name}`.trim()
+    )
+  );
 
   if (rewardLines.length > 0) {
     lines.push('');
@@ -301,10 +310,8 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
       lines.push(`${deliveryLabel}: C$${formatMoney(deliveryFee)}`);
     }
     if (discount > 0) {
-      lines.push('PEDIDO CON CUPON');
-      lines.push('METODO DE PAGO');
-      lines.push(`${paymentMethodLabel}: C$${formatMoney(total)}`);
-      lines.push(`CUPON: C$${formatMoney(discount)}`);
+      lines.push(`Cupon aplicado: -C$${formatMoney(discount)}`);
+      lines.push(`Metodo de pago: ${paymentMethodLabel}`);
     }
     lines.push(`${totalLabel}: C$${formatMoney(total)}`);
   }

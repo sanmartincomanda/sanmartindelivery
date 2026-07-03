@@ -116,9 +116,11 @@ const getKitchenOrderText = (pedido = {}) => {
   if (Array.isArray(pedido.items) && pedido.items.length > 0) {
     return buildStoreKitchenOrderText(pedido.items, {
       subtotal: pedido.subtotalEstimado,
+      discount: pedido.descuentoCupon,
       deliveryFee: pedido.deliveryFee,
       deliveryDistanceKm: pedido.deliveryDistanceKm,
       total: pedido.total,
+      metodoPago: pedido.metodoPago,
       totalLabel:
         pedido?.totalAproximado === false
           ? 'Total actualizado de pedido'
