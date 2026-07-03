@@ -1,4 +1,5 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { equalTo, get, orderByChild, query as databaseQuery, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import {
@@ -9007,13 +9008,12 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
 function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const whatsappLink = buildOrderUpdateReviewWhatsAppLink(order, currentUser);
-
-  return (
+  const modalContent = (
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 96,
+        zIndex: 420,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -9060,7 +9060,7 @@ function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
             Tu pedido ha sido actualizado
           </h2>
           <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.55 }}>
-            Revisa los pesos actualizados por SICAR antes de continuar con tu pedido.
+            Revisa tu detalle actualizado antes de continuar con tu pedido.
           </p>
         </div>
 
@@ -9171,6 +9171,12 @@ function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined' || !document.body) {
+    return modalContent;
+  }
+
+  return createPortal(modalContent, document.body);
 }
 
 function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose }) {
