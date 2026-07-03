@@ -1,5 +1,5 @@
 import React, { startTransition, useEffect, useMemo, useState } from 'react';
-import { onValue, orderByChild, query, ref, startAt } from 'firebase/database';
+import { get, onValue, orderByChild, query, ref, startAt } from 'firebase/database';
 import { database } from '../firebase';
 import {
   applySicarPriceUpdatesWithOptions,
@@ -78,7 +78,12 @@ import {
   SYSTEM_USERS_PATH,
 } from '../services/systemUsers';
 import { cleanupExpiredStoreOrders, formatOrderNumber, STORE_CHANNEL } from '../services/orders';
-import { getOrderHistoryRetentionStartDate, sortOrdersByDateAndNumberDesc } from '../services/orderArchive';
+import {
+  getOrderHistoryRetentionStartDate,
+  normalizeCouponCode,
+  sortOrdersByDateAndNumberDesc,
+  STORE_COUPON_ARCHIVE_USAGE_PATH,
+} from '../services/orderArchive';
 import {
   compressImportedCatalogImage,
   fetchSicarCatalogSelection,
@@ -4483,6 +4488,7 @@ function CouponsManager({
     minimumPurchase: String(welcomeCouponCampaign?.minimumPurchase || ''),
     active: welcomeCouponCampaign?.active !== false,
   }));
+  const [archivedCouponUsageByUser, setArchivedCouponUsageByUser] = useState({});
 
   useEffect(() => {
     setCampaignDraft({
@@ -4551,6 +4557,50 @@ function CouponsManager({
         .sort((left, right) => Number(right.assignedAt || 0) - Number(left.assignedAt || 0)),
     [welcomeCouponCampaign?.assignments]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const userKeys = campaignAssignments
+      .map((assignment) => String(assignment.userKey || '').trim())
+      .filter(Boolean);
+
+    if (userKeys.length === 0) {
+      setArchivedCouponUsageByUser({});
+      return undefined;
+    }
+
+    Promise.all(
+      userKeys.map(async (userKey) => {
+        try {
+          const snapshot = await get(ref(database, `${STORE_COUPON_ARCHIVE_USAGE_PATH}/${userKey}`));
+          const value = snapshot.val();
+          return [
+            userKey,
+            value && typeof value === 'object' ? value : {},
+          ];
+        } catch (error) {
+          console.error(`No se pudo cargar el uso archivado del cupon para ${userKey}:`, error);
+          return [userKey, {}];
+        }
+      })
+    ).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+
+      setArchivedCouponUsageByUser(
+        entries.reduce((accumulator, [userKey, counts]) => {
+          accumulator[userKey] = counts;
+          return accumulator;
+        }, {})
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignAssignments]);
+
   const storeUsersByKey = useMemo(
     () =>
       (storeUsers || []).reduce((accumulator, user) => {
@@ -4600,15 +4650,25 @@ function CouponsManager({
         const deliveredOrder = userOrders.find((order) => isDeliveredWelcomeOrder(order) && !isCanceledWelcomeOrder(order)) || null;
         const pendingOrder = userOrders.find((order) => !isCanceledWelcomeOrder(order) && !isDeliveredWelcomeOrder(order)) || null;
         const canceledOrders = userOrders.filter((order) => isCanceledWelcomeOrder(order));
+        const archivedUsageMap =
+          archivedCouponUsageByUser[String(assignment.userKey || '').trim()] &&
+          typeof archivedCouponUsageByUser[String(assignment.userKey || '').trim()] === 'object'
+            ? archivedCouponUsageByUser[String(assignment.userKey || '').trim()]
+            : {};
+        const archivedUsageEntries = Object.entries(archivedUsageMap || {});
         const couponCode = String(
           welcomeCoupon?.coupon?.code ||
             deliveredOrder?.cupon?.code ||
             pendingOrder?.cupon?.code ||
             canceledOrders[0]?.cupon?.code ||
+            archivedUsageEntries[0]?.[0] ||
             ''
         ).trim();
-        const usedCount = deliveredOrder ? 1 : 0;
-        const effectiveStatus = deliveredOrder
+        const archivedUsageCount = couponCode
+          ? Number(archivedUsageMap[normalizeCouponCode(couponCode)] || 0)
+          : archivedUsageEntries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
+        const usedCount = Math.max(deliveredOrder ? 1 : 0, archivedUsageCount);
+        const effectiveStatus = deliveredOrder || archivedUsageCount > 0
           ? 'used'
           : pendingOrder
             ? 'reserved'
@@ -4628,6 +4688,8 @@ function CouponsManager({
           deliveredOrder,
           pendingOrder,
           canceledOrders,
+          archivedUsageCount,
+          archiveOnlyUsed: !deliveredOrder && archivedUsageCount > 0,
           canceledCount: canceledOrders.length,
           effectiveStatus,
           statusMeta,
@@ -4641,7 +4703,7 @@ function CouponsManager({
           lastOrder,
         };
       }),
-    [campaignAssignments, storeUsersByKey, welcomeCouponOrdersByUser]
+    [archivedCouponUsageByUser, campaignAssignments, storeUsersByKey, welcomeCouponOrdersByUser]
   );
   const assignedCount = Math.max(0, Number(welcomeCouponCampaign?.assignedCount || 0));
   const campaignLimit = Math.max(0, Number(welcomeCouponCampaign?.limit || 0));
@@ -4917,7 +4979,7 @@ function CouponsManager({
                       {row.codigoCliente ? ` | Cliente SICAR: ${row.codigoCliente}` : ''}
                     </div>
                     <div style={{ color: '#166534', fontSize: 13 }}>
-                      Pedido: {row.deliveredOrder ? `#${formatOrderNumber(row.deliveredOrder.id)}` : '-'}
+                      Pedido: {row.deliveredOrder ? `#${formatOrderNumber(row.deliveredOrder.id)}` : row.archiveOnlyUsed ? 'Historial archivado' : '-'}
                       {row.usedAt ? ` | ${formatAdminDateTime(row.usedAt)}` : ''}
                     </div>
                   </div>
@@ -5013,6 +5075,9 @@ function CouponsManager({
                         ) : null}
                         {assignment.usedAt ? (
                           <div>Usado: {formatAdminDateTime(assignment.usedAt)}</div>
+                        ) : null}
+                        {assignment.archiveOnlyUsed ? (
+                          <div>Uso archivado detectado: {assignment.archivedUsageCount} canje(s) en historial.</div>
                         ) : null}
                         {assignment.pendingOrder ? (
                           <div>
