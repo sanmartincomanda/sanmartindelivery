@@ -1085,6 +1085,7 @@ export default function TiendaVirtualView({
   const [rewardActionBusy, setRewardActionBusy] = useState(false);
   const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
   const [storeClosedNoticeOpen, setStoreClosedNoticeOpen] = useState(false);
+  const [registerOutOfCoverageOpen, setRegisterOutOfCoverageOpen] = useState(false);
   const [storeClosedNoticeDismissed, setStoreClosedNoticeDismissed] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
@@ -2022,6 +2023,15 @@ export default function TiendaVirtualView({
     [activeDeliveryAddress?.ubicacion, deliverySettings, fulfillmentType]
   );
   const deliverySummary = useMemo(() => buildStoreDeliverySummary(deliveryQuote), [deliveryQuote]);
+  const authRegistrationCoverageQuote = useMemo(
+    () =>
+      calculateStoreDeliveryQuote({
+        settings: deliverySettings,
+        destination: authForm?.ubicacion,
+        fulfillmentType: ORDER_FULFILLMENT_DELIVERY,
+      }),
+    [authForm?.ubicacion, deliverySettings]
+  );
   const storeOperationStatus = useMemo(
     () => getStoreOperationStatus(deliverySettings),
     [deliverySettings]
@@ -2706,6 +2716,12 @@ export default function TiendaVirtualView({
     if (!hasLocation(authForm.ubicacion)) {
       setAuthLoading(false);
       setAuthError('Debes guardar el punto exacto en el mapa antes de crear la cuenta.');
+      return;
+    }
+
+    if (authRegistrationCoverageQuote?.reason === 'out_of_coverage') {
+      setAuthLoading(false);
+      setRegisterOutOfCoverageOpen(true);
       return;
     }
 
@@ -6651,6 +6667,12 @@ export default function TiendaVirtualView({
         />
       )}
 
+      {registerOutOfCoverageOpen && (
+        <RegisterOutOfCoverageModal
+          onClose={() => setRegisterOutOfCoverageOpen(false)}
+        />
+      )}
+
       {profileOpen && currentUser && (
         <ProfileSheet
           user={currentUser}
@@ -8986,6 +9008,71 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
 
         <button type="button" className="store-button" onClick={onClose}>
           Navegar tienda
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RegisterOutOfCoverageModal({ onClose }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 260,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+        background: 'rgba(15, 23, 42, 0.56)',
+        backdropFilter: 'blur(8px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: 'min(430px, 100%)',
+          borderRadius: 28,
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          background: '#ffffff',
+          boxShadow: '0 32px 90px rgba(15, 23, 42, 0.28)',
+          padding: '24px 22px 20px',
+          display: 'grid',
+          gap: 16,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={{ display: 'grid', gap: 8 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 54,
+              height: 54,
+              borderRadius: 20,
+              background: 'linear-gradient(135deg, rgba(190, 24, 93, 0.12) 0%, rgba(239, 68, 68, 0.22) 100%)',
+              color: '#b91c1c',
+              fontSize: 28,
+              fontWeight: 900,
+            }}
+          >
+            !
+          </div>
+          <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.05, color: '#0f172a' }}>
+            Direccion fuera de rango
+          </h2>
+          <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.6 }}>
+            Cubrimos el area de ciudad Granada y alrededores.
+          </p>
+          <p style={{ margin: 0, color: '#0f3b82', fontWeight: 900, lineHeight: 1.6 }}>
+            Proximamente abarcaremos nuevas zonas. 🙌
+          </p>
+        </div>
+
+        <button type="button" className="store-button" onClick={onClose}>
+          Entendido
         </button>
       </div>
     </div>
