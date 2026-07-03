@@ -6573,6 +6573,7 @@ export default function TiendaVirtualView({
           selectedReward={selectedRewardRedemption}
           welcomeCoupon={welcomeCoupon}
           welcomeCouponStatus={welcomeCouponStatus}
+          welcomeCouponExpiryLabel={welcomeCouponExpiryLabel}
           welcomeCouponActionBusy={welcomeCouponActionBusy}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
@@ -8222,6 +8223,7 @@ function CheckoutSheet({
   selectedReward,
   welcomeCoupon,
   welcomeCouponStatus,
+  welcomeCouponExpiryLabel,
   welcomeCouponActionBusy,
   onClose,
   onApplyCoupon,
