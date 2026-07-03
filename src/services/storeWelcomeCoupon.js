@@ -1,12 +1,14 @@
 import { get, onValue, ref, runTransaction, set, update } from 'firebase/database';
 import { database } from '../firebase';
-import { normalizeStoreCoupon } from './storeCoupons';
+import { isStoreCouponExpired, normalizeStoreCoupon } from './storeCoupons';
 
 export const STORE_WELCOME_COUPON_CAMPAIGN_PATH = 'storeCampaigns/welcomeCoupon200';
 export const STORE_WELCOME_COUPON_CAMPAIGN_ID = 'welcome_coupon_200_granada_jun2026';
 export const STORE_WELCOME_COUPON_LIMIT = 55;
 export const STORE_WELCOME_COUPON_AMOUNT = 200;
 export const STORE_WELCOME_COUPON_MINIMUM = 700;
+export const STORE_WELCOME_COUPON_VALID_DAYS = 10;
+const STORE_WELCOME_COUPON_VALID_MS = STORE_WELCOME_COUPON_VALID_DAYS * 24 * 60 * 60 * 1000;
 
 const cleanPhoneDigits = (value = '') => String(value || '').replace(/\D/g, '');
 
@@ -33,6 +35,15 @@ const normalizeMoney = (value, fallback = 0) => {
   }
 
   return Math.max(0, Number(Number(fallback || 0).toFixed(2)));
+};
+
+const resolveWelcomeCouponExpiresAt = (assignedAt = 0) => {
+  const baseAssignedAt = Math.max(0, Number(assignedAt || 0));
+  if (baseAssignedAt <= 0) {
+    return 0;
+  }
+
+  return baseAssignedAt + STORE_WELCOME_COUPON_VALID_MS;
 };
 
 export const buildDefaultStoreWelcomeCouponCampaign = (overrides = {}) => ({
@@ -154,6 +165,7 @@ const buildWelcomeCouponPayload = ({
   amount = STORE_WELCOME_COUPON_AMOUNT,
   minimumPurchase = STORE_WELCOME_COUPON_MINIMUM,
   campaignId = STORE_WELCOME_COUPON_CAMPAIGN_ID,
+  assignedAt = 0,
 } = {}) =>
   normalizeStoreCoupon({
     code: buildWelcomeCouponCode({ slotNumber, phone, userKey }),
@@ -169,6 +181,13 @@ const buildWelcomeCouponPayload = ({
     autoApply: true,
     personal: true,
     welcomeCoupon: true,
+    createdAt: Math.max(0, Number(assignedAt || 0)),
+    createdAtIso: Number(assignedAt || 0) > 0 ? new Date(Number(assignedAt || 0)).toISOString() : '',
+    expiresAt: resolveWelcomeCouponExpiresAt(assignedAt),
+    expiresAtIso:
+      resolveWelcomeCouponExpiresAt(assignedAt) > 0
+        ? new Date(resolveWelcomeCouponExpiresAt(assignedAt)).toISOString()
+        : '',
   });
 
 export const normalizeStoreWelcomeCoupon = (value = {}) => {
@@ -177,7 +196,17 @@ export const normalizeStoreWelcomeCoupon = (value = {}) => {
   }
 
   const slotNumber = Math.max(0, Math.trunc(Number(value.slotNumber || value.slot || 0)));
-  const coupon = normalizeStoreCoupon(value.coupon || {});
+  const assignedAt = Math.max(0, Number(value.assignedAt || value.coupon?.createdAt || 0));
+  const expiresAt = Math.max(
+    0,
+    Number(value.expiresAt || value.coupon?.expiresAt || resolveWelcomeCouponExpiresAt(assignedAt))
+  );
+  const coupon = normalizeStoreCoupon(value.coupon || {}, {
+    createdAt: assignedAt,
+    createdAtIso: assignedAt > 0 ? new Date(assignedAt).toISOString() : '',
+    expiresAt,
+    expiresAtIso: expiresAt > 0 ? new Date(expiresAt).toISOString() : '',
+  });
 
   if (!slotNumber || !coupon.code) {
     return null;
@@ -187,7 +216,11 @@ export const normalizeStoreWelcomeCoupon = (value = {}) => {
     campaignId: String(value.campaignId || STORE_WELCOME_COUPON_CAMPAIGN_ID).trim(),
     slotNumber,
     assignedUserKey: String(value.assignedUserKey || coupon.assignedUserKey || '').trim(),
-    assignedAt: Math.max(0, Number(value.assignedAt || 0)),
+    assignedAt,
+    expiresAt,
+    expiresAtIso: String(
+      value.expiresAtIso || coupon.expiresAtIso || (expiresAt > 0 ? new Date(expiresAt).toISOString() : '')
+    ).trim(),
     claimedAt: Math.max(0, Number(value.claimedAt || 0)),
     usedAt: Math.max(0, Number(value.usedAt || 0)),
     lastOrderKey: String(value.lastOrderKey || '').trim(),
@@ -202,6 +235,14 @@ export const getStoreWelcomeCouponEffectiveStatus = (welcomeCoupon = null, usedC
   const normalized = normalizeStoreWelcomeCoupon(welcomeCoupon);
   if (!normalized) {
     return 'none';
+  }
+
+  if (
+    normalized.status === 'expired' ||
+    isStoreCouponExpired(normalized.coupon) ||
+    (normalized.expiresAt > 0 && Date.now() > normalized.expiresAt)
+  ) {
+    return 'expired';
   }
 
   if (Number(usedCount || 0) >= Math.max(1, Number(normalized.coupon?.maxUsesPerUser || 1))) {
@@ -267,6 +308,7 @@ export async function ensureStoreWelcomeCouponForUser({
         amount: currentCampaign.amount,
         minimumPurchase: currentCampaign.minimumPurchase,
         campaignId: currentCampaign.campaignId,
+        assignedAt: Number(existingAssignment.assignedAt || now),
       }),
     });
 
@@ -338,6 +380,7 @@ export async function ensureStoreWelcomeCouponForUser({
     slotNumber,
     assignedUserKey: cleanUserKey,
     assignedAt: Number(assignedEntry?.assignedAt || now),
+    expiresAt: resolveWelcomeCouponExpiresAt(Number(assignedEntry?.assignedAt || now)),
     claimedAt: 0,
     usedAt: 0,
     status: 'available',
@@ -350,6 +393,7 @@ export async function ensureStoreWelcomeCouponForUser({
       amount: campaignValue.amount,
       minimumPurchase: campaignValue.minimumPurchase,
       campaignId: campaignValue.campaignId,
+      assignedAt: Number(assignedEntry?.assignedAt || now),
     }),
   });
 
@@ -370,6 +414,10 @@ export async function claimStoreWelcomeCoupon({
 
   if (!cleanUserKey || !normalized) {
     throw new Error('Cupon de bienvenida invalido.');
+  }
+
+  if (getStoreWelcomeCouponEffectiveStatus(normalized) === 'expired') {
+    throw new Error('Tu cupon de bienvenida ya vencio.');
   }
 
   const claimedAt = Date.now();

@@ -9,6 +9,11 @@ const sanitizeCouponCode = (value) =>
     .toUpperCase()
     .replace(/\s+/g, '');
 
+const normalizeCouponTimestamp = (value, fallback = 0) => {
+  const numeric = Number(value ?? fallback ?? 0);
+  return Number.isFinite(numeric) ? Math.max(0, Math.trunc(numeric)) : 0;
+};
+
 export const normalizeCouponCode = sanitizeCouponCode;
 
 export const getStoreCouponKey = (code) =>
@@ -24,6 +29,8 @@ export const normalizeStoreCoupon = (coupon = {}, fallback = {}) => {
   const backup = fallback || {};
   const code = sanitizeCouponCode(source.code ?? backup.code);
   const type = source.type === 'amount' || backup.type === 'amount' ? 'amount' : 'percent';
+  const createdAt = normalizeCouponTimestamp(source.createdAt, backup.createdAt);
+  const expiresAt = normalizeCouponTimestamp(source.expiresAt, backup.expiresAt);
 
   return {
     code,
@@ -39,7 +46,21 @@ export const normalizeStoreCoupon = (coupon = {}, fallback = {}) => {
     autoApply: source.autoApply ?? backup.autoApply ?? false,
     personal: source.personal ?? backup.personal ?? false,
     welcomeCoupon: source.welcomeCoupon ?? backup.welcomeCoupon ?? false,
+    createdAt,
+    createdAtIso: String(source.createdAtIso ?? backup.createdAtIso ?? '').trim(),
+    expiresAt,
+    expiresAtIso: String(source.expiresAtIso ?? backup.expiresAtIso ?? '').trim(),
   };
+};
+
+export const isStoreCouponExpired = (coupon = {}, now = Date.now()) => {
+  const normalized = normalizeStoreCoupon(coupon);
+  const expiresAt = normalizeCouponTimestamp(normalized.expiresAt, 0);
+  if (!normalized.code || expiresAt <= 0) {
+    return false;
+  }
+
+  return Number(now || Date.now()) > expiresAt;
 };
 
 export const mergeStoreCoupons = (remoteCoupons = {}) =>
@@ -53,7 +74,7 @@ export const calculateCouponDiscount = (coupon, subtotal) => {
   const normalized = normalizeStoreCoupon(coupon);
   const amount = Number(subtotal || 0);
 
-  if (!normalized.code || normalized.active === false || amount <= 0) {
+  if (!normalized.code || normalized.active === false || isStoreCouponExpired(normalized) || amount <= 0) {
     return 0;
   }
 

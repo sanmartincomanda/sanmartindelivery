@@ -21,6 +21,7 @@ import {
 } from '../services/storeCategories';
 import {
   calculateCouponDiscount,
+  isStoreCouponExpired,
   mergeStoreCoupons,
   normalizeStoreCoupon,
   normalizeCouponUsageLimit,
@@ -355,7 +356,27 @@ const buildStoreDeliverySummary = (deliveryQuote) => {
 };
 
 const findWelcomeCouponHeroImage = (products = []) => {
-  const prioritizedProduct = (Array.isArray(products) ? products : []).find((product) => {
+  const normalizedProducts = Array.isArray(products) ? products : [];
+  const exactProduct =
+    normalizedProducts.find(
+      (product) =>
+        String(product?.image || '').trim() &&
+        String(product?.code || '').trim() === '00005'
+    ) ||
+    normalizedProducts.find((product) => {
+      const text = `${product?.name || ''} ${product?.description || ''}`
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+      return String(product?.image || '').trim() && (text.includes('flap/s') || text.includes('flap'));
+    });
+
+  if (exactProduct?.image) {
+    return exactProduct.image;
+  }
+
+  const prioritizedProduct = normalizedProducts.find((product) => {
     const text = `${product?.category || ''} ${product?.subcategory || ''} ${product?.name || ''}`
       .toLowerCase()
       .normalize('NFD')
@@ -380,11 +401,28 @@ const getWelcomeCouponCartMessage = (welcomeCoupon = null, totalAmount = 0) => {
     return '';
   }
 
+  if (normalized.expiresAt > 0 && Date.now() > normalized.expiresAt) {
+    return 'Tu cupon de bienvenida ya vencio.';
+  }
+
   if (Number(totalAmount || 0) < Number(normalized.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)) {
     return `Disponible desde ${formatCurrency(normalized.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)} de compra.`;
   }
 
   return `Listo para descontarte ${formatCurrency(normalized.amount || STORE_WELCOME_COUPON_AMOUNT)} en este pedido.`;
+};
+
+const formatCouponExpiryLabel = (timestamp = 0) => {
+  const numeric = Number(timestamp || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('es-NI', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(numeric));
 };
 
 const isCanceledOrderStatus = (status) => {
@@ -1850,6 +1888,10 @@ export default function TiendaVirtualView({
     () => getStoreWelcomeCouponEffectiveStatus(welcomeCoupon, welcomeCouponUsageCount),
     [welcomeCoupon, welcomeCouponUsageCount]
   );
+  const welcomeCouponExpiryLabel = useMemo(
+    () => formatCouponExpiryLabel(welcomeCoupon?.expiresAt),
+    [welcomeCoupon?.expiresAt]
+  );
 
   const getCouponUsageMessage = (coupon) => {
     const assignedUserKey = String(coupon?.assignedUserKey || '').trim();
@@ -1861,11 +1903,15 @@ export default function TiendaVirtualView({
 
     const limit = normalizeCouponUsageLimit(coupon?.maxUsesPerUser || 0);
     if (limit <= 0) {
-      return '';
+      return isStoreCouponExpired(coupon) ? 'Este cupon ya vencio.' : '';
     }
 
     if (!currentUser?.key) {
       return 'Inicia sesion para usar este cupon.';
+    }
+
+    if (isStoreCouponExpired(coupon)) {
+      return 'Este cupon ya vencio.';
     }
 
     if (!couponUsageReady) {
@@ -1891,6 +1937,14 @@ export default function TiendaVirtualView({
       setAppliedCoupon(null);
       if (!silent) {
         setCouponMessage('Cupon no encontrado o inactivo.');
+      }
+      return false;
+    }
+
+    if (isStoreCouponExpired(normalizedCoupon)) {
+      setAppliedCoupon(null);
+      if (!silent) {
+        setCouponMessage('Este cupon ya vencio.');
       }
       return false;
     }
@@ -1941,8 +1995,8 @@ export default function TiendaVirtualView({
     [promotions]
   );
   const welcomeCouponHeroImage = useMemo(
-    () => findWelcomeCouponHeroImage(activeProducts),
-    [activeProducts]
+    () => findWelcomeCouponHeroImage(catalog),
+    [catalog]
   );
 
   const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
@@ -2030,12 +2084,15 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (welcomeCouponStatus === 'available' && welcomeCoupon?.coupon?.code) {
+    if (
+      ['available', 'claimed'].includes(welcomeCouponStatus) &&
+      welcomeCoupon?.coupon?.code
+    ) {
       setWelcomeCouponOpen(true);
       return;
     }
 
-    if (welcomeCouponStatus === 'used') {
+    if (['used', 'expired'].includes(welcomeCouponStatus)) {
       setWelcomeCouponOpen(false);
     }
   }, [currentUser?.key, welcomeCoupon?.coupon?.code, welcomeCouponStatus]);
@@ -6634,10 +6691,22 @@ export default function TiendaVirtualView({
       {welcomeCouponOpen && welcomeCoupon && (
         <WelcomeCouponModal
           welcomeCoupon={welcomeCoupon}
+          status={welcomeCouponStatus}
+          canApply={
+            welcomeCouponStatus === 'claimed' &&
+            Number(totalAmount || 0) >= Number(welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
+          }
+          expiresLabel={welcomeCouponExpiryLabel}
           heroImage={welcomeCouponHeroImage}
           busy={welcomeCouponActionBusy}
           onClose={() => setWelcomeCouponOpen(false)}
           onClaim={handleClaimWelcomeCoupon}
+          onApply={() => {
+            if (welcomeCoupon?.coupon) {
+              applyResolvedCoupon(welcomeCoupon.coupon);
+              setWelcomeCouponOpen(false);
+            }
+          }}
         />
       )}
 
@@ -6648,15 +6717,20 @@ export default function TiendaVirtualView({
 
 function WelcomeCouponModal({
   welcomeCoupon,
+  status = 'available',
+  canApply = false,
+  expiresLabel = '',
   heroImage = '',
   busy = false,
   onClose,
   onClaim,
+  onApply,
 }) {
   const amount = `C$${Math.round(Number(welcomeCoupon?.amount || STORE_WELCOME_COUPON_AMOUNT))}`;
   const minimum = `C$${Math.round(
     Number(welcomeCoupon?.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
   )}`;
+  const isClaimedReminder = status === 'claimed';
   const overlayStyle = {
     position: 'fixed',
     inset: 0,
@@ -6751,7 +6825,7 @@ function WelcomeCouponModal({
 
           <div style={{ marginTop: 34 }}>
             <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.04em' }}>
-              GANASTE UN CUPON DE
+              {isClaimedReminder ? 'APLICA TU CUPON DE' : 'GANASTE UN CUPON DE'}
             </div>
             <div
               style={{
@@ -6786,12 +6860,30 @@ function WelcomeCouponModal({
             >
               Tu compra debe ser como minimo de {minimum}
             </div>
+            {expiresLabel ? (
+              <div
+                style={{
+                  marginTop: 14,
+                  fontSize: 16,
+                  fontWeight: 800,
+                  letterSpacing: '0.01em',
+                  color: 'rgba(255,255,255,0.92)',
+                }}
+              >
+                Vencimiento: {expiresLabel}
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div style={{ padding: '0 28px 28px' }}>
-          <button type="button" style={buttonStyle} onClick={onClaim} disabled={busy}>
-            {busy ? 'Activando...' : 'Canjear'}
+          <button
+            type="button"
+            style={buttonStyle}
+            onClick={isClaimedReminder ? (canApply ? onApply : onClose) : onClaim}
+            disabled={busy}
+          >
+            {busy ? 'Activando...' : isClaimedReminder ? (canApply ? 'Aplicar cupon' : 'Seguir comprando') : 'Canjear'}
           </button>
         </div>
       </div>
@@ -8191,7 +8283,7 @@ function CheckoutSheet({
   const showWelcomeCouponCard =
     welcomeCoupon &&
     welcomeCoupon.coupon &&
-    welcomeCouponStatus !== 'used';
+    !['used', 'expired'].includes(welcomeCouponStatus);
   const welcomeCouponCanApply =
     showWelcomeCouponCard &&
     Number(totalAmount || 0) >= Number(welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM);
@@ -8317,6 +8409,11 @@ function CheckoutSheet({
                       )}.`
                     : getWelcomeCouponCartMessage(welcomeCoupon, totalAmount)}
                 </p>
+                {welcomeCouponExpiryLabel && (
+                  <p style={{ margin: '8px 0 0', fontSize: '0.9rem', color: 'var(--store-text-soft)' }}>
+                    <strong>Vencimiento:</strong> {welcomeCouponExpiryLabel}
+                  </p>
+                )}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
                   {welcomeCouponStatus === 'available' ? (
                     <button
@@ -8488,6 +8585,11 @@ function CheckoutSheet({
                       )}.`
                     : getWelcomeCouponCartMessage(welcomeCoupon, totalAmount)}
                 </p>
+                {welcomeCouponExpiryLabel && (
+                  <p style={{ margin: '8px 0 0', fontSize: '0.9rem', color: 'var(--store-text-soft)' }}>
+                    <strong>Vencimiento:</strong> {welcomeCouponExpiryLabel}
+                  </p>
+                )}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
                   {welcomeCouponStatus === 'available' ? (
                     <button
