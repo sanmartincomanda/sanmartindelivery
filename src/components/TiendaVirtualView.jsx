@@ -120,6 +120,7 @@ const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_ORDER_UPDATE_ACK_KEY = 'sanmartin_store_order_update_ack';
 const STORE_WHATSAPP_NUMBER = '50584657949';
+const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248', '00249']);
 const ORDER_PROGRESS_STEPS = [
   { key: 'preparando', label: 'Preparando', icon: 'prep' },
   { key: 'en_camino', label: 'En camino', icon: 'driver' },
@@ -144,6 +145,11 @@ const STORE_GROUP_PAGE_SIZE = 5;
 const STORE_CASH_PAYMENT = 'EFECTIVO';
 const STORE_MOBILE_NAV_BREAKPOINT = 820;
 const STORE_MOBILE_SCROLL_OFFSET = 96;
+const isDeliveryServiceItem = (item = {}) => {
+  const code = String(item?.codigo || item?.code || '').trim();
+  const name = String(item?.nombre || item?.name || '').trim().toLowerCase();
+  return DELIVERY_SERVICE_ITEM_CODES.has(code) || name.includes('servicio a domicilio');
+};
 const EMPTY_STORE_AUTH_FORM = {
   nombre: '',
   email: '',
@@ -812,7 +818,9 @@ const buildOrderItemsMessage = (order = {}) => {
     return order.pedido || 'Sin detalle de productos';
   }
 
-  return order.items
+  const visibleItems = order.items.filter((item) => !isDeliveryServiceItem(item));
+
+  return visibleItems
     .map((item) => {
       const quantity = formatStoreQuantity(item.cantidad, item.unidad);
       const nameLine = [
@@ -9008,6 +9016,9 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
 function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const whatsappLink = buildOrderUpdateReviewWhatsAppLink(order, currentUser);
+  const visibleItems = (Array.isArray(order.items) ? order.items : []).filter(
+    (item) => !isDeliveryServiceItem(item)
+  );
   const modalContent = (
     <div
       style={{
@@ -9075,7 +9086,7 @@ function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
           }}
         >
           <div style={{ display: 'grid', gap: 10 }}>
-            {(Array.isArray(order.items) ? order.items : []).map((item) => (
+            {visibleItems.map((item) => (
               <div
                 key={`${order.firebaseKey || order.id}-updated-${item.codigo || item.nombre}`}
                 style={{
@@ -9398,10 +9409,10 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
         </div>
       </div>
 
-      {Array.isArray(order.items) && order.items.length > 0 && (
+      {Array.isArray(order.items) && order.items.some((item) => !isDeliveryServiceItem(item)) && (
         <div className="store-status-items">
           <strong className="store-status-items-title">Detalle del pedido</strong>
-          {order.items.map((item) => (
+          {order.items.filter((item) => !isDeliveryServiceItem(item)).map((item) => (
             <div key={`${order.firebaseKey || order.id}-${item.codigo || item.nombre}`}>
               <div>
                 {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
