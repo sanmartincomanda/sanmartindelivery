@@ -7,6 +7,7 @@ import { createSicarClientSyncManager } from './sicarClientSync.mjs';
 import { createOrderArchiveManager } from './orderArchiveManager.mjs';
 import { createSicarQuoteSyncManager } from './sicarQuoteSync.mjs';
 import { createStoreRewardsSyncManager } from './storeRewardsSync.mjs';
+import { createStoreWelcomeCouponSyncManager } from './storeWelcomeCouponSync.mjs';
 import { getCrmDashboardSnapshot } from './crmAnalytics.mjs';
 import {
   SICAR_MIN_OVERALL_SHARE_PCT,
@@ -308,6 +309,7 @@ const sicarClientSync = createSicarClientSyncManager({
 });
 
 const storeRewardsSync = createStoreRewardsSyncManager();
+const storeWelcomeCouponSync = createStoreWelcomeCouponSyncManager();
 
 const orderArchive = createOrderArchiveManager({
   repoRoot,
@@ -730,6 +732,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       quoteSync: sicarQuoteSync.state,
       clientSync: sicarClientSync.state,
       rewardsSync: storeRewardsSync.state,
+      welcomeCouponSync: storeWelcomeCouponSync.state,
       orderArchive: orderArchive.state,
     });
   }
@@ -922,6 +925,9 @@ server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   sicarClientSync.initAutoSync();
   storeRewardsSync.initAutoSync().catch((error) => {
     console.error('No se pudo iniciar la sincronizacion de recompensas:', error);
+  });
+  storeWelcomeCouponSync.initAutoSync().catch((error) => {
+    console.error('No se pudo iniciar la sincronizacion del cupon de bienvenida:', error);
   });
   if (ENABLE_SICAR_QUOTE_SYNC) {
     sicarQuoteSync.initAutoSync();

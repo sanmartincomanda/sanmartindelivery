@@ -3,6 +3,10 @@ import { database } from '../firebase';
 import { hoyISO } from '../components/Utils';
 import { normalizeLocation } from './geo';
 import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards';
+import {
+  buildStoreWelcomeCouponReservationState,
+  isStoreWelcomeCouponCoupon,
+} from './storeWelcomeCoupon';
 
 export const ORDER_LIMIT_PER_DAY = 125;
 export const MANUAL_CHANNEL = 'manual';
@@ -399,7 +403,14 @@ export async function createOrder(payload, options = {}) {
         title: String(payload.cupon.title || '').trim(),
         type: String(payload.cupon.type || '').trim(),
         value: Number(payload.cupon.value || 0),
+        minimum: Math.max(0, Number(payload.cupon.minimum || 0)),
         maxUsesPerUser: Math.max(0, Math.trunc(Number(payload.cupon.maxUsesPerUser || 0))),
+        assignedUserKey: String(payload.cupon.assignedUserKey || '').trim(),
+        campaignId: String(payload.cupon.campaignId || '').trim(),
+        autoApply: payload.cupon.autoApply === true,
+        personal: payload.cupon.personal === true,
+        welcomeCoupon: payload.cupon.welcomeCoupon === true,
+        expiresAt: Math.max(0, Number(payload.cupon.expiresAt || 0)),
       }
     : null;
 
@@ -482,6 +493,29 @@ export async function createOrder(payload, options = {}) {
   const updates = {
     [`orders/${orderKey}`]: orderRecord,
   };
+
+  const storeUserKey = String(payload.storeUserKey || '').trim();
+  const welcomeCouponReservation =
+    channel === STORE_CHANNEL &&
+    storeUserKey &&
+    isStoreWelcomeCouponCoupon(coupon)
+      ? buildStoreWelcomeCouponReservationState({
+          welcomeCoupon:
+            payload.welcomeCouponRecord || {
+              assignedUserKey: storeUserKey,
+              claimedAt: createdAt,
+              amount: Number(coupon?.value || 0),
+              minimumPurchase: Number(coupon?.minimum || 0),
+              coupon,
+            },
+          orderKey,
+          reservedAt: createdAt,
+        })
+      : null;
+
+  if (welcomeCouponReservation) {
+    updates[`storeUsers/${storeUserKey}/welcomeCoupon`] = welcomeCouponReservation;
+  }
 
   if (channel === STORE_CHANNEL) {
     updates[`${SICAR_QUOTE_QUEUE_PATH}/${orderKey}`] = {

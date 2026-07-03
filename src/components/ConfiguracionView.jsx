@@ -111,6 +111,10 @@ import {
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import {
   buildDefaultStoreWelcomeCouponCampaign,
+  getStoreWelcomeCouponEffectiveStatus,
+  isStoreWelcomeCouponCode,
+  isStoreWelcomeCouponCoupon,
+  normalizeStoreWelcomeCoupon,
   normalizeStoreWelcomeCouponCampaign,
   saveStoreWelcomeCouponCampaign,
   subscribeStoreWelcomeCouponCampaign,
@@ -625,7 +629,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || section !== 'pedidos') {
+    if (!isStoreMode || (section !== 'pedidos' && section !== 'cupones')) {
       return undefined;
     }
 
@@ -693,7 +697,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode]);
 
   useEffect(() => {
-    if (isStoreMode || usersTab !== 'clientes') {
+    if (
+      (isStoreMode && section !== 'cupones') ||
+      (!isStoreMode && usersTab !== 'clientes')
+    ) {
       return undefined;
     }
 
@@ -2544,6 +2551,8 @@ export default function ConfiguracionView({ mode = 'users' }) {
             savingCoupon={savingCoupon}
             welcomeCouponCampaign={welcomeCouponCampaign}
             savingWelcomeCouponCampaign={savingWelcomeCouponCampaign}
+            storeUsers={storeUsers}
+            storeOrders={storeOrders}
             setCouponPin={setCouponPin}
             unlockCoupons={unlockCoupons}
             updateCouponForm={updateCouponForm}
@@ -4457,6 +4466,8 @@ function CouponsManager({
   savingCoupon,
   welcomeCouponCampaign,
   savingWelcomeCouponCampaign,
+  storeUsers,
+  storeOrders,
   setCouponPin,
   unlockCoupons,
   updateCouponForm,
@@ -4489,6 +4500,39 @@ function CouponsManager({
 
   const formatCouponValue = (coupon) =>
     coupon.type === 'amount' ? `C$ ${Number(coupon.value || 0).toFixed(2)}` : `${Number(coupon.value || 0)}%`;
+  const normalizeOrderStatusText = (value = '') =>
+    String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  const isCanceledWelcomeOrder = (order = {}) => {
+    const status = normalizeOrderStatusText(order?.estado || '');
+    return status.includes('cancel') || status.includes('anulad');
+  };
+  const isDeliveredWelcomeOrder = (order = {}) =>
+    normalizeOrderStatusText(order?.estado || '').includes('entregado');
+  const getOrderTimestamp = (order = {}) =>
+    Math.max(0, Number(order?.timestamp || 0), Number(order?.timestampIngresoMs || 0));
+  const getWelcomeCouponStatusMeta = (status = 'available') => {
+    if (status === 'used') {
+      return { label: 'Canjeado', tone: '#065f46', background: '#dcfce7' };
+    }
+
+    if (status === 'reserved') {
+      return { label: 'En pedido', tone: '#1d4ed8', background: '#dbeafe' };
+    }
+
+    if (status === 'claimed') {
+      return { label: 'Activado', tone: '#92400e', background: '#fef3c7' };
+    }
+
+    if (status === 'expired') {
+      return { label: 'Vencido', tone: '#991b1b', background: '#fee2e2' };
+    }
+
+    return { label: 'Disponible', tone: '#475569', background: '#e2e8f0' };
+  };
   const formatCouponUsageLimit = (coupon) => {
     const limit = Math.max(0, Math.trunc(Number(coupon.maxUsesPerUser || 0)));
     if (limit <= 0) {
@@ -4507,9 +4551,106 @@ function CouponsManager({
         .sort((left, right) => Number(right.assignedAt || 0) - Number(left.assignedAt || 0)),
     [welcomeCouponCampaign?.assignments]
   );
+  const storeUsersByKey = useMemo(
+    () =>
+      (storeUsers || []).reduce((accumulator, user) => {
+        const userKey = String(user?.key || '').trim();
+        if (userKey) {
+          accumulator[userKey] = user;
+        }
+        return accumulator;
+      }, {}),
+    [storeUsers]
+  );
+  const welcomeCouponOrdersByUser = useMemo(() => {
+    const map = new Map();
+
+    (storeOrders || []).forEach((order) => {
+      if (!isStoreWelcomeCouponCoupon(order?.cupon || {}) && !isStoreWelcomeCouponCode(order?.cupon?.code)) {
+        return;
+      }
+
+      const userKey = String(order?.storeUserKey || '').trim();
+      if (!userKey) {
+        return;
+      }
+
+      if (!map.has(userKey)) {
+        map.set(userKey, []);
+      }
+
+      map.get(userKey).push(order);
+    });
+
+    map.forEach((orders, userKey) => {
+      map.set(
+        userKey,
+        [...orders].sort((left, right) => getOrderTimestamp(right) - getOrderTimestamp(left))
+      );
+    });
+
+    return map;
+  }, [storeOrders]);
+  const campaignAssignmentRows = useMemo(
+    () =>
+      campaignAssignments.map((assignment) => {
+        const storeUser = storeUsersByKey[assignment.userKey] || {};
+        const welcomeCoupon = normalizeStoreWelcomeCoupon(storeUser?.welcomeCoupon);
+        const userOrders = welcomeCouponOrdersByUser.get(assignment.userKey) || [];
+        const deliveredOrder = userOrders.find((order) => isDeliveredWelcomeOrder(order) && !isCanceledWelcomeOrder(order)) || null;
+        const pendingOrder = userOrders.find((order) => !isCanceledWelcomeOrder(order) && !isDeliveredWelcomeOrder(order)) || null;
+        const canceledOrders = userOrders.filter((order) => isCanceledWelcomeOrder(order));
+        const usedCount = deliveredOrder ? 1 : 0;
+        const effectiveStatus = deliveredOrder
+          ? 'used'
+          : pendingOrder
+            ? 'reserved'
+            : getStoreWelcomeCouponEffectiveStatus(welcomeCoupon, usedCount);
+        const lastOrder = deliveredOrder || pendingOrder || canceledOrders[0] || null;
+        const statusMeta = getWelcomeCouponStatusMeta(effectiveStatus);
+
+        return {
+          ...assignment,
+          nombre: storeUser?.nombre || assignment.customerName || 'Cliente sin nombre',
+          telefono: storeUser?.telefono || assignment.phoneSuffix || '',
+          codigoCliente: storeUser?.codigo || '',
+          welcomeCoupon,
+          userOrders,
+          usedCount,
+          deliveredOrder,
+          pendingOrder,
+          canceledOrders,
+          canceledCount: canceledOrders.length,
+          effectiveStatus,
+          statusMeta,
+          claimedAt: Math.max(0, Number(welcomeCoupon?.claimedAt || 0)),
+          usedAt: Math.max(
+            0,
+            Number(welcomeCoupon?.usedAt || 0),
+            Number(deliveredOrder?.timestamp || 0),
+            Number(deliveredOrder?.timestampIngresoMs || 0)
+          ),
+          lastOrder,
+        };
+      }),
+    [campaignAssignments, storeUsersByKey, welcomeCouponOrdersByUser]
+  );
   const assignedCount = Math.max(0, Number(welcomeCouponCampaign?.assignedCount || 0));
   const campaignLimit = Math.max(0, Number(welcomeCouponCampaign?.limit || 0));
   const remainingCount = Math.max(0, campaignLimit - assignedCount);
+  const claimedCount = campaignAssignmentRows.filter((row) => row.claimedAt > 0).length;
+  const redeemedCount = campaignAssignmentRows.filter((row) => row.effectiveStatus === 'used').length;
+  const reservedCount = campaignAssignmentRows.filter((row) => row.effectiveStatus === 'reserved').length;
+  const expiredCount = campaignAssignmentRows.filter((row) => row.effectiveStatus === 'expired').length;
+  const availableCount = campaignAssignmentRows.filter((row) => row.effectiveStatus === 'available').length;
+  const canceledUseCount = campaignAssignmentRows.filter((row) => row.canceledCount > 0).length;
+  const redeemedRows = useMemo(
+    () =>
+      campaignAssignmentRows
+        .filter((row) => row.effectiveStatus === 'used')
+        .sort((left, right) => Number(right.usedAt || 0) - Number(left.usedAt || 0)),
+    [campaignAssignmentRows]
+  );
   const handleSaveCampaign = async (event) => {
     event.preventDefault();
     const nextLimit = Math.max(assignedCount, 1, Math.trunc(Number(campaignDraft.limit || 0)));
@@ -4689,11 +4830,97 @@ function CouponsManager({
               <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Restantes</div>
               <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{remainingCount}</div>
             </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Activados</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{claimedCount}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Canjeados</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{redeemedCount}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>En pedido</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{reservedCount}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Disponibles</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{availableCount}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Vencidos</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{expiredCount}</div>
+            </div>
+            <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Intentos cancelados</div>
+              <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{canceledUseCount}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <strong style={{ fontSize: 18 }}>Clientes que ya canjearon el cupon C$200</strong>
+            {redeemedRows.length === 0 ? (
+              <div
+                style={{
+                  padding: 18,
+                  borderRadius: 12,
+                  border: '1px dashed #cbd5e1',
+                  color: '#64748b',
+                  fontWeight: 800,
+                  textAlign: 'center',
+                }}
+              >
+                Todavia no hay clientes con el cupon de bienvenida canjeado.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {redeemedRows.map((row) => (
+                  <div
+                    key={`redeemed-${row.userKey}`}
+                    style={{
+                      border: '1px solid #dcfce7',
+                      borderRadius: 12,
+                      padding: 12,
+                      background: '#f0fdf4',
+                      display: 'grid',
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#14532d' }}>
+                        {row.nombre} {row.telefono ? `| ${row.telefono}` : ''}
+                      </strong>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: 999,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: row.statusMeta.tone,
+                          background: row.statusMeta.background,
+                        }}
+                      >
+                        {row.statusMeta.label}
+                      </span>
+                    </div>
+                    <div style={{ color: '#166534', fontSize: 13, fontWeight: 700 }}>
+                      Codigo: {row.welcomeCoupon?.coupon?.code || '-'}
+                      {row.codigoCliente ? ` | Cliente SICAR: ${row.codigoCliente}` : ''}
+                    </div>
+                    <div style={{ color: '#166534', fontSize: 13 }}>
+                      Pedido: {row.deliveredOrder ? `#${formatOrderNumber(row.deliveredOrder.id)}` : '-'}
+                      {row.usedAt ? ` | ${formatAdminDateTime(row.usedAt)}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gap: 10 }}>
             <strong style={{ fontSize: 18 }}>Detalle de cupones otorgados</strong>
-            {campaignAssignments.length === 0 ? (
+            {campaignAssignmentRows.length === 0 ? (
               <div
                 style={{
                   padding: 18,
@@ -4708,7 +4935,7 @@ function CouponsManager({
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 8 }}>
-                {campaignAssignments.map((assignment) => (
+                {campaignAssignmentRows.map((assignment) => (
                   <div
                     key={`${assignment.userKey}-${assignment.slotNumber}`}
                     style={{
@@ -4718,7 +4945,7 @@ function CouponsManager({
                       display: 'grid',
                       gridTemplateColumns: 'auto minmax(0, 1fr)',
                       gap: 12,
-                      alignItems: 'center',
+                      alignItems: 'start',
                     }}
                   >
                     <div
@@ -4737,12 +4964,63 @@ function CouponsManager({
                       {String(assignment.slotNumber || '').padStart(2, '0')}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 900, color: '#0f172a' }}>
-                        {assignment.customerName || 'Cliente sin nombre'} {assignment.phoneSuffix ? `| Tel. ${assignment.phoneSuffix}` : ''}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          flexWrap: 'wrap',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ fontWeight: 900, color: '#0f172a' }}>
+                          {assignment.nombre} {assignment.telefono ? `| Tel. ${assignment.telefono}` : ''}
+                        </div>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: 999,
+                            padding: '4px 10px',
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color: assignment.statusMeta.tone,
+                            background: assignment.statusMeta.background,
+                          }}
+                        >
+                          {assignment.statusMeta.label}
+                        </span>
                       </div>
                       <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
                         {assignment.userKey}
                         {assignment.assignedAt ? ` | ${formatAdminDateTime(assignment.assignedAt)}` : ''}
+                      </div>
+                      <div style={{ color: '#475569', fontSize: 13, marginTop: 6, display: 'grid', gap: 4 }}>
+                        <div>
+                          Codigo: {assignment.welcomeCoupon?.coupon?.code || '-'}
+                          {assignment.codigoCliente ? ` | Cliente SICAR: ${assignment.codigoCliente}` : ''}
+                        </div>
+                        {assignment.claimedAt ? (
+                          <div>Activado: {formatAdminDateTime(assignment.claimedAt)}</div>
+                        ) : null}
+                        {assignment.usedAt ? (
+                          <div>Canjeado: {formatAdminDateTime(assignment.usedAt)}</div>
+                        ) : null}
+                        {assignment.pendingOrder ? (
+                          <div>
+                            Pedido pendiente: #{formatOrderNumber(assignment.pendingOrder.id)} | Estado:{' '}
+                            {assignment.pendingOrder.estado}
+                          </div>
+                        ) : null}
+                        {assignment.deliveredOrder ? (
+                          <div>
+                            Ultimo pedido con cupón: #{formatOrderNumber(assignment.deliveredOrder.id)} | Estado:{' '}
+                            {assignment.deliveredOrder.estado}
+                          </div>
+                        ) : null}
+                        {assignment.canceledCount > 0 ? (
+                          <div>Intentos cancelados: {assignment.canceledCount}</div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

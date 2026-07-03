@@ -1,6 +1,6 @@
 import { get, onValue, ref, runTransaction, set, update } from 'firebase/database';
-import { database } from '../firebase';
-import { isStoreCouponExpired, normalizeStoreCoupon } from './storeCoupons';
+import { database } from '../firebase.js';
+import { isStoreCouponExpired, normalizeStoreCoupon } from './storeCoupons.js';
 
 export const STORE_WELCOME_COUPON_CAMPAIGN_PATH = 'storeCampaigns/welcomeCoupon200';
 export const STORE_WELCOME_COUPON_CAMPAIGN_ID = 'welcome_coupon_200_granada_jun2026';
@@ -190,6 +190,31 @@ const buildWelcomeCouponPayload = ({
         : '',
   });
 
+const normalizeWelcomeCouponStatus = (value = '') => {
+  const cleanStatus = String(value || '').trim().toLowerCase();
+
+  if (cleanStatus === 'reserved' || cleanStatus === 'used' || cleanStatus === 'claimed' || cleanStatus === 'expired') {
+    return cleanStatus;
+  }
+
+  return 'available';
+};
+
+export const isStoreWelcomeCouponCode = (value = '') =>
+  String(value || '')
+    .trim()
+    .toUpperCase()
+    .startsWith('TV200-');
+
+export const isStoreWelcomeCouponCoupon = (value = {}) => {
+  const coupon = value && typeof value === 'object' ? value : {};
+  return (
+    coupon.welcomeCoupon === true ||
+    String(coupon.campaignId || '').trim() === STORE_WELCOME_COUPON_CAMPAIGN_ID ||
+    isStoreWelcomeCouponCode(coupon.code)
+  );
+};
+
 export const normalizeStoreWelcomeCoupon = (value = {}) => {
   if (!value || typeof value !== 'object') {
     return null;
@@ -222,9 +247,10 @@ export const normalizeStoreWelcomeCoupon = (value = {}) => {
       value.expiresAtIso || coupon.expiresAtIso || (expiresAt > 0 ? new Date(expiresAt).toISOString() : '')
     ).trim(),
     claimedAt: Math.max(0, Number(value.claimedAt || 0)),
+    reservedAt: Math.max(0, Number(value.reservedAt || 0)),
     usedAt: Math.max(0, Number(value.usedAt || 0)),
     lastOrderKey: String(value.lastOrderKey || '').trim(),
-    status: String(value.status || (value.claimedAt ? 'claimed' : 'available')).trim() || 'available',
+    status: normalizeWelcomeCouponStatus(value.status || (value.claimedAt ? 'claimed' : 'available')),
     amount: Math.max(0, Number(value.amount || coupon.value || STORE_WELCOME_COUPON_AMOUNT)),
     minimumPurchase: Math.max(0, Number(value.minimumPurchase || coupon.minimum || STORE_WELCOME_COUPON_MINIMUM)),
     coupon,
@@ -249,7 +275,7 @@ export const getStoreWelcomeCouponEffectiveStatus = (welcomeCoupon = null, usedC
     return 'used';
   }
 
-  if (normalized.usedAt > 0 || normalized.status === 'used') {
+  if (normalized.usedAt > 0 || normalized.status === 'used' || normalized.status === 'reserved') {
     return 'used';
   }
 
@@ -258,6 +284,63 @@ export const getStoreWelcomeCouponEffectiveStatus = (welcomeCoupon = null, usedC
   }
 
   return 'available';
+};
+
+export const buildStoreWelcomeCouponReservationState = ({
+  welcomeCoupon,
+  orderKey = '',
+  reservedAt = Date.now(),
+} = {}) => {
+  const normalized = normalizeStoreWelcomeCoupon(welcomeCoupon);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalizeStoreWelcomeCoupon({
+    ...normalized,
+    reservedAt: Math.max(0, Number(reservedAt || Date.now())),
+    usedAt: 0,
+    lastOrderKey: String(orderKey || '').trim(),
+    status: 'reserved',
+  });
+};
+
+export const buildStoreWelcomeCouponUsedState = ({
+  welcomeCoupon,
+  orderKey = '',
+  usedAt = Date.now(),
+} = {}) => {
+  const normalized = normalizeStoreWelcomeCoupon(welcomeCoupon);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalizeStoreWelcomeCoupon({
+    ...normalized,
+    reservedAt: Math.max(0, Number(normalized.reservedAt || usedAt || Date.now())),
+    usedAt: Math.max(0, Number(usedAt || Date.now())),
+    lastOrderKey: String(orderKey || normalized.lastOrderKey || '').trim(),
+    status: 'used',
+  });
+};
+
+export const buildStoreWelcomeCouponReleasedState = ({
+  welcomeCoupon,
+  releasedAt = Date.now(),
+} = {}) => {
+  const normalized = normalizeStoreWelcomeCoupon(welcomeCoupon);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalizeStoreWelcomeCoupon({
+    ...normalized,
+    reservedAt: 0,
+    usedAt: 0,
+    lastOrderKey: '',
+    status: normalized.claimedAt > 0 ? 'claimed' : 'available',
+    updatedAt: Math.max(0, Number(releasedAt || Date.now())),
+  });
 };
 
 export async function ensureStoreWelcomeCouponForUser({
