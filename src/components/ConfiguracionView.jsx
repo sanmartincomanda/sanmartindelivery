@@ -4600,6 +4600,13 @@ function CouponsManager({
         const deliveredOrder = userOrders.find((order) => isDeliveredWelcomeOrder(order) && !isCanceledWelcomeOrder(order)) || null;
         const pendingOrder = userOrders.find((order) => !isCanceledWelcomeOrder(order) && !isDeliveredWelcomeOrder(order)) || null;
         const canceledOrders = userOrders.filter((order) => isCanceledWelcomeOrder(order));
+        const couponCode = String(
+          welcomeCoupon?.coupon?.code ||
+            deliveredOrder?.cupon?.code ||
+            pendingOrder?.cupon?.code ||
+            canceledOrders[0]?.cupon?.code ||
+            ''
+        ).trim();
         const usedCount = deliveredOrder ? 1 : 0;
         const effectiveStatus = deliveredOrder
           ? 'used'
@@ -4614,6 +4621,7 @@ function CouponsManager({
           nombre: storeUser?.nombre || assignment.customerName || 'Cliente sin nombre',
           telefono: storeUser?.telefono || assignment.phoneSuffix || '',
           codigoCliente: storeUser?.codigo || '',
+          couponCode,
           welcomeCoupon,
           userOrders,
           usedCount,
@@ -4835,7 +4843,7 @@ function CouponsManager({
               <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{claimedCount}</div>
             </div>
             <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
-              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Canjeados</div>
+              <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase' }}>Usados en pedido</div>
               <div style={{ marginTop: 6, fontWeight: 900, fontSize: 22 }}>{redeemedCount}</div>
             </div>
             <div style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#f8fafc' }}>
@@ -4857,7 +4865,7 @@ function CouponsManager({
           </div>
 
           <div style={{ display: 'grid', gap: 10 }}>
-            <strong style={{ fontSize: 18 }}>Clientes que ya canjearon el cupon C$200</strong>
+            <strong style={{ fontSize: 18 }}>Clientes que ya usaron el cupon C$200 en un pedido entregado</strong>
             {redeemedRows.length === 0 ? (
               <div
                 style={{
@@ -4869,7 +4877,7 @@ function CouponsManager({
                   textAlign: 'center',
                 }}
               >
-                Todavia no hay clientes con el cupon de bienvenida canjeado.
+                Todavia no hay clientes que hayan usado el cupon de bienvenida en un pedido entregado.
               </div>
             ) : (
               <div style={{ display: 'grid', gap: 8 }}>
@@ -4905,7 +4913,7 @@ function CouponsManager({
                       </span>
                     </div>
                     <div style={{ color: '#166534', fontSize: 13, fontWeight: 700 }}>
-                      Codigo: {row.welcomeCoupon?.coupon?.code || '-'}
+                      Codigo: {row.couponCode || '-'}
                       {row.codigoCliente ? ` | Cliente SICAR: ${row.codigoCliente}` : ''}
                     </div>
                     <div style={{ color: '#166534', fontSize: 13 }}>
@@ -4997,14 +5005,14 @@ function CouponsManager({
                       </div>
                       <div style={{ color: '#475569', fontSize: 13, marginTop: 6, display: 'grid', gap: 4 }}>
                         <div>
-                          Codigo: {assignment.welcomeCoupon?.coupon?.code || '-'}
+                          Codigo: {assignment.couponCode || '-'}
                           {assignment.codigoCliente ? ` | Cliente SICAR: ${assignment.codigoCliente}` : ''}
                         </div>
                         {assignment.claimedAt ? (
                           <div>Activado: {formatAdminDateTime(assignment.claimedAt)}</div>
                         ) : null}
                         {assignment.usedAt ? (
-                          <div>Canjeado: {formatAdminDateTime(assignment.usedAt)}</div>
+                          <div>Usado: {formatAdminDateTime(assignment.usedAt)}</div>
                         ) : null}
                         {assignment.pendingOrder ? (
                           <div>
