@@ -6,8 +6,8 @@ export const STORE_DELIVERY_SETTINGS_PATH = 'storeDeliverySettings';
 export const STORE_DELIVERY_TAX_RATE = 15;
 export const STORE_DEFAULT_COVERAGE_RADIUS_KM = 7.5;
 export const STORE_DELIVERY_FEE_BRACKETS = [
-  { key: 'under2km', label: '< 2 km', maxDistanceKm: 2 },
-  { key: 'under35km', label: '< 3.5 km', maxDistanceKm: 3.5 },
+  { key: 'under2km', label: '< 1.85 km', maxDistanceKm: 1.85 },
+  { key: 'under35km', label: '< 3.1 km', maxDistanceKm: 3.1 },
   { key: 'under4km', label: '< 4 km', maxDistanceKm: 4 },
   { key: 'under6km', label: '< 6 km', maxDistanceKm: 6 },
   { key: 'above6km', label: '+ 6 km', maxDistanceKm: Number.POSITIVE_INFINITY },
