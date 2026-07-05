@@ -634,7 +634,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || (section !== 'pedidos' && section !== 'cupones')) {
+    if (!isStoreMode || !['pedidos', 'cupones', 'recompensas'].includes(section)) {
       return undefined;
     }
 
@@ -703,7 +703,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
   useEffect(() => {
     if (
-      (isStoreMode && section !== 'cupones') ||
+      (isStoreMode && !['cupones', 'recompensas'].includes(section)) ||
       (!isStoreMode && usersTab !== 'clientes')
     ) {
       return undefined;
@@ -727,7 +727,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
     });
 
     return () => unsubscribe();
-  }, [isStoreMode, usersTab]);
+  }, [isStoreMode, section, usersTab]);
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
