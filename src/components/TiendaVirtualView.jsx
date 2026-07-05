@@ -1091,6 +1091,7 @@ export default function TiendaVirtualView({
   const [mobileNavSection, setMobileNavSection] = useState('home');
   const quantityNoticeTimeoutRef = useRef(null);
   const autoAppliedCouponRef = useRef('');
+  const autoClaimingWelcomeCouponRef = useRef('');
   const pageTopRef = useRef(null);
   const filtersPanelRef = useRef(null);
 
@@ -2102,6 +2103,7 @@ export default function TiendaVirtualView({
     if (!currentUser?.key) {
       setWelcomeCouponOpen(false);
       autoAppliedCouponRef.current = '';
+      autoClaimingWelcomeCouponRef.current = '';
       return;
     }
 
@@ -2124,7 +2126,7 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (welcomeCouponStatus !== 'claimed') {
+    if (!['available', 'claimed'].includes(welcomeCouponStatus)) {
       return;
     }
 
@@ -2136,11 +2138,45 @@ export default function TiendaVirtualView({
       return;
     }
 
+    if (welcomeCouponStatus === 'available') {
+      if (autoClaimingWelcomeCouponRef.current === welcomeCouponCode) {
+        return;
+      }
+
+      autoClaimingWelcomeCouponRef.current = welcomeCouponCode;
+
+      claimStoreWelcomeCoupon({
+        userKey: currentUser.key,
+        welcomeCoupon,
+      })
+        .then((claimedCoupon) => {
+          const nextUser = {
+            ...currentUser,
+            welcomeCoupon: claimedCoupon,
+          };
+          setCurrentUser(nextUser);
+          persistStoreSession(nextUser);
+          applyResolvedCoupon(claimedCoupon.coupon, { silent: true });
+        })
+        .catch((error) => {
+          console.error('No se pudo activar automaticamente el cupon de bienvenida:', error);
+        })
+        .finally(() => {
+          if (autoClaimingWelcomeCouponRef.current === welcomeCouponCode) {
+            autoClaimingWelcomeCouponRef.current = '';
+          }
+        });
+
+      return;
+    }
+
     applyResolvedCoupon(welcomeCouponPersonalCoupon, { silent: true });
   }, [
     appliedCoupon?.code,
     currentUser?.key,
+    currentUser,
     totalAmount,
+    welcomeCoupon,
     welcomeCouponPersonalCoupon,
     welcomeCouponStatus,
   ]);
