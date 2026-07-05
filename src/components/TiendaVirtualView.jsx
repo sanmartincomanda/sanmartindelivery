@@ -3046,8 +3046,54 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (appliedCoupon) {
-      const usageMessage = getCouponUsageMessage(appliedCoupon);
+    let resolvedAppliedCoupon = appliedCoupon ? normalizeStoreCoupon(appliedCoupon) : null;
+    let resolvedWelcomeCouponRecord = welcomeCoupon;
+
+    if (
+      !resolvedAppliedCoupon &&
+      currentUser?.key &&
+      ['available', 'claimed'].includes(welcomeCouponStatus)
+    ) {
+      const checkoutWelcomeCoupon = normalizeStoreCoupon(welcomeCoupon?.coupon || {});
+      const welcomeMinimum = Number(
+        checkoutWelcomeCoupon.minimum ||
+          welcomeCoupon?.minimumPurchase ||
+          STORE_WELCOME_COUPON_MINIMUM
+      );
+
+      if (checkoutWelcomeCoupon.code && totalAmount >= welcomeMinimum) {
+        if (welcomeCouponStatus === 'available') {
+          try {
+            const claimedCoupon = await claimStoreWelcomeCoupon({
+              userKey: currentUser.key,
+              welcomeCoupon,
+            });
+
+            if (claimedCoupon?.coupon?.code) {
+              resolvedWelcomeCouponRecord = claimedCoupon;
+              resolvedAppliedCoupon = normalizeStoreCoupon(claimedCoupon.coupon);
+              const nextUser = {
+                ...currentUser,
+                welcomeCoupon: claimedCoupon,
+              };
+              setCurrentUser(nextUser);
+              persistStoreSession(nextUser);
+            }
+          } catch (claimError) {
+            console.warn('No se pudo reclamar automaticamente el cupon de bienvenida.', claimError);
+          }
+        } else {
+          resolvedAppliedCoupon = checkoutWelcomeCoupon;
+        }
+
+        if (resolvedAppliedCoupon?.code) {
+          applyResolvedCoupon(resolvedAppliedCoupon, { silent: true });
+        }
+      }
+    }
+
+    if (resolvedAppliedCoupon) {
+      const usageMessage = getCouponUsageMessage(resolvedAppliedCoupon);
       if (usageMessage) {
         setAppliedCoupon(null);
         setCouponMessage(usageMessage);
@@ -3112,23 +3158,24 @@ export default function TiendaVirtualView({
           deliveryDistanceKm: pickupFlow ? 0 : Number(deliveryQuote?.distanceKm || 0),
           coverageRadiusKm: pickupFlow ? 0 : Number(deliveryQuote?.coverageRadiusKm || 0),
           deliveryFeeBracket: pickupFlow ? '' : String(deliveryQuote?.feeKey || ''),
-          cupon: appliedCoupon
+          cupon: resolvedAppliedCoupon
             ? {
-                code: appliedCoupon.code,
-                title: appliedCoupon.title,
-                type: appliedCoupon.type,
-                value: appliedCoupon.value,
-                minimum: appliedCoupon.minimum || 0,
-                maxUsesPerUser: appliedCoupon.maxUsesPerUser || 0,
-                assignedUserKey: appliedCoupon.assignedUserKey || '',
-                campaignId: appliedCoupon.campaignId || '',
-                autoApply: appliedCoupon.autoApply === true,
-                personal: appliedCoupon.personal === true,
-                welcomeCoupon: appliedCoupon.welcomeCoupon === true,
-                expiresAt: appliedCoupon.expiresAt || 0,
+                code: resolvedAppliedCoupon.code,
+                title: resolvedAppliedCoupon.title,
+                type: resolvedAppliedCoupon.type,
+                value: resolvedAppliedCoupon.value,
+                minimum: resolvedAppliedCoupon.minimum || 0,
+                maxUsesPerUser: resolvedAppliedCoupon.maxUsesPerUser || 0,
+                assignedUserKey: resolvedAppliedCoupon.assignedUserKey || '',
+                campaignId: resolvedAppliedCoupon.campaignId || '',
+                autoApply: resolvedAppliedCoupon.autoApply === true,
+                personal: resolvedAppliedCoupon.personal === true,
+                welcomeCoupon: resolvedAppliedCoupon.welcomeCoupon === true,
+                expiresAt: resolvedAppliedCoupon.expiresAt || 0,
               }
             : null,
-          welcomeCouponRecord: appliedCoupon?.welcomeCoupon === true ? welcomeCoupon : null,
+          welcomeCouponRecord:
+            resolvedAppliedCoupon?.welcomeCoupon === true ? resolvedWelcomeCouponRecord : null,
           total: approximateTotalAmount,
           estimatedRewardPoints,
           observaciones: checkoutNotes,
@@ -3141,9 +3188,13 @@ export default function TiendaVirtualView({
         { channel: STORE_CHANNEL }
       );
 
-      if (appliedCoupon?.welcomeCoupon === true && welcomeCoupon && currentUser?.key) {
+      if (
+        resolvedAppliedCoupon?.welcomeCoupon === true &&
+        resolvedWelcomeCouponRecord &&
+        currentUser?.key
+      ) {
         const nextWelcomeCoupon = buildStoreWelcomeCouponReservationState({
-          welcomeCoupon,
+          welcomeCoupon: resolvedWelcomeCouponRecord,
           orderKey: order.firebaseKey,
           reservedAt: Date.now(),
         });
