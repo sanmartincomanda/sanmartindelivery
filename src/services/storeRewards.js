@@ -1118,6 +1118,25 @@ export const subscribeStoreRewardAccount = (userKey, onData, onError, databaseIn
   );
 };
 
+export const subscribeStoreRewardAccounts = (onData, onError, databaseInstance = database) =>
+  onValue(
+    ref(databaseInstance, STORE_REWARD_ACCOUNTS_PATH),
+    (snapshot) => {
+      const accounts = Object.entries(snapshot.val() || {}).reduce((accumulator, [customerId, account]) => {
+        const cleanCustomerId = String(customerId || '').trim();
+        if (!cleanCustomerId) {
+          return accumulator;
+        }
+
+        accumulator[cleanCustomerId] = normalizeStoreRewardAccount(account, cleanCustomerId);
+        return accumulator;
+      }, {});
+
+      onData(accounts);
+    },
+    onError
+  );
+
 export const subscribeStoreRewardTransactions = (
   userKey,
   onData,
@@ -1152,6 +1171,86 @@ export const subscribeStoreRewardTransactions = (
     onError
   );
 };
+
+export async function adjustStoreRewardPoints({
+  userKey,
+  pointsDelta,
+  note = '',
+  adminLabel = 'Ajuste manual desde administrador.',
+  databaseInstance = database,
+}) {
+  const cleanUserKey = String(userKey || '').trim();
+  const delta = Math.trunc(Number(pointsDelta || 0));
+
+  if (!cleanUserKey) {
+    throw new Error('Cliente invalido para ajustar puntos.');
+  }
+
+  if (!Number.isFinite(delta) || delta === 0) {
+    throw new Error('Indica un ajuste de puntos valido.');
+  }
+
+  await ensureStoreRewardAccount(cleanUserKey, { databaseInstance });
+
+  const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
+  let balanceBefore = 0;
+  let balanceAfter = 0;
+  let failureCode = '';
+
+  const transactionResult = await runTransaction(accountRef, (currentValue) => {
+    const account = normalizeStoreRewardAccount(currentValue, cleanUserKey);
+    balanceBefore = Math.max(0, roundPoints(account.pointsBalance || 0));
+    balanceAfter = balanceBefore + delta;
+
+    if (balanceAfter < 0) {
+      failureCode = 'INSUFFICIENT_BALANCE';
+      return;
+    }
+
+    return {
+      ...account,
+      customerId: cleanUserKey,
+      pointsBalance: balanceAfter,
+      updatedAt: Date.now(),
+      createdAt: account.createdAt || Date.now(),
+    };
+  });
+
+  if (!transactionResult.committed) {
+    const error = new Error(
+      failureCode === 'INSUFFICIENT_BALANCE'
+        ? 'No puedes dejar el saldo de puntos en negativo.'
+        : 'No se pudo guardar el ajuste de puntos.'
+    );
+    error.code = failureCode || 'REWARD_ADJUST_FAILED';
+    throw error;
+  }
+
+  const transactionKey = getStoreRewardTransactionKey(`adjust_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+  const detailNote = [String(adminLabel || '').trim(), String(note || '').trim()].filter(Boolean).join(' | ');
+
+  await set(
+    ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${transactionKey}`),
+    createAccountTransactionRecord({
+      customerId: cleanUserKey,
+      type: STORE_REWARD_TRANSACTION_TYPES.ADJUSTED,
+      status: 'applied',
+      points: Math.abs(delta),
+      signedPoints: delta,
+      balanceBefore,
+      balanceAfter,
+      note: detailNote,
+    })
+  );
+
+  return {
+    adjusted: true,
+    transactionKey,
+    pointsDelta: delta,
+    balanceBefore,
+    balanceAfter,
+  };
+}
 
 export async function saveStoreRewardSettings(settings, options = {}) {
   const databaseInstance = options.databaseInstance || database;

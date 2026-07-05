@@ -2523,7 +2523,11 @@ export default function ConfiguracionView({ mode = 'users' }) {
             )}
           </>
         ) : isStoreMode && section === 'recompensas' ? (
-          <StoreRewardsAdminSection catalog={products} />
+          <StoreRewardsAdminSection
+            catalog={products}
+            storeUsers={storeUsers}
+            storeOrders={storeOrders}
+          />
         ) : isStoreMode && section === 'entrega' ? (
           <DeliverySettingsManager
             settings={deliverySettings}

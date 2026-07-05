@@ -1,16 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  adjustStoreRewardPoints,
+  buildCustomerRewardSummary,
   calculateStoreRewardRequiredSpend,
   calculateStoreRewardWeightPercent,
   DEFAULT_STORE_REWARD_SETTINGS,
   deleteStoreReward,
   mergeStoreRewards,
   normalizeStoreReward,
+  normalizeStoreRewardAccount,
   normalizeStoreRewardSettings,
   saveStoreReward,
   saveStoreRewardSettings,
   seedDefaultStoreRewardsProgramIfEmpty,
+  subscribeStoreRewardAccounts,
   subscribeStoreRewardSettings,
+  subscribeStoreRewardTransactions,
   subscribeStoreRewards,
   updateStoreReward,
 } from '../services/storeRewards';
@@ -73,14 +78,80 @@ const buildRewardFormFromReward = (reward = {}) => ({
   })),
 });
 
-export default function StoreRewardsAdminSection({ catalog = [] }) {
+const formatDateTime = (value) => {
+  const timestamp = Number(value || 0);
+  if (!timestamp) {
+    return 'Sin movimiento';
+  }
+
+  try {
+    return new Intl.DateTimeFormat('es-NI', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(timestamp));
+  } catch (error) {
+    return 'Sin movimiento';
+  }
+};
+
+const formatSignedPoints = (value) => {
+  const numeric = Number(value || 0);
+  const prefix = numeric > 0 ? '+' : '';
+  return `${prefix}${Math.trunc(numeric)} pts`;
+};
+
+const getRewardTransactionTypeLabel = (transaction = {}) => {
+  const type = String(transaction?.type || '').trim().toLowerCase();
+  if (type === 'earned') {
+    return 'Compra completada';
+  }
+  if (type === 'redeemed') {
+    return 'Premio canjeado';
+  }
+  if (type === 'reversed') {
+    return 'Puntos revertidos';
+  }
+  if (type === 'adjusted') {
+    return 'Ajuste manual';
+  }
+  return 'Movimiento';
+};
+
+const buildRewardProgressLabel = (row) => {
+  if (row?.bestAvailableReward?.name) {
+    return `Puede reclamar ${row.bestAvailableReward.name}`;
+  }
+
+  if (row?.closestReward?.name) {
+    return `Le faltan ${Math.max(0, Number(row.missingPoints || 0))} pts para ${row.closestReward.name}`;
+  }
+
+  return 'Sin premios configurados';
+};
+
+export default function StoreRewardsAdminSection({
+  catalog = [],
+  storeUsers = [],
+  storeOrders = [],
+}) {
   const [settings, setSettings] = useState(DEFAULT_STORE_REWARD_SETTINGS);
   const [rewardMap, setRewardMap] = useState({});
+  const [rewardAccountsMap, setRewardAccountsMap] = useState({});
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [rewardSaving, setRewardSaving] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [rewardForm, setRewardForm] = useState(createEmptyRewardForm());
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('con_cuenta');
+  const [selectedCustomerKey, setSelectedCustomerKey] = useState('');
+  const [selectedCustomerTransactions, setSelectedCustomerTransactions] = useState([]);
+  const [adjustmentForm, setAdjustmentForm] = useState({
+    mode: 'sumar',
+    points: '',
+    note: '',
+  });
+  const [adjustingPoints, setAdjustingPoints] = useState(false);
 
   const catalogOptions = useMemo(
     () =>
@@ -104,6 +175,59 @@ export default function StoreRewardsAdminSection({ catalog = [] }) {
       })),
     [catalog, rewardMap, settings]
   );
+
+  const storeUsersByKey = useMemo(
+    () =>
+      (Array.isArray(storeUsers) ? storeUsers : []).reduce((accumulator, user) => {
+        const userKey = String(user?.key || user?.id || user?.userKey || '').trim();
+        if (!userKey) {
+          return accumulator;
+        }
+
+        accumulator[userKey] = user;
+        return accumulator;
+      }, {}),
+    [storeUsers]
+  );
+
+  const rewardOrdersByUser = useMemo(() => {
+    const map = {};
+
+    (Array.isArray(storeOrders) ? storeOrders : []).forEach((order) => {
+      const userKey = String(order?.storeUserKey || '').trim();
+      if (!userKey) {
+        return;
+      }
+
+      const orderTimestamp = Number(order?.timestamp || order?.timestampIngresoMs || 0);
+      if (!map[userKey]) {
+        map[userKey] = {
+          totalOrders: 0,
+          rewardOrders: 0,
+          deliveredRewardOrders: 0,
+          lastOrderAt: 0,
+          lastRewardOrderAt: 0,
+          lastRewardOrder: null,
+        };
+      }
+
+      map[userKey].totalOrders += 1;
+      map[userKey].lastOrderAt = Math.max(map[userKey].lastOrderAt, orderTimestamp);
+
+      if (String(order?.rewardRedemption?.rewardName || '').trim()) {
+        map[userKey].rewardOrders += 1;
+        if (String(order?.estado || '').trim().toLowerCase() === 'entregado') {
+          map[userKey].deliveredRewardOrders += 1;
+        }
+        if (orderTimestamp >= Number(map[userKey].lastRewardOrderAt || 0)) {
+          map[userKey].lastRewardOrderAt = orderTimestamp;
+          map[userKey].lastRewardOrder = order;
+        }
+      }
+    });
+
+    return map;
+  }, [storeOrders]);
 
   useEffect(() => {
     let mounted = true;
@@ -155,6 +279,39 @@ export default function StoreRewardsAdminSection({ catalog = [] }) {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = subscribeStoreRewardAccounts(
+      (value) => {
+        setRewardAccountsMap(value && typeof value === 'object' ? value : {});
+      },
+      (error) => {
+        console.error('No se pudieron cargar las cuentas del Club San Martin:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCustomerKey) {
+      setSelectedCustomerTransactions([]);
+      return undefined;
+    }
+
+    const unsubscribe = subscribeStoreRewardTransactions(
+      selectedCustomerKey,
+      (transactions) => {
+        setSelectedCustomerTransactions(Array.isArray(transactions) ? transactions : []);
+      },
+      (error) => {
+        console.error(`No se pudieron cargar los movimientos de ${selectedCustomerKey}:`, error);
+      },
+      80
+    );
+
+    return () => unsubscribe();
+  }, [selectedCustomerKey]);
+
   const openNewReward = () => {
     setRewardForm(createEmptyRewardForm());
     setEditorOpen(true);
@@ -174,10 +331,185 @@ export default function StoreRewardsAdminSection({ catalog = [] }) {
     setRewardForm(createEmptyRewardForm());
   };
 
+  const rewardCustomerRows = useMemo(() => {
+    const allKeys = new Set([
+      ...Object.keys(storeUsersByKey),
+      ...Object.keys(rewardAccountsMap || {}),
+      ...Object.keys(rewardOrdersByUser || {}),
+    ]);
+
+    return [...allKeys]
+      .map((userKey) => {
+        const storeUser = storeUsersByKey[userKey] || {};
+        const hasStoredAccount = rewardAccountsMap?.[userKey] !== undefined;
+        const account = normalizeStoreRewardAccount(rewardAccountsMap?.[userKey] || {}, userKey);
+        const orderStats = rewardOrdersByUser?.[userKey] || {
+          totalOrders: 0,
+          rewardOrders: 0,
+          deliveredRewardOrders: 0,
+          lastOrderAt: 0,
+          lastRewardOrderAt: 0,
+          lastRewardOrder: null,
+        };
+        const pointsBalance = Math.max(0, Number(account.pointsBalance || 0));
+        const pendingHoldPoints = Object.values(account.holds || {}).reduce(
+          (sum, hold) => sum + Math.max(0, Number(hold?.points || 0)),
+          0
+        );
+        const rewardSummary = buildCustomerRewardSummary(rewards, pointsBalance, 0, settings);
+        const bestAvailableReward = rewardSummary.bestReward || null;
+        const closestReward = rewardSummary.closestReward || null;
+        const missingPoints = closestReward
+          ? Math.max(0, Number(closestReward.pointsRequired || 0) - pointsBalance)
+          : 0;
+        const lastActivityAt = Math.max(
+          Number(account.updatedAt || 0),
+          Number(orderStats.lastRewardOrderAt || 0),
+          Number(orderStats.lastOrderAt || 0)
+        );
+
+        return {
+          userKey,
+          storeUser,
+          account,
+          hasStoredAccount,
+          pointsBalance,
+          pendingHoldPoints,
+          rewardSummary,
+          bestAvailableReward,
+          closestReward,
+          missingPoints,
+          progressLabel: buildRewardProgressLabel({
+            bestAvailableReward,
+            closestReward,
+            missingPoints,
+          }),
+          totalOrders: Number(orderStats.totalOrders || 0),
+          rewardOrders: Number(orderStats.rewardOrders || 0),
+          deliveredRewardOrders: Number(orderStats.deliveredRewardOrders || 0),
+          lastRewardOrder: orderStats.lastRewardOrder || null,
+          lastActivityAt,
+        };
+      })
+      .sort((left, right) => {
+        if (Number(right.pointsBalance || 0) !== Number(left.pointsBalance || 0)) {
+          return Number(right.pointsBalance || 0) - Number(left.pointsBalance || 0);
+        }
+
+        if (Number(right.lastActivityAt || 0) !== Number(left.lastActivityAt || 0)) {
+          return Number(right.lastActivityAt || 0) - Number(left.lastActivityAt || 0);
+        }
+
+        return String(left.storeUser?.nombre || left.storeUser?.name || '').localeCompare(
+          String(right.storeUser?.nombre || right.storeUser?.name || ''),
+          'es-NI',
+          { sensitivity: 'base' }
+        );
+      });
+  }, [rewardAccountsMap, rewardOrdersByUser, rewards, settings, storeUsersByKey]);
+
+  const filteredRewardCustomerRows = useMemo(() => {
+    const search = String(customerSearch || '').trim().toLowerCase();
+
+    return rewardCustomerRows.filter((row) => {
+      const name = String(row.storeUser?.nombre || row.storeUser?.name || '').toLowerCase();
+      const phone = String(row.storeUser?.telefono || row.storeUser?.phone || '').toLowerCase();
+      const code = String(row.storeUser?.codigo || '').toLowerCase();
+      const email = String(row.storeUser?.email || '').toLowerCase();
+
+      if (search && ![name, phone, code, email, row.userKey.toLowerCase()].some((value) => value.includes(search))) {
+        return false;
+      }
+
+      if (customerFilter === 'con_cuenta') {
+        return row.hasStoredAccount || row.rewardOrders > 0;
+      }
+
+      if (customerFilter === 'con_puntos') {
+        return row.pointsBalance > 0;
+      }
+
+      if (customerFilter === 'puede_canjear') {
+        return Boolean(row.bestAvailableReward);
+      }
+
+      if (customerFilter === 'con_canje') {
+        return row.rewardOrders > 0 || Number(row.account.lifetimePointsRedeemed || 0) > 0;
+      }
+
+      if (customerFilter === 'sin_puntos') {
+        return row.pointsBalance <= 0;
+      }
+
+      return true;
+    });
+  }, [customerFilter, customerSearch, rewardCustomerRows]);
+
+  const rewardCustomerMetrics = useMemo(() => {
+    return rewardCustomerRows.reduce(
+      (summary, row) => {
+        summary.totalCustomers += 1;
+        summary.customersWithAccount += row.hasStoredAccount ? 1 : 0;
+        summary.customersWithPoints += row.pointsBalance > 0 ? 1 : 0;
+        summary.customersClaimable += row.bestAvailableReward ? 1 : 0;
+        summary.customersWithRedemption += row.rewardOrders > 0 ? 1 : 0;
+        summary.totalPointsBalance += Number(row.pointsBalance || 0);
+        summary.totalLifetimeRedeemed += Number(row.account.lifetimePointsRedeemed || 0);
+        summary.pendingHoldPoints += Number(row.pendingHoldPoints || 0);
+        return summary;
+      },
+      {
+        totalCustomers: 0,
+        customersWithAccount: 0,
+        customersWithPoints: 0,
+        customersClaimable: 0,
+        customersWithRedemption: 0,
+        totalPointsBalance: 0,
+        totalLifetimeRedeemed: 0,
+        pendingHoldPoints: 0,
+      }
+    );
+  }, [rewardCustomerRows]);
+
+  const selectedCustomerRow = useMemo(
+    () => rewardCustomerRows.find((row) => row.userKey === selectedCustomerKey) || null,
+    [rewardCustomerRows, selectedCustomerKey]
+  );
+
   const updateSettingsField = (field, value) => {
     setSettings((current) => ({
       ...current,
       [field]: field === 'enabled' ? value : value,
+    }));
+  };
+
+  const openCustomerEditor = (row) => {
+    setSelectedCustomerKey(String(row?.userKey || '').trim());
+    setAdjustmentForm({
+      mode: 'sumar',
+      points: '',
+      note: '',
+    });
+  };
+
+  const closeCustomerEditor = () => {
+    if (adjustingPoints) {
+      return;
+    }
+
+    setSelectedCustomerKey('');
+    setSelectedCustomerTransactions([]);
+    setAdjustmentForm({
+      mode: 'sumar',
+      points: '',
+      note: '',
+    });
+  };
+
+  const updateAdjustmentField = (field, value) => {
+    setAdjustmentForm((current) => ({
+      ...current,
+      [field]: value,
     }));
   };
 
@@ -200,6 +532,54 @@ export default function StoreRewardsAdminSection({ catalog = [] }) {
       setMessage(error?.message || 'No se pudo guardar la configuracion.');
     } finally {
       setSettingsSaving(false);
+    }
+  };
+
+  const saveCustomerAdjustment = async (event) => {
+    event.preventDefault();
+    if (!selectedCustomerRow) {
+      return;
+    }
+
+    const basePoints = Math.max(0, Math.trunc(Number(adjustmentForm.points || 0)));
+    const currentBalance = Math.max(0, Number(selectedCustomerRow.pointsBalance || 0));
+    let pointsDelta = 0;
+
+    if (adjustmentForm.mode === 'fijar') {
+      pointsDelta = basePoints - currentBalance;
+    } else {
+      pointsDelta = adjustmentForm.mode === 'restar' ? -basePoints : basePoints;
+    }
+
+    if (!pointsDelta) {
+      setMessage('El ajuste no cambia el saldo actual del cliente.');
+      return;
+    }
+
+    setAdjustingPoints(true);
+    setMessage('');
+
+    try {
+      const result = await adjustStoreRewardPoints({
+        userKey: selectedCustomerRow.userKey,
+        pointsDelta,
+        note: adjustmentForm.note,
+        adminLabel: 'Ajuste manual desde Programa de Recompensas',
+      });
+
+      setMessage(
+        `Saldo actualizado para ${selectedCustomerRow.storeUser?.nombre || 'cliente'}: ${result.balanceBefore} pts -> ${result.balanceAfter} pts.`
+      );
+      setAdjustmentForm({
+        mode: 'sumar',
+        points: '',
+        note: '',
+      });
+    } catch (error) {
+      console.error('No se pudo ajustar la cuenta de recompensas:', error);
+      setMessage(error?.message || 'No se pudo guardar el ajuste de puntos.');
+    } finally {
+      setAdjustingPoints(false);
     }
   };
 
@@ -431,6 +811,180 @@ export default function StoreRewardsAdminSection({ catalog = [] }) {
           </button>
         </form>
 
+        <section
+          style={{
+            display: 'grid',
+            gap: 14,
+            padding: 18,
+            borderRadius: 22,
+            background: 'linear-gradient(135deg, rgba(15,23,42,0.04), rgba(59,130,246,0.08))',
+            border: '1px solid #dbeafe',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <strong style={{ display: 'block', fontSize: 20 }}>Seguimiento de clientes</strong>
+              <span style={{ color: '#64748b', fontWeight: 700 }}>
+                Mira como va cada cliente con sus puntos, premios disponibles y canjes.
+              </span>
+            </div>
+            <div style={{ color: '#0f172a', fontWeight: 900 }}>
+              {filteredRewardCustomerRows.length} de {rewardCustomerRows.length} clientes
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {[
+              { label: 'Con cuenta', value: rewardCustomerMetrics.customersWithAccount, helper: 'Clientes ya inscritos en recompensas' },
+              { label: 'Con puntos', value: rewardCustomerMetrics.customersWithPoints, helper: 'Tienen saldo disponible' },
+              { label: 'Puntos activos', value: `${rewardCustomerMetrics.totalPointsBalance} pts`, helper: 'Saldo total acumulado' },
+              { label: 'Pueden canjear', value: rewardCustomerMetrics.customersClaimable, helper: 'Ya alcanzaron al menos un premio' },
+              { label: 'Ya canjearon', value: rewardCustomerMetrics.customersWithRedemption, helper: 'Han usado premio en un pedido' },
+              { label: 'Puntos en reserva', value: `${rewardCustomerMetrics.pendingHoldPoints} pts`, helper: 'Apartados en pedidos pendientes' },
+            ].map((metric) => (
+              <article
+                key={metric.label}
+                style={{
+                  padding: 16,
+                  borderRadius: 18,
+                  background: '#ffffff',
+                  border: '1px solid #dbeafe',
+                  boxShadow: '0 14px 32px rgba(15, 23, 42, 0.05)',
+                }}
+              >
+                <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {metric.label}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 28, fontWeight: 900, color: '#0f172a' }}>{metric.value}</div>
+                <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>{metric.helper}</div>
+              </article>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(260px, 1.2fr) minmax(180px, 220px)',
+              gap: 12,
+              alignItems: 'end',
+            }}
+          >
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={{ color: '#475569', fontWeight: 800 }}>Buscar cliente</span>
+              <input
+                className="cfg-input"
+                value={customerSearch}
+                onChange={(event) => setCustomerSearch(event.target.value)}
+                placeholder="Nombre, telefono, correo o codigo"
+              />
+            </label>
+
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={{ color: '#475569', fontWeight: 800 }}>Filtro</span>
+              <select
+                className="cfg-select"
+                value={customerFilter}
+                onChange={(event) => setCustomerFilter(event.target.value)}
+              >
+                <option value="con_cuenta">Con cuenta o movimiento</option>
+                <option value="todos">Todos</option>
+                <option value="con_puntos">Con puntos</option>
+                <option value="puede_canjear">Pueden canjear</option>
+                <option value="con_canje">Ya canjearon</option>
+                <option value="sin_puntos">Sin puntos</option>
+              </select>
+            </label>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="cfg-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Saldo</th>
+                  <th>Historial</th>
+                  <th>Como va</th>
+                  <th>Ultimo movimiento</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRewardCustomerRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ color: '#64748b', fontWeight: 800 }}>
+                      No encontramos clientes para ese filtro.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRewardCustomerRows.map((row) => (
+                    <tr key={row.userKey}>
+                      <td>
+                        <strong>{row.storeUser?.nombre || row.storeUser?.name || 'Cliente sin nombre'}</strong>
+                        <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                          {row.storeUser?.telefono || row.storeUser?.phone || 'Sin telefono'}
+                        </div>
+                        <div style={{ marginTop: 4, color: '#94a3b8', fontWeight: 700 }}>
+                          {row.storeUser?.codigo || row.storeUser?.email || row.userKey}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 900, fontSize: 24, color: '#0f172a' }}>{row.pointsBalance} pts</div>
+                        <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                          {row.pendingHoldPoints > 0
+                            ? `${row.pendingHoldPoints} pts reservados`
+                            : row.hasStoredAccount
+                              ? 'Cuenta activa'
+                              : 'Sin cuenta creada aun'}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ color: '#0f172a', fontWeight: 800 }}>
+                          Ganados: {Number(row.account.lifetimePointsEarned || 0)} pts
+                        </div>
+                        <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                          Canjeados: {Number(row.account.lifetimePointsRedeemed || 0)} pts
+                        </div>
+                        <div style={{ marginTop: 4, color: '#94a3b8', fontWeight: 700 }}>
+                          Pedidos con premio: {row.rewardOrders}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ color: '#0f172a', fontWeight: 800 }}>{row.progressLabel}</div>
+                        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {row.bestAvailableReward ? (
+                            <span className="cfg-badge">Disponible ahora</span>
+                          ) : row.closestReward ? (
+                            <span className="cfg-badge off">{row.missingPoints} pts pendientes</span>
+                          ) : (
+                            <span className="cfg-badge off">Sin premios</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ color: '#0f172a', fontWeight: 800 }}>{formatDateTime(row.lastActivityAt)}</div>
+                        <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                          {row.lastRewardOrder?.rewardRedemption?.rewardName || 'Sin canje reciente'}
+                        </div>
+                      </td>
+                      <td>
+                        <button type="button" className="cfg-button secondary" onClick={() => openCustomerEditor(row)}>
+                          Ver cliente
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <div style={{ overflowX: 'auto' }}>
           <table className="cfg-table">
             <thead>
@@ -497,6 +1051,269 @@ export default function StoreRewardsAdminSection({ catalog = [] }) {
           </table>
         </div>
       </section>
+
+      {selectedCustomerRow && (
+        <div
+          className="cfg-driver-modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeCustomerEditor();
+            }
+          }}
+        >
+          <div
+            className="cfg-driver-modal"
+            style={{ width: 'min(1080px, 100%)', display: 'grid', gap: 16 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+                  Programa de Recompensas / Cliente
+                </div>
+                <h2 style={{ margin: '6px 0 0', fontSize: 28 }}>
+                  {selectedCustomerRow.storeUser?.nombre || selectedCustomerRow.storeUser?.name || 'Cliente sin nombre'}
+                </h2>
+                <div style={{ marginTop: 6, color: '#64748b', fontWeight: 700 }}>
+                  {selectedCustomerRow.storeUser?.telefono || selectedCustomerRow.storeUser?.phone || 'Sin telefono'}
+                  {' · '}
+                  {selectedCustomerRow.storeUser?.codigo || selectedCustomerRow.storeUser?.email || selectedCustomerRow.userKey}
+                </div>
+              </div>
+
+              <button type="button" className="cfg-button secondary" onClick={closeCustomerEditor} disabled={adjustingPoints}>
+                Cerrar
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: 12,
+              }}
+            >
+              {[
+                { label: 'Saldo actual', value: `${selectedCustomerRow.pointsBalance} pts`, helper: selectedCustomerRow.bestAvailableReward ? 'Puede reclamar premio ahora' : 'Saldo disponible para canjes' },
+                { label: 'Ganados', value: `${Number(selectedCustomerRow.account.lifetimePointsEarned || 0)} pts`, helper: 'Total acreditado por compras' },
+                { label: 'Canjeados', value: `${Number(selectedCustomerRow.account.lifetimePointsRedeemed || 0)} pts`, helper: 'Total usado en premios' },
+                { label: 'Reservados', value: `${Number(selectedCustomerRow.pendingHoldPoints || 0)} pts`, helper: 'Apartados en pedidos pendientes' },
+              ].map((metric) => (
+                <article
+                  key={metric.label}
+                  style={{
+                    padding: 16,
+                    borderRadius: 18,
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <div style={{ color: '#64748b', fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    {metric.label}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 24, fontWeight: 900, color: '#0f172a' }}>{metric.value}</div>
+                  <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>{metric.helper}</div>
+                </article>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1.1fr) minmax(320px, 420px)',
+                gap: 16,
+                alignItems: 'start',
+              }}
+            >
+              <div style={{ display: 'grid', gap: 12 }}>
+                <section
+                  style={{
+                    padding: 16,
+                    borderRadius: 18,
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <strong style={{ display: 'block', fontSize: 18 }}>Como va con sus recompensas</strong>
+                  <div style={{ marginTop: 10, color: '#0f172a', fontWeight: 800 }}>
+                    {selectedCustomerRow.progressLabel}
+                  </div>
+                  <div style={{ marginTop: 8, color: '#64748b', fontWeight: 700 }}>
+                    {selectedCustomerRow.bestAvailableReward
+                      ? `Premio desbloqueado: ${selectedCustomerRow.bestAvailableReward.name}`
+                      : selectedCustomerRow.closestReward
+                        ? `Siguiente meta: ${selectedCustomerRow.closestReward.name}`
+                        : 'Todavia no hay premios configurados para mostrar.'}
+                  </div>
+
+                  {(selectedCustomerRow.rewardSummary.availableRewards.length > 0 ||
+                    selectedCustomerRow.rewardSummary.upcomingRewards.length > 0) && (
+                    <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>
+                      {[...selectedCustomerRow.rewardSummary.availableRewards, ...selectedCustomerRow.rewardSummary.upcomingRewards]
+                        .slice(0, 3)
+                        .map((reward) => {
+                          const missingPoints = Math.max(
+                            0,
+                            Number(reward.pointsRequired || 0) - Number(selectedCustomerRow.pointsBalance || 0)
+                          );
+
+                          return (
+                            <div
+                              key={reward.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                gap: 12,
+                                padding: '12px 14px',
+                                borderRadius: 14,
+                                background: '#f8fafc',
+                                border: '1px solid #e2e8f0',
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#0f172a' }}>{reward.name}</div>
+                                <div style={{ marginTop: 4, color: '#64748b', fontWeight: 700 }}>
+                                  {Number(reward.pointsRequired || 0)} pts
+                                </div>
+                              </div>
+                              <div style={{ textAlign: 'right', fontWeight: 800, color: missingPoints <= 0 ? '#047857' : '#1d4ed8' }}>
+                                {missingPoints <= 0 ? 'Disponible' : `Faltan ${missingPoints} pts`}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  style={{
+                    padding: 16,
+                    borderRadius: 18,
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  <strong style={{ display: 'block', fontSize: 18 }}>Movimientos recientes</strong>
+                  <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+                    {selectedCustomerTransactions.length === 0 ? (
+                      <div style={{ color: '#64748b', fontWeight: 700 }}>
+                        Este cliente todavia no tiene movimientos de puntos.
+                      </div>
+                    ) : (
+                      selectedCustomerTransactions.slice(0, 12).map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          style={{
+                            display: 'grid',
+                            gap: 4,
+                            padding: '12px 14px',
+                            borderRadius: 14,
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <strong style={{ color: '#0f172a' }}>{getRewardTransactionTypeLabel(transaction)}</strong>
+                            <span style={{ color: Number(transaction.signedPoints || 0) >= 0 ? '#047857' : '#b91c1c', fontWeight: 900 }}>
+                              {formatSignedPoints(transaction.signedPoints || 0)}
+                            </span>
+                          </div>
+                          <div style={{ color: '#64748b', fontWeight: 700 }}>
+                            {transaction.rewardName || transaction.note || 'Sin detalle adicional'}
+                          </div>
+                          <div style={{ color: '#94a3b8', fontWeight: 700 }}>
+                            {formatDateTime(transaction.createdAt)} · Saldo {Number(transaction.balanceAfter || 0)} pts
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              <form
+                onSubmit={saveCustomerAdjustment}
+                style={{
+                  display: 'grid',
+                  gap: 12,
+                  padding: 16,
+                  borderRadius: 18,
+                  background: '#fff7ed',
+                  border: '1px solid #fed7aa',
+                }}
+              >
+                <div>
+                  <strong style={{ display: 'block', fontSize: 18, color: '#9a3412' }}>Editar saldo como administrador</strong>
+                  <span style={{ color: '#9a3412', fontWeight: 700 }}>
+                    Cada cambio queda registrado en el historial del cliente.
+                  </span>
+                </div>
+
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span style={{ color: '#9a3412', fontWeight: 800 }}>Tipo de ajuste</span>
+                  <select
+                    className="cfg-select"
+                    value={adjustmentForm.mode}
+                    onChange={(event) => updateAdjustmentField('mode', event.target.value)}
+                  >
+                    <option value="sumar">Sumar puntos</option>
+                    <option value="restar">Restar puntos</option>
+                    <option value="fijar">Fijar saldo exacto</option>
+                  </select>
+                </label>
+
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span style={{ color: '#9a3412', fontWeight: 800 }}>
+                    {adjustmentForm.mode === 'fijar' ? 'Nuevo saldo final' : 'Cantidad de puntos'}
+                  </span>
+                  <input
+                    className="cfg-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={adjustmentForm.points}
+                    onChange={(event) => updateAdjustmentField('points', event.target.value)}
+                    placeholder={adjustmentForm.mode === 'fijar' ? 'Ejemplo: 400' : 'Ejemplo: 50'}
+                  />
+                </label>
+
+                <label style={{ display: 'grid', gap: 6 }}>
+                  <span style={{ color: '#9a3412', fontWeight: 800 }}>Nota administrativa</span>
+                  <textarea
+                    className="cfg-textarea"
+                    value={adjustmentForm.note}
+                    onChange={(event) => updateAdjustmentField('note', event.target.value)}
+                    placeholder="Motivo del ajuste"
+                  />
+                </label>
+
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    background: 'rgba(255,255,255,0.82)',
+                    border: '1px solid #fdba74',
+                    color: '#9a3412',
+                    fontWeight: 800,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Saldo actual: <strong>{selectedCustomerRow.pointsBalance} pts</strong>
+                  <br />
+                  {adjustmentForm.mode === 'fijar'
+                    ? 'El sistema calculara automaticamente la diferencia contra el saldo actual.'
+                    : 'Usa sumar o restar para corregir puntos sin perder trazabilidad.'}
+                </div>
+
+                <button type="submit" className="cfg-button" disabled={adjustingPoints}>
+                  {adjustingPoints ? 'Guardando ajuste...' : 'Guardar ajuste'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editorOpen && (
         <div
