@@ -3,7 +3,8 @@ import { equalTo, onValue, orderByChild, query, ref, update } from 'firebase/dat
 import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
-import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
+import { buildStoreKitchenOrderText, formatWeight, isPickupOrder } from '../services/orders';
+import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const KITCHEN_THEME = SAN_MARTIN_THEME;
@@ -112,6 +113,132 @@ const buildKitchenWhatsappLink = (pedido = {}) => {
   )}`;
 };
 
+const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248', '00249']);
+
+const normalizeKitchenItemCode = (item = {}) =>
+  String(item?.codigo ?? item?.code ?? '').trim().toUpperCase();
+
+const getKitchenRewardCodeSet = (pedido = {}) =>
+  new Set(
+    (Array.isArray(pedido?.rewardRedemption?.items) ? pedido.rewardRedemption.items : [])
+      .map((item) => String(item?.productCode || '').trim().toUpperCase())
+      .filter(Boolean)
+  );
+
+const getStoreProductItems = (pedido = {}) => {
+  const rewardCodes = getKitchenRewardCodeSet(pedido);
+
+  return (Array.isArray(pedido.items) ? pedido.items : []).filter((item) => {
+    const code = normalizeKitchenItemCode(item);
+    const sourceType = String(item?.sourceType || '').trim().toLowerCase();
+
+    if (!code) {
+      return false;
+    }
+
+    if (DELIVERY_SERVICE_ITEM_CODES.has(code)) {
+      return false;
+    }
+
+    if (rewardCodes.has(code)) {
+      return false;
+    }
+
+    if (sourceType === 'delivery' || sourceType === 'reward') {
+      return false;
+    }
+
+    return true;
+  });
+};
+
+const getRequestedStoreQuantity = (item = {}) =>
+  Number(item?.cantidadSolicitada ?? item?.requestedQuantity ?? item?.cantidad ?? item?.quantity ?? 0);
+
+const getActualStoreQuantity = (item = {}) =>
+  Number(item?.cantidadReal ?? item?.realQuantity ?? item?.cantidad ?? item?.quantity ?? 0);
+
+const roundKitchenQuantity = (value) => Number(Number(value || 0).toFixed(3));
+
+const formatKitchenQuantityInputValue = (value) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return '';
+  }
+
+  return formatWeight(roundKitchenQuantity(numeric));
+};
+
+const parseKitchenQuantityInputValue = (value) => {
+  const normalized = String(value || '').trim().replace(',', '.');
+  if (!normalized) {
+    return NaN;
+  }
+
+  return Number(normalized);
+};
+
+const getKitchenQuantityStep = (item = {}) => {
+  const explicitStep = Number(item?.quantityStep ?? item?.step ?? 0);
+  if (Number.isFinite(explicitStep) && explicitStep > 0) {
+    return explicitStep;
+  }
+
+  return String(item?.unidad ?? item?.unit ?? '').trim().toLowerCase() === 'unidad' ? 1 : 0.1;
+};
+
+const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
+  const updatedItems = productItems.map((item) => {
+    const actualQuantity = roundKitchenQuantity(getActualStoreQuantity(item));
+    const requestedQuantity = roundKitchenQuantity(getRequestedStoreQuantity(item) || actualQuantity);
+    const unitPrice = Number(item?.precioUnitario ?? item?.price ?? 0);
+
+    return {
+      ...item,
+      sourceType: 'order',
+      cantidadSolicitada: requestedQuantity,
+      cantidadReal: actualQuantity,
+      cantidad: actualQuantity,
+      subtotal: Number((actualQuantity * unitPrice).toFixed(2)),
+    };
+  });
+
+  const subtotal = Number(
+    updatedItems.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0).toFixed(2)
+  );
+  const discount = Math.max(0, Number(pedido?.descuentoCupon || 0));
+  const deliveryFee = Math.max(0, Number(pedido?.deliveryFee || 0));
+  const total = Number(Math.max(subtotal - discount + deliveryFee, 0).toFixed(2));
+  const nowIso = new Date().toISOString();
+
+  return {
+    items: updatedItems,
+    pedido: buildStoreKitchenOrderText(updatedItems, {
+      subtotal,
+      discount,
+      deliveryFee,
+      deliveryDistanceKm: pedido?.deliveryDistanceKm,
+      total,
+      metodoPago: pedido?.metodoPago,
+      totalLabel: 'Total actualizado de pedido',
+      subtotalLabel: 'Subtotal actualizado',
+      observaciones: pedido?.observaciones,
+      rewardRedemption: pedido?.rewardRedemption,
+    }),
+    subtotalEstimado: subtotal,
+    total,
+    totalAproximado: false,
+    totalActualizadoAt: nowIso,
+    sicarQuote: {
+      ...(pedido?.sicarQuote || {}),
+      status: 'pending',
+      requestedAt: nowIso,
+      requestedBy: 'kitchen',
+      lastRequestedByKitchenAt: nowIso,
+    },
+  };
+};
+
 const getKitchenOrderText = (pedido = {}) => {
   if (Array.isArray(pedido.items) && pedido.items.length > 0) {
     return buildStoreKitchenOrderText(pedido.items, {
@@ -158,6 +285,8 @@ export default function KitchenView({ orders, allowRuta = true }) {
   const [animatingCards, setAnimatingCards] = useState(new Set());
   const [modalCocinero, setModalCocinero] = useState(null);
   const [cocineroSeleccionado, setCocineroSeleccionado] = useState(null);
+  const [storeItemDrafts, setStoreItemDrafts] = useState({});
+  const [storeSyncState, setStoreSyncState] = useState({});
 
   useEffect(() => {
     if (!allowRuta) {
@@ -207,6 +336,126 @@ export default function KitchenView({ orders, allowRuta = true }) {
     }
 
     update(ref(database, `${basePath}/${firebaseKey}`), payload);
+  };
+
+  const setStoreSyncEntry = (orderKey, nextEntry) => {
+    setStoreSyncState((current) => ({
+      ...current,
+      [orderKey]: {
+        ...(current[orderKey] || {}),
+        ...nextEntry,
+      },
+    }));
+  };
+
+  const clearStoreDraft = (orderKey) => {
+    setStoreItemDrafts((current) => {
+      if (!Object.prototype.hasOwnProperty.call(current, orderKey)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[orderKey];
+      return next;
+    });
+  };
+
+  const getStoreDraftValue = (pedido, item, index) => {
+    const orderDraft = storeItemDrafts[pedido.firebaseKey];
+    if (orderDraft && Object.prototype.hasOwnProperty.call(orderDraft, index)) {
+      return orderDraft[index];
+    }
+
+    return formatKitchenQuantityInputValue(getActualStoreQuantity(item));
+  };
+
+  const handleStoreDraftChange = (pedido, index, value) => {
+    setStoreItemDrafts((current) => ({
+      ...current,
+      [pedido.firebaseKey]: {
+        ...(current[pedido.firebaseKey] || {}),
+        [index]: value,
+      },
+    }));
+  };
+
+  const handleApplyStoreActualQuantities = async (pedido) => {
+    if (!pedido?.firebaseKey || kitchenTab !== 'delivery') {
+      return;
+    }
+
+    const productItems = getStoreProductItems(pedido);
+    if (productItems.length === 0) {
+      return;
+    }
+
+    const originalPatch = {
+      items: Array.isArray(pedido.items) ? pedido.items : [],
+      pedido: String(pedido.pedido || '').trim(),
+      subtotalEstimado: Number(pedido.subtotalEstimado || 0),
+      total: Number(pedido.total || 0),
+      totalAproximado: pedido.totalAproximado !== false,
+      totalActualizadoAt: pedido.totalActualizadoAt || null,
+      sicarQuote: pedido.sicarQuote || null,
+    };
+
+    let wroteOrder = false;
+
+    try {
+      const nextItems = productItems.map((item, index) => {
+        const rawValue = getStoreDraftValue(pedido, item, index);
+        const parsedQuantity = parseKitchenQuantityInputValue(rawValue);
+
+        if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+          throw new Error(`Ingresa una cantidad real valida para ${item?.nombre || 'este producto'}.`);
+        }
+
+        return {
+          ...item,
+          cantidadReal: roundKitchenQuantity(parsedQuantity),
+        };
+      });
+
+      const patch = buildStoreKitchenItemsPatch(pedido, nextItems);
+      setStoreSyncEntry(pedido.firebaseKey, {
+        busy: true,
+        error: '',
+        success: '',
+      });
+
+      await update(ref(database, `orders/${pedido.firebaseKey}`), patch);
+      wroteOrder = true;
+
+      await syncSicarQuoteForOrder(pedido.firebaseKey, {
+        applyToFirebase: true,
+      });
+
+      clearStoreDraft(pedido.firebaseKey);
+      setStoreSyncEntry(pedido.firebaseKey, {
+        busy: false,
+        error: '',
+        success: 'Pesos actualizados y cotizacion sincronizada.',
+      });
+    } catch (error) {
+      if (wroteOrder) {
+        try {
+          await update(ref(database, `orders/${pedido.firebaseKey}`), originalPatch);
+        } catch (revertError) {
+          console.error('No se pudo revertir el pedido tras fallar la cotizacion SICAR:', revertError);
+        }
+      }
+
+      console.error('Error actualizando pesos reales desde cocina:', error);
+      const message =
+        error?.message ||
+        'No se pudieron actualizar los pesos desde cocina. Verifica que el puente local SICAR este activo.';
+      setStoreSyncEntry(pedido.firebaseKey, {
+        busy: false,
+        error: message,
+        success: '',
+      });
+      window.alert(message);
+    }
   };
 
   const handleSelectCocinero = (firebaseKey, nombreReal, tab = kitchenTab) => {
@@ -677,6 +926,12 @@ export default function KitchenView({ orders, allowRuta = true }) {
             const isEditing = editingId === pedido.firebaseKey;
             const isAnimating = animatingCards.has(pedido.firebaseKey);
             const customerWhatsappLink = buildKitchenWhatsappLink(pedido);
+            const storeProductItems = getStoreProductItems(pedido);
+            const isStructuredStoreOrder =
+              kitchenTab === 'delivery' &&
+              String(pedido?.canal || '').trim() === 'tienda_virtual' &&
+              storeProductItems.length > 0;
+            const storeSyncEntry = storeSyncState[pedido.firebaseKey] || {};
             
             return (
               <div
@@ -949,7 +1204,229 @@ export default function KitchenView({ orders, allowRuta = true }) {
                         Detalle del Pedido
                       </div>
                       
-                      {isEditing ? (
+                      {isStructuredStoreOrder ? (
+                        <div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '120px 90px minmax(0, 1fr) 160px',
+                            gap: '12px',
+                            marginBottom: '14px',
+                            paddingBottom: '10px',
+                            borderBottom: '2px solid #e2e8f0',
+                            fontSize: '12px',
+                            fontWeight: 800,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                            color: '#64748b'
+                          }}>
+                            <div>Cantidad solicitada</div>
+                            <div>Unidad</div>
+                            <div>Producto</div>
+                            <div>Cantidad real</div>
+                          </div>
+
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '12px'
+                          }}>
+                            {storeProductItems.map((item, itemIndex) => (
+                              <div
+                                key={`${pedido.firebaseKey}-${normalizeKitchenItemCode(item) || itemIndex}-${itemIndex}`}
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '120px 90px minmax(0, 1fr) 160px',
+                                  gap: '12px',
+                                  alignItems: 'center',
+                                  padding: '14px 16px',
+                                  borderRadius: '16px',
+                                  background: '#f8fafc',
+                                  border: '1px solid #dbe4f0'
+                                }}
+                              >
+                                <div style={{
+                                  fontSize: '24px',
+                                  fontWeight: 800,
+                                  color: '#0f172a'
+                                }}>
+                                  {formatWeight(getRequestedStoreQuantity(item))}
+                                </div>
+                                <div style={{
+                                  fontSize: '16px',
+                                  fontWeight: 800,
+                                  color: '#475569',
+                                  textTransform: 'lowercase'
+                                }}>
+                                  {String(item?.unidad || 'lb').trim() || 'lb'}
+                                </div>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{
+                                    fontSize: '18px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    lineHeight: 1.25
+                                  }}>
+                                    {item?.nombre || 'Producto sin nombre'}
+                                  </div>
+                                  <div style={{
+                                    marginTop: '4px',
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    color: '#64748b'
+                                  }}>
+                                    {normalizeKitchenItemCode(item) || 'Sin codigo'}
+                                  </div>
+                                </div>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step={getKitchenQuantityStep(item)}
+                                  min={String(item?.unidad || '').trim().toLowerCase() === 'unidad' ? '1' : '0.1'}
+                                  value={getStoreDraftValue(pedido, item, itemIndex)}
+                                  onChange={(event) =>
+                                    handleStoreDraftChange(pedido, itemIndex, event.target.value)
+                                  }
+                                  onFocus={(event) => event.target.select()}
+                                  style={{
+                                    width: '100%',
+                                    height: '52px',
+                                    borderRadius: '14px',
+                                    border: '2px solid #cbd5e1',
+                                    background: 'white',
+                                    padding: '0 14px',
+                                    fontSize: '22px',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    outline: 'none'
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+
+                          {(pedido.observaciones || pedido.total || pedido.deliveryFee || pedido.descuentoCupon) && (
+                            <div style={{
+                              marginTop: '18px',
+                              padding: '18px',
+                              borderRadius: '16px',
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe'
+                            }}>
+                              {pedido.observaciones && (
+                                <div style={{ marginBottom: '12px' }}>
+                                  <div style={{
+                                    fontSize: '12px',
+                                    fontWeight: 800,
+                                    letterSpacing: '0.08em',
+                                    textTransform: 'uppercase',
+                                    color: '#1d4ed8',
+                                    marginBottom: '6px'
+                                  }}>
+                                    Notas del cliente
+                                  </div>
+                                  <div style={{
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    color: '#1e293b',
+                                    lineHeight: 1.5,
+                                    whiteSpace: 'pre-wrap'
+                                  }}>
+                                    {pedido.observaciones}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div style={{
+                                display: 'grid',
+                                gap: '8px',
+                                fontSize: '15px',
+                                fontWeight: 700,
+                                color: '#1e3a8a'
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                                  <span>{pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado'}</span>
+                                  <span>C${Number(pedido.subtotalEstimado || 0).toFixed(2)}</span>
+                                </div>
+                                {Number(pedido.descuentoCupon || 0) > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                                    <span>Cupon aplicado</span>
+                                    <span>-C${Number(pedido.descuentoCupon || 0).toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {Number(pedido.deliveryFee || 0) > 0 && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                                    <span>Servicio a domicilio</span>
+                                    <span>C${Number(pedido.deliveryFee || 0).toFixed(2)}</span>
+                                  </div>
+                                )}
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  gap: '16px',
+                                  paddingTop: '8px',
+                                  borderTop: '1px solid rgba(29, 78, 216, 0.18)',
+                                  fontSize: '17px',
+                                  fontWeight: 800,
+                                  color: '#0f172a'
+                                }}>
+                                  <span>{pedido?.totalAproximado === false ? 'Total actualizado de pedido' : 'Total aproximado de pedido'}</span>
+                                  <span>C${Number(pedido.total || 0).toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '12px', marginTop: '20px', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => handleApplyStoreActualQuantities(pedido)}
+                              disabled={storeSyncEntry.busy}
+                              className="btn-hover"
+                              style={{
+                                flex: '1 1 280px',
+                                padding: '16px 20px',
+                                borderRadius: '14px',
+                                border: 'none',
+                                background: storeSyncEntry.busy ? '#94a3b8' : config.color,
+                                color: 'white',
+                                fontWeight: 800,
+                                fontSize: '15px',
+                                cursor: storeSyncEntry.busy ? 'not-allowed' : 'pointer',
+                                boxShadow: storeSyncEntry.busy ? 'none' : `0 12px 30px ${config.color}33`
+                              }}
+                            >
+                              {storeSyncEntry.busy ? 'Actualizando pesos...' : 'Actualizar pesos y cotizacion'}
+                            </button>
+                          </div>
+
+                          {storeSyncEntry.error && (
+                            <div style={{
+                              marginTop: '12px',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: 'rgba(239, 68, 68, 0.12)',
+                              color: '#b91c1c',
+                              fontSize: '14px',
+                              fontWeight: 700
+                            }}>
+                              {storeSyncEntry.error}
+                            </div>
+                          )}
+
+                          {storeSyncEntry.success && (
+                            <div style={{
+                              marginTop: '12px',
+                              padding: '12px 14px',
+                              borderRadius: '12px',
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              color: '#047857',
+                              fontSize: '14px',
+                              fontWeight: 700
+                            }}>
+                              {storeSyncEntry.success}
+                            </div>
+                          )}
+                        </div>
+                      ) : isEditing ? (
                         <div>
                           <textarea
                             value={editText}
@@ -1022,30 +1499,32 @@ export default function KitchenView({ orders, allowRuta = true }) {
                           }}>
                             {getKitchenOrderText(pedido) || 'Sin detalle'}
                           </pre>
-                          <button
-                            onClick={() => {
-                              setEditingId(pedido.firebaseKey);
-                              setEditText(getKitchenOrderText(pedido) || '');
-                            }}
-                            className="btn-hover"
-                            style={{
-                              marginTop: '20px',
-                              padding: '12px 20px',
-                              borderRadius: '10px',
-                              border: '2px solid #e2e8f0',
-                              background: 'white',
-                              color: '#64748b',
-                              fontSize: '14px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px'
-                            }}
-                          >
-                            {Icons.edit}
-                            Editar Pedido
-                          </button>
+                          {String(pedido?.canal || '').trim() !== 'tienda_virtual' && (
+                            <button
+                              onClick={() => {
+                                setEditingId(pedido.firebaseKey);
+                                setEditText(getKitchenOrderText(pedido) || '');
+                              }}
+                              className="btn-hover"
+                              style={{
+                                marginTop: '20px',
+                                padding: '12px 20px',
+                                borderRadius: '10px',
+                                border: '2px solid #e2e8f0',
+                                background: 'white',
+                                color: '#64748b',
+                                fontSize: '14px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}
+                            >
+                              {Icons.edit}
+                              Editar Pedido
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

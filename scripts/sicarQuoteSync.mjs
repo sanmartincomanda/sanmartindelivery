@@ -1149,14 +1149,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     };
   };
 
-  const insertQuoteDraft = async (order = {}, draft = {}, sicarCustomer = null) => {
-    const header = '';
-    const footer = '';
-    const targetCliId = Number(sicarCustomer?.cliId || DEFAULT_CLIENT_ID || 1);
-
-    const detailValues = draft.detailItems.map((item) => `
+  const buildQuoteDetailValuesSql = (cotIdExpression, draft = {}) =>
+    draft.detailItems.map((item) => `
       (
-        @cotId,
+        ${cotIdExpression},
         ${item.artId},
         ${escapeSqlText(item.code, sqlEscape)},
         ${escapeSqlText(item.description, sqlEscape)},
@@ -1189,9 +1185,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       )
     `);
 
-    const quoteTaxValues = draft.taxRows.map((item, index) => `
+  const buildQuoteTaxValuesSql = (cotIdExpression, draft = {}) =>
+    draft.taxRows.map((item, index) => `
       (
-        @cotId,
+        ${cotIdExpression},
         ${Number(item.impId || 0)},
         ${formatMoney(item.taxTotal)},
         NULL,
@@ -1202,12 +1199,20 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       )
     `);
 
-    const detailTaxValues = draft.detailItems
-      .flatMap((item) =>
-        (Array.isArray(item.impIds) ? item.impIds : [])
-          .filter((impId) => Number(impId || 0) === 1)
-          .map((impId) => `(@cotId, ${item.artId}, ${Number(impId)})`)
-      );
+  const buildDetailTaxValuesSql = (cotIdExpression, draft = {}) =>
+    draft.detailItems.flatMap((item) =>
+      (Array.isArray(item.impIds) ? item.impIds : [])
+        .filter((impId) => Number(impId || 0) === 1)
+        .map((impId) => `(${cotIdExpression}, ${item.artId}, ${Number(impId)})`)
+    );
+
+  const insertQuoteDraft = async (order = {}, draft = {}, sicarCustomer = null) => {
+    const header = '';
+    const footer = '';
+    const targetCliId = Number(sicarCustomer?.cliId || DEFAULT_CLIENT_ID || 1);
+    const detailValues = buildQuoteDetailValuesSql('@cotId', draft);
+    const quoteTaxValues = buildQuoteTaxValuesSql('@cotId', draft);
+    const detailTaxValues = buildDetailTaxValuesSql('@cotId', draft);
 
     const rows = await runMysqlQuery(`
       START TRANSACTION;
@@ -1340,6 +1345,108 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     };
   };
 
+  const replaceQuoteDraft = async (quoteId, draft = {}, sicarCustomer = null) => {
+    const cleanQuoteId = Number(quoteId || 0);
+    if (cleanQuoteId <= 0) {
+      throw new Error('No existe una cotizacion SICAR enlazada para actualizar.');
+    }
+
+    const header = '';
+    const footer = '';
+    const targetCliId = Number(sicarCustomer?.cliId || DEFAULT_CLIENT_ID || 1);
+    const detailValues = buildQuoteDetailValuesSql(cleanQuoteId, draft);
+    const quoteTaxValues = buildQuoteTaxValuesSql(cleanQuoteId, draft);
+    const detailTaxValues = buildDetailTaxValuesSql(cleanQuoteId, draft);
+
+    await runMysqlQuery(`
+      START TRANSACTION;
+      DELETE FROM detallecotimpuesto
+      WHERE cot_id = ${cleanQuoteId};
+      DELETE FROM cotizacionimp
+      WHERE cot_id = ${cleanQuoteId};
+      DELETE FROM detallecot
+      WHERE cot_id = ${cleanQuoteId};
+      UPDATE cotizacion
+      SET fecha = ${escapeSqlText(draft.orderDate, sqlEscape)},
+          header = ${escapeSqlText(header, sqlEscape)},
+          footer = ${escapeSqlText(footer, sqlEscape)},
+          subtotal = ${formatMoney(draft.subtotal)},
+          descuento = 0.00,
+          total = ${formatMoney(draft.sicarTotal || draft.total)},
+          monAbr = ${escapeSqlText(DEFAULT_CURRENCY_ABBR, sqlEscape)},
+          monTipoCambio = ${formatRate(DEFAULT_CURRENCY_EXCHANGE)},
+          peso = 0.0000,
+          status = 1,
+          img = 1,
+          caracteristicas = 0,
+          desglosado = 0,
+          mosDescuento = 0,
+          mosPeso = 1,
+          impuestos = 1,
+          mosFirma = 1,
+          leyendaImpuestos = 1,
+          mosParidad = 0,
+          bloqueada = 0,
+          mosDetallePaq = 0,
+          mosClaveArt = 0,
+          mosPreAntDesc = 1,
+          usu_id = ${DEFAULT_USER_ID},
+          cli_id = ${targetCliId},
+          mon_id = ${DEFAULT_CURRENCY_ID},
+          vnd_id = ${DEFAULT_VENDOR_ID}
+      WHERE cot_id = ${cleanQuoteId};
+      INSERT INTO detallecot (
+        cot_id,
+        art_id,
+        clave,
+        descripcion,
+        cantidad,
+        unidad,
+        precioCompra,
+        precioNorSin,
+        precioNorCon,
+        precioSin,
+        precioCon,
+        importeCompra,
+        importeNorSin,
+        importeNorCon,
+        importeSin,
+        importeCon,
+        monPrecioNorSin,
+        monPrecioNorCon,
+        monPrecioSin,
+        monPrecioCon,
+        monImporteNorSin,
+        monImporteNorCon,
+        monImporteSin,
+        monImporteCon,
+        diferencia,
+        utilidad,
+        descPorcentaje,
+        descTotal,
+        caracteristicas,
+        orden
+      ) VALUES ${detailValues.join(',')};
+      INSERT INTO cotizacionimp (
+        cot_id,
+        imp_id,
+        total,
+        monTotal,
+        subtotal,
+        monSubtotal,
+        tras,
+        orden
+      ) VALUES ${quoteTaxValues.join(',')};
+      ${detailTaxValues.length > 0 ? `INSERT INTO detallecotimpuesto (cot_id, art_id, imp_id) VALUES ${detailTaxValues.join(',')};` : ''}
+      COMMIT;
+    `);
+
+    return {
+      cotId: cleanQuoteId,
+      missingCodes: draft.missingCodes || [],
+    };
+  };
+
   const assignCustomerToQuote = async (quoteId, sicarCustomer = {}) => {
     const cleanQuoteId = Number(quoteId || 0);
     const cleanCliId = Number(sicarCustomer?.cliId || 0);
@@ -1433,7 +1540,12 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
   const buildFirebaseOrderPatchFromQuote = (order = {}, quote = {}, missingCodes = [], sicarCustomer = null) => {
     const existingItemsByCode = new Map(
-      normalizeOrderItems(order.items).map((item) => [item.code, item])
+      (Array.isArray(order.items) ? order.items : [])
+        .map((item) => [normalizeCode(item?.codigo ?? item?.code ?? ''), item])
+        .filter(([code]) => Boolean(code))
+    );
+    const rewardCodes = new Set(
+      normalizeRewardOrderItems(order.rewardRedemption).map((item) => normalizeCode(item.code))
     );
     const grossTotal = roundMoney(quote?.sicarTotal || quote?.total || 0);
     const customerDiscount = roundMoney(
@@ -1443,23 +1555,60 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       quote?.customerTotal ?? Math.max(grossTotal - customerDiscount, 0)
     );
 
-    const items = (Array.isArray(quote.items) ? quote.items : []).map((item) => {
-      const existingItem = existingItemsByCode.get(item.code) || null;
-      const safeDescription =
-        existingItem?.description && existingItem.description !== item.name
-          ? existingItem.description
-          : '';
+    const items = (Array.isArray(quote.items) ? quote.items : [])
+      .filter((item) => {
+        const normalizedCode = normalizeCode(item?.code || '');
+        if (!normalizedCode) {
+          return false;
+        }
 
-      return {
-        codigo: item.code,
-        nombre: item.name,
-        descripcion: safeDescription,
-        unidad: item.storeUnit,
-        cantidad: item.quantity,
-        precioUnitario: item.price,
-        subtotal: item.total,
-      };
-    });
+        if (isDeliveryServiceCode(normalizedCode)) {
+          return false;
+        }
+
+        if (rewardCodes.has(normalizedCode)) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((item) => {
+        const normalizedCode = normalizeCode(item.code);
+        const existingItem = existingItemsByCode.get(normalizedCode) || null;
+        const safeDescription =
+          existingItem?.description && existingItem.description !== item.name
+            ? existingItem.description
+            : '';
+        const requestedQuantity = roundQuantity(
+          existingItem?.cantidadSolicitada ??
+            existingItem?.requestedQuantity ??
+            existingItem?.cantidad ??
+            item.quantity
+        );
+        const actualQuantity = roundQuantity(item.quantity);
+        const nextItem = {
+          codigo: item.code,
+          nombre: item.name,
+          descripcion: safeDescription,
+          unidad: item.storeUnit,
+          cantidadSolicitada: requestedQuantity,
+          cantidadReal: actualQuantity,
+          cantidad: actualQuantity,
+          precioUnitario: item.price,
+          subtotal: item.total,
+          sourceType: 'order',
+        };
+
+        if (Number(existingItem?.quantityStep || 0) > 0) {
+          nextItem.quantityStep = Number(existingItem.quantityStep);
+        }
+
+        if (Number(existingItem?.minQuantity || 0) > 0) {
+          nextItem.minQuantity = Number(existingItem.minQuantity);
+        }
+
+        return nextItem;
+      });
     const productSubtotal = deriveQuotedProductSubtotal({ ...quote, sicarTotal: grossTotal }, order);
 
     return {
@@ -1519,16 +1668,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     let quoteReference = await getQuoteByOrderReference(order);
     let missingCodes = [];
     let createdQuote = false;
+    const draft = await buildQuoteDraft(order);
 
     if (!quoteReference) {
-      const draft = await buildQuoteDraft(order);
       const created = await insertQuoteDraft(order, draft, sicarCustomer);
       createdQuote = true;
       missingCodes = Array.isArray(created.missingCodes) ? created.missingCodes : [];
       quoteReference = { cotId: created.cotId };
     } else {
-      missingCodes = Array.isArray(order?.sicarQuote?.missingCodes) ? order.sicarQuote.missingCodes : [];
-      await assignCustomerToQuote(quoteReference.cotId, sicarCustomer);
+      const replaced = await replaceQuoteDraft(quoteReference.cotId, draft, sicarCustomer);
+      missingCodes = Array.isArray(replaced.missingCodes) ? replaced.missingCodes : [];
     }
 
     if (!quoteReference?.cotId) {
