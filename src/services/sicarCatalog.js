@@ -70,6 +70,22 @@ export async function fetchSicarCatalogSelection() {
   return payload;
 }
 
+export async function fetchSicarRecentSoldProducts(days = 30) {
+  const safeDays = Math.max(1, Number(days || 30));
+  const response = await fetchSicarBridge(`/api/sicar/catalog-recent?days=${encodeURIComponent(String(safeDays))}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  const payload = await parseJsonResponse(response);
+  if (!Array.isArray(payload?.products)) {
+    throw new Error('La respuesta de SICAR no trae productos recientes.');
+  }
+
+  return payload;
+}
+
 export async function fetchSicarProductImage(code) {
   const safeCode = encodeURIComponent(String(code || '').trim());
   const response = await fetchSicarBridge(`/api/sicar/image?code=${safeCode}`, {

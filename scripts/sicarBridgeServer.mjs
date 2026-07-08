@@ -182,6 +182,22 @@ const getWindowDates = () => {
   };
 };
 
+const getRecentDaysWindowDates = (daysBack = 30) => {
+  const safeDays = Math.max(1, Number(daysBack || 30));
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - safeDays);
+  const endExclusive = new Date(now);
+  endExclusive.setDate(endExclusive.getDate() + 1);
+
+  return {
+    daysBack: safeDays,
+    startDate: formatDate(start),
+    endExclusiveDate: formatDate(endExclusive),
+    endInclusiveDate: formatDate(now),
+  };
+};
+
 const getMimeTypeFromHex = (hex = '') => {
   const signature = String(hex || '').toUpperCase();
   if (signature.startsWith('89504E47')) {
@@ -670,6 +686,77 @@ const buildCatalogSelection = async () => {
   };
 };
 
+const buildRecentSoldCatalogSelection = async (daysBack = 30) => {
+  const { startDate, endExclusiveDate, endInclusiveDate, daysBack: resolvedDaysBack } =
+    getRecentDaysWindowDates(daysBack);
+  const rawRows = await getSicarCatalogRows(startDate, endExclusiveDate);
+
+  const products = rawRows
+    .map((row) => {
+      const resolved = resolveRowDepartment(row);
+      if (!resolved) {
+        return null;
+      }
+
+      const storeSubcategory =
+        resolved.override?.storeSubcategory ||
+        normalizeStoreSubcategory(
+          row.sicarCategory || resolved.override?.sicarCategory,
+          resolved.departmentConfig.storeCategoryId
+        ) ||
+        'Otros';
+
+      return {
+        code: row.code,
+        name: row.name,
+        price: Number(row.price.toFixed(2)),
+        unit: normalizeStoreUnit(row.unit),
+        category: resolved.departmentConfig.storeCategoryId,
+        categoryLabel: resolved.departmentConfig.storeCategoryLabel,
+        subcategory: storeSubcategory,
+        active: true,
+        promo: false,
+        description: '',
+        sicar: {
+          artId: row.artId,
+          department: resolved.departmentName,
+          category: resolved.override?.sicarCategory || row.sicarCategory,
+          basePrice: Number(row.basePrice.toFixed(4)),
+          taxRatePct: Number(row.taxRatePct.toFixed(4)),
+          quantitySold30d: Number(row.quantitySold.toFixed(4)),
+          amountSold30d: Number(row.amountSold.toFixed(2)),
+          tickets30d: row.tickets,
+          imageId: row.imageId,
+          imageHash: row.imageHash,
+          hasImage: row.imageId > 0,
+        },
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => {
+      const leftQty = Number(left?.sicar?.quantitySold30d || 0);
+      const rightQty = Number(right?.sicar?.quantitySold30d || 0);
+      if (rightQty !== leftQty) {
+        return rightQty - leftQty;
+      }
+
+      return String(left?.name || '').localeCompare(String(right?.name || ''), 'es', {
+        sensitivity: 'base',
+      });
+    });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dateWindow: {
+      startDate,
+      endInclusiveDate,
+      endExclusiveDate,
+    },
+    daysBack: resolvedDaysBack,
+    products,
+  };
+};
+
 const getImageForSku = async (code) => {
   const safeCode = sqlEscape(code);
   const rows = await runMysqlQuery(`
@@ -771,6 +858,12 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
 
   if (requestUrl.pathname === '/api/sicar/catalog') {
     const payload = await buildCatalogSelection();
+    return json(200, payload);
+  }
+
+  if (requestUrl.pathname === '/api/sicar/catalog-recent') {
+    const days = Number(requestUrl.searchParams.get('days') || 30);
+    const payload = await buildRecentSoldCatalogSelection(days);
     return json(200, payload);
   }
 

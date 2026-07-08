@@ -436,6 +436,8 @@ export const normalizeStoreRewardRedemption = (rewardRedemption = {}) => {
 export const getStoreRewardRedemptionLabel = (rewardRedemption = {}) =>
   String(rewardRedemption?.rewardName || '').trim() || 'Premio Miembro Gold';
 
+export const STORE_REWARD_REDEMPTION_CART_LABEL = 'CANJE DE Membresia Gold';
+
 export const buildStoreRewardRedemptionTextLines = (rewardRedemption = {}) => {
   const normalizedRewardRedemption = normalizeStoreRewardRedemption(rewardRedemption);
   if (!normalizedRewardRedemption) {
@@ -448,8 +450,9 @@ export const buildStoreRewardRedemptionTextLines = (rewardRedemption = {}) => {
   }
 
   const lines = [
-    'Premio Miembro Gold:',
-    `- ${getStoreRewardRedemptionLabel(normalizedRewardRedemption)} | C$0.00`,
+    'Canje Miembro Gold:',
+    `- ${STORE_REWARD_REDEMPTION_CART_LABEL} | C$0.00`,
+    `  Premio: ${getStoreRewardRedemptionLabel(normalizedRewardRedemption)}`,
   ];
 
   selectedItems.forEach((item) => {

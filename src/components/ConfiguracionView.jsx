@@ -87,6 +87,7 @@ import {
 import {
   compressImportedCatalogImage,
   fetchSicarCatalogSelection,
+  fetchSicarRecentSoldProducts,
   fetchSicarPricesByCodes,
   fetchSicarProductImage,
   getSicarBridgeHealth,
@@ -499,6 +500,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [cleaningPromotions, setCleaningPromotions] = useState(false);
   const [syncingSicar, setSyncingSicar] = useState(false);
   const [syncingSicarPrices, setSyncingSicarPrices] = useState(false);
+  const [syncingSicarRecentSold, setSyncingSicarRecentSold] = useState(false);
   const [migratingCatalogImages, setMigratingCatalogImages] = useState(false);
   const [cleaningExpiredOrders, setCleaningExpiredOrders] = useState(false);
   const [testingSicar, setTestingSicar] = useState(false);
@@ -1669,6 +1671,102 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const syncRecentSicarSoldProducts = async () => {
+    setSyncingSicarRecentSold(true);
+    setMessage(
+      'Buscando productos vendidos en SICAR en los ultimos 30 dias que aun no estan en tu catalogo...'
+    );
+
+    try {
+      const health = await getSicarBridgeHealth();
+      setSicarHealth(health);
+
+      const currentCatalogMap = await getCurrentCatalogMap();
+      const payload = await fetchSicarRecentSoldProducts(30);
+      const recentProducts = Array.isArray(payload?.products) ? payload.products : [];
+      const missingProducts = recentProducts.filter((product) => {
+        const productKey = getCatalogProductKey(product?.code);
+        return productKey && !currentCatalogMap[productKey]?.code;
+      });
+
+      if (missingProducts.length === 0) {
+        setMessage('No se encontraron productos vendidos en los ultimos 30 dias fuera de tu catalogo actual.');
+        return;
+      }
+
+      const imageCandidates = missingProducts.filter((product) => product?.sicar?.hasImage).length;
+      let importedImages = 0;
+      const importedProducts = [];
+      const productBatches = chunkArray(missingProducts, 10);
+
+      for (let batchIndex = 0; batchIndex < productBatches.length; batchIndex += 1) {
+        const batch = productBatches[batchIndex];
+        const batchResults = await Promise.all(
+          batch.map(async (importedProduct) => {
+            let nextImage = '';
+            let importedImageCount = 0;
+
+            if (importedProduct?.sicar?.hasImage) {
+              try {
+                const remoteImage = await fetchSicarProductImage(importedProduct.code);
+                nextImage = await compressImportedCatalogImage(remoteImage.dataUrl);
+                importedImageCount = 1;
+              } catch (error) {
+                console.error(`No se pudo importar la imagen reciente de ${importedProduct.code}:`, error);
+              }
+            }
+
+            return {
+              product: {
+                ...importedProduct,
+                image: nextImage,
+              },
+              importedImageCount,
+            };
+          })
+        );
+
+        batchResults.forEach(({ product, importedImageCount }) => {
+          importedProducts.push(product);
+          importedImages += importedImageCount;
+        });
+
+        setMessage(
+          `Preparando productos vendidos 30 dias... ${importedProducts.length}/${missingProducts.length} SKUs listos y ${importedImages}/${imageCandidates} fotos importadas.`
+        );
+        await waitForUiPaint();
+      }
+
+      setMessage(`Guardando productos nuevos de SICAR... 0/${importedProducts.length} SKUs agregados.`);
+      const { appliedCount, appliedProducts } = await applySicarCatalogProductsWithOptions(importedProducts, {
+        currentMap: currentCatalogMap,
+        batchSize: SICAR_CATALOG_SYNC_BATCH_SIZE,
+        onProgress: ({ processed, total }) => {
+          setMessage(`Guardando productos nuevos de SICAR... ${processed}/${total} SKUs agregados.`);
+        },
+      });
+
+      const categoryCount = await syncStoreCategoriesFromCatalogProducts(appliedProducts);
+      const addedLines = appliedProducts
+        .map((product) => `- ${product.code} ${product.name}`)
+        .join('\n');
+
+      setMessage(
+        `Productos agregados desde SICAR: ${appliedCount}. Categorias sincronizadas: ${categoryCount}. Fotos importadas: ${importedImages}.\n\n${addedLines}`
+      );
+    } catch (error) {
+      console.error('Error agregando productos recientes de SICAR:', error);
+      setMessage(
+        buildSicarFailureMessage(
+          'No se pudieron agregar los productos vendidos en los ultimos 30 dias desde SICAR.',
+          error
+        )
+      );
+    } finally {
+      setSyncingSicarRecentSold(false);
+    }
+  };
+
   const migrateLegacyCatalogImages = async () => {
     setMigratingCatalogImages(true);
     setMessage('Migrando fotos legacy a Firebase Storage... esto puede tardar varios minutos.');
@@ -1990,8 +2088,32 @@ export default function ConfiguracionView({ mode = 'users' }) {
               <button
                 type="button"
                 className="cfg-button"
+                onClick={syncRecentSicarSoldProducts}
+                disabled={
+                  testingSicar ||
+                  loadingSicarPreview ||
+                  syncingSicar ||
+                  syncingSicarPrices ||
+                  syncingSicarRecentSold ||
+                  migratingCatalogImages ||
+                  cleaningExpiredOrders
+                }
+              >
+                {syncingSicarRecentSold ? 'Agregando vendidos 30 dias...' : 'Agregar vendidos 30 dias'}
+              </button>
+              <button
+                type="button"
+                className="cfg-button"
                 onClick={updateSicarPrices}
-                disabled={testingSicar || loadingSicarPreview || syncingSicar || syncingSicarPrices || migratingCatalogImages || cleaningExpiredOrders}
+                disabled={
+                  testingSicar ||
+                  loadingSicarPreview ||
+                  syncingSicar ||
+                  syncingSicarPrices ||
+                  syncingSicarRecentSold ||
+                  migratingCatalogImages ||
+                  cleaningExpiredOrders
+                }
               >
                 {syncingSicarPrices ? 'Actualizando precios...' : 'Actualizar precios SICAR'}
               </button>
@@ -2008,6 +2130,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
               background: '#fff',
               border: '1px solid #e2e8f0',
               fontWeight: 800,
+              whiteSpace: 'pre-wrap',
             }}
           >
             {message}

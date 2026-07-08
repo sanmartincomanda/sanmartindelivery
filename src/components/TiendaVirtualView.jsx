@@ -105,6 +105,7 @@ import {
   mergeStoreRewards,
   normalizeStoreRewardAccount,
   reserveStoreRewardPoints,
+  STORE_REWARD_REDEMPTION_CART_LABEL,
   subscribeStoreRewardAccount,
   subscribeStoreRewardSettings,
   subscribeStoreRewardTransactions,
@@ -295,6 +296,30 @@ const getStoreGeneralCatalogTailPriority = (product = {}) => {
 };
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+const getRewardCartPreview = (selectedReward = null) => {
+  if (!selectedReward?.rewardName) {
+    return null;
+  }
+
+  const rewardItems = Array.isArray(selectedReward.items) ? selectedReward.items : [];
+  const previewImage =
+    String(selectedReward.image || '').trim() ||
+    String(rewardItems[0]?.productImage || '').trim() ||
+    LOGO_PATH;
+
+  return {
+    image: previewImage,
+    title: STORE_REWARD_REDEMPTION_CART_LABEL,
+    subtitle: String(selectedReward.rewardName || '').trim(),
+    detail:
+      rewardItems.length > 0
+        ? rewardItems
+            .map((item) => `${Math.max(1, Number(item.quantity || 1))} x ${item.productName || item.productCode || 'Premio'}`)
+            .join(' · ')
+        : '',
+  };
+};
+
 const buildCoverageErrorMessage = (deliveryQuote) => {
   if (!deliveryQuote || deliveryQuote.reason !== 'out_of_coverage') {
     return '';
@@ -8375,6 +8400,7 @@ function CheckoutSheet({
   const canSubmitDelivery = pickupFlow || deliveryQuote?.available;
   const storeClosed = storeOperationStatus?.open === false;
   const deliveryFreeActive = Boolean(deliveryQuote?.deliveryFree) && !pickupFlow;
+  const rewardCartPreview = getRewardCartPreview(selectedReward);
   const deliveryChoices = [
     {
       value: ORDER_FULFILLMENT_DELIVERY,
@@ -8491,6 +8517,20 @@ function CheckoutSheet({
                 <strong>{formatCurrency(item.subtotal)}</strong>
               </div>
             ))}
+
+            {rewardCartPreview && (
+              <div className="store-order-line">
+                <img src={rewardCartPreview.image || LOGO_PATH} alt={rewardCartPreview.subtitle || rewardCartPreview.title} />
+                <div>
+                  <strong>{rewardCartPreview.title}</strong>
+                  <div style={{ color: '#6b7280', fontSize: 13 }}>{rewardCartPreview.subtitle}</div>
+                  {rewardCartPreview.detail && (
+                    <div style={{ color: '#94a3b8', fontSize: 12 }}>{rewardCartPreview.detail}</div>
+                  )}
+                </div>
+                <strong>{formatCurrency(0)}</strong>
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
               <strong>Total productos</strong>
@@ -8758,6 +8798,19 @@ function CheckoutSheet({
                     ? 'Solo se permite un premio por pedido. Si prefieres, puedes seguir acumulando para uno mejor.'
                     : 'Puedes elegir un premio ahora si ya alcanzaste los puntos necesarios.'}
                 </p>
+                {rewardCartPreview && (
+                  <div className="store-order-line" style={{ marginTop: 12 }}>
+                    <img
+                      src={rewardCartPreview.image || LOGO_PATH}
+                      alt={rewardCartPreview.subtitle || rewardCartPreview.title}
+                    />
+                    <div>
+                      <strong>{rewardCartPreview.title}</strong>
+                      <div style={{ color: '#6b7280', fontSize: 13 }}>{rewardCartPreview.subtitle}</div>
+                    </div>
+                    <strong>{formatCurrency(0)}</strong>
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
                   <button
                     type="button"
@@ -9614,7 +9667,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
 
       {order.rewardRedemption?.rewardName && (
         <div className="store-status-items">
-          <strong className="store-status-items-title">Premio Miembro Gold</strong>
+          <strong className="store-status-items-title">{STORE_REWARD_REDEMPTION_CART_LABEL}</strong>
           <div>
             <div>{order.rewardRedemption.rewardName}</div>
             <small>
