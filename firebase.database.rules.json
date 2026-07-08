@@ -163,6 +163,12 @@
       ".indexOn": ["active", "sortOrder"]
     },
 
+    "storeProductPromotions": {
+      ".read": true,
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".indexOn": ["active", "sortOrder"]
+    },
+
     "storeDeliverySettings": {
       ".read": true,
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
