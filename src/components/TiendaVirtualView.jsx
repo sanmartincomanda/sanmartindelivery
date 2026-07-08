@@ -8374,6 +8374,7 @@ function CheckoutSheet({
   const isCartStep = checkoutStep === 'cart';
   const canSubmitDelivery = pickupFlow || deliveryQuote?.available;
   const storeClosed = storeOperationStatus?.open === false;
+  const deliveryFreeActive = Boolean(deliveryQuote?.deliveryFree) && !pickupFlow;
   const deliveryChoices = [
     {
       value: ORDER_FULFILLMENT_DELIVERY,
