@@ -12,6 +12,11 @@ export const STORE_DELIVERY_FEE_BRACKETS = [
   { key: 'under6km', label: '< 5.5 km', maxDistanceKm: 5.5 },
   { key: 'above6km', label: '+ 5.51 km', maxDistanceKm: Number.POSITIVE_INFINITY },
 ];
+export const STORE_FREE_DELIVERY_PROMOTION = Object.freeze({
+  date: '2026-07-08',
+  label: 'DELIVERY GRATIS',
+  type: 'free_delivery_day',
+});
 export const STORE_OPERATION_DAY_ORDER = [
   'monday',
   'tuesday',
@@ -62,6 +67,24 @@ export const DEFAULT_STORE_DELIVERY_SETTINGS = {
 
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 const roundDistance = (value) => Number(Number(value || 0).toFixed(2));
+const formatDateKey = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+};
+export const isStoreFreeDeliveryPromotionActive = (value = new Date()) => {
+  const dateKey =
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())
+      ? String(value).trim()
+      : formatDateKey(value);
+
+  return dateKey === STORE_FREE_DELIVERY_PROMOTION.date;
+};
 
 const normalizePositiveNumber = (value, fallback) => {
   const numeric = Number(value);
@@ -449,6 +472,10 @@ export const calculateStoreDeliveryQuote = ({
   const matchedBracket =
     feeRows.find((bracket) => distanceKm <= bracket.maxDistanceKm) ||
     feeRows[feeRows.length - 1];
+  const baseFee = roundMoney(matchedBracket?.baseFee || 0);
+  const taxAmount = roundMoney(matchedBracket?.taxAmount || 0);
+  const totalFee = roundMoney(matchedBracket?.totalFee || 0);
+  const freeDeliveryActive = isStoreFreeDeliveryPromotionActive();
 
   return {
     available: true,
@@ -459,10 +486,17 @@ export const calculateStoreDeliveryQuote = ({
     coverageRadiusKm: normalizedSettings.coverageRadiusKm,
     feeKey: matchedBracket?.key || '',
     feeLabel: matchedBracket?.label || '',
-    baseFee: roundMoney(matchedBracket?.baseFee || 0),
+    baseFee: freeDeliveryActive ? 0 : baseFee,
     taxRate: normalizedSettings.taxRate,
-    taxAmount: roundMoney(matchedBracket?.taxAmount || 0),
-    totalFee: roundMoney(matchedBracket?.totalFee || 0),
+    taxAmount: freeDeliveryActive ? 0 : taxAmount,
+    totalFee: freeDeliveryActive ? 0 : totalFee,
+    originalBaseFee: baseFee,
+    originalTaxAmount: taxAmount,
+    originalTotalFee: totalFee,
+    deliveryFree: freeDeliveryActive,
+    promotionLabel: freeDeliveryActive ? STORE_FREE_DELIVERY_PROMOTION.label : '',
+    promotionType: freeDeliveryActive ? STORE_FREE_DELIVERY_PROMOTION.type : '',
+    promotionDate: freeDeliveryActive ? STORE_FREE_DELIVERY_PROMOTION.date : '',
   };
 };
 

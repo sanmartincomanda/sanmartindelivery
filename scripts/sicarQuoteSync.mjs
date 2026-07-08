@@ -160,6 +160,10 @@ const DELIVERY_SERVICE_CODES = new Set(
   Object.values(DELIVERY_SERVICE_CODES_BY_BRACKET).map((code) => normalizeCode(code)).filter(Boolean)
 );
 const isDeliveryServiceCode = (value = '') => DELIVERY_SERVICE_CODES.has(normalizeCode(value));
+const getOrderDeliveryOriginalFee = (order = {}) =>
+  roundMoney(order?.deliveryFeeOriginal ?? order?.deliveryFee ?? 0);
+const hasFreeDeliveryApplied = (order = {}) =>
+  Boolean(order?.deliveryFree) && getOrderDeliveryOriginalFee(order) > 0;
 
 const resolveDeliveryServiceBracketKey = (order = {}) => {
   const explicitKey = String(order?.deliveryFeeBracket || '').trim();
@@ -180,7 +184,7 @@ const resolveDeliveryServiceBracketKey = (order = {}) => {
 };
 
 const buildDeliveryServiceOrderItem = (order = {}) => {
-  const deliveryFee = roundMoney(order?.deliveryFee || 0);
+  const deliveryFee = getOrderDeliveryOriginalFee(order);
   if (deliveryFee <= 0) {
     return null;
   }
@@ -200,6 +204,7 @@ const buildDeliveryServiceOrderItem = (order = {}) => {
     unitPrice: deliveryFee,
     subtotal: deliveryFee,
     isDelivery: true,
+    isComplimentary: hasFreeDeliveryApplied(order),
     deliveryFeeBracket: bracketKey,
   };
 };
@@ -277,6 +282,7 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   const totalLabel = String(summary.totalLabel || 'Total aproximado de pedido').trim();
   const subtotalLabel = String(summary.subtotalLabel || 'Subtotal estimado').trim();
   const deliveryFee = roundMoney(summary.deliveryFee || 0);
+  const deliveryFree = hasFreeDeliveryApplied(summary);
   const deliveryDistanceKm = Number(summary.deliveryDistanceKm || 0);
   const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
   const lines = [];
@@ -302,7 +308,9 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   if (subtotal > 0) {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatMoney(subtotal)}`);
-    if (deliveryFee > 0) {
+    if (deliveryFree) {
+      lines.push('Servicio a domicilio: DELIVERY GRATIS');
+    } else if (deliveryFee > 0) {
       const deliveryLabel =
         deliveryDistanceKm > 0
           ? `Servicio a domicilio (${formatWeightLabel(deliveryDistanceKm)} km)`
@@ -340,7 +348,9 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
     'Detalle actualizado:',
   ];
 
-  (Array.isArray(quote.items) ? quote.items : []).forEach((item) => {
+  (Array.isArray(quote.items) ? quote.items : [])
+    .filter((item) => !isDeliveryServiceCode(item?.code || ''))
+    .forEach((item) => {
     lines.push(
       `- ${formatStoreQuantityLabel(item.quantity, item.storeUnit)} ${item.storeUnit} ${item.name} [${item.code}] | C$${formatMoney(item.total)}`
     );
@@ -349,6 +359,11 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
   lines.push('');
   if (customerDiscount > 0) {
     lines.push(`Cupon aplicado: -C$${formatMoney(customerDiscount)}`);
+  }
+  if (hasFreeDeliveryApplied(order)) {
+    lines.push('Servicio a domicilio: DELIVERY GRATIS');
+  } else if (roundMoney(order?.deliveryFee || 0) > 0) {
+    lines.push(`Servicio a domicilio: C$${formatMoney(order.deliveryFee)}`);
   }
   lines.push(`Total actualizado: C$${formatMoney(customerTotal)}`);
 
@@ -1034,6 +1049,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const hasTransferredTax = taxRatePct > 0;
       const isReward = item.isReward === true;
       const isDelivery = item.isDelivery === true;
+      const isComplimentaryDelivery = isDelivery && item.isComplimentary === true;
+      const isZeroPricedLine = isReward || isComplimentaryDelivery;
       const deliveryUnitTotal =
         isDelivery && quantity > 0 ? roundMoney(Number(item.subtotal || 0) / quantity) : 0;
       const sourceBasePrice =
@@ -1055,13 +1072,13 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const importeCompra = roundMoney(purchasePrice * quantity);
       const importeNorSin = roundMoney(priceNorSin * quantity);
       const importeNorCon = roundMoney(priceNorCon * quantity);
-      const initialImporteSin = isReward ? 0 : roundMoney(priceSin * quantity);
-      const initialImporteCon = isReward ? 0 : roundMoney(priceCon * quantity);
+      const initialImporteSin = isZeroPricedLine ? 0 : roundMoney(priceSin * quantity);
+      const initialImporteCon = isZeroPricedLine ? 0 : roundMoney(priceCon * quantity);
       const initialPriceSin = quantity > 0 ? roundMoney(initialImporteSin / quantity) : 0;
       const initialPriceCon = quantity > 0 ? roundMoney(initialImporteCon / quantity) : 0;
-      const initialDiscountTotal = isReward ? roundMoney(importeNorCon) : 0;
+      const initialDiscountTotal = isZeroPricedLine ? roundMoney(importeNorCon) : 0;
       const initialDiscountPercent =
-        isReward && importeNorCon > 0 ? roundRate((initialDiscountTotal / importeNorCon) * 100) : 0;
+        isZeroPricedLine && importeNorCon > 0 ? roundRate((initialDiscountTotal / importeNorCon) * 100) : 0;
       const diferencia = roundMoney(initialImporteCon - importeCompra);
       const utilidad = initialImporteCon > 0 ? roundRate((diferencia / initialImporteCon) * 100) : 0;
       const taxImpIds = (Array.isArray(article.impIds) ? article.impIds : []).filter((impId) => Number(impId) === 1);
@@ -1618,6 +1635,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         total: customerTotal,
         discount: customerDiscount,
         deliveryFee: order.deliveryFee,
+        deliveryFeeOriginal: order.deliveryFeeOriginal,
+        deliveryFree: order.deliveryFree,
         deliveryDistanceKm: order.deliveryDistanceKm,
         metodoPago: order.metodoPago,
         totalLabel: 'Total actualizado de pedido',

@@ -217,6 +217,8 @@ const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
       subtotal,
       discount,
       deliveryFee,
+      deliveryFeeOriginal: pedido?.deliveryFeeOriginal,
+      deliveryFree: pedido?.deliveryFree,
       deliveryDistanceKm: pedido?.deliveryDistanceKm,
       total,
       metodoPago: pedido?.metodoPago,
@@ -245,6 +247,8 @@ const getKitchenOrderText = (pedido = {}) => {
       subtotal: pedido.subtotalEstimado,
       discount: pedido.descuentoCupon,
       deliveryFee: pedido.deliveryFee,
+      deliveryFeeOriginal: pedido.deliveryFeeOriginal,
+      deliveryFree: pedido.deliveryFree,
       deliveryDistanceKm: pedido.deliveryDistanceKm,
       total: pedido.total,
       metodoPago: pedido.metodoPago,
@@ -1304,7 +1308,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
                             ))}
                           </div>
 
-                          {(pedido.observaciones || pedido.total || pedido.deliveryFee || pedido.descuentoCupon) && (
+                          {(pedido.observaciones || pedido.total || pedido.deliveryFee || pedido.deliveryFree || pedido.descuentoCupon) && (
                             <div style={{
                               marginTop: '18px',
                               padding: '18px',
@@ -1353,7 +1357,12 @@ export default function KitchenView({ orders, allowRuta = true }) {
                                     <span>-C${Number(pedido.descuentoCupon || 0).toFixed(2)}</span>
                                   </div>
                                 )}
-                                {Number(pedido.deliveryFee || 0) > 0 && (
+                                {Boolean(pedido.deliveryFree) && Number(pedido.deliveryFeeOriginal || 0) > 0 ? (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                                    <span>Servicio a domicilio</span>
+                                    <span>DELIVERY GRATIS</span>
+                                  </div>
+                                ) : Number(pedido.deliveryFee || 0) > 0 && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
                                     <span>Servicio a domicilio</span>
                                     <span>C${Number(pedido.deliveryFee || 0).toFixed(2)}</span>

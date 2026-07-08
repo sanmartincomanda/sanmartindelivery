@@ -22,6 +22,13 @@ const roundToHalf = (value) => Math.round(Number(value || 0) * 2) / 2;
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
 const formatDistanceAmount = (value) => Number(value || 0).toFixed(2).replace(/\.00$/, '');
+const getOrderDeliveryOriginalFee = (source = {}) =>
+  Math.max(
+    0,
+    Number(source?.deliveryFeeOriginal ?? source?.originalDeliveryFee ?? source?.deliveryFee ?? 0)
+  );
+const hasFreeDeliveryApplied = (source = {}) =>
+  Boolean(source?.deliveryFree) && getOrderDeliveryOriginalFee(source) > 0;
 
 const removeTextAccents = (value) =>
   String(value || '')
@@ -193,6 +200,8 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
   const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
   const discount = Number(summary.discount || 0);
   const total = Number(summary.total ?? Math.max(subtotal - discount, 0));
+  const deliveryFee = Math.max(0, Number(summary.deliveryFee || 0));
+  const deliveryFree = hasFreeDeliveryApplied(summary);
 
   if (subtotal > 0) {
     lines.push('');
@@ -200,6 +209,11 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
     if (discount > 0) {
       const discountLabel = summary.couponCode ? `Cupon ${summary.couponCode}` : 'Descuento cupon';
       lines.push(`${discountLabel}: -C$${formatAmount(discount)}`);
+    }
+    if (deliveryFree) {
+      lines.push('Servicio a domicilio: DELIVERY GRATIS');
+    } else if (deliveryFee > 0) {
+      lines.push(`Servicio a domicilio: C$${formatAmount(deliveryFee)}`);
     }
     lines.push(`${totalLabel}: C$${formatAmount(total)}`);
   }
@@ -218,6 +232,7 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   const total = Number(summary.total ?? subtotal);
   const deliveryFee = Math.max(0, Number(summary.deliveryFee || 0));
   const deliveryDistanceKm = Math.max(0, Number(summary.deliveryDistanceKm || 0));
+  const deliveryFree = hasFreeDeliveryApplied(summary);
   const discount = Math.max(0, Number(summary.discount || summary.couponDiscount || 0));
   const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
   const lines = [];
@@ -240,7 +255,9 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   if (subtotal > 0) {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
-    if (deliveryFee > 0) {
+    if (deliveryFree) {
+      lines.push('Servicio a domicilio: DELIVERY GRATIS');
+    } else if (deliveryFee > 0) {
       const deliveryLabel = deliveryDistanceKm > 0
         ? `Servicio a domicilio (${formatDistanceAmount(deliveryDistanceKm)} km)`
         : 'Servicio a domicilio';
@@ -389,8 +406,18 @@ export async function createOrder(payload, options = {}) {
     Math.min(Number(payload.descuentoCupon || 0), Number(subtotal || 0))
   );
   const deliveryFee = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFee || 0));
+  const deliveryFeeOriginal = pickupOrder
+    ? 0
+    : Math.max(0, Number(payload.deliveryFeeOriginal ?? payload.deliveryFee ?? 0));
   const deliveryFeeBase = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFeeBase || 0));
   const deliveryFeeTax = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFeeTax || 0));
+  const deliveryFeeBaseOriginal = pickupOrder
+    ? 0
+    : Math.max(0, Number(payload.deliveryFeeBaseOriginal ?? payload.deliveryFeeBase ?? 0));
+  const deliveryFeeTaxOriginal = pickupOrder
+    ? 0
+    : Math.max(0, Number(payload.deliveryFeeTaxOriginal ?? payload.deliveryFeeTax ?? 0));
+  const deliveryFree = !pickupOrder && payload.deliveryFree === true && deliveryFeeOriginal > 0;
   const deliveryDistanceKm = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryDistanceKm || 0));
   const coverageRadiusKm = pickupOrder ? 0 : Math.max(0, Number(payload.coverageRadiusKm || 0));
   const total =
@@ -420,6 +447,8 @@ export async function createOrder(payload, options = {}) {
     subtotal,
     discount: couponDiscount,
     deliveryFee,
+    deliveryFeeOriginal,
+    deliveryFree,
     deliveryDistanceKm,
     total,
     metodoPago: payload.metodoPago,
@@ -449,8 +478,15 @@ export async function createOrder(payload, options = {}) {
     subtotalEstimado: subtotal,
     descuentoCupon: couponDiscount,
     deliveryFee,
+    deliveryFeeOriginal,
     deliveryFeeBase,
     deliveryFeeTax,
+    deliveryFeeBaseOriginal,
+    deliveryFeeTaxOriginal,
+    deliveryFree,
+    deliveryPromotionLabel: deliveryFree ? String(payload.deliveryPromotionLabel || 'DELIVERY GRATIS').trim() : '',
+    deliveryPromotionType: deliveryFree ? String(payload.deliveryPromotionType || 'free_delivery_day').trim() : '',
+    deliveryPromotionDate: deliveryFree ? String(payload.deliveryPromotionDate || fecha).trim() : '',
     deliveryDistanceKm,
     coverageRadiusKm,
     deliveryFeeBracket: String(payload.deliveryFeeBracket || '').trim(),

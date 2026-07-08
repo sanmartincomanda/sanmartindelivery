@@ -393,6 +393,8 @@ export default function ListaPedidos({ pedidos = [] }) {
         subtotal: pedido.subtotalEstimado,
         discount: pedido.descuentoCupon,
         deliveryFee: pedido.deliveryFee,
+        deliveryFeeOriginal: pedido.deliveryFeeOriginal,
+        deliveryFree: pedido.deliveryFree,
         deliveryDistanceKm: pedido.deliveryDistanceKm,
         total: pedido.total,
         metodoPago: pedido.metodoPago,

@@ -64,6 +64,7 @@ import {
   DEFAULT_STORE_DELIVERY_SETTINGS,
   formatStoreDeliveryDistance,
   getStoreOperationStatus,
+  STORE_FREE_DELIVERY_PROMOTION,
   subscribeStoreDeliverySettings,
 } from '../services/storeDeliverySettings';
 import {
@@ -344,6 +345,14 @@ const buildStoreDeliverySummary = (deliveryQuote) => {
       title: 'Fuera de cobertura',
       message: buildCoverageErrorMessage(deliveryQuote),
       tone: 'error',
+    };
+  }
+
+  if (deliveryQuote.deliveryFree) {
+    return {
+      title: 'Servicio a domicilio',
+      message: `Promocion activa solo por hoy ${STORE_FREE_DELIVERY_PROMOTION.date.split('-').reverse().join('/')}.`,
+      tone: 'active',
     };
   }
 
@@ -2056,6 +2065,14 @@ export default function TiendaVirtualView({
     () => Number((discountedProductTotal + deliveryFeeAmount).toFixed(2)),
     [deliveryFeeAmount, discountedProductTotal]
   );
+  const deliveryFreeActive = Boolean(deliveryQuote?.deliveryFree) && !pickupFlow;
+  const deliveryOriginalFeeAmount = useMemo(() => {
+    if (!deliveryQuote?.available || deliveryQuote.isPickup) {
+      return 0;
+    }
+
+    return Number(deliveryQuote.originalTotalFee ?? deliveryQuote.totalFee ?? 0);
+  }, [deliveryQuote]);
   const estimatedRewardPoints = useMemo(
     () => calculateEarnedRewardPoints(discountedProductTotal, rewardSettings),
     [discountedProductTotal, rewardSettings]
@@ -3153,8 +3170,15 @@ export default function TiendaVirtualView({
           subtotalEstimado: totalAmount,
           descuentoCupon: couponDiscount,
           deliveryFee: deliveryFeeAmount,
+          deliveryFeeOriginal: pickupFlow ? 0 : deliveryOriginalFeeAmount,
           deliveryFeeBase: pickupFlow ? 0 : Number(deliveryQuote?.baseFee || 0),
           deliveryFeeTax: pickupFlow ? 0 : Number(deliveryQuote?.taxAmount || 0),
+          deliveryFeeBaseOriginal: pickupFlow ? 0 : Number(deliveryQuote?.originalBaseFee ?? deliveryQuote?.baseFee ?? 0),
+          deliveryFeeTaxOriginal: pickupFlow ? 0 : Number(deliveryQuote?.originalTaxAmount ?? deliveryQuote?.taxAmount ?? 0),
+          deliveryFree: pickupFlow ? false : deliveryFreeActive,
+          deliveryPromotionLabel: pickupFlow ? '' : String(deliveryQuote?.promotionLabel || ''),
+          deliveryPromotionType: pickupFlow ? '' : String(deliveryQuote?.promotionType || ''),
+          deliveryPromotionDate: pickupFlow ? '' : String(deliveryQuote?.promotionDate || ''),
           deliveryDistanceKm: pickupFlow ? 0 : Number(deliveryQuote?.distanceKm || 0),
           coverageRadiusKm: pickupFlow ? 0 : Number(deliveryQuote?.coverageRadiusKm || 0),
           deliveryFeeBracket: pickupFlow ? '' : String(deliveryQuote?.feeKey || ''),
@@ -8488,6 +8512,8 @@ function CheckoutSheet({
               <h3 style={{ margin: '10px 0 4px' }}>
                 {pickupFlow
                   ? 'Sin costo de envio'
+                  : deliveryFreeActive
+                    ? 'DELIVERY GRATIS'
                   : deliveryQuote?.available
                     ? `${formatCurrency(deliveryFeeAmount)} por envio`
                     : 'No disponible por ahora'}
@@ -8664,6 +8690,8 @@ function CheckoutSheet({
               <h3 style={{ margin: '10px 0 4px' }}>
                 {pickupFlow
                   ? 'Sin costo de envio'
+                  : deliveryFreeActive
+                    ? 'DELIVERY GRATIS'
                   : deliveryQuote?.available
                     ? `${formatCurrency(deliveryFeeAmount)} por envio`
                     : 'No disponible por ahora'}
@@ -9291,7 +9319,12 @@ function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
                 <span>-{formatCurrency(order.descuentoCupon)}</span>
               </div>
             )}
-            {Number(order.deliveryFee || 0) > 0 && (
+            {Boolean(order.deliveryFree) && Number(order.deliveryFeeOriginal || 0) > 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 800 }}>
+                <span>Servicio a domicilio</span>
+                <span>DELIVERY GRATIS</span>
+              </div>
+            ) : Number(order.deliveryFee || 0) > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontWeight: 800 }}>
                 <span>Servicio a domicilio</span>
                 <span>{formatCurrency(order.deliveryFee)}</span>
