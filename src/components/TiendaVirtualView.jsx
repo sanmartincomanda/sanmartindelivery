@@ -35,6 +35,12 @@ import {
   STORE_PROMOTIONS_PATH,
 } from '../services/storePromotions';
 import {
+  applyStoreProductPromotionsToCatalog,
+  mergeStoreProductPromotions,
+  isStoreProductPromotionActive,
+  STORE_PRODUCT_PROMOTIONS_PATH,
+} from '../services/storeProductPromotions';
+import {
   readStoreJsonCache,
   STORE_CATALOG_CACHE_KEY,
   STORE_CATALOG_CACHE_VERSION,
@@ -42,6 +48,8 @@ import {
   STORE_CATEGORIES_CACHE_VERSION,
   STORE_COUPONS_CACHE_KEY,
   STORE_COUPONS_CACHE_VERSION,
+  STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
+  STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
   STORE_PROMOTIONS_CACHE_KEY,
   STORE_PROMOTIONS_CACHE_VERSION,
   unwrapStoreCache,
@@ -296,6 +304,10 @@ const getStoreGeneralCatalogTailPriority = (product = {}) => {
 };
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+const formatPromotionPercent = (value) => `${Number(value || 0).toFixed(2).replace(/\.00$/, '')}%`;
+const hasDiscountedStorePrice = (product = {}) =>
+  Number(product?.hasSpecialPromotion ? product?.originalPrice : 0) > Number(product?.price || 0);
+
 const getRewardCartPreview = (selectedReward = null) => {
   if (!selectedReward?.rewardName) {
     return null;
@@ -1038,6 +1050,14 @@ export default function TiendaVirtualView({
       mergeStorePromotions()
     )
   );
+  const [productPromotions, setProductPromotions] = useState(() =>
+    getInitialStoreCollection(
+      STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
+      STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
+      mergeStoreProductPromotions,
+      []
+    )
+  );
   const [cart, setCart] = useState({});
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -1123,6 +1143,7 @@ export default function TiendaVirtualView({
   const [storeClosedNoticeDismissed, setStoreClosedNoticeDismissed] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
   const quantityNoticeTimeoutRef = useRef(null);
   const autoAppliedCouponRef = useRef('');
   const autoClaimingWelcomeCouponRef = useRef('');
@@ -1133,6 +1154,14 @@ export default function TiendaVirtualView({
   const isDashboard = mode === 'dashboard';
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const showMobileBottomNav = isPhoneLayout && !isDashboard;
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTimeMs(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1199,6 +1228,35 @@ export default function TiendaVirtualView({
     };
 
     loadCatalog();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProductPromotions = async () => {
+      try {
+        const snapshot = await get(ref(database, STORE_PRODUCT_PROMOTIONS_PATH));
+        const remotePromotions = snapshot.val() || {};
+        writeStoreVersionedCache(
+          STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
+          STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
+          remotePromotions
+        );
+        if (!cancelled) {
+          startTransition(() => {
+            setProductPromotions(mergeStoreProductPromotions(remotePromotions));
+          });
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar las promociones especiales de tienda:', error);
+      }
+    };
+
+    loadProductPromotions();
 
     return () => {
       cancelled = true;
@@ -1547,9 +1605,28 @@ export default function TiendaVirtualView({
     setAlternateDelivery(createEmptyDeliveryDraft());
   }, [currentUser]);
 
+  const activeProductPromotions = useMemo(
+    () =>
+      productPromotions
+        .filter((promotion) => isStoreProductPromotionActive(promotion, currentTimeMs))
+        .sort((left, right) => {
+          if (Number(left.sortOrder || 0) !== Number(right.sortOrder || 0)) {
+            return Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
+          }
+
+          return Number(right.discountPct || 0) - Number(left.discountPct || 0);
+        }),
+    [currentTimeMs, productPromotions]
+  );
+
   const activeProducts = useMemo(
-    () => catalog.filter((product) => product.active !== false),
-    [catalog]
+    () =>
+      applyStoreProductPromotionsToCatalog(
+        catalog.filter((product) => product.active !== false),
+        activeProductPromotions,
+        currentTimeMs
+      ),
+    [activeProductPromotions, catalog, currentTimeMs]
   );
 
   const storeRewards = useMemo(
@@ -1602,7 +1679,7 @@ export default function TiendaVirtualView({
     const productSubcategories = activeProducts
       .filter((product) => {
         if (activeCategory === 'promociones') {
-          return product.promo || product.category === 'promociones';
+          return product.promo || product.category === 'promociones' || product.hasSpecialPromotion;
         }
 
         return product.category === activeCategory;
@@ -1624,7 +1701,7 @@ export default function TiendaVirtualView({
 
       counts[category.id] = activeProducts.filter((product) => {
         if (category.id === 'promociones') {
-          return product.promo || product.category === 'promociones';
+          return product.promo || product.category === 'promociones' || product.hasSpecialPromotion;
         }
 
         return product.category === category.id;
@@ -1641,7 +1718,7 @@ export default function TiendaVirtualView({
 
     const scopedProducts = activeProducts.filter((product) => {
       if (activeCategory === 'promociones') {
-        return product.promo || product.category === 'promociones';
+        return product.promo || product.category === 'promociones' || product.hasSpecialPromotion;
       }
 
       return product.category === activeCategory;
@@ -1664,7 +1741,8 @@ export default function TiendaVirtualView({
     const matchingProducts = activeProducts.filter((product) => {
       const matchesCategory =
         activeCategory === 'todos' ||
-        (activeCategory === 'promociones' && (product.promo || product.category === 'promociones')) ||
+        (activeCategory === 'promociones' &&
+          (product.promo || product.category === 'promociones' || product.hasSpecialPromotion)) ||
         product.category === activeCategory;
 
       const matchesSubcategory =
@@ -1709,6 +1787,28 @@ export default function TiendaVirtualView({
       return [];
     }
 
+    const productPromotionSections = activeProductPromotions
+      .map((promotion) => ({
+        ...promotion,
+        products: filteredProducts.filter(
+          (product) => product.specialPromotion?.id === promotion.id
+        ),
+      }))
+      .filter((promotion) => promotion.products.length > 0)
+      .map((promotion) => ({
+        id: `promo-${promotion.id}`,
+        title: promotion.title,
+        kicker: `Promocion especial · ${formatPromotionPercent(promotion.discountPct)} OFF`,
+        subtitle: `${promotion.products.length} productos`,
+        products: promotion.products,
+      }));
+
+    const promotedProductCodeSet = new Set(
+      productPromotionSections.flatMap((section) =>
+        section.products.map((product) => String(product.code || '').trim())
+      )
+    );
+
     const groupedProducts = STORE_ALL_PRODUCTS_PRIORITY_GROUPS.map((group) => ({
       ...group,
       products: [],
@@ -1716,6 +1816,10 @@ export default function TiendaVirtualView({
     const remainingProducts = [];
 
     filteredProducts.forEach((product) => {
+      if (promotedProductCodeSet.has(String(product.code || '').trim())) {
+        return;
+      }
+
       const priorityIndex = getStoreAllProductsPriority(product);
       if (priorityIndex < groupedProducts.length) {
         const group = groupedProducts[priorityIndex];
@@ -1733,7 +1837,7 @@ export default function TiendaVirtualView({
       remainingProducts.push(product);
     });
 
-    const sections = groupedProducts
+    const regularSections = groupedProducts
       .filter((group) => group.products.length > 0)
       .map((group) => ({
         id: `${group.category}-${group.subcategory}`,
@@ -1744,7 +1848,7 @@ export default function TiendaVirtualView({
       }));
 
     if (remainingProducts.length > 0) {
-      sections.push({
+      regularSections.push({
         id: 'otros-productos',
         title: 'Catalogo general',
         kicker: 'Catalogo general',
@@ -1753,8 +1857,8 @@ export default function TiendaVirtualView({
       });
     }
 
-    return sections;
-  }, [activeCategory, filteredProducts]);
+    return [...productPromotionSections, ...regularSections];
+  }, [activeCategory, activeProductPromotions, filteredProducts]);
 
   useEffect(() => {
     if (activeCategory !== 'todos') {
@@ -2038,8 +2142,8 @@ export default function TiendaVirtualView({
   );
 
   const activePromotions = useMemo(
-    () => promotions.filter((promotion) => isStorePromotionVisible(promotion)),
-    [promotions]
+    () => promotions.filter((promotion) => isStorePromotionVisible(promotion, currentTimeMs)),
+    [currentTimeMs, promotions]
   );
   const welcomeCouponHeroImage = useMemo(
     () => findWelcomeCouponHeroImage(catalog),
@@ -3291,6 +3395,7 @@ export default function TiendaVirtualView({
 
   const renderStoreProductTile = (product) => {
     const quantity = Number(cart[product.code] || 0);
+    const discountedPrice = hasDiscountedStorePrice(product);
 
     return (
       <article key={product.code} className="store-product">
@@ -3314,11 +3419,21 @@ export default function TiendaVirtualView({
           </span>
           <span className="store-product-code">{product.code}</span>
           <span className="store-product-name">{product.name}</span>
-          <span className="store-price">{formatCurrency(product.price)}</span>
+          {product.specialPromotion?.title && (
+            <span className="store-product-promo-badge">{product.specialPromotion.title}</span>
+          )}
+          <span className={`store-price-stack ${discountedPrice ? 'promo' : ''}`}>
+            {discountedPrice && <span className="store-price-old">{formatCurrency(product.originalPrice)}</span>}
+            <span className="store-price">{formatCurrency(product.price)}</span>
+          </span>
           <span className="store-unit">
             {quantity > 0
               ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} en carrito`
-              : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
+              : discountedPrice
+                ? `${formatPromotionPercent(product.specialPromotion?.discountPct)} menos · ${formatCurrency(
+                    product.price
+                  )}/${product.unit}`
+                : `C$ ${Number(product.price || 0).toFixed(2)}/${product.unit}`}
           </span>
         </button>
         <button
@@ -4424,6 +4539,41 @@ export default function TiendaVirtualView({
           font-size: 17px;
           font-weight: 950;
           color: #7b1022;
+        }
+        .store-price-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .store-price-stack.promo .store-price {
+          color: #b91c1c;
+        }
+        .store-price-sheet {
+          margin-bottom: 4px;
+        }
+        .store-price-old {
+          color: #94a3b8;
+          font-size: 12px;
+          font-weight: 900;
+          text-decoration: line-through;
+          letter-spacing: 0.01em;
+        }
+        .store-product-promo-badge,
+        .store-product-sheet-promo {
+          display: inline-flex;
+          align-items: center;
+          align-self: flex-start;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: linear-gradient(135deg, rgba(185, 28, 28, 0.12), rgba(220, 38, 38, 0.18));
+          color: #991b1b;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.03em;
+        }
+        .store-product-sheet-promo {
+          margin-bottom: 8px;
+          font-size: 12px;
         }
         .store-unit {
           display: block;
@@ -8133,6 +8283,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
   const minQuantity = getMinQuantity(product);
   const quickQuantities = getQuickQuantities(product, quantity);
   const nextQuickQuantity = Number(((quickQuantities[quickQuantities.length - 1] || minQuantity) + step).toFixed(3));
+  const discountedPrice = hasDiscountedStorePrice(product);
 
   return (
     <div className="store-sheet-overlay product-overlay">
@@ -8151,9 +8302,17 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
           </div>
           <div>
             <h2 style={{ margin: '0 0 8px', fontSize: 30, lineHeight: 1.04 }}>{product.name}</h2>
-            <p className="store-price" style={{ fontSize: 24 }}>
-              {formatCurrency(product.price)}
-            </p>
+            {product.specialPromotion?.title && (
+              <div className="store-product-sheet-promo">
+                {product.specialPromotion.title} · {formatPromotionPercent(product.specialPromotion.discountPct)} OFF
+              </div>
+            )}
+            <div className={`store-price-stack store-price-sheet ${discountedPrice ? 'promo' : ''}`}>
+              {discountedPrice && <span className="store-price-old">{formatCurrency(product.originalPrice)}</span>}
+              <p className="store-price" style={{ fontSize: 24, margin: 0 }}>
+                {formatCurrency(product.price)}
+              </p>
+            </div>
             <p className="store-unit">{product.description || `Precio por ${product.unit}`}</p>
             <p className="store-unit" style={{ marginTop: 8 }}>
               {getQuantityRuleMessage(product)}

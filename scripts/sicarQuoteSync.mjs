@@ -1051,15 +1051,25 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const isDelivery = item.isDelivery === true;
       const isComplimentaryDelivery = isDelivery && item.isComplimentary === true;
       const isZeroPricedLine = isReward || isComplimentaryDelivery;
-      const deliveryUnitTotal =
-        isDelivery && quantity > 0 ? roundMoney(Number(item.subtotal || 0) / quantity) : 0;
+      const explicitStoreUnitTotal =
+        !isReward && quantity > 0
+          ? roundMoney(
+              Number(item.subtotal || 0) > 0
+                ? Number(item.subtotal || 0) / quantity
+                : Number(item.unitPrice || 0)
+            )
+          : 0;
       const sourceBasePrice =
-        isDelivery && deliveryUnitTotal > 0
-          ? roundMoney(hasTransferredTax ? deliveryUnitTotal / (1 + taxRatePct / 100) : deliveryUnitTotal)
+        explicitStoreUnitTotal > 0
+          ? roundMoney(
+              hasTransferredTax
+                ? explicitStoreUnitTotal / (1 + taxRatePct / 100)
+                : explicitStoreUnitTotal
+            )
           : roundRate(article.basePrice);
       const sourceGrossPrice =
-        isDelivery && deliveryUnitTotal > 0
-          ? roundMoney(deliveryUnitTotal)
+        explicitStoreUnitTotal > 0
+          ? roundMoney(explicitStoreUnitTotal)
           : roundMoney(hasTransferredTax ? article.basePrice * (1 + taxRatePct / 100) : article.basePrice);
       const priceNorSin = roundMoney(sourceBasePrice);
       const priceSin = truncateMoney(sourceBasePrice);

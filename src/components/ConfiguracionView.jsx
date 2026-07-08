@@ -46,6 +46,15 @@ import {
   updateStorePromotion,
 } from '../services/storePromotions';
 import {
+  cleanupExpiredStoreProductPromotions,
+  deleteStoreProductPromotion,
+  getStoreProductPromotionStatus,
+  mergeStoreProductPromotions,
+  saveStoreProductPromotion,
+  STORE_PRODUCT_PROMOTIONS_PATH,
+  updateStoreProductPromotion,
+} from '../services/storeProductPromotions';
+import {
   DEFAULT_STORE_DELIVERY_SETTINGS,
   buildStoreOperationScheduleSummary,
   getStoreDeliveryFeeRows,
@@ -100,6 +109,8 @@ import {
   STORE_CATEGORIES_CACHE_VERSION,
   STORE_COUPONS_CACHE_KEY,
   STORE_COUPONS_CACHE_VERSION,
+  STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
+  STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
   STORE_PROMOTIONS_CACHE_KEY,
   STORE_PROMOTIONS_CACHE_VERSION,
   unwrapStoreCache,
@@ -182,6 +193,17 @@ const emptyPromotion = {
   id: '',
   title: '',
   image: '',
+  active: true,
+  sortOrder: '',
+  startsAt: '',
+  endsAt: '',
+};
+
+const emptyProductPromotion = {
+  id: '',
+  title: '',
+  discountPct: '',
+  productCodes: [],
   active: true,
   sortOrder: '',
   startsAt: '',
@@ -467,6 +489,14 @@ export default function ConfiguracionView({ mode = 'users' }) {
       mergeStorePromotions()
     )
   );
+  const [productPromotions, setProductPromotions] = useState(() =>
+    getInitialConfigCollection(
+      STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
+      STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
+      mergeStoreProductPromotions,
+      []
+    )
+  );
   const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
   const [storeUsers, setStoreUsers] = useState([]);
@@ -475,6 +505,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [couponForm, setCouponForm] = useState(emptyCoupon);
   const [promotionForm, setPromotionForm] = useState(emptyPromotion);
+  const [productPromotionForm, setProductPromotionForm] = useState(emptyProductPromotion);
   const [driverForm, setDriverForm] = useState(emptyDriver);
   const [kitchenForm, setKitchenForm] = useState(emptyKitchenForm);
   const [deliverySettings, setDeliverySettings] = useState(() =>
@@ -492,12 +523,14 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [savingCategory, setSavingCategory] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
   const [savingPromotion, setSavingPromotion] = useState(false);
+  const [savingProductPromotion, setSavingProductPromotion] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
   const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingDeliverySettings, setSavingDeliverySettings] = useState(false);
   const [savingWelcomeCouponCampaign, setSavingWelcomeCouponCampaign] = useState(false);
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [cleaningPromotions, setCleaningPromotions] = useState(false);
+  const [cleaningProductPromotions, setCleaningProductPromotions] = useState(false);
   const [syncingSicar, setSyncingSicar] = useState(false);
   const [syncingSicarPrices, setSyncingSicarPrices] = useState(false);
   const [syncingSicarRecentSold, setSyncingSicarRecentSold] = useState(false);
@@ -519,7 +552,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode]);
 
   useEffect(() => {
-    if (!isStoreMode || !['catalogo', 'categorias', 'recompensas'].includes(section)) {
+    if (!isStoreMode || !['catalogo', 'categorias', 'recompensas', 'promos_tienda'].includes(section)) {
       return undefined;
     }
 
@@ -611,6 +644,30 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
     cleanupExpiredStorePromotions().catch((error) => {
       console.error('No se pudieron limpiar las historias vencidas:', error);
+    });
+
+    return () => unsubscribe();
+  }, [isStoreMode, section]);
+
+  useEffect(() => {
+    if (!isStoreMode || section !== 'promos_tienda') {
+      return undefined;
+    }
+
+    const unsubscribe = onValue(ref(database, STORE_PRODUCT_PROMOTIONS_PATH), (snapshot) => {
+      const remotePromotions = snapshot.val() || {};
+      writeStoreVersionedCache(
+        STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
+        STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
+        remotePromotions
+      );
+      startTransition(() => {
+        setProductPromotions(mergeStoreProductPromotions(remotePromotions));
+      });
+    });
+
+    cleanupExpiredStoreProductPromotions().catch((error) => {
+      console.error('No se pudieron limpiar las promociones especiales vencidas:', error);
     });
 
     return () => unsubscribe();
@@ -852,6 +909,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }));
   };
 
+  const updateProductPromotionForm = (field, value) => {
+    setProductPromotionForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const updateDriverForm = (field, value) => {
     setDriverForm((current) => ({
       ...current,
@@ -968,6 +1032,19 @@ export default function ConfiguracionView({ mode = 'users' }) {
       id: promotion.id || '',
       title: promotion.title || '',
       image: promotion.image || '',
+      active: promotion.active !== false,
+      sortOrder: promotion.sortOrder ?? '',
+      startsAt: toDateTimeInputValue(promotion.startsAt),
+      endsAt: toDateTimeInputValue(promotion.endsAt),
+    });
+  };
+
+  const editProductPromotion = (promotion) => {
+    setProductPromotionForm({
+      id: promotion.id || '',
+      title: promotion.title || '',
+      discountPct: promotion.discountPct ?? '',
+      productCodes: Array.isArray(promotion.productCodes) ? promotion.productCodes : [],
       active: promotion.active !== false,
       sortOrder: promotion.sortOrder ?? '',
       startsAt: toDateTimeInputValue(promotion.startsAt),
@@ -1270,6 +1347,58 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const saveProductPromotion = async (event) => {
+    event.preventDefault();
+    const startsAt = normalizeDateTimeInputValue(productPromotionForm.startsAt);
+    const endsAt = normalizeDateTimeInputValue(productPromotionForm.endsAt);
+
+    if (productPromotionForm.startsAt && !startsAt) {
+      setMessage('La fecha inicial de la promocion especial no es valida.');
+      return;
+    }
+
+    if (productPromotionForm.endsAt && !endsAt) {
+      setMessage('La fecha final de la promocion especial no es valida.');
+      return;
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      setMessage('La vigencia final debe ser posterior a la inicial.');
+      return;
+    }
+
+    setSavingProductPromotion(true);
+    setMessage('');
+
+    try {
+      const existingPromotion =
+        productPromotions.find((promotion) => promotion.id === productPromotionForm.id) || null;
+      await saveStoreProductPromotion(
+        {
+          id: productPromotionForm.id,
+          title: productPromotionForm.title,
+          discountPct: Number(productPromotionForm.discountPct || 0),
+          productCodes: productPromotionForm.productCodes || [],
+          active: productPromotionForm.active,
+          sortOrder:
+            productPromotionForm.sortOrder === ''
+              ? productPromotions.length * 10
+              : Number(productPromotionForm.sortOrder || 0),
+          startsAt,
+          endsAt,
+        },
+        existingPromotion
+      );
+      setProductPromotionForm(emptyProductPromotion);
+      setMessage('Promocion especial guardada.');
+    } catch (error) {
+      console.error('Error guardando promocion especial:', error);
+      setMessage(error?.message || 'No se pudo guardar la promocion especial.');
+    } finally {
+      setSavingProductPromotion(false);
+    }
+  };
+
   const saveDeliveryDriver = async (event) => {
     event.preventDefault();
     setSavingDriver(true);
@@ -1376,6 +1505,16 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const toggleProductPromotion = async (promotion) => {
+    try {
+      await updateStoreProductPromotion(promotion.id, { active: promotion.active === false });
+      setMessage('Promocion especial actualizada.');
+    } catch (error) {
+      console.error('No se pudo actualizar la promocion especial:', error);
+      setMessage('No se pudo actualizar la promocion especial.');
+    }
+  };
+
   const removePromotion = async (promotion) => {
     const confirmed =
       typeof window === 'undefined' ||
@@ -1391,6 +1530,23 @@ export default function ConfiguracionView({ mode = 'users' }) {
     } catch (error) {
       console.error('Error eliminando historia:', error);
       setMessage('No se pudo eliminar la historia.');
+    }
+  };
+
+  const removeProductPromotion = async (promotion) => {
+    const confirmed = window.confirm(
+      `Se borrara la promocion especial "${promotion.title || promotion.id}". Continuar?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteStoreProductPromotion(promotion.id);
+      setMessage('Promocion especial eliminada.');
+    } catch (error) {
+      console.error('No se pudo eliminar la promocion especial:', error);
+      setMessage('No se pudo eliminar la promocion especial.');
     }
   };
 
@@ -1410,6 +1566,25 @@ export default function ConfiguracionView({ mode = 'users' }) {
       setMessage('No se pudieron limpiar las historias vencidas.');
     } finally {
       setCleaningPromotions(false);
+    }
+  };
+
+  const clearExpiredProductPromotions = async () => {
+    setCleaningProductPromotions(true);
+    setMessage('');
+
+    try {
+      const removedCount = await cleanupExpiredStoreProductPromotions();
+      setMessage(
+        removedCount > 0
+          ? `Se eliminaron ${removedCount} promociones especiales vencidas.`
+          : 'No habia promociones especiales vencidas para eliminar.'
+      );
+    } catch (error) {
+      console.error('Error limpiando promociones especiales vencidas:', error);
+      setMessage('No se pudieron limpiar las promociones especiales vencidas.');
+    } finally {
+      setCleaningProductPromotions(false);
     }
   };
 
@@ -1859,6 +2034,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Historias',
           title: 'Historias',
         },
+        promos_tienda: {
+          path: 'Admintv / Tienda Virtual / Promociones especiales',
+          title: 'Promociones especiales',
+        },
       }[section] || {
         path: 'Admintv / Tienda Virtual',
         title: 'Tienda Virtual',
@@ -2211,6 +2390,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('promociones')}
             >
               Historias
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'promos_tienda' ? 'active' : ''}`}
+              onClick={() => setSection('promos_tienda')}
+            >
+              Promos tienda
             </button>
           </div>
         )}
@@ -2673,6 +2859,21 @@ export default function ConfiguracionView({ mode = 'users' }) {
             handlePromotionImageFile={handlePromotionImageFile}
             clearExpiredPromotions={clearExpiredPromotions}
             resetPromotionForm={() => setPromotionForm(emptyPromotion)}
+          />
+        ) : isStoreMode && section === 'promos_tienda' ? (
+          <ProductPromotionsManager
+            promotions={productPromotions}
+            promotionForm={productPromotionForm}
+            products={products}
+            savingPromotion={savingProductPromotion}
+            cleaningPromotions={cleaningProductPromotions}
+            updatePromotionForm={updateProductPromotionForm}
+            savePromotion={saveProductPromotion}
+            editPromotion={editProductPromotion}
+            togglePromotion={toggleProductPromotion}
+            removePromotion={removeProductPromotion}
+            clearExpiredPromotions={clearExpiredProductPromotions}
+            resetPromotionForm={() => setProductPromotionForm(emptyProductPromotion)}
           />
         ) : isStoreMode && section === 'cupones' ? (
           <CouponsManager
@@ -4580,6 +4781,325 @@ function PromotionsManager({
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="submit" className="cfg-button" disabled={savingPromotion}>
             {savingPromotion ? 'Guardando...' : 'Guardar historia'}
+          </button>
+          <button type="button" className="cfg-button secondary" onClick={resetPromotionForm}>
+            Nueva
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ProductPromotionsManager({
+  promotions,
+  promotionForm,
+  products,
+  savingPromotion,
+  cleaningPromotions,
+  updatePromotionForm,
+  savePromotion,
+  editPromotion,
+  togglePromotion,
+  removePromotion,
+  clearExpiredPromotions,
+  resetPromotionForm,
+}) {
+  const [productSearch, setProductSearch] = useState('');
+  const selectedCodes = Array.isArray(promotionForm.productCodes) ? promotionForm.productCodes : [];
+  const selectedCodeSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
+  const normalizedSearch = String(productSearch || '').trim().toLowerCase();
+  const activeCount = promotions.filter((promotion) => getStoreProductPromotionStatus(promotion) === 'active').length;
+  const expiredCount = promotions.filter((promotion) => getStoreProductPromotionStatus(promotion) === 'expired').length;
+
+  const filteredProducts = useMemo(() => {
+    const source = Array.isArray(products) ? products : [];
+    return source
+      .filter((product) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+
+        return [product.code, product.name, product.category, product.subcategory]
+          .join(' ')
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .slice(0, 120);
+  }, [normalizedSearch, products]);
+
+  const selectedProducts = useMemo(() => {
+    const source = Array.isArray(products) ? products : [];
+    return source.filter((product) => selectedCodeSet.has(product.code));
+  }, [products, selectedCodeSet]);
+
+  const toggleProductCode = (code) => {
+    const cleanCode = String(code || '').trim();
+    if (!cleanCode) {
+      return;
+    }
+
+    const nextCodes = selectedCodeSet.has(cleanCode)
+      ? selectedCodes.filter((entry) => entry !== cleanCode)
+      : [...selectedCodes, cleanCode];
+
+    updatePromotionForm('productCodes', nextCodes);
+  };
+
+  return (
+    <div
+      className="cfg-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.2fr) minmax(380px, 0.8fr)',
+        gap: 18,
+        marginTop: 18,
+        alignItems: 'start',
+      }}
+    >
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Promociones especiales</h2>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+              Crea descuentos porcentuales por articulo con vigencia para la tienda virtual.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'start' }}>
+            <span className="cfg-badge">{activeCount} activas</span>
+            <span className={`cfg-badge ${expiredCount > 0 ? 'off' : ''}`}>{expiredCount} vencidas</span>
+            <button
+              type="button"
+              className="cfg-button secondary"
+              onClick={clearExpiredPromotions}
+              disabled={cleaningPromotions}
+            >
+              {cleaningPromotions ? 'Limpiando...' : 'Borrar vencidas'}
+            </button>
+          </div>
+        </div>
+
+        {promotions.length === 0 ? (
+          <div
+            style={{
+              padding: 28,
+              border: '1px dashed #cbd5e1',
+              borderRadius: 8,
+              color: '#64748b',
+              textAlign: 'center',
+              fontWeight: 800,
+            }}
+          >
+            No hay promociones especiales cargadas todavia.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {promotions.map((promotion) => {
+              const status = getStoreProductPromotionStatus(promotion);
+              const statusClass = status === 'active' ? '' : 'off';
+
+              return (
+                <div
+                  key={promotion.id}
+                  style={{
+                    border: '1px solid #edf2f7',
+                    borderRadius: 12,
+                    padding: 14,
+                    display: 'grid',
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                    <div>
+                      <strong style={{ fontSize: 18 }}>{promotion.title}</strong>
+                      <div style={{ color: '#0f172a', marginTop: 6, fontWeight: 900 }}>
+                        {Number(promotion.discountPct || 0)}% de descuento
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span className={`cfg-badge ${statusClass}`}>{getPromotionStatusLabel(promotion)}</span>
+                      <span className={`cfg-badge ${promotion.active === false ? 'off' : ''}`}>
+                        {promotion.active === false ? 'Oculta' : 'Visible'}
+                      </span>
+                      <span className="cfg-badge">{promotion.productCodes?.length || 0} articulos</span>
+                    </div>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6, fontWeight: 700 }}>
+                    <div>Inicio: {promotion.startsAt ? formatAdminDateTime(promotion.startsAt) : 'Inmediato'}</div>
+                    <div>Finaliza: {promotion.endsAt ? formatAdminDateTime(promotion.endsAt) : 'Sin vencimiento'}</div>
+                  </div>
+                  <div style={{ color: '#334155', fontWeight: 700, fontSize: 13 }}>
+                    {Array.isArray(promotion.productCodes) ? promotion.productCodes.join(', ') : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className="cfg-button secondary" onClick={() => editPromotion(promotion)}>
+                      Editar
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => togglePromotion(promotion)}>
+                      {promotion.active === false ? 'Activar' : 'Desactivar'}
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => removePromotion(promotion)}>
+                      Borrar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <form
+        onSubmit={savePromotion}
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+          display: 'grid',
+          gap: 10,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 22 }}>Promocion especial</h2>
+        <input
+          className="cfg-input"
+          value={promotionForm.title}
+          onChange={(event) => updatePromotionForm('title', event.target.value)}
+          placeholder="Titulo de promocion"
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <input
+            className="cfg-input"
+            type="number"
+            min="1"
+            max="100"
+            step="0.01"
+            value={promotionForm.discountPct}
+            onChange={(event) => updatePromotionForm('discountPct', event.target.value)}
+            placeholder="% descuento"
+          />
+          <input
+            className="cfg-input"
+            type="number"
+            min="0"
+            step="1"
+            value={promotionForm.sortOrder}
+            onChange={(event) => updatePromotionForm('sortOrder', event.target.value)}
+            placeholder="Orden"
+          />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <select
+            className="cfg-select"
+            value={promotionForm.active ? 'activo' : 'inactivo'}
+            onChange={(event) => updatePromotionForm('active', event.target.value === 'activo')}
+          >
+            <option value="activo">Visible</option>
+            <option value="inactivo">Oculta</option>
+          </select>
+          <div style={{ alignSelf: 'center', color: '#64748b', fontWeight: 800 }}>
+            {selectedProducts.length} articulos seleccionados
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Inicio de vigencia</span>
+            <input
+              className="cfg-input"
+              type="datetime-local"
+              value={promotionForm.startsAt}
+              onChange={(event) => updatePromotionForm('startsAt', event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Final de vigencia</span>
+            <input
+              className="cfg-input"
+              type="datetime-local"
+              value={promotionForm.endsAt}
+              onChange={(event) => updatePromotionForm('endsAt', event.target.value)}
+            />
+          </label>
+        </div>
+        <input
+          className="cfg-input"
+          value={productSearch}
+          onChange={(event) => setProductSearch(event.target.value)}
+          placeholder="Buscar articulos por codigo, nombre o categoria"
+        />
+        {selectedProducts.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {selectedProducts.map((product) => (
+              <button
+                key={`selected-${product.code}`}
+                type="button"
+                className="cfg-button secondary"
+                style={{ padding: '8px 10px', borderRadius: 999 }}
+                onClick={() => toggleProductCode(product.code)}
+              >
+                {product.code} · {product.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            border: '1px solid #e2e8f0',
+            borderRadius: 12,
+            maxHeight: 340,
+            overflow: 'auto',
+            display: 'grid',
+            gap: 0,
+          }}
+        >
+          {filteredProducts.map((product) => {
+            const checked = selectedCodeSet.has(product.code);
+
+            return (
+              <label
+                key={product.code}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto minmax(0, 1fr)',
+                  gap: 10,
+                  alignItems: 'start',
+                  padding: 10,
+                  borderBottom: '1px solid #eef2f7',
+                  background: checked ? '#eff6ff' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleProductCode(product.code)}
+                  style={{ marginTop: 3 }}
+                />
+                <div>
+                  <strong>{product.code} · {product.name}</strong>
+                  <div style={{ color: '#64748b', fontWeight: 700, fontSize: 13 }}>
+                    {product.category} / {product.subcategory} · {formatCurrencyAmount(product.price)}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+          {filteredProducts.length === 0 && (
+            <div style={{ padding: 16, color: '#64748b', fontWeight: 800 }}>
+              No encontramos articulos con ese filtro.
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="submit" className="cfg-button" disabled={savingPromotion}>
+            {savingPromotion ? 'Guardando...' : 'Guardar promocion'}
           </button>
           <button type="button" className="cfg-button secondary" onClick={resetPromotionForm}>
             Nueva
