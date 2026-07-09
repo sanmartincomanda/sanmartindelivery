@@ -122,6 +122,17 @@ const getRewardStatusTone = (pointsBalance = 0) =>
     ? { background: '#ecfeff', color: '#0f766e' }
     : { background: '#f8fafc', color: '#64748b' };
 
+const NEW_CUSTOMER_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+const isNewCustomerRecord = (customer = {}, now = Date.now()) => {
+  const createdAt = Number(customer?.createdAt || 0);
+  if (!createdAt) {
+    return false;
+  }
+
+  return createdAt >= now - NEW_CUSTOMER_WINDOW_MS;
+};
+
 const resolveOrderAmount = (order = {}) => {
   const customerTotal = Number(order?.totalActualizadoCliente || 0);
   if (customerTotal > 0) {
@@ -260,6 +271,7 @@ export default function StoreCustomersAdminSection({
   const ordersByUser = useMemo(() => getOrderSummaryByUser(storeOrders), [storeOrders]);
 
   const customerRows = useMemo(() => {
+    const now = Date.now();
     return (Array.isArray(storeUsers) ? storeUsers : [])
       .map((user) => {
         const userKey = String(user?.key || '').trim();
@@ -302,10 +314,13 @@ export default function StoreCustomersAdminSection({
           welcomeCoupon,
           welcomeCouponStatus,
           welcomeCouponUsageCount,
+          isNewCustomer: isNewCustomerRecord(user, now),
         };
       })
       .sort(
         (left, right) =>
+          Number(right?.createdAt || 0) - Number(left?.createdAt || 0) ||
+          Number(right?.updatedAt || 0) - Number(left?.updatedAt || 0) ||
           Number(right?.orderSummary?.lastOrderAt || 0) - Number(left?.orderSummary?.lastOrderAt || 0) ||
           Number(right?.rewardAccount?.pointsBalance || 0) - Number(left?.rewardAccount?.pointsBalance || 0) ||
           String(left?.nombre || '').localeCompare(String(right?.nombre || ''), 'es-NI', {
@@ -338,6 +353,7 @@ export default function StoreCustomersAdminSection({
   const metrics = useMemo(() => {
     return {
       total: customerRows.length,
+      nuevos: customerRows.filter((customer) => customer?.isNewCustomer).length,
       conCompra: customerRows.filter((customer) => Number(customer?.orderSummary?.totalOrders || 0) > 0).length,
       conPuntos: customerRows.filter((customer) => Number(customer?.rewardAccount?.pointsBalance || 0) > 0).length,
       conCuponActivo: customerRows.filter((customer) =>
@@ -437,6 +453,7 @@ export default function StoreCustomersAdminSection({
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span className="cfg-badge">Clientes: {metrics.total}</span>
+          <span className="cfg-badge">Nuevos 7 dias: {metrics.nuevos}</span>
           <span className="cfg-badge">Con compra: {metrics.conCompra}</span>
           <span className="cfg-badge">Con puntos: {metrics.conPuntos}</span>
           <span className="cfg-badge">Cupon activo: {metrics.conCuponActivo}</span>
@@ -511,6 +528,22 @@ export default function StoreCustomersAdminSection({
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {customer.isNewCustomer && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: 999,
+                          padding: '6px 10px',
+                          fontSize: 12,
+                          fontWeight: 900,
+                          background: '#fef3c7',
+                          color: '#92400e',
+                        }}
+                      >
+                        CLIENTE NUEVO
+                      </span>
+                    )}
                     <span
                       style={{
                         display: 'inline-flex',
@@ -598,6 +631,22 @@ export default function StoreCustomersAdminSection({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'start' }}>
+                {selectedCustomer.isNewCustomer && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      borderRadius: 999,
+                      padding: '6px 10px',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      background: '#fef3c7',
+                      color: '#92400e',
+                    }}
+                  >
+                    CLIENTE NUEVO
+                  </span>
+                )}
                 <span className="cfg-badge">Miembro Gold: {Math.trunc(Number(selectedCustomer.rewardAccount?.pointsBalance || 0))} pts</span>
                 <button type="button" className="cfg-button secondary" onClick={() => setSelectedUserKey('')}>
                   Cerrar
