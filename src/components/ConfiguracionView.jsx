@@ -1351,6 +1351,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
     event.preventDefault();
     const startsAt = normalizeDateTimeInputValue(productPromotionForm.startsAt);
     const endsAt = normalizeDateTimeInputValue(productPromotionForm.endsAt);
+    const promotionTitle = String(productPromotionForm.title || '').trim();
 
     if (productPromotionForm.startsAt && !startsAt) {
       setMessage('La fecha inicial de la promocion especial no es valida.');
@@ -1376,7 +1377,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
       await saveStoreProductPromotion(
         {
           id: productPromotionForm.id,
-          title: productPromotionForm.title,
+          title: promotionTitle,
           discountPct: Number(productPromotionForm.discountPct || 0),
           productCodes: productPromotionForm.productCodes || [],
           active: productPromotionForm.active,
@@ -4972,7 +4973,7 @@ function ProductPromotionsManager({
           className="cfg-input"
           value={promotionForm.title}
           onChange={(event) => updatePromotionForm('title', event.target.value)}
-          placeholder="Titulo de promocion"
+          placeholder="Titulo de promocion (opcional)"
         />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <input

@@ -42,6 +42,34 @@ const normalizePromotionCodes = (value) => {
 
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 
+const buildFallbackPromotionTitle = (source = {}, backup = {}) => {
+  const directTitle = String(source.title ?? backup.title ?? '').trim();
+  if (directTitle) {
+    return directTitle;
+  }
+
+  const productCodes = normalizePromotionCodes(source.productCodes ?? backup.productCodes);
+  const discountPct = roundMoney(source.discountPct ?? backup.discountPct ?? 0);
+
+  if (productCodes.length === 1 && discountPct > 0) {
+    return `${discountPct}% en ${productCodes[0]}`;
+  }
+
+  if (productCodes.length > 1 && discountPct > 0) {
+    return `${discountPct}% en ${productCodes.length} articulos`;
+  }
+
+  if (productCodes.length === 1) {
+    return `Promocion ${productCodes[0]}`;
+  }
+
+  if (discountPct > 0) {
+    return `Promocion ${discountPct}%`;
+  }
+
+  return 'Promocion especial';
+};
+
 const sortProductPromotions = (left, right) =>
   Number(left.sortOrder || 0) - Number(right.sortOrder || 0) ||
   Number(right.discountPct || 0) - Number(left.discountPct || 0) ||
@@ -55,7 +83,7 @@ export const getStoreProductPromotionKey = (id) =>
 export const normalizeStoreProductPromotion = (promotion = {}, fallback = {}, index = 0) => {
   const source = promotion || {};
   const backup = fallback || {};
-  const title = String(source.title ?? backup.title ?? '').trim();
+  const title = buildFallbackPromotionTitle(source, backup);
   const id = normalizePromotionId(source.id ?? backup.id ?? title);
   const productCodes = normalizePromotionCodes(source.productCodes ?? backup.productCodes);
   const discountPct = Math.min(100, Math.max(0, Number(source.discountPct ?? backup.discountPct ?? 0) || 0));
@@ -172,8 +200,8 @@ export async function saveStoreProductPromotion(promotion, existingPromotion = n
     deleted: false,
   };
 
-  if (!normalized.id || !normalized.title) {
-    throw new Error('La promocion necesita titulo.');
+  if (!normalized.id) {
+    throw new Error('No se pudo generar el titulo de la promocion.');
   }
 
   if (normalized.discountPct <= 0) {
