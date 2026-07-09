@@ -1,7 +1,8 @@
-import { get, push, ref, set, update } from 'firebase/database';
+import { equalTo, get, orderByChild, push, query, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { hasLocation, normalizeLocation } from './geo';
 import {
+  buildStoreCustomerEmail,
   createStoreCustomerAuth,
   getCurrentAuthUser,
   normalizeAuthEmail,
@@ -121,6 +122,99 @@ const sanitizeStoreUser = (user, key) => {
     key,
     hasPassword: Boolean(passwordHash),
   };
+};
+
+const getStoreUserRecordByAuthUid = async (authUid = '') => {
+  const cleanAuthUid = String(authUid || '').trim();
+  if (!cleanAuthUid) {
+    return null;
+  }
+
+  const snapshot = await get(ref(database, `${STORE_USERS_PATH}/${cleanAuthUid}`));
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return {
+    key: cleanAuthUid,
+    value: snapshot.val(),
+  };
+};
+
+const getStoreUserRecordByPhone = async (phone = '') => {
+  const cleanPhone = cleanStorePhone(phone);
+  if (!cleanPhone) {
+    return null;
+  }
+
+  const snapshot = await get(query(ref(database, STORE_USERS_PATH), orderByChild('telefono'), equalTo(cleanPhone)));
+  const [entry] = Object.entries(snapshot.val() || {});
+  if (!entry) {
+    return null;
+  }
+
+  const [key, value] = entry;
+  return { key, value };
+};
+
+const getStoreUserRecordByEmail = async (email = '') => {
+  const cleanEmail = cleanStoreEmail(email);
+  if (!cleanEmail) {
+    return null;
+  }
+
+  const snapshot = await get(query(ref(database, STORE_USERS_PATH), orderByChild('email'), equalTo(cleanEmail)));
+  const [entry] = Object.entries(snapshot.val() || {});
+  if (!entry) {
+    return null;
+  }
+
+  const [key, value] = entry;
+  return { key, value };
+};
+
+const getStoreUserRecordByContact = async ({ email = '', telefono = '' } = {}) => {
+  const byPhone = await getStoreUserRecordByPhone(telefono);
+  if (byPhone) {
+    return byPhone;
+  }
+
+  return getStoreUserRecordByEmail(email);
+};
+
+const upsertStoreUserAtAuthUid = async (authUid, sourceValue = {}) => {
+  const cleanAuthUid = String(authUid || '').trim();
+  if (!cleanAuthUid || !sourceValue || typeof sourceValue !== 'object') {
+    return null;
+  }
+
+  const now = Date.now();
+  const nextValue = {
+    ...(sourceValue || {}),
+    authUid: cleanAuthUid,
+    updatedAt: now,
+    lastLoginAt: now,
+  };
+
+  await set(ref(database, `${STORE_USERS_PATH}/${cleanAuthUid}`), nextValue);
+
+  return {
+    key: cleanAuthUid,
+    value: nextValue,
+  };
+};
+
+const resolveWelcomeCouponForStoreUser = async ({ userKey, phone, name }) => {
+  try {
+    return await ensureStoreWelcomeCouponForUser({
+      userKey,
+      phone,
+      name,
+    });
+  } catch (error) {
+    console.warn('No se pudo resolver el cupon de bienvenida del cliente.', error);
+    return null;
+  }
 };
 
 export async function ensureStoreUser({
@@ -274,26 +368,24 @@ export async function registerStoreUserWithEmail({
     authUser = await createStoreCustomerAuth({ nombre, email: cleanEmail, telefono: cleanPhone, password: cleanPassword });
   } catch (error) {
     if (error.code === 'auth/email-already-in-use') {
-      const userExistsError = new Error('El correo ya tiene cuenta');
-      userExistsError.code = 'USER_EXISTS';
-      throw userExistsError;
+      try {
+        authUser = await signInStoreCustomer({
+          email: cleanEmail,
+          telefono: cleanPhone,
+          password: cleanPassword,
+        });
+      } catch (signInError) {
+        const userExistsError = new Error('El correo ya tiene cuenta');
+        userExistsError.code = 'USER_EXISTS';
+        throw userExistsError;
+      }
+    } else {
+      throw error;
     }
-
-    throw error;
   }
 
   const authUserKey = authUser.uid;
   await upsertOwnClientRole(authUserKey, { nombre, email: cleanEmail, telefono: cleanPhone });
-
-  const authUserRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
-  const userSnapshot = await get(authUserRef);
-  const existingUser = userSnapshot.val();
-
-  if (existingUser?.createdAt) {
-    const error = new Error('El usuario ya existe');
-    error.code = 'USER_EXISTS';
-    throw error;
-  }
 
   const passwordHash = await hashStorePassword(cleanPhone, cleanPassword);
   const profile = await ensureStoreUser({
@@ -308,12 +400,12 @@ export async function registerStoreUserWithEmail({
     authUid: authUserKey,
   });
 
-  await update(authUserRef, {
+  await update(ref(database, `${STORE_USERS_PATH}/${authUserKey}`), {
     passwordHash,
     lastLoginAt: Date.now(),
   });
 
-  const welcomeCoupon = await ensureStoreWelcomeCouponForUser({
+  const welcomeCoupon = await resolveWelcomeCouponForStoreUser({
     userKey: authUserKey,
     phone: cleanPhone,
     name: nombre,
@@ -334,8 +426,13 @@ export async function loginStoreUser({ email, telefono, password }) {
 }
 
 export async function requestStorePasswordReset({ email, telefono }) {
-  const cleanEmail = cleanStoreEmail(email);
+  let cleanEmail = cleanStoreEmail(email);
   const cleanPhone = cleanStorePhone(telefono);
+
+  if (!cleanEmail && cleanPhone) {
+    const contactRecord = await getStoreUserRecordByPhone(cleanPhone);
+    cleanEmail = cleanStoreEmail(contactRecord?.value?.email);
+  }
 
   if (!cleanEmail) {
     const error = new Error('Correo requerido');
@@ -364,25 +461,67 @@ export async function loginStoreUserWithEmail({ email, telefono, password }) {
     throw error;
   }
 
-  const authUser = await signInStoreCustomer({ email: cleanEmail, telefono: cleanPhone, password: cleanPassword });
+  let authUser = null;
+  let contactRecord = null;
+
+  try {
+    authUser = await signInStoreCustomer({ email: cleanEmail, telefono: cleanPhone, password: cleanPassword });
+  } catch (primaryError) {
+    contactRecord = await getStoreUserRecordByContact({ email: cleanEmail, telefono: cleanPhone });
+
+    const fallbackPhone = cleanPhone || cleanStorePhone(contactRecord?.value?.telefono);
+    const fallbackEmail = cleanEmail || cleanStoreEmail(contactRecord?.value?.email);
+    const aliasEmailFromPhone = fallbackPhone ? buildStoreCustomerEmail(fallbackPhone) : '';
+    const alternateEmail =
+      fallbackEmail && fallbackEmail !== aliasEmailFromPhone ? fallbackEmail : '';
+
+    try {
+      if (cleanEmail && fallbackPhone) {
+        authUser = await signInStoreCustomer({
+          telefono: fallbackPhone,
+          password: cleanPassword,
+        });
+      } else if (cleanPhone && alternateEmail) {
+        authUser = await signInStoreCustomer({
+          email: alternateEmail,
+          password: cleanPassword,
+        });
+      } else {
+        throw primaryError;
+      }
+    } catch (fallbackError) {
+      throw primaryError;
+    }
+  }
+
   const authUserKey = authUser.uid;
   await touchLastLogin(authUserKey);
 
-  const userRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
-  const userSnapshot = await get(userRef);
-  const user = userSnapshot.val();
+  let authUserRecord = await getStoreUserRecordByAuthUid(authUserKey);
+  if (!authUserRecord) {
+    contactRecord = contactRecord || (await getStoreUserRecordByContact({ email: cleanEmail, telefono: cleanPhone }));
+    if (contactRecord?.value) {
+      authUserRecord = await upsertStoreUserAtAuthUid(authUserKey, contactRecord.value);
+    }
+  }
 
-  if (!user) {
-    const error = new Error('Usuario no encontrado');
-    error.code = 'USER_NOT_FOUND';
+  if (!authUserRecord?.value) {
+    const error = new Error('Perfil incompleto');
+    error.code = 'PROFILE_REQUIRED';
+    error.authUser = {
+      uid: authUserKey,
+      email: cleanEmail || cleanStoreEmail(authUser.email),
+      telefono: cleanPhone,
+      nombre: String(authUser.displayName || '').trim(),
+    };
     throw error;
   }
 
-  await update(userRef, {
+  await update(ref(database, `${STORE_USERS_PATH}/${authUserKey}`), {
     lastLoginAt: Date.now(),
   });
 
-  return sanitizeStoreUser(user, authUserKey);
+  return sanitizeStoreUser(authUserRecord.value, authUserKey);
 }
 
 export async function loginStoreUserWithGoogle() {
@@ -430,7 +569,7 @@ export async function loginStoreUserWithGoogle() {
   );
 }
 
-export async function completeGoogleStoreUserProfile({
+export async function completeExistingStoreUserProfile({
   nombre,
   email,
   telefono,
@@ -438,6 +577,7 @@ export async function completeGoogleStoreUserProfile({
   referencia,
   fechaCumpleanos,
   ubicacion,
+  provider = 'google',
 }) {
   const authUser = getCurrentAuthUser();
   if (!authUser) {
@@ -453,7 +593,7 @@ export async function completeGoogleStoreUserProfile({
     nombre: nombre || authUser.displayName,
     email: cleanEmail,
     telefono: cleanPhone,
-    provider: 'google',
+    provider: String(provider || 'password').trim() || 'password',
   });
 
   const profile = await ensureStoreUser({
@@ -471,7 +611,7 @@ export async function completeGoogleStoreUserProfile({
     lastLoginAt: Date.now(),
   });
 
-  const welcomeCoupon = await ensureStoreWelcomeCouponForUser({
+  const welcomeCoupon = await resolveWelcomeCouponForStoreUser({
     userKey: authUser.uid,
     phone: cleanPhone,
     name: nombre || authUser.displayName,
@@ -485,6 +625,12 @@ export async function completeGoogleStoreUserProfile({
     authUser.uid
   );
 }
+
+export const completeGoogleStoreUserProfile = (payload = {}) =>
+  completeExistingStoreUserProfile({
+    ...(payload || {}),
+    provider: 'google',
+  });
 
 export async function updateStoreUserProfile(user, patch) {
   const currentUser = user || {};

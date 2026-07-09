@@ -93,7 +93,7 @@ import {
 } from '../services/storePopupAds';
 import {
   cleanStorePhone,
-  completeGoogleStoreUserProfile,
+  completeExistingStoreUserProfile,
   loginStoreUserWithGoogle,
   loginStoreUser,
   registerStoreUser,
@@ -2983,7 +2983,22 @@ export default function TiendaVirtualView({
       }));
     } catch (error) {
       console.error('Error iniciando sesion de tienda:', error);
-      setAuthError('Correo, telefono o contrasena incorrectos.');
+      if (error.code === 'PROFILE_REQUIRED') {
+        const authUser = error.authUser || {};
+        setAuthProviderDraft({ provider: 'password', uid: authUser.uid });
+        setAuthMode('register');
+        setAuthForm((current) => ({
+          ...current,
+          nombre: authUser.nombre || current.nombre,
+          email: authUser.email || current.email,
+          telefono: authUser.telefono || current.telefono,
+          password: '',
+          confirmPassword: '',
+        }));
+        setAuthError('Tu cuenta ya existe, pero faltan datos de direccion y mapa. Completa el registro para terminarla.');
+      } else {
+        setAuthError('Correo, telefono o contrasena incorrectos.');
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -3059,15 +3074,15 @@ export default function TiendaVirtualView({
     setAuthLoading(true);
     setAuthError('');
     setAuthNotice('');
-    const isGoogleProfileCompletion = authProviderDraft?.provider === 'google';
+    const isExistingAuthProfileCompletion = Boolean(authProviderDraft?.uid);
 
-    if (!isGoogleProfileCompletion && authForm.password !== authForm.confirmPassword) {
+    if (!isExistingAuthProfileCompletion && authForm.password !== authForm.confirmPassword) {
       setAuthLoading(false);
       setAuthError('Las contrasenas no coinciden.');
       return;
     }
 
-    if (!isGoogleProfileCompletion && String(authForm.password || '').trim().length < 6) {
+    if (!isExistingAuthProfileCompletion && String(authForm.password || '').trim().length < 6) {
       setAuthLoading(false);
       setAuthError('La contrasena debe tener al menos 6 caracteres.');
       return;
@@ -3086,8 +3101,11 @@ export default function TiendaVirtualView({
     }
 
     try {
-      const user = isGoogleProfileCompletion
-        ? await completeGoogleStoreUserProfile(authForm)
+      const user = isExistingAuthProfileCompletion
+        ? await completeExistingStoreUserProfile({
+            ...authForm,
+            provider: authProviderDraft?.provider || 'password',
+          })
         : await registerStoreUser(authForm);
       setAuthProviderDraft(null);
       persistStoreSession(user);
@@ -7500,7 +7518,7 @@ function StoreAuthView({
   onBrowseCatalog,
 }) {
   const isRegister = authMode === 'register';
-  const isGoogleProfileCompletion = isRegister && authProviderDraft?.provider === 'google';
+  const isAuthProfileCompletion = isRegister && Boolean(authProviderDraft?.uid);
 
   const content = (
     <section className={`store-auth-card ${embedded ? 'inline' : ''}`}>
@@ -7530,7 +7548,9 @@ function StoreAuthView({
       <h2 style={{ margin: '0 0 4px', fontSize: 26 }}>{isRegister ? 'Crea tu usuario' : 'Bienvenido'}</h2>
       <p style={{ margin: '0 0 16px', color: '#6b7280', fontWeight: 700 }}>
         {isRegister
-          ? 'Usaremos estos datos para tus pedidos delivery.'
+          ? isAuthProfileCompletion
+            ? 'Completa los datos que faltan para terminar tu cuenta.'
+            : 'Usaremos estos datos para tus pedidos delivery.'
           : 'Ingresa con tu correo o telefono y contrasena.'}
       </p>
 
@@ -7565,7 +7585,7 @@ function StoreAuthView({
           value={authForm.email}
           onChange={(event) => onFormChange('email', event.target.value)}
           placeholder={isRegister ? 'Correo electronico' : 'Correo o telefono'}
-          disabled={isGoogleProfileCompletion}
+          disabled={isAuthProfileCompletion}
           autoComplete={isRegister ? 'email' : 'username'}
           required
         />
@@ -7578,7 +7598,7 @@ function StoreAuthView({
             required
           />
         )}
-        {!isGoogleProfileCompletion && (
+        {!isAuthProfileCompletion && (
           <>
             <input
               className="store-field"
@@ -7600,7 +7620,7 @@ function StoreAuthView({
             )}
           </>
         )}
-        {isRegister && !isGoogleProfileCompletion && (
+        {isRegister && !isAuthProfileCompletion && (
           <input
             className="store-field"
             type="password"
@@ -7641,7 +7661,7 @@ function StoreAuthView({
         <button type="submit" className="store-button" disabled={authLoading}>
           {authLoading
             ? 'Procesando...'
-            : isGoogleProfileCompletion
+            : isAuthProfileCompletion
               ? 'Completar cuenta'
               : isRegister
                 ? 'Crear cuenta y entrar'

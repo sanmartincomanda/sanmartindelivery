@@ -62,7 +62,7 @@
     "storeUsers": {
       ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["updatedAt", "codigo", "telefono", "authUid"],
+      ".indexOn": ["updatedAt", "codigo", "telefono", "authUid", "email"],
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
         ".write": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')"
