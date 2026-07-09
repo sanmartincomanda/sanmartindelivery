@@ -149,11 +149,37 @@ export const formatWeight = (value) => {
   return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1).replace(/\.0$/, '');
 };
 
+const normalizeItemSpecialPromotion = (value = null) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const id = String(value.id || '').trim();
+  const title = String(value.title || '').trim();
+  const discountPct = Math.max(0, Number(value.discountPct || 0));
+
+  if (!id && !title && discountPct <= 0) {
+    return null;
+  }
+
+  return {
+    id,
+    title,
+    discountPct: Number(discountPct.toFixed(2)),
+  };
+};
+
 const normalizeStoreItems = (items = []) =>
   items
     .map((item) => {
       const cantidad = roundToHalf(item.cantidad ?? item.quantity ?? 0);
       const precioUnitario = Number(item.precioUnitario ?? item.price ?? 0);
+      const precioUnitarioOriginal = Number(
+        item.precioUnitarioOriginal ?? item.originalUnitPrice ?? precioUnitario
+      );
+      const promocionEspecial = normalizeItemSpecialPromotion(
+        item.promocionEspecial ?? item.specialPromotion ?? null
+      );
       const subtotal = Number((cantidad * precioUnitario).toFixed(2));
 
       return {
@@ -163,6 +189,10 @@ const normalizeStoreItems = (items = []) =>
         unidad: String(item.unidad ?? item.unit ?? 'lb').trim() || 'lb',
         cantidad,
         precioUnitario,
+        precioUnitarioOriginal: Number(precioUnitarioOriginal.toFixed(2)),
+        precioFijo:
+          item.precioFijo === true || item.priceLocked === true || Boolean(promocionEspecial),
+        promocionEspecial,
         subtotal,
       };
     })

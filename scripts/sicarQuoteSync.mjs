@@ -97,6 +97,26 @@ const formatStoreQuantityLabel = (quantity, unit) =>
     ? String(Number(quantity || 0))
     : formatWeightLabel(quantity);
 
+const normalizeOrderSpecialPromotion = (value = null) => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const id = normalizeCode(value.id || '');
+  const title = normalizeText(value.title || '');
+  const discountPct = roundMoney(value.discountPct || 0);
+
+  if (!id && !title && discountPct <= 0) {
+    return null;
+  }
+
+  return {
+    id,
+    title,
+    discountPct,
+  };
+};
+
 const removeTextAccents = (value) =>
   String(value || '')
     .normalize('NFD')
@@ -145,6 +165,16 @@ const normalizeOrderItems = (items = []) =>
       unit: String(item?.unidad ?? item?.unit ?? 'lb').trim() || 'lb',
       quantity: roundQuantity(item?.cantidad ?? item?.quantity ?? 0),
       unitPrice: roundMoney(item?.precioUnitario ?? item?.price ?? 0),
+      originalUnitPrice: roundMoney(
+        item?.precioUnitarioOriginal ?? item?.originalUnitPrice ?? item?.precioUnitario ?? item?.price ?? 0
+      ),
+      fixedPrice:
+        item?.precioFijo === true ||
+        item?.priceLocked === true ||
+        Boolean(item?.promocionEspecial?.id || item?.specialPromotion?.id),
+      specialPromotion: normalizeOrderSpecialPromotion(
+        item?.promocionEspecial ?? item?.specialPromotion ?? null
+      ),
       subtotal: roundMoney(item?.subtotal ?? 0),
     }))
     .filter((item) => item.code && item.quantity > 0);
@@ -1051,6 +1081,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const isDelivery = item.isDelivery === true;
       const isComplimentaryDelivery = isDelivery && item.isComplimentary === true;
       const isZeroPricedLine = isReward || isComplimentaryDelivery;
+      const articleBasePrice = roundMoney(article.basePrice || 0);
+      const articleGrossPrice = roundMoney(
+        hasTransferredTax ? articleBasePrice * (1 + taxRatePct / 100) : articleBasePrice
+      );
       const explicitStoreUnitTotal =
         !isReward && quantity > 0
           ? roundMoney(
@@ -1059,22 +1093,29 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
                 : Number(item.unitPrice || 0)
             )
           : 0;
-      const sourceBasePrice =
-        explicitStoreUnitTotal > 0
-          ? roundMoney(
-              hasTransferredTax
-                ? explicitStoreUnitTotal / (1 + taxRatePct / 100)
-                : explicitStoreUnitTotal
-            )
-          : roundRate(article.basePrice);
-      const sourceGrossPrice =
-        explicitStoreUnitTotal > 0
-          ? roundMoney(explicitStoreUnitTotal)
-          : roundMoney(hasTransferredTax ? article.basePrice * (1 + taxRatePct / 100) : article.basePrice);
-      const priceNorSin = roundMoney(sourceBasePrice);
-      const priceSin = truncateMoney(sourceBasePrice);
-      const priceNorCon = roundMoney(sourceGrossPrice);
-      const priceCon = priceNorCon;
+      const shouldKeepStorePrice =
+        !isReward &&
+        !isDelivery &&
+        explicitStoreUnitTotal > 0 &&
+        (
+          item.fixedPrice === true ||
+          Boolean(item.specialPromotion?.id || item.specialPromotion?.title) ||
+          Math.abs(explicitStoreUnitTotal - articleGrossPrice) > 0.009
+        );
+      const sourceGrossPrice = shouldKeepStorePrice && explicitStoreUnitTotal > 0
+        ? roundMoney(explicitStoreUnitTotal)
+        : articleGrossPrice;
+      const sourceBasePrice = isZeroPricedLine
+        ? 0
+        : roundMoney(
+            hasTransferredTax
+              ? sourceGrossPrice / (1 + taxRatePct / 100)
+              : sourceGrossPrice
+          );
+      const priceNorSin = articleBasePrice;
+      const priceNorCon = articleGrossPrice;
+      const priceSin = isZeroPricedLine ? 0 : truncateMoney(sourceBasePrice);
+      const priceCon = isZeroPricedLine ? 0 : roundMoney(sourceGrossPrice);
       const purchaseBase = roundRate(article.purchaseAveragePrice || article.purchasePrice || 0);
       const purchasePrice = roundMoney(
         hasTransferredTax ? purchaseBase * (1 + taxRatePct / 100) : purchaseBase
@@ -1086,9 +1127,11 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       const initialImporteCon = isZeroPricedLine ? 0 : roundMoney(priceCon * quantity);
       const initialPriceSin = quantity > 0 ? roundMoney(initialImporteSin / quantity) : 0;
       const initialPriceCon = quantity > 0 ? roundMoney(initialImporteCon / quantity) : 0;
-      const initialDiscountTotal = isZeroPricedLine ? roundMoney(importeNorCon) : 0;
+      const initialDiscountTotal = isZeroPricedLine
+        ? roundMoney(importeNorCon)
+        : roundMoney(Math.max(importeNorCon - initialImporteCon, 0));
       const initialDiscountPercent =
-        isZeroPricedLine && importeNorCon > 0 ? roundRate((initialDiscountTotal / importeNorCon) * 100) : 0;
+        importeNorCon > 0 ? roundRate((initialDiscountTotal / importeNorCon) * 100) : 0;
       const diferencia = roundMoney(initialImporteCon - importeCompra);
       const utilidad = initialImporteCon > 0 ? roundRate((diferencia / initialImporteCon) * 100) : 0;
       const taxImpIds = (Array.isArray(article.impIds) ? article.impIds : []).filter((impId) => Number(impId) === 1);
@@ -1514,10 +1557,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         dc.descripcion,
         dc.cantidad,
         dc.unidad,
+        dc.precioNorSin,
+        dc.precioNorCon,
         dc.precioSin,
         dc.precioCon,
+        dc.importeNorSin,
+        dc.importeNorCon,
         dc.importeSin,
         dc.importeCon,
+        COALESCE(dc.descPorcentaje, 0),
+        COALESCE(dc.descTotal, 0),
         COALESCE(tax.impIds, '')
       FROM detallecot dc
       LEFT JOIN (
@@ -1535,30 +1584,76 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
     const items = detailRows.map((row) => {
       const parts = row.split('\t');
+      const quantity = roundQuantity(parts[3]);
+      const normalPriceWithoutTax = roundMoney(parts[5]);
+      const normalPrice = roundMoney(parts[6]);
+      const storedPriceWithoutTax = roundMoney(parts[7]);
+      const storedPrice = roundMoney(parts[8]);
+      const normalSubtotalWithoutTax = roundMoney(parts[9]);
+      const normalTotal = roundMoney(parts[10]);
+      const storedSubtotalWithoutTax = roundMoney(parts[11]);
+      const storedTotal = roundMoney(parts[12]);
+      const discountPercent = roundRate(parts[13]);
+      const discountTotal = roundMoney(parts[14]);
+      const effectiveTotalFromDiscount =
+        discountTotal > 0 ? roundMoney(Math.max(normalTotal - discountTotal, 0)) : storedTotal;
+      const effectiveTotal =
+        discountTotal > 0
+          ? roundMoney(
+              storedTotal > 0
+                ? Math.min(storedTotal, effectiveTotalFromDiscount || storedTotal)
+                : effectiveTotalFromDiscount
+            )
+          : storedTotal;
+      const effectiveSubtotalWithoutTaxFromDiscount =
+        discountTotal > 0 && normalTotal > 0
+          ? roundMoney(normalSubtotalWithoutTax * (effectiveTotal / normalTotal))
+          : storedSubtotalWithoutTax;
+      const effectiveSubtotalWithoutTax =
+        discountTotal > 0
+          ? roundMoney(
+              storedSubtotalWithoutTax > 0
+                ? Math.min(
+                    storedSubtotalWithoutTax,
+                    effectiveSubtotalWithoutTaxFromDiscount || storedSubtotalWithoutTax
+                  )
+                : effectiveSubtotalWithoutTaxFromDiscount
+            )
+          : storedSubtotalWithoutTax;
+
       return {
         artId: Number(parts[0] || 0),
         code: String(parts[1] || '').trim(),
         name: String(parts[2] || '').trim(),
         description: String(parts[2] || '').trim(),
-        quantity: roundQuantity(parts[3]),
+        quantity,
         unit: String(parts[4] || '').trim() || 'PZA',
         storeUnit: normalizeStoreUnitLabel(parts[4]),
-        priceWithoutTax: roundMoney(parts[5]),
-        price: roundMoney(parts[6]),
-        subtotalWithoutTax: roundMoney(parts[7]),
-        total: roundMoney(parts[8]),
-        impIds: parseImpIds(parts[9]),
+        listPriceWithoutTax: normalPriceWithoutTax,
+        listPrice: normalPrice,
+        priceWithoutTax:
+          quantity > 0 ? roundMoney(effectiveSubtotalWithoutTax / quantity) : storedPriceWithoutTax,
+        price: quantity > 0 ? roundMoney(effectiveTotal / quantity) : storedPrice,
+        subtotalWithoutTax: effectiveSubtotalWithoutTax,
+        total: effectiveTotal,
+        discountPercent,
+        discountTotal,
+        impIds: parseImpIds(parts[15]),
       };
     });
 
     const headerDiscount = roundMoney(descuento);
-    const headerTotal = roundMoney(total);
+    const computedSubtotalWithoutTax = roundMoney(
+      items.reduce((sum, item) => sum + roundMoney(item.subtotalWithoutTax || 0), 0)
+    );
+    const computedTotal = roundMoney(items.reduce((sum, item) => sum + roundMoney(item.total || 0), 0));
+    const headerTotal = computedTotal > 0 ? computedTotal : roundMoney(total);
 
     return {
       cotId: Number(cotId || 0),
       orderDate: String(fecha || '').trim(),
       subtotal: roundMoney(headerTotal + headerDiscount),
-      netSubtotal: roundMoney(subtotal),
+      netSubtotal: computedSubtotalWithoutTax > 0 ? computedSubtotalWithoutTax : roundMoney(subtotal),
       discount: headerDiscount,
       total: headerTotal,
       items,
@@ -1602,6 +1697,9 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       .map((item) => {
         const normalizedCode = normalizeCode(item.code);
         const existingItem = existingItemsByCode.get(normalizedCode) || null;
+        const existingPromotion = normalizeOrderSpecialPromotion(
+          existingItem?.promocionEspecial ?? existingItem?.specialPromotion ?? null
+        );
         const safeDescription =
           existingItem?.description && existingItem.description !== item.name
             ? existingItem.description
@@ -1613,6 +1711,21 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
             item.quantity
         );
         const actualQuantity = roundQuantity(item.quantity);
+        const shouldPreserveStorePrice =
+          existingItem?.precioFijo === true ||
+          existingItem?.priceLocked === true ||
+          Boolean(existingPromotion) ||
+          (
+            order?.totalAproximado !== false &&
+            Number(existingItem?.precioUnitario ?? 0) > 0 &&
+            Number(item?.listPrice || 0) > 0 &&
+            Number(existingItem?.precioUnitario ?? 0) < Number(item.listPrice || 0)
+          );
+        const resolvedUnitPrice = roundMoney(
+          shouldPreserveStorePrice
+            ? existingItem?.precioUnitario ?? item.price ?? 0
+            : item.price ?? 0
+        );
         const nextItem = {
           codigo: item.code,
           nombre: item.name,
@@ -1621,10 +1734,24 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
           cantidadSolicitada: requestedQuantity,
           cantidadReal: actualQuantity,
           cantidad: actualQuantity,
-          precioUnitario: item.price,
-          subtotal: item.total,
+          precioUnitario: resolvedUnitPrice,
+          subtotal: roundMoney(actualQuantity * resolvedUnitPrice),
           sourceType: 'order',
         };
+
+        if (Number(existingItem?.precioUnitarioOriginal ?? 0) > 0) {
+          nextItem.precioUnitarioOriginal = roundMoney(existingItem.precioUnitarioOriginal);
+        } else if (shouldPreserveStorePrice && Number(item?.listPrice || 0) > 0) {
+          nextItem.precioUnitarioOriginal = roundMoney(item.listPrice);
+        }
+
+        if (shouldPreserveStorePrice) {
+          nextItem.precioFijo = true;
+        }
+
+        if (existingPromotion) {
+          nextItem.promocionEspecial = existingPromotion;
+        }
 
         if (Number(existingItem?.quantityStep || 0) > 0) {
           nextItem.quantityStep = Number(existingItem.quantityStep);

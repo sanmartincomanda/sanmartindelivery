@@ -1939,6 +1939,18 @@ export default function TiendaVirtualView({
         .filter((product) => Number(cart[product.code] || 0) > 0)
         .map((product) => {
           const cantidad = Number(cart[product.code] || 0);
+          const specialPromotion =
+            product.specialPromotion && typeof product.specialPromotion === 'object'
+              ? {
+                  id: String(product.specialPromotion.id || '').trim(),
+                  title: String(product.specialPromotion.title || '').trim(),
+                  discountPct: Number(product.specialPromotion.discountPct || 0),
+                }
+              : null;
+          const originalUnitPrice = Number(
+            product.hasSpecialPromotion ? product.originalPrice || product.price : product.price
+          );
+
           return {
             codigo: product.code,
             nombre: product.name,
@@ -1946,6 +1958,9 @@ export default function TiendaVirtualView({
             unidad: product.unit,
             cantidad,
             precioUnitario: product.price,
+            precioUnitarioOriginal: Number(originalUnitPrice.toFixed(2)),
+            precioFijo: Boolean(product.hasSpecialPromotion),
+            promocionEspecial: specialPromotion,
             subtotal: Number((cantidad * product.price).toFixed(2)),
             image: product.image,
             minQuantity: getMinQuantity(product),
