@@ -138,6 +138,7 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
+import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import {
   buildDefaultStoreWelcomeCouponCampaign,
   getStoreWelcomeCouponEffectiveStatus,
@@ -768,7 +769,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || !['pedidos', 'cupones', 'recompensas'].includes(section)) {
+    if (!isStoreMode || !['pedidos', 'cupones', 'recompensas', 'clientes'].includes(section)) {
       return undefined;
     }
 
@@ -837,7 +838,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
   useEffect(() => {
     if (
-      (isStoreMode && !['cupones', 'recompensas'].includes(section)) ||
+      (isStoreMode && !['cupones', 'recompensas', 'clientes'].includes(section)) ||
       (!isStoreMode && usersTab !== 'clientes')
     ) {
       return undefined;
@@ -2232,6 +2233,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Cupones',
           title: 'Cupones',
         },
+        clientes: {
+          path: 'Admintv / Tienda Virtual / Clientes',
+          title: 'Clientes de tienda virtual',
+        },
         recompensas: {
           path: 'Admintv / Tienda Virtual / Programa de Recompensas',
           title: 'Club San Martin Granada',
@@ -2580,6 +2585,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('cupones')}
             >
               Cupones
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'clientes' ? 'active' : ''}`}
+              onClick={() => setSection('clientes')}
+            >
+              Clientes
             </button>
             <button
               type="button"
@@ -3134,6 +3146,11 @@ export default function ConfiguracionView({ mode = 'users' }) {
             editCoupon={editCoupon}
             toggleCoupon={toggleCoupon}
             resetCouponForm={() => setCouponForm(emptyCoupon)}
+          />
+        ) : isStoreMode && section === 'clientes' ? (
+          <StoreCustomersAdminSection
+            storeUsers={storeUsers}
+            storeOrders={storeOrders}
           />
         ) : (
           <UsersManager
@@ -6477,13 +6494,6 @@ function UsersManager({
           </button>
           <button
             type="button"
-            className={`cfg-tab ${usersTab === 'clientes' ? 'active' : ''}`}
-            onClick={() => setUsersTab('clientes')}
-          >
-            Clientes
-          </button>
-          <button
-            type="button"
             className={`cfg-tab ${usersTab === 'entregadores' ? 'active' : ''}`}
             onClick={() => setUsersTab('entregadores')}
           >
@@ -6529,8 +6539,8 @@ function UsersManager({
               fontWeight: 700,
             }}
           >
-            En esta etapa dejamos listo el modulo administrativo separado. El cambio de contrasena solicitado
-            esta disponible en la pestana Clientes.
+            En esta etapa dejamos listo el modulo administrativo separado. El control completo de clientes
+            ahora se gestiona dentro de Tienda Virtual, en su propia pestana Clientes.
           </div>
         </div>
       ) : usersTab === 'cocina' ? (
