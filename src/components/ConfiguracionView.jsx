@@ -55,6 +55,16 @@ import {
   updateStoreProductPromotion,
 } from '../services/storeProductPromotions';
 import {
+  cleanupExpiredStorePopupAds,
+  deleteStorePopupAd,
+  getStorePopupAdStatus,
+  mergeStorePopupAds,
+  saveStorePopupAd,
+  seedDefaultStorePopupAdsIfEmpty,
+  STORE_POPUP_ADS_PATH,
+  updateStorePopupAd,
+} from '../services/storePopupAds';
+import {
   DEFAULT_STORE_DELIVERY_SETTINGS,
   buildStoreOperationScheduleSummary,
   getStoreDeliveryFeeRows,
@@ -109,6 +119,8 @@ import {
   STORE_CATEGORIES_CACHE_VERSION,
   STORE_COUPONS_CACHE_KEY,
   STORE_COUPONS_CACHE_VERSION,
+  STORE_POPUP_ADS_CACHE_KEY,
+  STORE_POPUP_ADS_CACHE_VERSION,
   STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
   STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
   STORE_PROMOTIONS_CACHE_KEY,
@@ -206,6 +218,17 @@ const emptyProductPromotion = {
   productCodes: [],
   active: true,
   sortOrder: '',
+  startsAt: '',
+  endsAt: '',
+};
+
+const emptyPopupAd = {
+  id: '',
+  title: '',
+  image: '',
+  active: true,
+  sortOrder: '',
+  maxViewsPerUser: '2',
   startsAt: '',
   endsAt: '',
 };
@@ -316,6 +339,19 @@ const getPromotionStatusLabel = (promotion) => {
       return 'Inactiva';
     default:
       return 'Activa';
+  }
+};
+
+const getPopupAdStatusLabel = (popupAd) => {
+  switch (getStorePopupAdStatus(popupAd)) {
+    case 'scheduled':
+      return 'Programado';
+    case 'expired':
+      return 'Vencido';
+    case 'inactive':
+      return 'Inactivo';
+    default:
+      return 'Activo';
   }
 };
 
@@ -497,6 +533,14 @@ export default function ConfiguracionView({ mode = 'users' }) {
       []
     )
   );
+  const [popupAds, setPopupAds] = useState(() =>
+    getInitialConfigCollection(
+      STORE_POPUP_ADS_CACHE_KEY,
+      STORE_POPUP_ADS_CACHE_VERSION,
+      (value) => mergeStorePopupAds(value, { includeDefaults: true }),
+      mergeStorePopupAds({}, { includeDefaults: true })
+    )
+  );
   const [drivers, setDrivers] = useState(() => mergeDrivers());
   const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
   const [storeUsers, setStoreUsers] = useState([]);
@@ -506,6 +550,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [couponForm, setCouponForm] = useState(emptyCoupon);
   const [promotionForm, setPromotionForm] = useState(emptyPromotion);
   const [productPromotionForm, setProductPromotionForm] = useState(emptyProductPromotion);
+  const [popupAdForm, setPopupAdForm] = useState(emptyPopupAd);
   const [driverForm, setDriverForm] = useState(emptyDriver);
   const [kitchenForm, setKitchenForm] = useState(emptyKitchenForm);
   const [deliverySettings, setDeliverySettings] = useState(() =>
@@ -524,6 +569,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [savingCoupon, setSavingCoupon] = useState(false);
   const [savingPromotion, setSavingPromotion] = useState(false);
   const [savingProductPromotion, setSavingProductPromotion] = useState(false);
+  const [savingPopupAd, setSavingPopupAd] = useState(false);
   const [savingDriver, setSavingDriver] = useState(false);
   const [savingKitchen, setSavingKitchen] = useState(false);
   const [savingDeliverySettings, setSavingDeliverySettings] = useState(false);
@@ -531,6 +577,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [savingPasswordKey, setSavingPasswordKey] = useState('');
   const [cleaningPromotions, setCleaningPromotions] = useState(false);
   const [cleaningProductPromotions, setCleaningProductPromotions] = useState(false);
+  const [cleaningPopupAds, setCleaningPopupAds] = useState(false);
   const [syncingSicar, setSyncingSicar] = useState(false);
   const [syncingSicarPrices, setSyncingSicarPrices] = useState(false);
   const [syncingSicarRecentSold, setSyncingSicarRecentSold] = useState(false);
@@ -668,6 +715,34 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
     cleanupExpiredStoreProductPromotions().catch((error) => {
       console.error('No se pudieron limpiar las promociones especiales vencidas:', error);
+    });
+
+    return () => unsubscribe();
+  }, [isStoreMode, section]);
+
+  useEffect(() => {
+    if (!isStoreMode || section !== 'popup_ads') {
+      return undefined;
+    }
+
+    const unsubscribe = onValue(ref(database, STORE_POPUP_ADS_PATH), (snapshot) => {
+      const remotePopupAds = snapshot.val() || {};
+      writeStoreVersionedCache(
+        STORE_POPUP_ADS_CACHE_KEY,
+        STORE_POPUP_ADS_CACHE_VERSION,
+        remotePopupAds
+      );
+      startTransition(() => {
+        setPopupAds(mergeStorePopupAds(remotePopupAds, { includeDefaults: true }));
+      });
+    });
+
+    seedDefaultStorePopupAdsIfEmpty().catch((error) => {
+      console.error('No se pudieron inicializar los anuncios popup base:', error);
+    });
+
+    cleanupExpiredStorePopupAds().catch((error) => {
+      console.error('No se pudieron limpiar los anuncios popup vencidos:', error);
     });
 
     return () => unsubscribe();
@@ -916,6 +991,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }));
   };
 
+  const updatePopupAdForm = (field, value) => {
+    setPopupAdForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const updateDriverForm = (field, value) => {
     setDriverForm((current) => ({
       ...current,
@@ -1052,6 +1134,19 @@ export default function ConfiguracionView({ mode = 'users' }) {
     });
   };
 
+  const editPopupAd = (popupAd) => {
+    setPopupAdForm({
+      id: popupAd.id || '',
+      title: popupAd.title || '',
+      image: popupAd.image || '',
+      active: popupAd.active !== false,
+      sortOrder: popupAd.sortOrder ?? '',
+      maxViewsPerUser: String(popupAd.maxViewsPerUser ?? 2),
+      startsAt: toDateTimeInputValue(popupAd.startsAt),
+      endsAt: toDateTimeInputValue(popupAd.endsAt),
+    });
+  };
+
   const editDriver = (driver) => {
     setDriverForm({
       code: driver.code || '',
@@ -1153,6 +1248,30 @@ export default function ConfiguracionView({ mode = 'users' }) {
     };
     reader.onerror = () => {
       setMessage('No se pudo leer la historia seleccionada.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePopupAdImageFile = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const source = String(reader.result || '');
+      if (!source) {
+        setMessage('No se pudo leer la imagen del anuncio popup.');
+        return;
+      }
+
+      updatePopupAdForm('image', source);
+      setMessage('Imagen popup cargada. Guarda para publicarla.');
+    };
+    reader.onerror = () => {
+      setMessage('No se pudo leer la imagen del anuncio popup.');
     };
     reader.readAsDataURL(file);
   };
@@ -1400,6 +1519,54 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const savePopupAd = async (event) => {
+    event.preventDefault();
+    const startsAt = normalizeDateTimeInputValue(popupAdForm.startsAt);
+    const endsAt = normalizeDateTimeInputValue(popupAdForm.endsAt);
+
+    if (popupAdForm.startsAt && !startsAt) {
+      setMessage('La fecha inicial del popup no es valida.');
+      return;
+    }
+
+    if (popupAdForm.endsAt && !endsAt) {
+      setMessage('La fecha final del popup no es valida.');
+      return;
+    }
+
+    if (startsAt && endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      setMessage('La vigencia final del popup debe ser posterior a la inicial.');
+      return;
+    }
+
+    setSavingPopupAd(true);
+    setMessage('');
+
+    try {
+      const existingPopupAd = popupAds.find((popupAd) => popupAd.id === popupAdForm.id) || null;
+      await saveStorePopupAd(
+        {
+          id: popupAdForm.id,
+          title: popupAdForm.title,
+          image: popupAdForm.image,
+          active: popupAdForm.active,
+          sortOrder: popupAdForm.sortOrder === '' ? popupAds.length * 10 : Number(popupAdForm.sortOrder || 0),
+          maxViewsPerUser: Math.max(1, Math.trunc(Number(popupAdForm.maxViewsPerUser || 2))),
+          startsAt,
+          endsAt,
+        },
+        existingPopupAd
+      );
+      setPopupAdForm(emptyPopupAd);
+      setMessage('Anuncio popup guardado.');
+    } catch (error) {
+      console.error('Error guardando anuncio popup:', error);
+      setMessage(error?.message || 'No se pudo guardar el anuncio popup.');
+    } finally {
+      setSavingPopupAd(false);
+    }
+  };
+
   const saveDeliveryDriver = async (event) => {
     event.preventDefault();
     setSavingDriver(true);
@@ -1516,6 +1683,16 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const togglePopupAd = async (popupAd) => {
+    try {
+      await updateStorePopupAd(popupAd.id, { active: popupAd.active === false });
+      setMessage('Anuncio popup actualizado.');
+    } catch (error) {
+      console.error('No se pudo actualizar el anuncio popup:', error);
+      setMessage('No se pudo actualizar el anuncio popup.');
+    }
+  };
+
   const removePromotion = async (promotion) => {
     const confirmed =
       typeof window === 'undefined' ||
@@ -1548,6 +1725,23 @@ export default function ConfiguracionView({ mode = 'users' }) {
     } catch (error) {
       console.error('No se pudo eliminar la promocion especial:', error);
       setMessage('No se pudo eliminar la promocion especial.');
+    }
+  };
+
+  const removePopupAd = async (popupAd) => {
+    const confirmed =
+      typeof window === 'undefined' ||
+      window.confirm(`Se borrara el anuncio popup "${popupAd.title || popupAd.id}". Continuar?`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteStorePopupAd(popupAd.id);
+      setMessage('Anuncio popup eliminado.');
+    } catch (error) {
+      console.error('No se pudo eliminar el anuncio popup:', error);
+      setMessage('No se pudo eliminar el anuncio popup.');
     }
   };
 
@@ -1586,6 +1780,25 @@ export default function ConfiguracionView({ mode = 'users' }) {
       setMessage('No se pudieron limpiar las promociones especiales vencidas.');
     } finally {
       setCleaningProductPromotions(false);
+    }
+  };
+
+  const clearExpiredPopupAds = async () => {
+    setCleaningPopupAds(true);
+    setMessage('');
+
+    try {
+      const removedCount = await cleanupExpiredStorePopupAds();
+      setMessage(
+        removedCount > 0
+          ? `Se eliminaron ${removedCount} anuncios popup vencidos.`
+          : 'No habia anuncios popup vencidos para eliminar.'
+      );
+    } catch (error) {
+      console.error('No se pudieron limpiar los anuncios popup vencidos:', error);
+      setMessage('No se pudieron limpiar los anuncios popup vencidos.');
+    } finally {
+      setCleaningPopupAds(false);
     }
   };
 
@@ -2039,6 +2252,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Promociones especiales',
           title: 'Promociones especiales',
         },
+        popup_ads: {
+          path: 'Admintv / Tienda Virtual / Anuncios popup',
+          title: 'Anuncios popup',
+        },
       }[section] || {
         path: 'Admintv / Tienda Virtual',
         title: 'Tienda Virtual',
@@ -2398,6 +2615,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('promos_tienda')}
             >
               Promos tienda
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'popup_ads' ? 'active' : ''}`}
+              onClick={() => setSection('popup_ads')}
+            >
+              Popup ads
             </button>
           </div>
         )}
@@ -2875,6 +3099,21 @@ export default function ConfiguracionView({ mode = 'users' }) {
             removePromotion={removeProductPromotion}
             clearExpiredPromotions={clearExpiredProductPromotions}
             resetPromotionForm={() => setProductPromotionForm(emptyProductPromotion)}
+          />
+        ) : isStoreMode && section === 'popup_ads' ? (
+          <PopupAdsManager
+            popupAds={popupAds}
+            popupAdForm={popupAdForm}
+            savingPopupAd={savingPopupAd}
+            cleaningPopupAds={cleaningPopupAds}
+            updatePopupAdForm={updatePopupAdForm}
+            savePopupAd={savePopupAd}
+            editPopupAd={editPopupAd}
+            togglePopupAd={togglePopupAd}
+            removePopupAd={removePopupAd}
+            handlePopupAdImageFile={handlePopupAdImageFile}
+            clearExpiredPopupAds={clearExpiredPopupAds}
+            resetPopupAdForm={() => setPopupAdForm(emptyPopupAd)}
           />
         ) : isStoreMode && section === 'cupones' ? (
           <CouponsManager
@@ -5104,6 +5343,260 @@ function ProductPromotionsManager({
           </button>
           <button type="button" className="cfg-button secondary" onClick={resetPromotionForm}>
             Nueva
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function PopupAdsManager({
+  popupAds,
+  popupAdForm,
+  savingPopupAd,
+  cleaningPopupAds,
+  updatePopupAdForm,
+  savePopupAd,
+  editPopupAd,
+  togglePopupAd,
+  removePopupAd,
+  handlePopupAdImageFile,
+  clearExpiredPopupAds,
+  resetPopupAdForm,
+}) {
+  const activeCount = popupAds.filter((popupAd) => getStorePopupAdStatus(popupAd) === 'active').length;
+  const expiredCount = popupAds.filter((popupAd) => getStorePopupAdStatus(popupAd) === 'expired').length;
+
+  return (
+    <div
+      className="cfg-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1.2fr) minmax(360px, 0.8fr)',
+        gap: 18,
+        marginTop: 18,
+        alignItems: 'start',
+      }}
+    >
+      <section
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22 }}>Anuncios popup</h2>
+            <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700, lineHeight: 1.5 }}>
+              Solo un popup puede estar activo a la vez. Si el cliente tiene su popup de cupon vigente, este anuncio no se le mostrara.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'start' }}>
+            <span className="cfg-badge">{activeCount} activo</span>
+            <span className={`cfg-badge ${expiredCount > 0 ? 'off' : ''}`}>{expiredCount} vencidos</span>
+            <button
+              type="button"
+              className="cfg-button secondary"
+              onClick={clearExpiredPopupAds}
+              disabled={cleaningPopupAds}
+            >
+              {cleaningPopupAds ? 'Limpiando...' : 'Borrar vencidos'}
+            </button>
+          </div>
+        </div>
+
+        {popupAds.length === 0 ? (
+          <div
+            style={{
+              padding: 28,
+              border: '1px dashed #cbd5e1',
+              borderRadius: 8,
+              color: '#64748b',
+              textAlign: 'center',
+              fontWeight: 800,
+            }}
+          >
+            No hay anuncios popup cargados todavia.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {popupAds.map((popupAd) => {
+              const status = getStorePopupAdStatus(popupAd);
+              const statusClass = status === 'active' ? '' : 'off';
+
+              return (
+                <div
+                  key={popupAd.id}
+                  style={{
+                    border: '1px solid #edf2f7',
+                    borderRadius: 12,
+                    padding: 12,
+                    display: 'grid',
+                    gridTemplateColumns: '120px minmax(0, 1fr) auto',
+                    gap: 12,
+                    alignItems: 'center',
+                  }}
+                >
+                  <img
+                    src={popupAd.image || '/tienda/branding/logo.png'}
+                    alt={popupAd.title}
+                    style={{
+                      width: '120px',
+                      height: '160px',
+                      objectFit: 'cover',
+                      borderRadius: 16,
+                      border: '1px solid #e2e8f0',
+                      background: '#f8fafc',
+                    }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: 18 }}>{popupAd.title}</strong>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                      <span className={`cfg-badge ${statusClass}`}>{getPopupAdStatusLabel(popupAd)}</span>
+                      <span className={`cfg-badge ${popupAd.active === false ? 'off' : ''}`}>
+                        {popupAd.active === false ? 'Apagado' : 'Visible'}
+                      </span>
+                      <span className="cfg-badge">{Math.max(1, Number(popupAd.maxViewsPerUser || 1))} vistas</span>
+                    </div>
+                    <div style={{ color: '#64748b', marginTop: 8, fontSize: 13, lineHeight: 1.6 }}>
+                      <div>Inicio: {popupAd.startsAt ? formatAdminDateTime(popupAd.startsAt) : 'Inmediato'}</div>
+                      <div>Finaliza: {popupAd.endsAt ? formatAdminDateTime(popupAd.endsAt) : 'Sin vencimiento'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className="cfg-button secondary" onClick={() => editPopupAd(popupAd)}>
+                      Editar
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => togglePopupAd(popupAd)}>
+                      {popupAd.active === false ? 'Activar' : 'Desactivar'}
+                    </button>
+                    <button type="button" className="cfg-button secondary" onClick={() => removePopupAd(popupAd)}>
+                      Borrar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <form
+        onSubmit={savePopupAd}
+        style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 8,
+          padding: 16,
+          display: 'grid',
+          gap: 10,
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 22 }}>Anuncio popup</h2>
+        <input
+          className="cfg-input"
+          value={popupAdForm.title}
+          onChange={(event) => updatePopupAdForm('title', event.target.value)}
+          placeholder="Titulo interno del anuncio"
+        />
+        <input
+          className="cfg-input"
+          value={popupAdForm.image}
+          onChange={(event) => updatePopupAdForm('image', event.target.value)}
+          placeholder="URL de la imagen o imagen cargada"
+        />
+        <input className="cfg-input" type="file" accept="image/*" onChange={handlePopupAdImageFile} />
+        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
+          Se mostrara maximo las veces configuradas por cliente o por navegador. Si lo activas, los otros popups quedaran apagados automaticamente.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <select
+            className="cfg-select"
+            value={popupAdForm.active ? 'activo' : 'inactivo'}
+            onChange={(event) => updatePopupAdForm('active', event.target.value === 'activo')}
+          >
+            <option value="activo">Visible</option>
+            <option value="inactivo">Oculto</option>
+          </select>
+          <input
+            className="cfg-input"
+            type="number"
+            min="1"
+            step="1"
+            value={popupAdForm.maxViewsPerUser}
+            onChange={(event) => updatePopupAdForm('maxViewsPerUser', event.target.value)}
+            placeholder="Veces por cliente"
+          />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <input
+            className="cfg-input"
+            type="number"
+            min="0"
+            step="1"
+            value={popupAdForm.sortOrder}
+            onChange={(event) => updatePopupAdForm('sortOrder', event.target.value)}
+            placeholder="Orden"
+          />
+          <div
+            style={{
+              alignSelf: 'stretch',
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: 12,
+              border: '1px dashed #cbd5e1',
+              color: '#475569',
+              fontWeight: 800,
+              fontSize: 13,
+              textAlign: 'center',
+              padding: '10px 12px',
+            }}
+          >
+            Solo una activa a la vez
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Inicio de vigencia</span>
+            <input
+              className="cfg-input"
+              type="datetime-local"
+              value={popupAdForm.startsAt}
+              onChange={(event) => updatePopupAdForm('startsAt', event.target.value)}
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Final de vigencia</span>
+            <input
+              className="cfg-input"
+              type="datetime-local"
+              value={popupAdForm.endsAt}
+              onChange={(event) => updatePopupAdForm('endsAt', event.target.value)}
+            />
+          </label>
+        </div>
+        {popupAdForm.image && (
+          <img
+            src={popupAdForm.image}
+            alt="Vista previa de popup"
+            style={{
+              width: '100%',
+              maxHeight: 420,
+              objectFit: 'contain',
+              background: '#f1f5f9',
+              borderRadius: 14,
+              border: '1px solid #e2e8f0',
+            }}
+          />
+        )}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="submit" className="cfg-button" disabled={savingPopupAd}>
+            {savingPopupAd ? 'Guardando...' : 'Guardar popup'}
+          </button>
+          <button type="button" className="cfg-button secondary" onClick={resetPopupAdForm}>
+            Nuevo
           </button>
         </div>
       </form>

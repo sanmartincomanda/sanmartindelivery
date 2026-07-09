@@ -48,6 +48,8 @@ import {
   STORE_CATEGORIES_CACHE_VERSION,
   STORE_COUPONS_CACHE_KEY,
   STORE_COUPONS_CACHE_VERSION,
+  STORE_POPUP_ADS_CACHE_KEY,
+  STORE_POPUP_ADS_CACHE_VERSION,
   STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
   STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
   STORE_PROMOTIONS_CACHE_KEY,
@@ -84,6 +86,11 @@ import {
   STORE_WELCOME_COUPON_AMOUNT,
   STORE_WELCOME_COUPON_MINIMUM,
 } from '../services/storeWelcomeCoupon';
+import {
+  isStorePopupAdVisible,
+  mergeStorePopupAds,
+  STORE_POPUP_ADS_PATH,
+} from '../services/storePopupAds';
 import {
   cleanStorePhone,
   completeGoogleStoreUserProfile,
@@ -125,6 +132,7 @@ const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
 const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_SESSION_KEY = 'sanmartin_store_user';
+const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
 const STORE_ORDER_UPDATE_ACK_KEY = 'sanmartin_store_order_update_ack';
 const STORE_WHATSAPP_NUMBER = '50584657949';
 const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248', '00249']);
@@ -505,6 +513,57 @@ const getInitialStoreCollection = (cacheKey, cacheVersion, mergeCollection, fall
   }
 
   return fallbackValue;
+};
+
+const readStorePopupAdViewCounts = () => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(STORE_POPUP_AD_VIEW_COUNT_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (error) {
+    console.error('No se pudo leer el historial local de anuncios popup:', error);
+    return {};
+  }
+};
+
+const writeStorePopupAdViewCounts = (value) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(STORE_POPUP_AD_VIEW_COUNT_KEY, JSON.stringify(value || {}));
+  } catch (error) {
+    console.error('No se pudo guardar el historial local de anuncios popup:', error);
+  }
+};
+
+const getStorePopupViewerKey = (userKey = '') => {
+  const cleanUserKey = String(userKey || '').trim();
+  return cleanUserKey ? `user:${cleanUserKey}` : 'guest';
+};
+
+const getStorePopupAdViewCount = (viewCounts = {}, viewerKey = 'guest', popupAdId = '') =>
+  Math.max(0, Number(viewCounts?.[viewerKey]?.[popupAdId] || 0));
+
+const incrementStorePopupAdViewCount = (currentViewCounts = {}, viewerKey = 'guest', popupAdId = '') => {
+  const cleanPopupAdId = String(popupAdId || '').trim();
+  if (!cleanPopupAdId) {
+    return currentViewCounts;
+  }
+
+  const nextViewerCounts = {
+    ...(currentViewCounts?.[viewerKey] || {}),
+    [cleanPopupAdId]: getStorePopupAdViewCount(currentViewCounts, viewerKey, cleanPopupAdId) + 1,
+  };
+
+  return {
+    ...(currentViewCounts || {}),
+    [viewerKey]: nextViewerCounts,
+  };
 };
 
 const isUnitProduct = (product) => isUnitMeasure(product?.unit);
@@ -1042,11 +1101,22 @@ export default function TiendaVirtualView({
       []
     )
   );
+  const [popupAds, setPopupAds] = useState(() =>
+    getInitialStoreCollection(
+      STORE_POPUP_ADS_CACHE_KEY,
+      STORE_POPUP_ADS_CACHE_VERSION,
+      (value) => mergeStorePopupAds(value, { includeDefaults: true }),
+      mergeStorePopupAds({}, { includeDefaults: true })
+    )
+  );
   const [cart, setCart] = useState({});
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponMessage, setCouponMessage] = useState('');
   const [welcomeCouponOpen, setWelcomeCouponOpen] = useState(false);
+  const [popupAdOpen, setPopupAdOpen] = useState(false);
+  const [openedPopupAdId, setOpenedPopupAdId] = useState('');
+  const [popupAdViewCounts, setPopupAdViewCounts] = useState(() => readStorePopupAdViewCounts());
   const [welcomeCouponActionBusy, setWelcomeCouponActionBusy] = useState(false);
   const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
@@ -1131,6 +1201,7 @@ export default function TiendaVirtualView({
   const quantityNoticeTimeoutRef = useRef(null);
   const autoAppliedCouponRef = useRef('');
   const autoClaimingWelcomeCouponRef = useRef('');
+  const popupAdSessionRef = useRef('');
   const pageTopRef = useRef(null);
   const filtersPanelRef = useRef(null);
 
@@ -1372,6 +1443,35 @@ export default function TiendaVirtualView({
     };
 
     loadPromotions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPopupAds = async () => {
+      try {
+        const snapshot = await get(ref(database, STORE_POPUP_ADS_PATH));
+        const remotePopupAds = snapshot.val() || {};
+        writeStoreVersionedCache(
+          STORE_POPUP_ADS_CACHE_KEY,
+          STORE_POPUP_ADS_CACHE_VERSION,
+          remotePopupAds
+        );
+        if (!cancelled) {
+          startTransition(() => {
+            setPopupAds(mergeStorePopupAds(remotePopupAds, { includeDefaults: true }));
+          });
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar los anuncios popup de tienda:', error);
+      }
+    };
+
+    loadPopupAds();
 
     return () => {
       cancelled = true;
@@ -2144,6 +2244,32 @@ export default function TiendaVirtualView({
     () => promotions.filter((promotion) => isStorePromotionVisible(promotion, currentTimeMs)),
     [currentTimeMs, promotions]
   );
+  const activePopupAds = useMemo(
+    () => popupAds.filter((popupAd) => isStorePopupAdVisible(popupAd, currentTimeMs)),
+    [currentTimeMs, popupAds]
+  );
+  const popupViewerKey = useMemo(
+    () => getStorePopupViewerKey(currentUser?.key),
+    [currentUser?.key]
+  );
+  const hasBlockingWelcomeCoupon = ['available', 'claimed'].includes(welcomeCouponStatus);
+  const popupAdCandidate = useMemo(() => {
+    if (hasBlockingWelcomeCoupon) {
+      return null;
+    }
+
+    return (
+      activePopupAds.find(
+        (popupAd) =>
+          getStorePopupAdViewCount(popupAdViewCounts, popupViewerKey, popupAd.id) <
+          Math.max(1, Number(popupAd.maxViewsPerUser || 1))
+      ) || null
+    );
+  }, [activePopupAds, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey]);
+  const openedPopupAd = useMemo(
+    () => popupAds.find((popupAd) => popupAd.id === openedPopupAdId) || null,
+    [openedPopupAdId, popupAds]
+  );
   const welcomeCouponHeroImage = useMemo(
     () => findWelcomeCouponHeroImage(catalog),
     [catalog]
@@ -2264,6 +2390,59 @@ export default function TiendaVirtualView({
       setWelcomeCouponOpen(false);
     }
   }, [currentUser?.key, welcomeCoupon?.coupon?.code, welcomeCouponStatus]);
+
+  useEffect(() => {
+    if (!popupAdOpen) {
+      return;
+    }
+
+    if (hasBlockingWelcomeCoupon || pendingOrderUpdateReview || orderSuccessOpen) {
+      setPopupAdOpen(false);
+      setOpenedPopupAdId('');
+    }
+  }, [hasBlockingWelcomeCoupon, orderSuccessOpen, pendingOrderUpdateReview, popupAdOpen]);
+
+  useEffect(() => {
+    if (!popupAdCandidate?.id || popupAdOpen || hasBlockingWelcomeCoupon) {
+      return;
+    }
+
+    if (pendingOrderUpdateReview || orderSuccessOpen) {
+      return;
+    }
+
+    const sessionKey = `${popupViewerKey}:${popupAdCandidate.id}`;
+    if (popupAdSessionRef.current === sessionKey) {
+      return;
+    }
+
+    popupAdSessionRef.current = sessionKey;
+    setOpenedPopupAdId(popupAdCandidate.id);
+    setPopupAdOpen(true);
+    setPopupAdViewCounts((current) => {
+      const next = incrementStorePopupAdViewCount(current, popupViewerKey, popupAdCandidate.id);
+      writeStorePopupAdViewCounts(next);
+      return next;
+    });
+  }, [
+    hasBlockingWelcomeCoupon,
+    orderSuccessOpen,
+    pendingOrderUpdateReview,
+    popupAdCandidate?.id,
+    popupAdOpen,
+    popupViewerKey,
+  ]);
+
+  useEffect(() => {
+    if (!popupAdOpen) {
+      return;
+    }
+
+    if (!openedPopupAd || !isStorePopupAdVisible(openedPopupAd, currentTimeMs)) {
+      setPopupAdOpen(false);
+      setOpenedPopupAdId('');
+    }
+  }, [currentTimeMs, openedPopupAd, popupAdOpen]);
 
   useEffect(() => {
     const welcomeCouponCode = normalizeCouponCode(welcomeCouponPersonalCoupon.code);
@@ -3457,6 +3636,7 @@ export default function TiendaVirtualView({
     authSheetOpen ||
     orderSuccessOpen ||
     welcomeCouponOpen ||
+    popupAdOpen ||
     selectedPromotionIndex !== null;
 
   return (
@@ -6730,63 +6910,54 @@ export default function TiendaVirtualView({
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
           ) : activeCategory === 'todos' ? (
             <div className="store-grouped-sections">
-              {groupedAllProductsSections.map((section, sectionIndex) => {
+              {showPromotions && (
+                <PromotionsStrip
+                  promotions={activePromotions}
+                  onOpen={(promotionIndex) => setSelectedPromotionIndex(promotionIndex)}
+                />
+              )}
+              {groupedAllProductsSections.map((section) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = section.products.slice(0, visibleCount);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
                 const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
 
                 return (
-                  <React.Fragment key={section.id}>
-                    <section className="store-product-group">
-                      <div className="store-product-group-head">
-                        <div>
-                          <span className="store-product-group-kicker">{section.kicker}</span>
-                          <h3 className="store-product-group-title">{section.title}</h3>
-                        </div>
-                        <span className="store-product-group-meta">
-                          {visibleProducts.length} de {section.products.length} productos
-                        </span>
+                  <section key={section.id} className="store-product-group">
+                    <div className="store-product-group-head">
+                      <div>
+                        <span className="store-product-group-kicker">{section.kicker}</span>
+                        <h3 className="store-product-group-title">{section.title}</h3>
                       </div>
-                      <div className="store-grid">
-                        {visibleProducts.map((product) => renderStoreProductTile(product))}
+                      <span className="store-product-group-meta">
+                        {visibleProducts.length} de {section.products.length} productos
+                      </span>
+                    </div>
+                    <div className="store-grid">
+                      {visibleProducts.map((product) => renderStoreProductTile(product))}
+                    </div>
+                    {remainingCount > 0 && (
+                      <div className="store-product-group-footer">
+                        <button
+                          type="button"
+                          className="store-button secondary store-product-group-more"
+                          onClick={() =>
+                            setGroupVisibleCounts((current) => ({
+                              ...current,
+                              [section.id]: Math.min(
+                                Number(current[section.id] || STORE_GROUP_PAGE_SIZE) + STORE_GROUP_PAGE_SIZE,
+                                section.products.length
+                              ),
+                            }))
+                          }
+                        >
+                          Mostrar {nextBatchSize} mas
+                        </button>
                       </div>
-                      {remainingCount > 0 && (
-                        <div className="store-product-group-footer">
-                          <button
-                            type="button"
-                            className="store-button secondary store-product-group-more"
-                            onClick={() =>
-                              setGroupVisibleCounts((current) => ({
-                                ...current,
-                                [section.id]: Math.min(
-                                  Number(current[section.id] || STORE_GROUP_PAGE_SIZE) + STORE_GROUP_PAGE_SIZE,
-                                  section.products.length
-                                ),
-                              }))
-                            }
-                          >
-                            Mostrar {nextBatchSize} mas
-                          </button>
-                        </div>
-                      )}
-                    </section>
-
-                    {showPromotions && sectionIndex === 0 && (
-                      <PromotionsStrip
-                        promotions={activePromotions}
-                        onOpen={(promotionIndex) => setSelectedPromotionIndex(promotionIndex)}
-                      />
                     )}
-                  </React.Fragment>
+                  </section>
                 );
               })}
-              {showPromotions && groupedAllProductsSections.length === 0 && (
-                <PromotionsStrip
-                  promotions={activePromotions}
-                  onOpen={(promotionIndex) => setSelectedPromotionIndex(promotionIndex)}
-                />
-              )}
             </div>
           ) : (
             <div className="store-grid">
@@ -7042,9 +7213,95 @@ export default function TiendaVirtualView({
         />
       )}
 
+      {popupAdOpen && openedPopupAd && (
+        <StorePopupAdModal
+          popupAd={openedPopupAd}
+          onClose={() => {
+            setPopupAdOpen(false);
+            setOpenedPopupAdId('');
+          }}
+        />
+      )}
+
       {orderSuccessOpen && <OrderSuccessSheet onClose={dismissOrderSuccess} />}
     </div>
   );
+}
+
+function StorePopupAdModal({ popupAd, onClose }) {
+  if (!popupAd) {
+    return null;
+  }
+
+  const modalContent = (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 88,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 18,
+        background: 'rgba(3, 12, 28, 0.84)',
+        backdropFilter: 'blur(8px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: 'min(460px, 100%)',
+          maxHeight: '92vh',
+          borderRadius: 30,
+          overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 38px 90px rgba(0, 0, 0, 0.4)',
+          background: '#14090d',
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar anuncio"
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            zIndex: 2,
+            width: 42,
+            height: 42,
+            borderRadius: '50%',
+            border: '1px solid rgba(255,255,255,0.18)',
+            background: 'rgba(8, 15, 29, 0.64)',
+            color: '#fff',
+            fontSize: 24,
+            cursor: 'pointer',
+          }}
+        >
+          ×
+        </button>
+        <img
+          src={popupAd.image}
+          alt={popupAd.title || 'Anuncio especial'}
+          style={{
+            display: 'block',
+            width: '100%',
+            maxHeight: '92vh',
+            objectFit: 'contain',
+            background: '#14090d',
+          }}
+        />
+      </div>
+    </div>
+  );
+
+  if (typeof document === 'undefined' || !document.body) {
+    return modalContent;
+  }
+
+  return createPortal(modalContent, document.body);
 }
 
 function WelcomeCouponModal({

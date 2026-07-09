@@ -8,6 +8,8 @@ export const STORE_PROMOTIONS_CACHE_KEY = 'sanmartin_store_promotions_cache_v1';
 export const STORE_PROMOTIONS_CACHE_VERSION = 1;
 export const STORE_PRODUCT_PROMOTIONS_CACHE_KEY = 'sanmartin_store_product_promotions_cache_v1';
 export const STORE_PRODUCT_PROMOTIONS_CACHE_VERSION = 1;
+export const STORE_POPUP_ADS_CACHE_KEY = 'sanmartin_store_popup_ads_cache_v1';
+export const STORE_POPUP_ADS_CACHE_VERSION = 1;
 
 export const readStoreJsonCache = (key) => {
   if (typeof window === 'undefined') {
