@@ -311,6 +311,57 @@ const getStoreGeneralCatalogTailPriority = (product = {}) => {
   return 0;
 };
 
+const STORE_RES_SUBCATEGORY_PRIORITY = [
+  'linea gold',
+  'linea diaria',
+  'linea parrillera',
+  'linea practica y tortas hamburguesa',
+  'linea selecta',
+];
+
+const STORE_RES_SUBCATEGORY_PRIORITY_INDEX = new Map(
+  STORE_RES_SUBCATEGORY_PRIORITY.map((value, index) => [value, index])
+);
+
+const getStoreCategoryDisplayLabel = (category = {}) => {
+  const categoryId = String(category?.id || '').trim().toLowerCase();
+  const label = String(category?.label || '').trim();
+
+  if (categoryId === 'promociones' || normalizeStorePriorityText(label) === 'promociones') {
+    return 'COMBOS';
+  }
+
+  return label;
+};
+
+const orderStoreSubcategories = (categoryId, subcategories = []) => {
+  const list = Array.isArray(subcategories) ? [...subcategories] : [];
+  if (normalizeStorePriorityText(categoryId) !== 'res') {
+    return list;
+  }
+
+  const originalIndexMap = new Map(
+    list.map((subcategory, index) => [normalizeStorePriorityText(subcategory), index])
+  );
+
+  return [...list].sort((left, right) => {
+    const leftKey = normalizeStorePriorityText(left);
+    const rightKey = normalizeStorePriorityText(right);
+    const leftPriority = STORE_RES_SUBCATEGORY_PRIORITY_INDEX.has(leftKey)
+      ? STORE_RES_SUBCATEGORY_PRIORITY_INDEX.get(leftKey)
+      : Number.MAX_SAFE_INTEGER;
+    const rightPriority = STORE_RES_SUBCATEGORY_PRIORITY_INDEX.has(rightKey)
+      ? STORE_RES_SUBCATEGORY_PRIORITY_INDEX.get(rightKey)
+      : Number.MAX_SAFE_INTEGER;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return Number(originalIndexMap.get(leftKey) || 0) - Number(originalIndexMap.get(rightKey) || 0);
+  });
+};
+
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 const formatPromotionPercent = (value) => `${Number(value || 0).toFixed(2).replace(/\.00$/, '')}%`;
 const hasDiscountedStorePrice = (product = {}) =>
@@ -1722,6 +1773,10 @@ export default function TiendaVirtualView({
     () => {
       const orderedCategories = categories
         .filter((category) => category.active !== false)
+        .map((category) => ({
+          ...category,
+          label: getStoreCategoryDisplayLabel(category),
+        }))
         .sort((left, right) => {
           const leftIsPromotions = String(left?.id || '').trim().toLowerCase() === 'promociones';
           const rightIsPromotions = String(right?.id || '').trim().toLowerCase() === 'promociones';
@@ -1774,6 +1829,36 @@ export default function TiendaVirtualView({
     return Array.from(new Set([...officialSubcategories, ...productSubcategories]));
   }, [activeCategory, activeProducts, selectedCategory]);
 
+  const orderedSubcategoryOptions = useMemo(
+    () => orderStoreSubcategories(activeCategory, subcategoryOptions),
+    [activeCategory, subcategoryOptions]
+  );
+
+  useEffect(() => {
+    if (activeCategory === 'todos') {
+      if (activeSubcategory !== 'todas') {
+        setActiveSubcategory('todas');
+      }
+      return;
+    }
+
+    if (orderedSubcategoryOptions.length === 0) {
+      if (activeSubcategory !== 'todas') {
+        setActiveSubcategory('todas');
+      }
+      return;
+    }
+
+    const hasActiveSubcategory = orderedSubcategoryOptions.some(
+      (subcategory) =>
+        normalizeStorePriorityText(subcategory) === normalizeStorePriorityText(activeSubcategory)
+    );
+
+    if (!hasActiveSubcategory || activeSubcategory === 'todas') {
+      setActiveSubcategory(orderedSubcategoryOptions[0]);
+    }
+  }, [activeCategory, activeSubcategory, orderedSubcategoryOptions]);
+
   const categoryProductCounts = useMemo(() => {
     const counts = {};
 
@@ -1810,14 +1895,14 @@ export default function TiendaVirtualView({
 
     const counts = { todas: scopedProducts.length };
 
-    subcategoryOptions.forEach((subcategory) => {
+    orderedSubcategoryOptions.forEach((subcategory) => {
       counts[subcategory] = scopedProducts.filter(
         (product) => String(product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
       ).length;
     });
 
     return counts;
-  }, [activeCategory, activeProducts, subcategoryOptions]);
+  }, [activeCategory, activeProducts, orderedSubcategoryOptions]);
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
@@ -1882,7 +1967,7 @@ export default function TiendaVirtualView({
       .map((promotion) => ({
         id: `promo-${promotion.id}`,
         title: promotion.title,
-        kicker: `Promocion especial · ${formatPromotionPercent(promotion.discountPct)} OFF`,
+        kicker: `COMBO especial · ${formatPromotionPercent(promotion.discountPct)} OFF`,
         subtitle: `${promotion.products.length} productos`,
         products: promotion.products,
       }));
@@ -6863,21 +6948,9 @@ export default function TiendaVirtualView({
               ))}
             </nav>
 
-            {subcategoryOptions.length > 0 && (
+            {orderedSubcategoryOptions.length > 0 && (
               <nav className="store-subtabs">
-                <button
-                  type="button"
-                  className={`store-chip store-filter-chip compact ${
-                    activeSubcategory === 'todas' ? 'active' : ''
-                  }`}
-                  onClick={() => setActiveSubcategory('todas')}
-                >
-                  <span className="store-filter-pill-label">Todas</span>
-                  <span className="store-filter-badge">
-                    {Number(subcategoryProductCounts.todas || 0)}
-                  </span>
-                </button>
-                {subcategoryOptions.map((subcategory) => (
+                {orderedSubcategoryOptions.map((subcategory) => (
                   <button
                     key={subcategory}
                     type="button"
@@ -8316,7 +8389,7 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose }) {
         className="store-story-viewer"
         role="dialog"
         aria-modal="true"
-        aria-label={`Promocion ${activeIndex + 1} de ${promotions.length}`}
+        aria-label={`Combo ${activeIndex + 1} de ${promotions.length}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="store-story-progress" aria-hidden="true">
@@ -8339,7 +8412,7 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose }) {
         <div className="store-story-viewer-head">
           <div className="store-story-viewer-meta">
             <span className="store-story-viewer-count">
-              Historia {activeIndex + 1} / {promotions.length}
+              Combo {activeIndex + 1} / {promotions.length}
             </span>
             <strong>{promotion.title}</strong>
           </div>
@@ -8358,12 +8431,12 @@ function PromotionViewer({ promotions, activeIndex, onChange, onClose }) {
               type="button"
               onClick={goToPrevious}
               disabled={isFirstPromotion}
-              aria-label="Promocion anterior"
+              aria-label="Combo anterior"
             />
             <button
               type="button"
               onClick={goToNext}
-              aria-label={isLastPromotion ? 'Cerrar historias' : 'Siguiente promocion'}
+              aria-label={isLastPromotion ? 'Cerrar historias' : 'Siguiente combo'}
             />
           </div>
         </div>
@@ -9465,7 +9538,7 @@ function PromotionsStrip({ promotions, onOpen }) {
 
   return (
     <section className="store-promo">
-      <h2 className="store-section-title">Promociones activas</h2>
+      <h2 className="store-section-title">COMBOS</h2>
       <div className="store-stories">
         {promotions.map((promotion, index) => (
           <button
