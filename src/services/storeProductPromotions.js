@@ -42,8 +42,19 @@ const normalizePromotionCodes = (value) => {
 
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 
+const pickFirstNonEmptyString = (...values) => {
+  for (const value of values) {
+    const normalized = String(value ?? '').trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return '';
+};
+
 const buildFallbackPromotionTitle = (source = {}, backup = {}) => {
-  const directTitle = String(source.title ?? backup.title ?? '').trim();
+  const directTitle = pickFirstNonEmptyString(source.title, backup.title);
   if (directTitle) {
     return directTitle;
   }
@@ -84,7 +95,8 @@ export const normalizeStoreProductPromotion = (promotion = {}, fallback = {}, in
   const source = promotion || {};
   const backup = fallback || {};
   const title = buildFallbackPromotionTitle(source, backup);
-  const id = normalizePromotionId(source.id ?? backup.id ?? title);
+  const rawId = pickFirstNonEmptyString(source.id, backup.id, title);
+  const id = normalizePromotionId(rawId);
   const productCodes = normalizePromotionCodes(source.productCodes ?? backup.productCodes);
   const discountPct = Math.min(100, Math.max(0, Number(source.discountPct ?? backup.discountPct ?? 0) || 0));
 
