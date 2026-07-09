@@ -187,6 +187,20 @@ const getKitchenQuantityStep = (item = {}) => {
   return String(item?.unidad ?? item?.unit ?? '').trim().toLowerCase() === 'unidad' ? 1 : 0.1;
 };
 
+const buildKitchenCustomerUpdateSignature = (source = {}) =>
+  JSON.stringify({
+    subtotal: Number(source?.subtotalEstimado ?? source?.subtotal ?? 0).toFixed(2),
+    discount: Number(source?.descuentoCupon ?? source?.discount ?? 0).toFixed(2),
+    deliveryFee: Number(source?.deliveryFee ?? 0).toFixed(2),
+    total: Number(source?.total ?? 0).toFixed(2),
+    items: (Array.isArray(source?.items) ? source.items : []).map((item) => ({
+      code: String(item?.codigo ?? item?.code ?? item?.nombre ?? '').trim(),
+      qty: Number(item?.cantidadReal ?? item?.cantidad ?? item?.quantity ?? 0).toFixed(3),
+      price: Number(item?.precioUnitario ?? item?.price ?? 0).toFixed(2),
+      subtotal: Number(item?.subtotal ?? 0).toFixed(2),
+    })),
+  });
+
 const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
   const updatedItems = productItems.map((item) => {
     const actualQuantity = roundKitchenQuantity(getActualStoreQuantity(item));
@@ -210,6 +224,17 @@ const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
   const deliveryFee = Math.max(0, Number(pedido?.deliveryFee || 0));
   const total = Number(Math.max(subtotal - discount + deliveryFee, 0).toFixed(2));
   const nowIso = new Date().toISOString();
+  const nextCustomerSignature = buildKitchenCustomerUpdateSignature({
+    items: updatedItems,
+    subtotalEstimado: subtotal,
+    descuentoCupon: discount,
+    deliveryFee,
+    total,
+  });
+  const currentCustomerSignature = buildKitchenCustomerUpdateSignature(pedido);
+  const customerVisibleChange = nextCustomerSignature !== currentCustomerSignature;
+  const currentCustomerUpdateRevision = String(pedido?.sicarQuote?.customerUpdateRevision || '').trim();
+  const customerUpdateRevision = customerVisibleChange ? nowIso : currentCustomerUpdateRevision;
 
   return {
     items: updatedItems,
@@ -237,6 +262,9 @@ const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
       requestedAt: nowIso,
       requestedBy: 'kitchen',
       lastRequestedByKitchenAt: nowIso,
+      customerUpdateRevision,
+      customerUpdatePending:
+        customerVisibleChange || Boolean(pedido?.sicarQuote?.customerUpdatePending),
     },
   };
 };

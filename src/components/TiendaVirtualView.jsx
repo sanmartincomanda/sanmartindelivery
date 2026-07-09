@@ -952,26 +952,10 @@ const writeStoreOrderUpdateAcknowledgements = (acknowledgements = {}) => {
 };
 
 const getStoreOrderUpdateRevision = (order = {}) => {
-  const explicitRevision = String(
-    order?.sicarQuote?.lastAppliedAt ||
-      order?.totalActualizadoAt ||
-      ''
-  ).trim();
+  const explicitRevision = String(order?.sicarQuote?.customerUpdateRevision || '').trim();
 
   if (explicitRevision) {
     return explicitRevision;
-  }
-
-  if (order?.totalAproximado === false) {
-    return JSON.stringify({
-      total: Number(order?.total || 0).toFixed(2),
-      subtotal: Number(order?.subtotalEstimado || 0).toFixed(2),
-      items: (Array.isArray(order?.items) ? order.items : []).map((item) => ({
-        code: String(item?.codigo || item?.nombre || '').trim(),
-        qty: Number(item?.cantidad || 0).toFixed(2),
-        subtotal: Number(item?.subtotal || 0).toFixed(2),
-      })),
-    });
   }
 
   return '';

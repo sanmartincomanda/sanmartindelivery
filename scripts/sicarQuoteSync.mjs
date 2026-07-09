@@ -179,6 +179,20 @@ const normalizeOrderItems = (items = []) =>
     }))
     .filter((item) => item.code && item.quantity > 0);
 
+const buildCustomerVisibleOrderSignature = (source = {}) =>
+  JSON.stringify({
+    subtotal: roundMoney(source?.subtotalEstimado ?? source?.subtotal ?? 0).toFixed(2),
+    discount: roundMoney(source?.descuentoCupon ?? source?.discount ?? 0).toFixed(2),
+    deliveryFee: roundMoney(source?.deliveryFee ?? 0).toFixed(2),
+    total: roundMoney(source?.total ?? source?.customerTotal ?? 0).toFixed(2),
+    items: (Array.isArray(source?.items) ? source.items : []).map((item) => ({
+      code: normalizeCode(item?.codigo ?? item?.code ?? item?.name ?? item?.nombre ?? ''),
+      qty: roundQuantity(item?.cantidadReal ?? item?.cantidad ?? item?.quantity ?? 0).toFixed(3),
+      price: roundMoney(item?.precioUnitario ?? item?.price ?? 0).toFixed(2),
+      subtotal: roundMoney(item?.subtotal ?? item?.total ?? 0).toFixed(2),
+    })),
+  });
+
 const DELIVERY_SERVICE_CODES_BY_BRACKET = {
   under2km: '00171',
   under35km: '00172',
@@ -1764,6 +1778,18 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         return nextItem;
       });
     const productSubtotal = deriveQuotedProductSubtotal({ ...quote, sicarTotal: grossTotal }, order);
+    const nowIso = new Date().toISOString();
+    const nextCustomerSignature = buildCustomerVisibleOrderSignature({
+      items,
+      subtotalEstimado: productSubtotal,
+      descuentoCupon: customerDiscount,
+      deliveryFee: order.deliveryFee,
+      total: customerTotal,
+    });
+    const currentCustomerSignature = buildCustomerVisibleOrderSignature(order);
+    const customerVisibleChange = nextCustomerSignature !== currentCustomerSignature;
+    const currentCustomerUpdateRevision = String(order?.sicarQuote?.customerUpdateRevision || '').trim();
+    const customerUpdateRevision = customerVisibleChange ? nowIso : currentCustomerUpdateRevision;
 
     return {
       items,
@@ -1785,7 +1811,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       total: customerTotal,
       totalAproximado: false,
       totalActualizadoPorSicar: true,
-      totalActualizadoAt: new Date().toISOString(),
+      totalActualizadoAt: nowIso,
       sicarQuote: {
         status: missingCodes.length > 0 ? 'partial' : 'linked',
         cotId: quote.cotId,
@@ -1800,8 +1826,11 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         grossTotal,
         customerTotal,
         missingCodes,
-        lastSyncedAt: new Date().toISOString(),
-        lastAppliedAt: new Date().toISOString(),
+        lastSyncedAt: nowIso,
+        lastAppliedAt: nowIso,
+        customerUpdateRevision,
+        customerUpdatePending:
+          customerVisibleChange || Boolean(order?.sicarQuote?.customerUpdatePending),
       },
     };
   };
