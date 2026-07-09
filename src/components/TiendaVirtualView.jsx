@@ -30,11 +30,6 @@ import {
   STORE_COUPONS_PATH,
 } from '../services/storeCoupons';
 import {
-  isStorePromotionVisible,
-  mergeStorePromotions,
-  STORE_PROMOTIONS_PATH,
-} from '../services/storePromotions';
-import {
   applyStoreProductPromotionsToCatalog,
   mergeStoreProductPromotions,
   isStoreProductPromotionActive,
@@ -52,8 +47,6 @@ import {
   STORE_POPUP_ADS_CACHE_VERSION,
   STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
   STORE_PRODUCT_PROMOTIONS_CACHE_VERSION,
-  STORE_PROMOTIONS_CACHE_KEY,
-  STORE_PROMOTIONS_CACHE_VERSION,
   unwrapStoreCache,
   writeStoreVersionedCache,
 } from '../services/storeCache';
@@ -160,6 +153,7 @@ const STORE_GROUP_PAGE_SIZE = 5;
 const STORE_CASH_PAYMENT = 'EFECTIVO';
 const STORE_MOBILE_NAV_BREAKPOINT = 820;
 const STORE_MOBILE_SCROLL_OFFSET = 96;
+const STORE_COMBOS_CATEGORY_ID = 'promociones';
 const isDeliveryServiceItem = (item = {}) => {
   const code = String(item?.codigo || item?.code || '').trim();
   const name = String(item?.nombre || item?.name || '').trim().toLowerCase();
@@ -327,11 +321,30 @@ const getStoreCategoryDisplayLabel = (category = {}) => {
   const categoryId = String(category?.id || '').trim().toLowerCase();
   const label = String(category?.label || '').trim();
 
-  if (categoryId === 'promociones' || normalizeStorePriorityText(label) === 'promociones') {
+  if (categoryId === STORE_COMBOS_CATEGORY_ID || normalizeStorePriorityText(label) === 'promociones') {
     return 'COMBOS';
   }
 
   return label;
+};
+
+const isStoreComboProduct = (product = {}) =>
+  normalizeStorePriorityText(product?.category) === STORE_COMBOS_CATEGORY_ID;
+
+const getStoreGroupActionLabel = (section = {}) => {
+  const explicitLabel = String(section?.actionLabel || '').trim();
+  if (explicitLabel) {
+    return explicitLabel;
+  }
+
+  const title = String(section?.title || '').trim();
+  if (!title) {
+    return 'Ver seccion';
+  }
+
+  const titleParts = title.split(/\s[·-]\s/).map((value) => String(value || '').trim()).filter(Boolean);
+  const targetLabel = titleParts.length > 1 ? titleParts[titleParts.length - 1] : title;
+  return `Ver ${targetLabel}`;
 };
 
 const orderStoreSubcategories = (categoryId, subcategories = []) => {
@@ -1136,14 +1149,6 @@ export default function TiendaVirtualView({
       []
     )
   );
-  const [promotions, setPromotions] = useState(() =>
-    getInitialStoreCollection(
-      STORE_PROMOTIONS_CACHE_KEY,
-      STORE_PROMOTIONS_CACHE_VERSION,
-      mergeStorePromotions,
-      mergeStorePromotions()
-    )
-  );
   const [productPromotions, setProductPromotions] = useState(() =>
     getInitialStoreCollection(
       STORE_PRODUCT_PROMOTIONS_CACHE_KEY,
@@ -1176,7 +1181,6 @@ export default function TiendaVirtualView({
   const [activeSubcategory, setActiveSubcategory] = useState('todas');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedProductQuantity, setSelectedProductQuantity] = useState(0);
-  const [selectedPromotionIndex, setSelectedPromotionIndex] = useState(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -1465,35 +1469,6 @@ export default function TiendaVirtualView({
     };
 
     loadCoupons();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadPromotions = async () => {
-      try {
-        const snapshot = await get(ref(database, STORE_PROMOTIONS_PATH));
-        const remotePromotions = snapshot.val() || {};
-        writeStoreVersionedCache(
-          STORE_PROMOTIONS_CACHE_KEY,
-          STORE_PROMOTIONS_CACHE_VERSION,
-          remotePromotions
-        );
-        if (!cancelled) {
-          startTransition(() => {
-            setPromotions(mergeStorePromotions(remotePromotions));
-          });
-        }
-      } catch (error) {
-        console.error('No se pudieron cargar las historias de tienda:', error);
-      }
-    };
-
-    loadPromotions();
 
     return () => {
       cancelled = true;
@@ -1967,7 +1942,7 @@ export default function TiendaVirtualView({
       .map((promotion) => ({
         id: `promo-${promotion.id}`,
         title: promotion.title,
-        kicker: `COMBO especial · ${formatPromotionPercent(promotion.discountPct)} OFF`,
+        kicker: `Promocion especial - ${formatPromotionPercent(promotion.discountPct)} OFF`,
         subtitle: `${promotion.products.length} productos`,
         products: promotion.products,
       }));
@@ -1977,6 +1952,11 @@ export default function TiendaVirtualView({
         section.products.map((product) => String(product.code || '').trim())
       )
     );
+    const comboProducts = filteredProducts.filter((product) => {
+      const productCode = String(product.code || '').trim();
+      return isStoreComboProduct(product) && !promotedProductCodeSet.has(productCode);
+    });
+    const comboProductCodeSet = new Set(comboProducts.map((product) => String(product.code || '').trim()));
 
     const groupedProducts = STORE_ALL_PRODUCTS_PRIORITY_GROUPS.map((group) => ({
       ...group,
@@ -1985,7 +1965,8 @@ export default function TiendaVirtualView({
     const remainingProducts = [];
 
     filteredProducts.forEach((product) => {
-      if (promotedProductCodeSet.has(String(product.code || '').trim())) {
+      const productCode = String(product.code || '').trim();
+      if (promotedProductCodeSet.has(productCode) || comboProductCodeSet.has(productCode)) {
         return;
       }
 
@@ -2014,7 +1995,26 @@ export default function TiendaVirtualView({
         kicker: group.kicker || 'Prioridad tienda',
         subtitle: `${group.products.length} productos`,
         products: group.products,
+        category: group.category,
+        subcategory: group.subcategory,
+        targetCategory: group.category,
+        targetSubcategory: group.subcategory,
       }));
+
+    const comboSection =
+      comboProducts.length > 0
+        ? {
+            id: 'store-home-combos',
+            title: 'COMBOS',
+            kicker: 'Combos de tienda',
+            subtitle: `${comboProducts.length} productos`,
+            products: comboProducts,
+            category: STORE_COMBOS_CATEGORY_ID,
+            targetCategory: STORE_COMBOS_CATEGORY_ID,
+            targetSubcategory: 'todas',
+            actionLabel: 'Ver combos',
+          }
+        : null;
 
     if (remainingProducts.length > 0) {
       regularSections.push({
@@ -2026,7 +2026,7 @@ export default function TiendaVirtualView({
       });
     }
 
-    return [...productPromotionSections, ...regularSections];
+    return [...productPromotionSections, ...(comboSection ? [comboSection] : []), ...regularSections];
   }, [activeCategory, activeProductPromotions, filteredProducts]);
 
   useEffect(() => {
@@ -2325,10 +2325,6 @@ export default function TiendaVirtualView({
     [selectedRewardRedemption?.rewardId, storeRewards]
   );
 
-  const activePromotions = useMemo(
-    () => promotions.filter((promotion) => isStorePromotionVisible(promotion, currentTimeMs)),
-    [currentTimeMs, promotions]
-  );
   const activePopupAds = useMemo(
     () => popupAds.filter((popupAd) => isStorePopupAdVisible(popupAd, currentTimeMs)),
     [currentTimeMs, popupAds]
@@ -2416,11 +2412,6 @@ export default function TiendaVirtualView({
     () => calculateEarnedRewardPoints(discountedProductTotal, rewardSettings),
     [discountedProductTotal, rewardSettings]
   );
-  const showPromotions =
-    deferredQuery.trim().length === 0 &&
-    activeCategory === 'todos' &&
-    activeSubcategory === 'todas' &&
-    activePromotions.length > 0;
 
   useEffect(() => {
     if (!deliverySettingsReady) {
@@ -2437,21 +2428,6 @@ export default function TiendaVirtualView({
       setStoreClosedNoticeDismissed(false);
     }
   }, [deliverySettingsReady, storeClosedNoticeDismissed, storeOperationStatus?.open]);
-
-  useEffect(() => {
-    if (selectedPromotionIndex === null) {
-      return;
-    }
-
-    if (activePromotions.length === 0) {
-      setSelectedPromotionIndex(null);
-      return;
-    }
-
-    if (selectedPromotionIndex >= activePromotions.length) {
-      setSelectedPromotionIndex(activePromotions.length - 1);
-    }
-  }, [activePromotions.length, selectedPromotionIndex]);
 
   const cartCount = cartItems.length;
 
@@ -3272,6 +3248,25 @@ export default function TiendaVirtualView({
     });
   };
 
+  const openStoreGroupCatalog = (section = {}) => {
+    const targetCategory = String(section?.targetCategory || section?.category || '').trim();
+    const targetSubcategory = String(section?.targetSubcategory || section?.subcategory || '').trim();
+
+    if (!targetCategory) {
+      return;
+    }
+
+    setMobileNavSection('categories');
+    setActiveCategory(targetCategory);
+    setActiveSubcategory(targetCategory === 'todos' ? 'todas' : targetSubcategory || 'todas');
+
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        scrollToStoreRef(filtersPanelRef);
+      }, 80);
+    }
+  };
+
   const openCustomerOrders = () => {
     if (!currentUser) {
       openAuthSheet('login', 'orders');
@@ -3739,8 +3734,7 @@ export default function TiendaVirtualView({
     authSheetOpen ||
     orderSuccessOpen ||
     welcomeCouponOpen ||
-    popupAdOpen ||
-    selectedPromotionIndex !== null;
+    popupAdOpen;
 
   return (
     <div className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''}`}>
@@ -4625,6 +4619,20 @@ export default function TiendaVirtualView({
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 0.08em;
+          white-space: nowrap;
+        }
+        .store-product-group-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 10px;
+        }
+        .store-product-group-link {
+          min-height: 40px;
+          padding: 0 18px;
+          border-radius: 999px;
+          font-size: 13px;
+          font-weight: 900;
           white-space: nowrap;
         }
         .store-product-group-footer {
@@ -6595,9 +6603,18 @@ export default function TiendaVirtualView({
           .store-product-group-title {
             font-size: 20px;
           }
+          .store-product-group-actions {
+            align-items: flex-start;
+            width: 100%;
+          }
           .store-product-group-meta {
             font-size: 11px;
             white-space: normal;
+          }
+          .store-product-group-link {
+            width: 100%;
+            min-height: 42px;
+            padding: 0 16px;
           }
           .store-product-group-more {
             width: 100%;
@@ -7001,17 +7018,13 @@ export default function TiendaVirtualView({
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
           ) : activeCategory === 'todos' ? (
             <div className="store-grouped-sections">
-              {showPromotions && (
-                <PromotionsStrip
-                  promotions={activePromotions}
-                  onOpen={(promotionIndex) => setSelectedPromotionIndex(promotionIndex)}
-                />
-              )}
               {groupedAllProductsSections.map((section) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = section.products.slice(0, visibleCount);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
                 const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
+                const actionLabel = getStoreGroupActionLabel(section);
+                const canOpenSection = Boolean(section.targetCategory || section.category);
 
                 return (
                   <section key={section.id} className="store-product-group">
@@ -7020,9 +7033,20 @@ export default function TiendaVirtualView({
                         <span className="store-product-group-kicker">{section.kicker}</span>
                         <h3 className="store-product-group-title">{section.title}</h3>
                       </div>
-                      <span className="store-product-group-meta">
-                        {visibleProducts.length} de {section.products.length} productos
-                      </span>
+                      <div className="store-product-group-actions">
+                        <span className="store-product-group-meta">
+                          {visibleProducts.length} de {section.products.length} productos
+                        </span>
+                        {canOpenSection && (
+                          <button
+                            type="button"
+                            className="store-button secondary store-product-group-link"
+                            onClick={() => openStoreGroupCatalog(section)}
+                          >
+                            {actionLabel}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="store-grid">
                       {visibleProducts.map((product) => renderStoreProductTile(product))}
@@ -7120,15 +7144,6 @@ export default function TiendaVirtualView({
 
             setSelectedProductQuantity(clampQuantity(nextQuantity, selectedProduct));
           }}
-        />
-      )}
-
-      {selectedPromotionIndex !== null && (
-        <PromotionViewer
-          promotions={activePromotions}
-          activeIndex={selectedPromotionIndex}
-          onChange={setSelectedPromotionIndex}
-          onClose={() => setSelectedPromotionIndex(null)}
         />
       )}
 
