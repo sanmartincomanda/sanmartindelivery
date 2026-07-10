@@ -313,6 +313,20 @@ const STORE_RES_SUBCATEGORY_PRIORITY = [
   'linea selecta',
 ];
 
+const STORE_SEARCH_CATEGORY_PRIORITY = [
+  'res',
+  'pollo',
+  STORE_COMBOS_CATEGORY_ID,
+  'cerdo',
+  'congelados',
+  'refrigerados',
+  'abarroteria',
+];
+
+const STORE_SEARCH_CATEGORY_PRIORITY_INDEX = new Map(
+  STORE_SEARCH_CATEGORY_PRIORITY.map((value, index) => [normalizeStorePriorityText(value), index])
+);
+
 const STORE_RES_SUBCATEGORY_PRIORITY_INDEX = new Map(
   STORE_RES_SUBCATEGORY_PRIORITY.map((value, index) => [value, index])
 );
@@ -330,6 +344,15 @@ const getStoreCategoryDisplayLabel = (category = {}) => {
 
 const isStoreComboProduct = (product = {}) =>
   normalizeStorePriorityText(product?.category) === STORE_COMBOS_CATEGORY_ID;
+
+const getStoreSearchCategoryPriority = (product = {}) => {
+  const categoryKey = normalizeStorePriorityText(product?.category);
+  if (STORE_SEARCH_CATEGORY_PRIORITY_INDEX.has(categoryKey)) {
+    return STORE_SEARCH_CATEGORY_PRIORITY_INDEX.get(categoryKey);
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+};
 
 const getStoreGroupActionLabel = (section = {}) => {
   const explicitLabel = String(section?.actionLabel || '').trim();
@@ -1880,7 +1903,8 @@ export default function TiendaVirtualView({
   }, [activeCategory, activeProducts, orderedSubcategoryOptions]);
 
   const filteredProducts = useMemo(() => {
-    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    const normalizedQuery = normalizeStorePriorityText(deferredQuery);
+    const hasActiveSearch = normalizedQuery.length > 0;
 
     const matchingProducts = activeProducts.filter((product) => {
       const matchesCategory =
@@ -1894,11 +1918,17 @@ export default function TiendaVirtualView({
         String(product.subcategory || '').toLowerCase() === activeSubcategory.toLowerCase();
 
       const matchesSearch =
-        !normalizedQuery ||
-        [product.code, product.name, product.description, product.category, product.subcategory]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedQuery);
+        !hasActiveSearch ||
+        normalizeStorePriorityText(
+          [
+            product.code,
+            product.name,
+            product.description,
+            product.category,
+            product.categoryLabel,
+            product.subcategory,
+          ].join(' ')
+        ).includes(normalizedQuery);
 
       return matchesCategory && matchesSubcategory && matchesSearch;
     });
@@ -1908,6 +1938,15 @@ export default function TiendaVirtualView({
     }
 
     return [...matchingProducts].sort((left, right) => {
+      if (hasActiveSearch) {
+        const categoryPriorityDifference =
+          getStoreSearchCategoryPriority(left) - getStoreSearchCategoryPriority(right);
+
+        if (categoryPriorityDifference !== 0) {
+          return categoryPriorityDifference;
+        }
+      }
+
       const priorityDifference =
         getStoreAllProductsPriority(left) - getStoreAllProductsPriority(right);
 
@@ -1925,6 +1964,9 @@ export default function TiendaVirtualView({
       return compareCatalogProducts(left, right);
     });
   }, [activeCategory, activeProducts, activeSubcategory, deferredQuery]);
+
+  const hasActiveStoreSearch = deferredQuery.trim().length > 0;
+  const showSearchResultsAsFlatList = activeCategory === 'todos' && hasActiveStoreSearch;
 
   const groupedAllProductsSections = useMemo(() => {
     if (activeCategory !== 'todos') {
@@ -7016,7 +7058,7 @@ export default function TiendaVirtualView({
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="store-empty">No encontramos productos con esa busqueda.</div>
-          ) : activeCategory === 'todos' ? (
+          ) : activeCategory === 'todos' && !showSearchResultsAsFlatList ? (
             <div className="store-grouped-sections">
               {groupedAllProductsSections.map((section) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
