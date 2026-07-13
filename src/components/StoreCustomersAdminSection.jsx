@@ -165,20 +165,23 @@ const getOrderSummaryByUser = (orders = []) => {
         pickupOrders: 0,
         totalSpent: 0,
         lastOrderAt: 0,
+        lastPurchaseAt: 0,
         firstOrderAt: 0,
         lastOrder: null,
+        lastPurchaseOrder: null,
       });
     }
 
     const bucket = summary.get(userKey);
     const orderTimestamp = Number(order?.timestampIngresoMs || order?.timestamp || 0);
     const amount = resolveOrderAmount(order);
+    const delivered = isDeliveredStatus(order?.estado) && !isCanceledStatus(order?.estado);
 
     bucket.orders.push(order);
     bucket.totalOrders += 1;
-    bucket.totalSpent += amount;
-    if (isDeliveredStatus(order?.estado)) {
+    if (delivered) {
       bucket.deliveredOrders += 1;
+      bucket.totalSpent += amount;
     }
     if (isCanceledStatus(order?.estado)) {
       bucket.canceledOrders += 1;
@@ -192,6 +195,10 @@ const getOrderSummaryByUser = (orders = []) => {
     if (orderTimestamp >= bucket.lastOrderAt) {
       bucket.lastOrderAt = orderTimestamp;
       bucket.lastOrder = order;
+    }
+    if (delivered && orderTimestamp >= bucket.lastPurchaseAt) {
+      bucket.lastPurchaseAt = orderTimestamp;
+      bucket.lastPurchaseOrder = order;
     }
   });
 
@@ -583,7 +590,7 @@ export default function StoreCustomersAdminSection({
                   <MetricCard label="Fecha ingreso" value={formatDateOnly(customer.createdAt)} />
                   <MetricCard
                     label="Ultima compra"
-                    value={customer.orderSummary?.lastOrderAt ? formatDateTime(customer.orderSummary.lastOrderAt) : 'Sin compras'}
+                    value={customer.orderSummary?.lastPurchaseAt ? formatDateTime(customer.orderSummary.lastPurchaseAt) : 'Sin compras'}
                   />
                   <MetricCard label="Pedidos" value={String(customer.orderSummary?.totalOrders || 0)} />
                   <MetricCard label="Venta acumulada" value={formatCurrency(customer.orderSummary?.totalSpent || 0)} />
@@ -664,7 +671,7 @@ export default function StoreCustomersAdminSection({
               <MetricCard label="Fecha de ingreso" value={formatDateTime(selectedCustomer.createdAt)} />
               <MetricCard
                 label="Ultima compra"
-                value={selectedCustomer.orderSummary?.lastOrderAt ? formatDateTime(selectedCustomer.orderSummary.lastOrderAt) : 'Sin compras'}
+                value={selectedCustomer.orderSummary?.lastPurchaseAt ? formatDateTime(selectedCustomer.orderSummary.lastPurchaseAt) : 'Sin compras'}
               />
               <MetricCard label="Pedidos totales" value={String(selectedCustomer.orderSummary?.totalOrders || 0)} />
               <MetricCard label="Pedidos entregados" value={String(selectedCustomer.orderSummary?.deliveredOrders || 0)} />
@@ -672,9 +679,9 @@ export default function StoreCustomersAdminSection({
               <MetricCard
                 label="Ticket promedio"
                 value={formatCurrency(
-                  Number(selectedCustomer.orderSummary?.totalOrders || 0) > 0
+                  Number(selectedCustomer.orderSummary?.deliveredOrders || 0) > 0
                     ? Number(selectedCustomer.orderSummary?.totalSpent || 0) /
-                        Number(selectedCustomer.orderSummary?.totalOrders || 1)
+                        Number(selectedCustomer.orderSummary?.deliveredOrders || 1)
                     : 0
                 )}
               />

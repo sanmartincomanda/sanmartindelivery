@@ -137,6 +137,7 @@ import {
   reverseGeocodeLocation,
   searchLocationCandidates,
 } from '../services/geo';
+import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import {
@@ -151,6 +152,47 @@ import {
 } from '../services/storeWelcomeCoupon';
 
 const COUPONS_PIN = '210397';
+
+const formatDateKeyForBridge = (date = new Date()) => {
+  const baseDate = date instanceof Date ? new Date(date.getTime()) : new Date(date);
+  if (Number.isNaN(baseDate.getTime())) {
+    return '';
+  }
+
+  const year = baseDate.getFullYear();
+  const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+  const day = String(baseDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const mergeStoreOrdersWithArchive = (liveOrders = [], archivedOrders = []) => {
+  const mergedByKey = new Map();
+
+  [...(Array.isArray(archivedOrders) ? archivedOrders : []), ...(Array.isArray(liveOrders) ? liveOrders : [])].forEach(
+    (order = {}) => {
+      const firebaseKey = String(order?.firebaseKey || '').trim();
+      const fallbackKey = [
+        String(order?.fecha || '').trim(),
+        String(order?.id || '').trim(),
+        String(order?.storeUserKey || '').trim(),
+        String(order?.cliente || '').trim(),
+      ]
+        .filter(Boolean)
+        .join('|');
+      const recordKey = firebaseKey || fallbackKey;
+
+      if (!recordKey) {
+        return;
+      }
+
+      const current = mergedByKey.get(recordKey) || {};
+      const prefersLiveRecord = !order?.archivedSource;
+      mergedByKey.set(recordKey, prefersLiveRecord ? { ...current, ...order } : { ...order, ...current });
+    }
+  );
+
+  return Array.from(mergedByKey.values());
+};
 
 const buildSicarFailureMessage = (prefix, error) => {
   const detail = String(error?.message || '').trim();
@@ -775,30 +817,80 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
     setStoreOrdersLoading(true);
     const retentionStartDate = getOrderHistoryRetentionStartDate(new Date());
+    const historyEndDate = formatDateKeyForBridge(new Date());
     const ordersQuery = query(ref(database, 'orders'), orderByChild('fecha'), startAt(retentionStartDate));
+    let cancelled = false;
+    let liveReady = false;
+    let archiveReady = !canUseLocalBridgeHistory();
+    let latestLiveOrders = [];
+    let archivedStoreOrders = [];
+
+    const publishMergedOrders = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const mergedOrders = sortOrdersByDateAndNumberDesc(
+        mergeStoreOrdersWithArchive(latestLiveOrders, archivedStoreOrders)
+      );
+
+      startTransition(() => {
+        setStoreOrders(mergedOrders);
+        if (liveReady && archiveReady) {
+          setStoreOrdersLoading(false);
+        }
+      });
+    };
+
+    const loadArchivedOrders = async () => {
+      if (!canUseLocalBridgeHistory()) {
+        publishMergedOrders();
+        return;
+      }
+
+      try {
+        const nextArchivedOrders = await fetchArchivedOrdersFromBridge(
+          retentionStartDate,
+          historyEndDate
+        );
+        archivedStoreOrders = nextArchivedOrders.filter((order) => order.canal === STORE_CHANNEL);
+      } catch (error) {
+        console.warn('No se pudo cargar el historial archivado de tienda virtual para admin:', error);
+        archivedStoreOrders = [];
+      } finally {
+        archiveReady = true;
+        publishMergedOrders();
+      }
+    };
+
+    loadArchivedOrders();
 
     const unsubscribe = onValue(
       ordersQuery,
       (snapshot) => {
-        const nextOrders = Object.entries(snapshot.val() || {})
+        latestLiveOrders = Object.entries(snapshot.val() || {})
           .map(([firebaseKey, value]) => ({
             firebaseKey,
             ...value,
           }))
           .filter((order) => order.canal === STORE_CHANNEL);
 
-        startTransition(() => {
-          setStoreOrders(sortOrdersByDateAndNumberDesc(nextOrders));
-          setStoreOrdersLoading(false);
-        });
+        liveReady = true;
+        publishMergedOrders();
       },
       (error) => {
         console.error('No se pudieron cargar los pedidos de tienda virtual:', error);
-        setStoreOrdersLoading(false);
+        liveReady = true;
+        if (archiveReady) {
+          setStoreOrdersLoading(false);
+        }
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [isStoreMode, section]);
 
   useEffect(() => {
