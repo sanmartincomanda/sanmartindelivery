@@ -189,8 +189,9 @@ const upsertStoreUserAtAuthUid = async (authUid, sourceValue = {}) => {
   }
 
   const now = Date.now();
+  const { welcomeCoupon: _ignoredWelcomeCoupon, ...sourceProfile } = sourceValue || {};
   const nextValue = {
-    ...(sourceValue || {}),
+    ...sourceProfile,
     authUid: cleanAuthUid,
     updatedAt: now,
     lastLoginAt: now,
@@ -521,7 +522,19 @@ export async function loginStoreUserWithEmail({ email, telefono, password }) {
     lastLoginAt: Date.now(),
   });
 
-  return sanitizeStoreUser(authUserRecord.value, authUserKey);
+  const welcomeCoupon = await resolveWelcomeCouponForStoreUser({
+    userKey: authUserKey,
+    phone: authUserRecord.value?.telefono || cleanPhone,
+    name: authUserRecord.value?.nombre,
+  });
+
+  return sanitizeStoreUser(
+    {
+      ...authUserRecord.value,
+      welcomeCoupon,
+    },
+    authUserKey
+  );
 }
 
 export async function loginStoreUserWithGoogle() {
@@ -560,10 +573,17 @@ export async function loginStoreUserWithGoogle() {
     lastLoginAt: Date.now(),
   });
 
+  const welcomeCoupon = await resolveWelcomeCouponForStoreUser({
+    userKey: authUserKey,
+    phone: user.telefono,
+    name: user.nombre || authUser.displayName,
+  });
+
   return sanitizeStoreUser(
     {
       ...user,
       email: user.email || cleanStoreEmail(authUser.email),
+      welcomeCoupon,
     },
     authUserKey
   );
