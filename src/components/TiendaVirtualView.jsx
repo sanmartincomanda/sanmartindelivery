@@ -5334,6 +5334,24 @@ export default function TiendaVirtualView({
           line-height: 1.08;
           text-wrap: balance;
         }
+        .store-product-sheet-copy {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .store-product-sheet-info {
+          display: grid;
+          gap: 0;
+        }
+        .store-product-sheet-title {
+          margin: 0 0 8px;
+          color: #0f172a;
+          font-size: 30px;
+          line-height: 1.04;
+          font-weight: 950;
+          letter-spacing: -0.03em;
+        }
         .store-detail-grid {
           display: grid;
           grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -5391,6 +5409,12 @@ export default function TiendaVirtualView({
           width: 100%;
           height: 46px;
           font-size: 18px;
+        }
+        .store-product-sheet-footer {
+          margin-top: auto;
+        }
+        .store-product-sheet-selection {
+          margin-bottom: 14px;
         }
         .store-form {
           display: grid;
@@ -6604,12 +6628,12 @@ export default function TiendaVirtualView({
             min-height: 100vh;
             max-height: 100vh;
             border-radius: 0;
-            padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 26px;
+            padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 16px;
           }
           .store-sheet-head.product {
             top: 0;
-            margin: 0 0 14px;
-            padding: 0 0 10px;
+            margin: 0 0 10px;
+            padding: 0 0 8px;
             background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.9) 72%, rgba(255, 255, 255, 0) 100%);
           }
           .store-product-sheet-heading {
@@ -6629,6 +6653,69 @@ export default function TiendaVirtualView({
           }
           .store-back-label {
             display: none;
+          }
+          .store-product-sheet-copy {
+            min-height: 0;
+          }
+          .store-product-sheet-title {
+            margin-bottom: 6px;
+            font-size: clamp(18px, 5.8vw, 24px);
+            line-height: 1.02;
+          }
+          .store-price-sheet .store-price {
+            font-size: 20px !important;
+          }
+          .store-product-sheet-promo {
+            margin-bottom: 6px;
+            font-size: 11px;
+          }
+          .store-detail-image {
+            height: clamp(180px, 27vh, 230px);
+            aspect-ratio: auto;
+            padding: 10px;
+            border-radius: 24px;
+          }
+          .store-detail-image img {
+            object-fit: contain;
+          }
+          .store-qty-row {
+            gap: 7px;
+            margin: 10px 0 10px;
+          }
+          .store-qty-row .store-chip {
+            min-height: 38px;
+            padding: 7px 12px;
+            font-size: 13px;
+          }
+          .store-stepper {
+            grid-template-columns: 44px 1fr 44px;
+            gap: 8px;
+            margin-bottom: 8px;
+          }
+          .store-stepper button,
+          .store-stepper .store-qty-input {
+            height: 42px;
+          }
+          .store-stepper button {
+            font-size: 22px;
+          }
+          .store-stepper .store-qty-input {
+            font-size: 17px;
+          }
+          .store-product-sheet-footer {
+            position: sticky;
+            bottom: calc(env(safe-area-inset-bottom, 0px) * -1);
+            margin-top: 10px;
+            padding-top: 10px;
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.96) 20%, #ffffff 48%);
+          }
+          .store-product-sheet-selection {
+            margin: 0 0 8px;
+            font-size: 11px;
+          }
+          .store-product-sheet-footer .store-button {
+            min-height: 52px;
           }
           .store-product-card {
             padding: 4px 2px 8px;
@@ -8706,8 +8793,9 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
           <div className="store-detail-image">
             <img src={product.image || LOGO_PATH} alt={product.name} />
           </div>
-          <div>
-            <h2 style={{ margin: '0 0 8px', fontSize: 30, lineHeight: 1.04 }}>{product.name}</h2>
+          <div className="store-product-sheet-copy">
+            <div className="store-product-sheet-info">
+            <h2 className="store-product-sheet-title">{product.name}</h2>
             {product.specialPromotion?.title && (
               <div className="store-product-sheet-promo">
                 {product.specialPromotion.title} · {formatPromotionPercent(product.specialPromotion.discountPct)} OFF
@@ -8715,7 +8803,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
             )}
             <div className={`store-price-stack store-price-sheet ${discountedPrice ? 'promo' : ''}`}>
               {discountedPrice && <span className="store-price-old">{formatCurrency(product.originalPrice)}</span>}
-              <p className="store-price" style={{ fontSize: 24, margin: 0 }}>
+              <p className="store-price" style={{ margin: 0 }}>
                 {formatCurrency(product.price)}
               </p>
             </div>
@@ -8767,8 +8855,10 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                 +
               </button>
             </div>
+            </div>
 
-            <p className="store-unit" style={{ marginBottom: 14 }}>
+            <div className="store-product-sheet-footer">
+            <p className="store-unit store-product-sheet-selection">
               {quantity > 0
                 ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} seleccionado`
                 : `Elige la cantidad en ${product.unit}`}
@@ -8787,6 +8877,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                   ? 'Quitar del carrito'
                   : 'Selecciona cantidad para agregar'}
             </button>
+            </div>
           </div>
         </div>
       </div>
