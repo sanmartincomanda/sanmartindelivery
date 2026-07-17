@@ -14,7 +14,10 @@ import {
 import {
   ensureAuthenticatedFirebaseSession,
   getAuthenticatedFirebaseDatabase,
+  refreshAuthenticatedFirebaseSession,
 } from './firebaseScriptAuth.mjs';
+import { buildSicarCustomerTextFields } from './sicarCustomerFields.mjs';
+import { ensureStoreWelcomeCouponForUser } from '../src/services/storeWelcomeCoupon.js';
 
 const CLIENTS_PATH = 'clients';
 const CLIENT_DIRECTORY_PATH = 'clientDirectory';
@@ -24,6 +27,7 @@ const POLL_INTERVAL_MS = 60 * 1000;
 const FULL_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const STORE_USERS_BACKSTOP_SYNC_MS = 60 * 60 * 1000;
 const UPDATE_BATCH_SIZE = 400;
+const ENABLE_STORE_WELCOME_COUPON_SYNC = false;
 
 const normalizeText = (value = '') =>
   String(value ?? '')
@@ -74,6 +78,9 @@ const appendPatchToUpdates = (updates, basePath, patch) => {
     updates[`${basePath}/${field}`] = value;
   });
 };
+
+const isFirebasePermissionDeniedError = (error) =>
+  /permission_denied/i.test(String(error?.message || error || '').trim());
 
 const buildSicarClientFromRow = (line = '') => {
   const parts = String(line || '').split('\t');
@@ -319,6 +326,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     lastStoreUsersProcessed: 0,
     lastStoreUsersCreatedInSicar: 0,
     lastStoreUsersUpdatedInSicar: 0,
+    lastWelcomeCouponsGranted: 0,
     reportFilePath,
   };
 
@@ -336,7 +344,18 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     const batches = splitIntoBatches(entries, UPDATE_BATCH_SIZE);
 
     for (const batch of batches) {
-      await update(ref(database), Object.fromEntries(batch));
+      const payload = Object.fromEntries(batch);
+
+      try {
+        await update(ref(database), payload);
+      } catch (error) {
+        if (!isFirebasePermissionDeniedError(error)) {
+          throw error;
+        }
+
+        await refreshAuthenticatedFirebaseSession();
+        await update(ref(database), payload);
+      }
     }
   };
 
@@ -453,13 +472,17 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
     const address = buildStoreUserFullAddress(storeUser);
     const phone = normalizeText(storeUser.telefono);
     const email = normalizeEmail(storeUser.mail);
+    const customerFields = buildSicarCustomerTextFields({
+      fullAddress: address,
+      commentPrefix: 'Cliente tienda virtual',
+    });
 
     if (!code || !name || !address) {
       return { action: 'skipped', cliId: 0 };
     }
 
     const existing = await getSicarClientByClave(code);
-    const comment = 'Cliente tienda virtual';
+    const comment = customerFields.comentario || 'Cliente tienda virtual';
 
     if (!existing) {
       await runMysqlQuery(`
@@ -490,7 +513,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
           clave
         ) VALUES (
           '${sqlEscape(name)}',
-          '${sqlEscape(address)}',
+          '${sqlEscape(customerFields.domicilio || '-')}',
           '',
           '',
           '',
@@ -526,7 +549,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
 
     const desiredPatch = {
       nombre: name,
-      domicilio: address,
+      domicilio: customerFields.domicilio || '-',
       telefono: phone,
       celular: phone,
       mail: email,
@@ -795,11 +818,52 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
         let processed = 0;
         let createdInSicar = 0;
         let updatedInSicar = 0;
+        let welcomeCouponsGranted = 0;
         let maxUpdatedAt = normalizeNumber(state.lastStoreUserSeenUpdatedAt, 0);
+        const failedUsers = [];
+        const couponErrors = [];
 
         for (const storeUser of storeUsers) {
           maxUpdatedAt = Math.max(maxUpdatedAt, normalizeNumber(storeUser.updatedAt, 0));
-          const syncResult = await upsertStoreUserIntoSicar(storeUser);
+          if (ENABLE_STORE_WELCOME_COUPON_SYNC) {
+            const alreadyHasWelcomeCoupon = Boolean(storeUser?.welcomeCoupon?.coupon?.code);
+
+            try {
+              const welcomeCoupon = await ensureStoreWelcomeCouponForUser({
+                userKey: storeUser.firebaseKey,
+                phone: storeUser.telefono,
+                name: storeUser.nombre,
+                databaseInstance: database,
+              });
+
+              if (!alreadyHasWelcomeCoupon && welcomeCoupon?.coupon?.code) {
+                welcomeCouponsGranted += 1;
+              }
+            } catch (error) {
+              couponErrors.push({
+                firebaseKey: storeUser.firebaseKey,
+                codigo: storeUser.codigo,
+                nombre: storeUser.nombre,
+                error: String(
+                  error?.message || error || 'No se pudo otorgar el cupon de bienvenida.'
+                ).trim(),
+              });
+            }
+          }
+
+          let syncResult = null;
+          try {
+            syncResult = await upsertStoreUserIntoSicar(storeUser);
+          } catch (error) {
+            failedUsers.push({
+              firebaseKey: storeUser.firebaseKey,
+              codigo: storeUser.codigo,
+              nombre: storeUser.nombre,
+              error: String(error?.message || error || 'No se pudo sincronizar el cliente.').trim(),
+            });
+            state.lastError = failedUsers[failedUsers.length - 1].error;
+            continue;
+          }
 
           if (syncResult.action === 'skipped') {
             continue;
@@ -820,6 +884,7 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
         state.lastStoreUsersProcessed = processed;
         state.lastStoreUsersCreatedInSicar = createdInSicar;
         state.lastStoreUsersUpdatedInSicar = updatedInSicar;
+        state.lastWelcomeCouponsGranted = welcomeCouponsGranted;
 
         if (incremental) {
           state.lastStoreUserIncrementalSyncAt = new Date().toISOString();
@@ -834,14 +899,24 @@ export function createSicarClientSyncManager({ runMysqlQuery, repoRoot }) {
           processed,
           createdInSicar,
           updatedInSicar,
+          welcomeCouponsGranted,
+          couponErrorsCount: couponErrors.length,
+          couponErrors,
+          failedUsersCount: failedUsers.length,
+          failedUsers,
           lastStoreUserSeenUpdatedAt: maxUpdatedAt,
         });
 
         return {
-          ok: true,
+          ok: failedUsers.length === 0,
           processed,
           createdInSicar,
           updatedInSicar,
+          welcomeCouponsGranted,
+          couponErrorsCount: couponErrors.length,
+          couponErrors,
+          failedUsersCount: failedUsers.length,
+          failedUsers,
         };
       } catch (error) {
         state.lastError = String(error?.message || error || 'No se pudo sincronizar clientes TV hacia SICAR.');

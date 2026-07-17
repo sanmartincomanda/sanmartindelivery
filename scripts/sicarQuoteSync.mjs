@@ -2,6 +2,7 @@ import { get, onValue, orderByChild, query, ref, startAt, update } from 'firebas
 import {
   ensureAuthenticatedFirebaseSession,
   getAuthenticatedFirebaseDatabase,
+  refreshAuthenticatedFirebaseSession,
 } from './firebaseScriptAuth.mjs';
 import {
   buildStoreRewardRedemptionTextLines,
@@ -38,6 +39,8 @@ const normalizeText = (value = '') =>
 const normalizeCode = (value = '') => String(value ?? '').trim();
 const normalizeEmail = (value = '') => String(value ?? '').trim().toLowerCase();
 const normalizePhone = (value = '') => String(value ?? '').replace(/[^\d+]/g, '').trim();
+const isFirebasePermissionDeniedError = (error) =>
+  /permission_denied/i.test(String(error?.message || error || '').trim());
 const normalizePaymentMethodLabel = (value = '') => {
   const normalized = removeTextAccents(value || '');
 
@@ -436,6 +439,18 @@ const buildQuoteFingerprint = (quote = {}) =>
 
 export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   const database = getAuthenticatedFirebaseDatabase();
+  const updateDatabaseRef = async (targetRef, payload) => {
+    try {
+      await update(targetRef, payload);
+    } catch (error) {
+      if (!isFirebasePermissionDeniedError(error)) {
+        throw error;
+      }
+
+      await refreshAuthenticatedFirebaseSession();
+      await update(targetRef, payload);
+    }
+  };
   const state = {
     listening: false,
     processing: false,
@@ -464,7 +479,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       return;
     }
 
-    await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), patch);
+    await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), patch);
   };
 
   const syncLinkedQuoteWatch = async (orderKey, order = {}, quote = {}, options = {}) => {
@@ -508,7 +523,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       }
     }
 
-    await update(watchRef, patch);
+    await updateDatabaseRef(watchRef, patch);
   };
 
   const seedLinkedQuoteWatchesFromOrders = async () => {
@@ -544,14 +559,14 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     });
 
     if (Object.keys(updates).length > 0) {
-      await update(ref(database), updates);
+      await updateDatabaseRef(ref(database), updates);
     }
   };
 
   const markQueueAsError = async (orderKey, queueEntry = {}, error) => {
     const now = Date.now();
     const errorMessage = String(error?.message || error || 'No se pudo sincronizar la cotizacion con SICAR.').trim();
-    await update(ref(database), {
+    await updateDatabaseRef(ref(database), {
       [`${QUOTE_QUEUE_PATH}/${orderKey}`]: {
         ...queueEntry,
         status: 'error',
@@ -569,7 +584,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
   };
 
   const clearQueueEntry = async (orderKey) => {
-    await update(ref(database), {
+    await updateDatabaseRef(ref(database), {
       [`${QUOTE_QUEUE_PATH}/${orderKey}`]: null,
     });
   };
@@ -896,28 +911,39 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     }
 
     const nowIso = new Date().toISOString();
-    const rootUpdates = {
+    const criticalUpdates = {
       [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/cliId`]: Number(sicarCustomer.cliId || 0),
       [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/clientCode`]: normalizeCode(sicarCustomer.clave),
       [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/clientName`]: normalizeText(sicarCustomer.name),
       [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/customerLinkedAt`]: nowIso,
     };
+    const auxiliaryUpdates = {};
 
     if (order?.storeUserKey) {
-      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
-      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
-      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
-      rootUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarLastSyncedAt`] = nowIso;
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarLastSyncedAt`] = nowIso;
     }
 
     if (order?.clienteFirebaseKey) {
-      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
-      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
-      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
-      rootUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarLastSyncedAt`] = nowIso;
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarLastSyncedAt`] = nowIso;
     }
 
-    await update(ref(database), rootUpdates);
+    await updateDatabaseRef(ref(database), criticalUpdates);
+
+    if (Object.keys(auxiliaryUpdates).length > 0) {
+      try {
+        await updateDatabaseRef(ref(database), auxiliaryUpdates);
+      } catch (error) {
+        if (!isFirebasePermissionDeniedError(error)) {
+          throw error;
+        }
+      }
+    }
   };
 
   const ensureSicarCustomerForOrder = async (orderKey, order = {}) => {
@@ -1900,7 +1926,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
     if (applyToFirebase) {
       const orderPatch = buildFirebaseOrderPatchFromQuote(order, customerQuote, missingCodes, sicarCustomer);
-      await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
+      await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
       await syncLinkedQuoteWatch(orderKey, order, customerQuote, { applyToFirebase: true });
     } else {
       await updateOrderQuoteStatus(orderKey, quoteMetaPatch);
@@ -1947,7 +1973,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
           const order = await getOrderByKey(orderKey);
 
           if (!order || String(order.canal || '').trim() !== STORE_CHANNEL || isFinalStoreStatus(order.estado)) {
-            await update(ref(database), {
+            await updateDatabaseRef(ref(database), {
               [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
             });
             continue;
@@ -1955,7 +1981,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
           const cotId = Number(watchEntry?.cotId || order?.sicarQuote?.cotId || 0);
           if (cotId <= 0) {
-            await update(ref(database), {
+            await updateDatabaseRef(ref(database), {
               [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
             });
             continue;
@@ -1994,7 +2020,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
             ? order.sicarQuote.missingCodes
             : [];
           const orderPatch = buildFirebaseOrderPatchFromQuote(order, quote, missingCodes);
-          await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
+          await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
           await syncLinkedQuoteWatch(orderKey, order, quote, { applyToFirebase: true });
 
           const nowIso = new Date().toISOString();
@@ -2072,7 +2098,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       for (const [orderKey, entry] of queueEntries) {
         try {
           const result = await syncOrderQuote(orderKey, { applyToFirebase: true });
-          await update(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
+          await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
             status: result.missingCodes.length > 0 ? 'partial' : 'synced',
             cotId: result.quote.cotId,
             appOrderNumber: Number(result.appOrderNumber || 0),

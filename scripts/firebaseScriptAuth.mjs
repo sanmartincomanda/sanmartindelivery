@@ -1,5 +1,5 @@
 import { getApps, initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 
 const FIREBASE_CONFIG = {
@@ -43,24 +43,42 @@ const getScriptFirebaseApp = () => {
 
 export const getAuthenticatedFirebaseDatabase = () => getDatabase(getScriptFirebaseApp());
 
-export async function ensureAuthenticatedFirebaseSession() {
+const resolveScriptCredentials = () => {
+  const username = String(process.env.SICAR_FIREBASE_USERNAME || 'admin').trim() || 'admin';
+  const scope = String(process.env.SICAR_FIREBASE_SCOPE || 'admin').trim() || 'admin';
+
+  return {
+    email: String(process.env.SICAR_FIREBASE_EMAIL || buildInternalEmail(username, scope)).trim(),
+    password: resolvePassword(process.env.SICAR_FIREBASE_PASSWORD || 'admin'),
+  };
+};
+
+export async function ensureAuthenticatedFirebaseSession(options = {}) {
   const app = getScriptFirebaseApp();
   const auth = getAuth(app);
+  const forceRefresh = options?.forceRefresh === true;
 
-  if (auth.currentUser) {
-    return auth.currentUser;
+  if (!forceRefresh && auth.currentUser) {
+    try {
+      await auth.currentUser.getIdToken(true);
+      return auth.currentUser;
+    } catch {
+    }
   }
 
   if (authPromise) {
     return authPromise;
   }
 
-  const username = String(process.env.SICAR_FIREBASE_USERNAME || 'admin').trim() || 'admin';
-  const scope = String(process.env.SICAR_FIREBASE_SCOPE || 'admin').trim() || 'admin';
-  const email = String(process.env.SICAR_FIREBASE_EMAIL || buildInternalEmail(username, scope)).trim();
-  const password = resolvePassword(process.env.SICAR_FIREBASE_PASSWORD || 'admin');
+  const { email, password } = resolveScriptCredentials();
 
-  authPromise = signInWithEmailAndPassword(auth, email, password)
+  authPromise = Promise.resolve()
+    .then(async () => {
+      if (forceRefresh && auth.currentUser) {
+        await signOut(auth).catch(() => {});
+      }
+    })
+    .then(() => signInWithEmailAndPassword(auth, email, password))
     .then((credential) => credential.user)
     .catch((error) => {
       authPromise = null;
@@ -68,4 +86,8 @@ export async function ensureAuthenticatedFirebaseSession() {
     });
 
   return authPromise;
+}
+
+export async function refreshAuthenticatedFirebaseSession() {
+  return ensureAuthenticatedFirebaseSession({ forceRefresh: true });
 }
