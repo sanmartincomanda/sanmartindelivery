@@ -625,73 +625,54 @@ export async function reserveStoreRewardPoints({
   }
 
   const reservationId = createRewardReservationId();
-  await ensureStoreRewardAccount(cleanUserKey, { databaseInstance });
+  const currentAccount = normalizeStoreRewardAccount(
+    await ensureStoreRewardAccount(cleanUserKey, { databaseInstance }),
+    cleanUserKey
+  );
   const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
-  let failureCode = '';
-  let failureMessage = '';
+  const balanceBefore = currentAccount.pointsBalance;
 
-  const transactionResult = await runTransaction(accountRef, (currentValue) => {
-    const account = normalizeStoreRewardAccount(currentValue, cleanUserKey);
-    const balanceBefore = account.pointsBalance;
-
-    if (account.holds?.[reservationId]) {
-      return account;
-    }
-
-    if (balanceBefore < hydratedReward.pointsRequired) {
-      failureCode = 'INSUFFICIENT_POINTS';
-      failureMessage = `Te faltan ${hydratedReward.pointsRequired - balanceBefore} puntos para reclamar este premio.`;
-      return;
-    }
-
-    if (roundMoney(cartAmount) < roundMoney(hydratedReward.minPurchaseAmount || 0)) {
-      failureCode = 'MIN_PURCHASE_REQUIRED';
-      failureMessage = `Este premio requiere una compra minima de C$ ${Number(hydratedReward.minPurchaseAmount || 0).toFixed(2)}.`;
-      return;
-    }
-
-    const now = Date.now();
-
-    return {
-      ...account,
-      customerId: cleanUserKey,
-      pointsBalance: Math.max(0, balanceBefore - hydratedReward.pointsRequired),
-      holds: {
-        ...(account.holds || {}),
-        [reservationId]: {
-          rewardId: hydratedReward.id,
-          rewardName: hydratedReward.name,
-          points: hydratedReward.pointsRequired,
-          minPurchaseAmount: roundMoney(hydratedReward.minPurchaseAmount || 0),
-          requestedAt: now,
-        },
-      },
-      pendingReservationId: reservationId,
-      updatedAt: now,
-      createdAt: account.createdAt || now,
-    };
-  });
-
-  if (!transactionResult.committed) {
-    const error = new Error(failureMessage || 'No se pudo reservar el premio.');
-    error.code = failureCode || 'REWARD_RESERVE_FAILED';
+  if (balanceBefore < hydratedReward.pointsRequired) {
+    const error = new Error(
+      `Te faltan ${hydratedReward.pointsRequired - balanceBefore} puntos para reclamar este premio.`
+    );
+    error.code = 'INSUFFICIENT_POINTS';
     throw error;
   }
 
-  const nextAccount = normalizeStoreRewardAccount(transactionResult.snapshot.val(), cleanUserKey);
-  const balanceAfter = nextAccount.pointsBalance;
-  const balanceBefore = balanceAfter + hydratedReward.pointsRequired;
+  if (roundMoney(cartAmount) < roundMoney(hydratedReward.minPurchaseAmount || 0)) {
+    const error = new Error(
+      `Este premio requiere una compra minima de C$ ${Number(hydratedReward.minPurchaseAmount || 0).toFixed(2)}.`
+    );
+    error.code = 'MIN_PURCHASE_REQUIRED';
+    throw error;
+  }
+
+  if (currentAccount.pendingReservationId) {
+    const error = new Error(
+      'Ya hay un premio reservado para un pedido. Espera unos segundos y vuelve a intentarlo.'
+    );
+    error.code = 'REWARD_RESERVATION_PENDING';
+    throw error;
+  }
+
+  const balanceAfter = Math.max(0, balanceBefore - hydratedReward.pointsRequired);
+  const requestedAt = Date.now();
   const rewardSnapshot = buildStoreRewardRedemptionSnapshot(hydratedReward, { ...selection, reservationId }, catalog);
   const transactionKey = getStoreRewardTransactionKey(reservationId);
+  const transactionRef = ref(
+    databaseInstance,
+    `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${transactionKey}`
+  );
 
   await set(
-    ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${transactionKey}`),
+    transactionRef,
     createAccountTransactionRecord({
       customerId: cleanUserKey,
       rewardId: hydratedReward.id,
       rewardName: hydratedReward.name,
       type: STORE_REWARD_TRANSACTION_TYPES.REDEEMED,
-      status: 'reserved',
+      status: 'requested',
       points: hydratedReward.pointsRequired,
       signedPoints: -hydratedReward.pointsRequired,
       balanceBefore,
@@ -699,6 +680,24 @@ export async function reserveStoreRewardPoints({
       note: 'Premio reservado para el siguiente pedido.',
       rewardSnapshot,
     })
+  );
+
+  await update(accountRef, {
+    pendingReservationId: reservationId,
+    pointsBalance: balanceAfter,
+    [`holds/${reservationId}`]: {
+      rewardId: hydratedReward.id,
+      rewardName: hydratedReward.name,
+      points: hydratedReward.pointsRequired,
+      minPurchaseAmount: roundMoney(hydratedReward.minPurchaseAmount || 0),
+      requestedAt,
+    },
+    updatedAt: requestedAt,
+  });
+
+  await set(
+    ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${transactionKey}/status`),
+    'reserved'
   );
 
   return {
