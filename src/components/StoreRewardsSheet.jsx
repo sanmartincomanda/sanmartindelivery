@@ -1277,7 +1277,16 @@ export default function StoreRewardsSheet({
             <div style={getPaneStyle('home')}>
               <div
                 ref={homeScrollRef}
-                style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 14, scrollBehavior: 'auto' }}
+                style={{
+                  height: '100%',
+                  overflowY: 'auto',
+                  display: 'grid',
+                  gridAutoRows: 'max-content',
+                  alignContent: 'start',
+                  gap: 14,
+                  paddingBottom: 4,
+                  scrollBehavior: 'auto',
+                }}
               >
                 <RewardsProgressCard
                   settings={settings}
