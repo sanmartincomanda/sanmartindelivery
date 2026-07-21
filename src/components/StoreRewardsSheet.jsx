@@ -116,128 +116,191 @@ function ClubTransactionsIcon({ size = 22, color = CLUB_THEME.blueDeep }) {
   );
 }
 
-function RewardsProgressCard({ settings, pointsBalance, closestReward }) {
+function ClubTrophyIcon({ size = 22, color = '#ffffff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 4h8v3.5c0 3.1-1.8 5.5-4 5.5s-4-2.4-4-5.5V4z" fill={color} />
+      <path d="M8 6H5v1.5C5 10 6.6 11 9 11M16 6h3v1.5C19 10 17.4 11 15 11M12 13v4M8.5 20h7M9.5 17h5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ClubSparkleIcon({ size = 16, color = '#f7d96b' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 2.8c.7 4.8 2.4 6.5 7.2 7.2-4.8.7-6.5 2.4-7.2 7.2-.7-4.8-2.4-6.5-7.2-7.2 4.8-.7 6.5-2.4 7.2-7.2z" fill={color} />
+      <path d="M19 15.5c.3 2.1 1.1 2.9 3.2 3.2-2.1.3-2.9 1.1-3.2 3.2-.3-2.1-1.1-2.9-3.2-3.2 2.1-.3 2.9-1.1 3.2-3.2z" fill={color} opacity="0.8" />
+    </svg>
+  );
+}
+
+function RewardsProgressCard({ settings, pointsBalance, closestReward, availableReward, onOpenRewards }) {
   void settings;
   const rawTargetPoints = Math.max(0, Number(closestReward?.pointsRequired || 0));
   const targetPoints = Math.max(rawTargetPoints, 1);
   const progressPct = Math.max(0, Math.min(100, Math.round((Number(pointsBalance || 0) / targetPoints) * 100)));
+  const hasUnlockedReward = Boolean(availableReward?.id);
+  const featuredReward = availableReward || closestReward;
 
   return (
     <section
+      className={`sm-rewards-progress-card${hasUnlockedReward ? ' sm-rewards-progress-card--winner' : ''}`}
       style={{
+        position: 'relative',
+        overflow: 'hidden',
         borderRadius: 28,
         padding: 18,
-        background: 'linear-gradient(160deg, #0e4d88 0%, #1d74c7 58%, #5caaf4 100%)',
+        background: hasUnlockedReward
+          ? 'linear-gradient(145deg, #082b51 0%, #0e5fa8 46%, #237fd0 72%, #b98b19 140%)'
+          : 'linear-gradient(160deg, #0e4d88 0%, #1d74c7 58%, #5caaf4 100%)',
         color: '#ffffff',
-        border: `1px solid ${CLUB_THEME.borderStrong}`,
-        boxShadow: `0 24px 50px ${CLUB_THEME.shadow}`,
+        border: hasUnlockedReward ? '1px solid rgba(247, 217, 107, 0.72)' : `1px solid ${CLUB_THEME.borderStrong}`,
+        boxShadow: hasUnlockedReward
+          ? '0 26px 58px rgba(8, 43, 81, 0.28), 0 0 0 1px rgba(247, 217, 107, 0.16)'
+          : `0 24px 50px ${CLUB_THEME.shadow}`,
       }}
     >
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.05, color: '#ffffff' }}>
-          {CLUB_DISPLAY_NAME}
+      {hasUnlockedReward && (
+        <div className="sm-reward-confetti" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
         </div>
-        <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
-          {"\u00A1Acumula puntos para obtener los mejores cortes!"}
-        </div>
-      </div>
+      )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '84px minmax(0, 1fr)',
-          gap: 14,
-          alignItems: 'center',
-        }}
-      >
-        <div
-          style={{
-            width: 84,
-            height: 84,
-            borderRadius: 24,
-            overflow: 'hidden',
-            background: 'rgba(255,255,255,0.18)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          {closestReward?.image ? (
-            <img
-              src={closestReward.image}
-              alt={closestReward.name || CLUB_DISPLAY_NAME}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <ClubSanMartinIcon size={56} />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.05, color: '#ffffff' }}>
+              {CLUB_DISPLAY_NAME}
+            </div>
+            <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
+              {hasUnlockedReward ? 'Tu constancia ya tiene premio.' : "\u00A1Acumula puntos para obtener los mejores cortes!"}
+            </div>
+          </div>
+
+          {hasUnlockedReward && (
+            <div className="sm-reward-winner-pill">
+              <ClubTrophyIcon size={18} />
+              <span>Premio ganado</span>
+              <ClubSparkleIcon size={14} />
+            </div>
           )}
         </div>
 
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.86)', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                Puntos actuales
-              </div>
-              <div style={{ marginTop: 4, fontSize: 34, fontWeight: 900, lineHeight: 1, color: '#ffffff' }}>
-                {Number(pointsBalance || 0)} pts
-              </div>
-            </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '84px minmax(0, 1fr)',
+            gap: 14,
+            alignItems: 'center',
+          }}
+        >
+          <div
+            className={hasUnlockedReward ? 'sm-reward-featured-image sm-reward-featured-image--winner' : 'sm-reward-featured-image'}
+            style={{
+              width: 84,
+              height: 84,
+              borderRadius: 24,
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.18)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
+            {featuredReward?.image ? (
+              <img
+                src={featuredReward.image}
+                alt={featuredReward.name || CLUB_DISPLAY_NAME}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <ClubSanMartinIcon size={56} />
+            )}
+          </div>
 
-            <div
-              style={{
-                padding: '8px 12px',
-                borderRadius: 999,
-                background: 'rgba(255,255,255,0.18)',
-                border: '1px solid rgba(255,255,255,0.16)',
-                fontSize: 13,
-                fontWeight: 900,
-                whiteSpace: 'nowrap',
-                color: '#ffffff',
-              }}
-            >
-              Meta: {rawTargetPoints} pts
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.86)', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Puntos actuales
+                </div>
+                <div style={{ marginTop: 4, fontSize: 34, fontWeight: 900, lineHeight: 1, color: '#ffffff' }}>
+                  {Number(pointsBalance || 0)} pts
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.18)',
+                  border: '1px solid rgba(255,255,255,0.16)',
+                  fontSize: 13,
+                  fontWeight: 900,
+                  whiteSpace: 'nowrap',
+                  color: '#ffffff',
+                }}
+              >
+                Meta: {rawTargetPoints} pts
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div
-        style={{
-          marginTop: 16,
-          display: 'grid',
-          gap: 10,
-        }}
-      >
         <div
           style={{
-            position: 'relative',
-            overflow: 'hidden',
-            height: 18,
-            borderRadius: 999,
-            background: 'rgba(255,255,255,0.16)',
-            border: '1px solid rgba(255,255,255,0.12)',
+            marginTop: 16,
+            display: 'grid',
+            gap: 10,
           }}
         >
           <div
             style={{
-              width: `${progressPct}%`,
-              height: '100%',
+              position: 'relative',
+              overflow: 'hidden',
+              height: 18,
               borderRadius: 999,
-              background: 'linear-gradient(90deg, #9c7a1f 0%, #d4af37 45%, #f0d78a 100%)',
-              boxShadow: '0 10px 22px rgba(212, 175, 55, 0.34)',
-              transition: 'width 180ms ease',
+              background: 'rgba(255,255,255,0.16)',
+              border: '1px solid rgba(255,255,255,0.12)',
             }}
-          />
+          >
+            <div
+              className={hasUnlockedReward ? 'sm-reward-progress-fill sm-reward-progress-fill--winner' : 'sm-reward-progress-fill'}
+              style={{
+                width: `${progressPct}%`,
+                height: '100%',
+                borderRadius: 999,
+                background: 'linear-gradient(90deg, #9c7a1f 0%, #d4af37 45%, #f0d78a 100%)',
+                boxShadow: '0 10px 22px rgba(212, 175, 55, 0.34)',
+                transition: 'width 180ms ease',
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 800, fontSize: 12.5, color: 'rgba(255,255,255,0.92)' }}>
+            <span>{Number(pointsBalance || 0)} pts</span>
+            <span>Meta: {rawTargetPoints} pts</span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 800, fontSize: 12.5, color: 'rgba(255,255,255,0.92)' }}>
-          <span>{Number(pointsBalance || 0)} pts</span>
-          <span>Meta: {rawTargetPoints} pts</span>
-        </div>
+        {hasUnlockedReward && (
+          <button type="button" className="sm-reward-victory-card" onClick={onOpenRewards}>
+            <span className="sm-reward-victory-icon"><ClubTrophyIcon size={24} /></span>
+            <span className="sm-reward-victory-copy">
+              <span className="sm-reward-victory-kicker">¡Lo lograste!</span>
+              <strong>{availableReward.name}</strong>
+              <span>Tu premio está listo para canjear.</span>
+            </span>
+            <span className="sm-reward-victory-action">Ver premio <ClubChevronIcon size={14} color="#082b51" /></span>
+          </button>
+        )}
       </div>
     </section>
   );
@@ -290,19 +353,33 @@ function RewardCard({
 
   return (
     <article
+      className={`sm-reward-detail-card${canRedeem ? ' sm-reward-detail-card--available' : ''}${isSelected ? ' sm-reward-detail-card--selected' : ''}`}
       style={{
+        position: 'relative',
+        overflow: 'hidden',
         display: 'grid',
         gridTemplateColumns: reward.image ? '112px minmax(0, 1fr)' : '1fr',
         gap: 16,
         padding: 18,
         borderRadius: 24,
-        background: CLUB_THEME.panelElevated,
-        border: isSelected ? `2px solid ${CLUB_THEME.borderStrong}` : `1px solid ${CLUB_THEME.border}`,
-        boxShadow: isSelected ? '0 22px 44px rgba(29, 116, 199, 0.16)' : '0 18px 36px rgba(24, 93, 160, 0.12)',
+        background: canRedeem
+          ? 'linear-gradient(135deg, #fffdf4 0%, #ffffff 46%, #eef7ff 100%)'
+          : CLUB_THEME.panelElevated,
+        border: canRedeem
+          ? '2px solid rgba(209, 172, 63, 0.72)'
+          : isSelected
+            ? `2px solid ${CLUB_THEME.borderStrong}`
+            : `1px solid ${CLUB_THEME.border}`,
+        boxShadow: canRedeem
+          ? '0 22px 46px rgba(154, 116, 18, 0.18), 0 0 0 4px rgba(232, 199, 108, 0.1)'
+          : isSelected
+            ? '0 22px 44px rgba(29, 116, 199, 0.16)'
+            : '0 18px 36px rgba(24, 93, 160, 0.12)',
       }}
     >
       {reward.image && (
         <div
+          className={canRedeem ? 'sm-reward-detail-image sm-reward-detail-image--available' : 'sm-reward-detail-image'}
           style={{
             height: 112,
             width: 112,
@@ -322,6 +399,14 @@ function RewardCard({
       )}
 
       <div style={{ display: 'grid', gap: 10 }}>
+        {canRedeem && (
+          <div className="sm-reward-card-unlocked-label">
+            <ClubTrophyIcon size={17} />
+            <span>¡Premio desbloqueado!</span>
+            <ClubSparkleIcon size={14} />
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <strong style={{ display: 'block', fontSize: 21, color: CLUB_THEME.text }}>{reward.name}</strong>
@@ -414,6 +499,7 @@ function RewardCard({
           ) : (
             <button
               type="button"
+              className={canRedeem ? 'sm-reward-redeem-button' : ''}
               disabled={!canRedeem || busy}
               onClick={() => onSelectReward(reward, { choices })}
               style={{
@@ -427,7 +513,8 @@ function RewardCard({
                 boxShadow: canRedeem ? '0 16px 30px rgba(24, 93, 160, 0.22)' : 'none',
               }}
             >
-              {actionLabel}
+              {canRedeem && <ClubTrophyIcon size={18} />}
+              <span>{actionLabel}</span>
             </button>
           )}
         </div>
@@ -480,10 +567,12 @@ export function StoreRewardsSummaryCard({
   onOpen,
   compact = false,
 }) {
-  void settings;
-  void rewards;
-  void cartAmount;
   const pointsBalance = Number(account?.pointsBalance || 0);
+  const summary = useMemo(
+    () => buildCustomerRewardSummary(rewards, pointsBalance, cartAmount, settings),
+    [rewards, pointsBalance, cartAmount, settings]
+  );
+  const hasAvailableReward = Boolean(currentUser && summary.availableRewards.length > 0);
   const compactTitle = compact ? 'Miembro Gold' : CLUB_DISPLAY_NAME;
   const compactSubtitle = 'San Martin Granada';
 
@@ -501,14 +590,23 @@ export function StoreRewardsSummaryCard({
       }}
     >
       <div
+        className={hasAvailableReward ? 'sm-reward-summary-card sm-reward-summary-card--winner' : 'sm-reward-summary-card'}
         style={{
           borderRadius: compact ? 20 : 24,
           padding: compact ? '10px 12px 10px 12px' : '14px 14px 14px 16px',
-          background: selectedReward
+          background: hasAvailableReward
+            ? 'linear-gradient(135deg, #fff8d8 0%, #ffffff 46%, #e8f4ff 100%)'
+            : selectedReward
             ? 'linear-gradient(135deg, rgba(29, 116, 199, 0.14) 0%, rgba(232, 199, 108, 0.18) 100%)'
             : 'linear-gradient(135deg, #ffffff 0%, #eef7ff 100%)',
-          border: selectedReward ? `1px solid ${CLUB_THEME.borderStrong}` : `1px solid ${CLUB_THEME.border}`,
-          boxShadow: '0 16px 30px rgba(24, 93, 160, 0.12)',
+          border: hasAvailableReward
+            ? '1px solid rgba(209, 172, 63, 0.74)'
+            : selectedReward
+              ? `1px solid ${CLUB_THEME.borderStrong}`
+              : `1px solid ${CLUB_THEME.border}`,
+          boxShadow: hasAvailableReward
+            ? '0 16px 32px rgba(154, 116, 18, 0.17)'
+            : '0 16px 30px rgba(24, 93, 160, 0.12)',
         }}
       >
         <div
@@ -570,7 +668,7 @@ export function StoreRewardsSummaryCard({
                   fontWeight: 800,
                 }}
               >
-                {currentUser ? 'Puntos disponibles' : 'Acceso al club'}
+                {hasAvailableReward ? '¡Premio listo!' : currentUser ? 'Puntos disponibles' : 'Acceso al club'}
               </div>
             )}
             {!compact && (
@@ -586,7 +684,7 @@ export function StoreRewardsSummaryCard({
                   fontWeight: 900,
                 }}
               >
-                {currentUser ? 'Puntos disponibles' : 'Acceso al club'}
+                {hasAvailableReward ? '¡Premio listo para canjear!' : currentUser ? 'Puntos disponibles' : 'Acceso al club'}
               </div>
             )}
           </div>
@@ -697,28 +795,34 @@ function getRewardPreviewStatusLabel(status = {}, reward = {}) {
 
 function RewardPreviewCard({ reward, status }) {
   const statusLabel = getRewardPreviewStatusLabel(status, reward);
+  const isAvailable = status.status === 'available';
 
   return (
     <div
+      className={`sm-reward-preview-card${isAvailable ? ' sm-reward-preview-card--available' : ''}`}
       style={{
+        position: 'relative',
+        overflow: 'hidden',
         display: 'grid',
-        gridTemplateColumns: '52px minmax(0, 1fr)',
-        gap: 12,
+        gridTemplateColumns: isAvailable ? '66px minmax(0, 1fr) auto' : '52px minmax(0, 1fr)',
+        gap: isAvailable ? 14 : 12,
         alignItems: 'center',
-        padding: '10px 12px',
-        borderRadius: 18,
-        border: `1px solid ${CLUB_THEME.border}`,
+        padding: isAvailable ? '13px 14px' : '10px 12px',
+        borderRadius: isAvailable ? 22 : 18,
+        border: isAvailable ? '2px solid rgba(209, 172, 63, 0.66)' : `1px solid ${CLUB_THEME.border}`,
         background:
-          status.status === 'available'
-            ? 'linear-gradient(135deg, rgba(29, 116, 199, 0.12) 0%, rgba(232, 199, 108, 0.14) 100%)'
+          isAvailable
+            ? 'linear-gradient(120deg, #fff9df 0%, #ffffff 44%, #eaf5ff 100%)'
             : CLUB_THEME.panelSoft,
+        boxShadow: isAvailable ? '0 14px 28px rgba(167, 126, 22, 0.16)' : 'none',
       }}
     >
       <div
+        className={isAvailable ? 'sm-reward-preview-image sm-reward-preview-image--available' : 'sm-reward-preview-image'}
         style={{
-          width: 52,
-          height: 52,
-          borderRadius: 16,
+          width: isAvailable ? 66 : 52,
+          height: isAvailable ? 66 : 52,
+          borderRadius: isAvailable ? 20 : 16,
           overflow: 'hidden',
           background: 'linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(237,246,255,0.92) 100%)',
           border: `1px solid ${CLUB_THEME.border}`,
@@ -738,13 +842,20 @@ function RewardPreviewCard({ reward, status }) {
         )}
       </div>
       <div style={{ minWidth: 0 }}>
+        {isAvailable && (
+          <div className="sm-reward-preview-winner-label">
+            <ClubTrophyIcon size={14} />
+            <span>¡Ganaste este premio!</span>
+          </div>
+        )}
         <strong
           style={{
             display: 'block',
             color: CLUB_THEME.text,
-            fontSize: 14,
+            fontSize: isAvailable ? 16 : 14,
             fontWeight: 900,
             lineHeight: 1.15,
+            marginTop: isAvailable ? 5 : 0,
           }}
         >
           {reward.name}
@@ -762,11 +873,20 @@ function RewardPreviewCard({ reward, status }) {
           <span style={{ color: CLUB_THEME.blueDeep, fontSize: 12, fontWeight: 900 }}>
             {Number(reward.pointsRequired || 0)} pts
           </span>
-          <span style={{ color: CLUB_THEME.textSoft, fontSize: 11.5, fontWeight: 800 }}>
-            {statusLabel}
-          </span>
+          {!isAvailable && (
+            <span style={{ color: CLUB_THEME.textSoft, fontSize: 11.5, fontWeight: 800 }}>
+              {statusLabel}
+            </span>
+          )}
         </div>
       </div>
+      {isAvailable && (
+        <div className="sm-reward-preview-action">
+          <ClubSparkleIcon size={14} color="#ffffff" />
+          <span>Canjear</span>
+          <ClubChevronIcon size={13} color="#ffffff" />
+        </div>
+      )}
     </div>
   );
 }
@@ -1136,13 +1256,23 @@ export default function StoreRewardsSheet({
                   settings={settings}
                   pointsBalance={pointsBalance}
                   closestReward={rewardSummary.closestReward}
+                  availableReward={rewardSummary.bestReward}
+                  onOpenRewards={() => openView('rewards')}
                 />
 
                 <SheetSectionShortcut
                   title="Premios"
                   icon={<ClubSanMartinIcon size={28} />}
-                  subtitle="Mira una vista previa y entra para verlos todos."
-                  badge={`${rewardList.length} ${rewardList.length === 1 ? 'premio' : 'premios'}`}
+                  subtitle={
+                    rewardSummary.availableRewards.length > 0
+                      ? '¡Tenés un premio esperando por vos!'
+                      : 'Mira una vista previa y entra para verlos todos.'
+                  }
+                  badge={
+                    rewardSummary.availableRewards.length > 0
+                      ? `${rewardSummary.availableRewards.length} ${rewardSummary.availableRewards.length === 1 ? 'listo' : 'listos'}`
+                      : `${rewardList.length} ${rewardList.length === 1 ? 'premio' : 'premios'}`
+                  }
                   preview={
                     rewardPreviewList.length > 0 ? (
                       rewardPreviewList.map((reward) => (
@@ -1207,6 +1337,8 @@ export default function StoreRewardsSheet({
                       settings={settings}
                       pointsBalance={pointsBalance}
                       closestReward={rewardSummary.closestReward}
+                      availableReward={rewardSummary.bestReward}
+                      onOpenRewards={() => openView('rewards')}
                     />
                   </div>
 
