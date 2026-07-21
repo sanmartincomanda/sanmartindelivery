@@ -3478,7 +3478,7 @@ export default function TiendaVirtualView({
   };
 
   const submitOrder = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
 
     if (!storeOperationStatus.open) {
       setStoreClosedNoticeOpen(true);
@@ -5883,6 +5883,24 @@ export default function TiendaVirtualView({
         .store-choice-grid.payment {
           grid-template-columns: repeat(4, minmax(0, 1fr));
         }
+        .store-fulfillment-section {
+          margin-top: 0;
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          border-radius: 22px;
+          padding: 14px;
+          background: linear-gradient(145deg, #f7fbff 0%, #ffffff 100%);
+          box-shadow: 0 14px 28px rgba(12, 77, 136, 0.08);
+        }
+        .store-choice-card.store-fulfillment-choice {
+          min-height: 76px;
+        }
+        .store-fulfillment-help {
+          margin: 10px 2px 0;
+          color: var(--sm-text-soft);
+          font-size: 12px;
+          font-weight: 800;
+          line-height: 1.4;
+        }
         .store-choice-card {
           min-height: 84px;
           border: 1px solid #ead8da;
@@ -6946,6 +6964,16 @@ export default function TiendaVirtualView({
           .store-map-fields,
           .store-choice-grid.two {
             grid-template-columns: 1fr;
+          }
+          .store-choice-grid.store-fulfillment-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .store-fulfillment-section {
+            padding: 12px;
+          }
+          .store-choice-card.store-fulfillment-choice {
+            min-height: 70px;
+            padding: 10px;
           }
           .store-choice-grid.payment {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -9111,6 +9139,11 @@ function CheckoutSheet({
       return;
     }
 
+    if (pickupFlow) {
+      onSubmit();
+      return;
+    }
+
     setCheckoutStep('details');
   };
 
@@ -9195,6 +9228,33 @@ function CheckoutSheet({
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
+
+            <div className="store-choice-section store-fulfillment-section">
+              <div className="store-choice-title">
+                <StoreCheckoutIcon name="route" />
+                <span>¿Como recibiras tu pedido?</span>
+              </div>
+              <div className="store-choice-grid two store-fulfillment-grid">
+                {deliveryChoices.map((choice) => (
+                  <button
+                    key={choice.value}
+                    type="button"
+                    className={`store-choice-card store-fulfillment-choice ${fulfillmentType === choice.value ? 'active' : ''}`}
+                    aria-pressed={fulfillmentType === choice.value}
+                    onClick={() => onFulfillmentTypeChange(choice.value)}
+                  >
+                    <StoreCheckoutIcon name={choice.icon} />
+                    <strong>{choice.value === ORDER_FULFILLMENT_DELIVERY ? 'Delivery' : choice.title}</strong>
+                    <span>{choice.detail}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="store-fulfillment-help">
+                {pickupFlow
+                  ? 'Al pedir en linea enviaremos tu pedido Pickup directamente.'
+                  : 'Luego confirmaras tu direccion y metodo de pago.'}
+              </p>
+            </div>
 
             {storeClosed && (
               <div className="store-status-card" style={{ marginTop: 0, borderColor: 'rgba(185, 28, 28, 0.18)' }}>
@@ -9360,8 +9420,13 @@ function CheckoutSheet({
               )}
             </div>
 
-            <button type="button" className="store-button" onClick={handleContinueCheckout}>
-              {storeClosed ? 'Tienda cerrada' : 'Pedir en linea'}
+            <button
+              type="button"
+              className="store-button"
+              onClick={handleContinueCheckout}
+              disabled={submitting || storeClosed}
+            >
+              {submitting ? 'Enviando...' : storeClosed ? 'Tienda cerrada' : 'Pedir en linea'}
             </button>
           </div>
         ) : (
@@ -9483,28 +9548,6 @@ function CheckoutSheet({
                 </div>
               </div>
             )}
-
-            <div className="store-choice-section">
-              <div className="store-choice-title">
-                <StoreCheckoutIcon name="route" />
-                <span>Tipo de entrega</span>
-              </div>
-              <div className="store-choice-grid two">
-                {deliveryChoices.map((choice) => (
-                  <button
-                    key={choice.value}
-                    type="button"
-                    className={`store-choice-card ${fulfillmentType === choice.value ? 'active' : ''}`}
-                    aria-pressed={fulfillmentType === choice.value}
-                    onClick={() => onFulfillmentTypeChange(choice.value)}
-                  >
-                    <StoreCheckoutIcon name={choice.icon} />
-                    <strong>{choice.title}</strong>
-                    <span>{choice.detail}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {isGuestCheckout ? (
               <div className="store-status-card store-auth-choice-card">

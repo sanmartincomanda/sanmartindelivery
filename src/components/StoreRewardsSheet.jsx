@@ -5,6 +5,7 @@ import {
   getStoreRewardChoiceGroups,
   getStoreRewardFixedItems,
 } from '../services/storeRewards';
+import { useRef } from 'react';
 import SanMartinCrownIcon from './SanMartinCrownIcon';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
@@ -1063,6 +1064,9 @@ export default function StoreRewardsSheet({
   const [isCompactLayout, setIsCompactLayout] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false
   );
+  const homeScrollRef = useRef(null);
+  const rewardsScrollRef = useRef(null);
+  const transactionsScrollRef = useRef(null);
   const pointsBalance = Number(account?.pointsBalance || 0);
   const rewardSummary = useMemo(
     () => buildCustomerRewardSummary(rewards, pointsBalance, cartAmount, settings),
@@ -1103,6 +1107,26 @@ export default function StoreRewardsSheet({
 
     setActiveView('home');
   }, [open]);
+
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const scrollContainers = {
+      home: homeScrollRef,
+      rewards: rewardsScrollRef,
+      transactions: transactionsScrollRef,
+    };
+    const frameId = window.requestAnimationFrame(() => {
+      const scrollContainer = scrollContainers[activeView]?.current;
+      if (scrollContainer) {
+        scrollContainer.scrollTop = 0;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeView, open]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1251,7 +1275,10 @@ export default function StoreRewardsSheet({
         ) : (
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             <div style={getPaneStyle('home')}>
-              <div style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 14 }}>
+              <div
+                ref={homeScrollRef}
+                style={{ height: '100%', overflowY: 'auto', display: 'grid', gap: 14, scrollBehavior: 'auto' }}
+              >
                 <RewardsProgressCard
                   settings={settings}
                   pointsBalance={pointsBalance}
@@ -1330,7 +1357,7 @@ export default function StoreRewardsSheet({
             </div>
 
             <div style={getPaneStyle('rewards')}>
-              <div style={{ height: '100%', overflowY: 'auto' }}>
+              <div ref={rewardsScrollRef} style={{ height: '100%', overflowY: 'auto', scrollBehavior: 'auto' }}>
                 <section style={panelSurfaceStyle}>
                   <div style={{ marginBottom: 16 }}>
                     <RewardsProgressCard
@@ -1368,7 +1395,7 @@ export default function StoreRewardsSheet({
             </div>
 
             <div style={getPaneStyle('transactions')}>
-              <div style={{ height: '100%', overflowY: 'auto' }}>
+              <div ref={transactionsScrollRef} style={{ height: '100%', overflowY: 'auto', scrollBehavior: 'auto' }}>
                 <section style={panelSurfaceStyle}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: CLUB_THEME.blueDeep }}>
