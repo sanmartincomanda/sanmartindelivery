@@ -118,16 +118,7 @@ const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248',
 const normalizeKitchenItemCode = (item = {}) =>
   String(item?.codigo ?? item?.code ?? '').trim().toUpperCase();
 
-const getKitchenRewardCodeSet = (pedido = {}) =>
-  new Set(
-    (Array.isArray(pedido?.rewardRedemption?.items) ? pedido.rewardRedemption.items : [])
-      .map((item) => String(item?.productCode || '').trim().toUpperCase())
-      .filter(Boolean)
-  );
-
 const getStoreProductItems = (pedido = {}) => {
-  const rewardCodes = getKitchenRewardCodeSet(pedido);
-
   return (Array.isArray(pedido.items) ? pedido.items : []).filter((item) => {
     const code = normalizeKitchenItemCode(item);
     const sourceType = String(item?.sourceType || '').trim().toLowerCase();
@@ -140,16 +131,28 @@ const getStoreProductItems = (pedido = {}) => {
       return false;
     }
 
-    if (rewardCodes.has(code)) {
-      return false;
-    }
-
     if (sourceType === 'delivery' || sourceType === 'reward') {
       return false;
     }
 
     return true;
   });
+};
+
+const getKitchenRewardItems = (pedido = {}) => {
+  const redemption = pedido?.rewardRedemption;
+  const rewardName = String(redemption?.rewardName || 'Premio Miembro Gold').trim();
+
+  return (Array.isArray(redemption?.items) ? redemption.items : [])
+    .map((item, index) => ({
+      id: String(item?.id || `${item?.productCode || 'premio'}-${index}`).trim(),
+      codigo: String(item?.productCode || '').trim(),
+      nombre: String(item?.productName || item?.choiceLabel || item?.productCode || 'Producto premio').trim(),
+      cantidad: Math.max(1, Number(item?.quantity || 1)),
+      unidad: String(item?.productUnit || 'unidad').trim() || 'unidad',
+      rewardName,
+    }))
+    .filter((item) => item.codigo && item.nombre);
 };
 
 const getRequestedStoreQuantity = (item = {}) =>
@@ -642,6 +645,28 @@ export default function KitchenView({ orders, allowRuta = true }) {
         .modal-content {
           animation: modalIn 0.3s ease;
         }
+        .kitchen-item-grid {
+          display: grid;
+          grid-template-columns: 92px 62px minmax(0, 1fr) 108px;
+          gap: 10px;
+          align-items: center;
+        }
+        .kitchen-quantity-input {
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 108px;
+          height: 42px;
+        }
+        @media (max-width: 760px) {
+          .kitchen-item-grid {
+            grid-template-columns: 70px 48px minmax(0, 1fr) 84px;
+            gap: 6px;
+          }
+          .kitchen-quantity-input {
+            max-width: 84px;
+            height: 38px;
+          }
+        }
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -959,10 +984,11 @@ export default function KitchenView({ orders, allowRuta = true }) {
             const isAnimating = animatingCards.has(pedido.firebaseKey);
             const customerWhatsappLink = buildKitchenWhatsappLink(pedido);
             const storeProductItems = getStoreProductItems(pedido);
+            const kitchenRewardItems = getKitchenRewardItems(pedido);
             const isStructuredStoreOrder =
               kitchenTab === 'delivery' &&
               String(pedido?.canal || '').trim() === 'tienda_virtual' &&
-              storeProductItems.length > 0;
+              (storeProductItems.length > 0 || kitchenRewardItems.length > 0);
             const storeSyncEntry = storeSyncState[pedido.firebaseKey] || {};
             
             return (
@@ -1238,19 +1264,19 @@ export default function KitchenView({ orders, allowRuta = true }) {
                       
                       {isStructuredStoreOrder ? (
                         <div>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '120px 90px minmax(0, 1fr) 160px',
-                            gap: '12px',
-                            marginBottom: '14px',
-                            paddingBottom: '10px',
-                            borderBottom: '2px solid #e2e8f0',
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            letterSpacing: '0.08em',
-                            textTransform: 'uppercase',
-                            color: '#64748b'
-                          }}>
+                          <div
+                            className="kitchen-item-grid"
+                            style={{
+                              marginBottom: '14px',
+                              paddingBottom: '10px',
+                              borderBottom: '2px solid #e2e8f0',
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              letterSpacing: '0.08em',
+                              textTransform: 'uppercase',
+                              color: '#64748b'
+                            }}
+                          >
                             <div>Cantidad solicitada</div>
                             <div>Unidad</div>
                             <div>Producto</div>
@@ -1262,16 +1288,90 @@ export default function KitchenView({ orders, allowRuta = true }) {
                             flexDirection: 'column',
                             gap: '12px'
                           }}>
+                            {kitchenRewardItems.map((item, itemIndex) => (
+                              <div
+                                key={`${pedido.firebaseKey}-reward-${item.id || itemIndex}`}
+                                className="kitchen-item-grid"
+                                style={{
+                                  padding: '12px 14px',
+                                  borderRadius: '14px',
+                                  background: 'linear-gradient(135deg, #fff7d6 0%, #fffbeb 100%)',
+                                  border: '2px solid #f2c94c',
+                                  boxShadow: '0 6px 16px rgba(180, 128, 0, 0.12)'
+                                }}
+                              >
+                                <div style={{
+                                  fontSize: '21px',
+                                  fontWeight: 900,
+                                  color: '#7c5200'
+                                }}>
+                                  {formatWeight(item.cantidad)}
+                                </div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  fontWeight: 800,
+                                  color: '#8a6200',
+                                  textTransform: 'lowercase'
+                                }}>
+                                  {item.unidad}
+                                </div>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{
+                                    display: 'inline-flex',
+                                    marginBottom: '5px',
+                                    padding: '4px 8px',
+                                    borderRadius: '999px',
+                                    background: '#b8860b',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    fontWeight: 900,
+                                    letterSpacing: '0.06em'
+                                  }}>
+                                    CANJE MIEMBRO GOLD
+                                  </div>
+                                  <div style={{
+                                    fontSize: '17px',
+                                    fontWeight: 900,
+                                    color: '#3f2c00',
+                                    lineHeight: 1.2
+                                  }}>
+                                    {item.nombre}
+                                  </div>
+                                  <div style={{
+                                    marginTop: '3px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    color: '#8a6200'
+                                  }}>
+                                    {item.codigo} | {item.rewardName}
+                                  </div>
+                                </div>
+                                <div style={{
+                                  width: '100%',
+                                  minHeight: '38px',
+                                  borderRadius: '11px',
+                                  background: '#fff',
+                                  border: '1px solid #e5bd45',
+                                  display: 'grid',
+                                  placeItems: 'center',
+                                  padding: '5px',
+                                  color: '#7c5200',
+                                  fontSize: '12px',
+                                  fontWeight: 900,
+                                  textAlign: 'center'
+                                }}>
+                                  PREPARAR {formatWeight(item.cantidad)}
+                                </div>
+                              </div>
+                            ))}
+
                             {storeProductItems.map((item, itemIndex) => (
                               <div
                                 key={`${pedido.firebaseKey}-${normalizeKitchenItemCode(item) || itemIndex}-${itemIndex}`}
+                                className="kitchen-item-grid"
                                 style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: '120px 90px minmax(0, 1fr) 160px',
-                                  gap: '12px',
-                                  alignItems: 'center',
-                                  padding: '14px 16px',
-                                  borderRadius: '16px',
+                                  padding: '12px 14px',
+                                  borderRadius: '14px',
                                   background: '#f8fafc',
                                   border: '1px solid #dbe4f0'
                                 }}
@@ -1319,14 +1419,13 @@ export default function KitchenView({ orders, allowRuta = true }) {
                                     handleStoreDraftChange(pedido, itemIndex, event.target.value)
                                   }
                                   onFocus={(event) => event.target.select()}
+                                  className="kitchen-quantity-input"
                                   style={{
-                                    width: '100%',
-                                    height: '52px',
-                                    borderRadius: '14px',
+                                    borderRadius: '11px',
                                     border: '2px solid #cbd5e1',
                                     background: 'white',
-                                    padding: '0 14px',
-                                    fontSize: '22px',
+                                    padding: '0 8px',
+                                    fontSize: '18px',
                                     fontWeight: 800,
                                     color: '#0f172a',
                                     outline: 'none'
