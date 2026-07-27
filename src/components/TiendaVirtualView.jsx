@@ -2539,6 +2539,20 @@ export default function TiendaVirtualView({
   );
 
   const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
+  const savedAddressCoverageQuote = useMemo(
+    () =>
+      calculateStoreDeliveryQuote({
+        settings: activeDeliverySettings,
+        destination: savedDeliveryAddress?.ubicacion,
+        fulfillmentType: ORDER_FULFILLMENT_DELIVERY,
+      }),
+    [activeDeliverySettings, savedDeliveryAddress?.ubicacion]
+  );
+  const showSavedAddressCoverageWarning = Boolean(
+    currentUser &&
+    hasLocation(savedDeliveryAddress?.ubicacion) &&
+    savedAddressCoverageQuote?.reason === 'out_of_coverage'
+  );
   const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
   const deliveryQuote = useMemo(
     () =>
@@ -4377,6 +4391,67 @@ export default function TiendaVirtualView({
           color: var(--sm-blue-deep);
           font-size: 22px;
           font-weight: 900;
+        }
+        .store-branch-coverage-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .store-coverage-alert {
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          padding: 7px 8px 7px 12px;
+          border: 1px solid rgba(197, 61, 61, 0.24);
+          border-radius: 16px;
+          background: linear-gradient(135deg, #fff8f6, #fff0ed);
+          color: #7f1d1d;
+          box-shadow: 0 10px 24px rgba(127, 29, 29, 0.08);
+        }
+        .store-coverage-alert-copy {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 12px;
+          font-weight: 900;
+          line-height: 1.2;
+        }
+        .store-coverage-alert-dot {
+          width: 9px;
+          height: 9px;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          background: #ef4444;
+          box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.11);
+        }
+        .store-coverage-alert-actions {
+          display: flex;
+          gap: 6px;
+        }
+        .store-coverage-alert-button {
+          min-height: 30px;
+          padding: 0 11px;
+          border: 1px solid rgba(12, 77, 136, 0.2);
+          border-radius: 10px;
+          background: #ffffff;
+          color: var(--sm-blue-deep);
+          font: inherit;
+          font-size: 11px;
+          font-weight: 950;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: transform 150ms ease, background 150ms ease;
+        }
+        .store-coverage-alert-button:hover {
+          transform: translateY(-1px);
+          background: #edf7ff;
+        }
+        .store-coverage-alert-button.primary {
+          border-color: transparent;
+          background: linear-gradient(135deg, #0c4d88, #2f8cdb);
+          color: #ffffff;
         }
         .store-icon-button,
         .store-order-status-button,
@@ -7085,6 +7160,23 @@ export default function TiendaVirtualView({
           .store-brand-actions {
             gap: 6px;
           }
+          .store-branch-coverage-row {
+            align-items: stretch;
+            flex-direction: column;
+          }
+          .store-coverage-alert {
+            width: 100%;
+            align-items: stretch;
+            flex-direction: column;
+            padding: 11px 12px;
+          }
+          .store-coverage-alert-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .store-coverage-alert-button {
+            min-height: 36px;
+          }
           .store-icon-button {
             width: 40px;
             height: 40px;
@@ -7333,11 +7425,37 @@ export default function TiendaVirtualView({
             </div>
           </div>
 
-          <StoreBranchButton
-            branch={selectedBranch}
-            locating={branchLocating}
-            onClick={openBranchSelector}
-          />
+          <div className="store-branch-coverage-row">
+            <StoreBranchButton
+              branch={selectedBranch}
+              locating={branchLocating}
+              onClick={openBranchSelector}
+            />
+            {showSavedAddressCoverageWarning && (
+              <div className="store-coverage-alert" role="status">
+                <div className="store-coverage-alert-copy">
+                  <span className="store-coverage-alert-dot" aria-hidden="true" />
+                  <span>Tu dirección no permite entregar desde esta tienda.</span>
+                </div>
+                <div className="store-coverage-alert-actions">
+                  <button
+                    type="button"
+                    className="store-coverage-alert-button primary"
+                    onClick={openBranchSelector}
+                  >
+                    Cambiar tienda
+                  </button>
+                  <button
+                    type="button"
+                    className="store-coverage-alert-button"
+                    onClick={openProfilePanel}
+                  >
+                    Cambiar dirección
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <label className="store-search-wrap">
             <span className="store-search-tag">Buscar</span>
