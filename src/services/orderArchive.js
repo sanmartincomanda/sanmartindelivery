@@ -1,4 +1,5 @@
 export const STORE_COUPON_ARCHIVE_USAGE_PATH = 'storeCouponUsageArchive';
+export const ORDER_HISTORY_CLOUD_PATH = 'orderHistory';
 export const ORDER_HISTORY_RETENTION_DAYS = 60;
 
 export const normalizeCouponCode = (value = '') =>

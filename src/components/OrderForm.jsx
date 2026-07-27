@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { hoyISO, normalizar } from './Utils';
 import {
   MANUAL_CHANNEL,
@@ -8,6 +8,17 @@ import {
 } from '../services/orders';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation } from '../services/geo';
 import { createManualClient } from '../services/clientDirectory';
+import {
+  getCurrentCatalogMap,
+  getProductMinQuantity,
+  getProductQuantityStep,
+  mergeCatalogProducts,
+} from '../services/storeCatalog';
+import {
+  calculateStoreDeliveryQuote,
+  formatStoreDeliveryDistance,
+  subscribeStoreDeliverySettings,
+} from '../services/storeDeliverySettings';
 
 const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
 
@@ -46,9 +57,76 @@ export default function OrderForm({
   const [hoverIdx, setHoverIdx] = useState(-1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successNumber, setSuccessNumber] = useState(null);
+  const [deliverySettings, setDeliverySettings] = useState(null);
+  const [deliverySettingsError, setDeliverySettingsError] = useState(false);
+  const [catalog, setCatalog] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [orderItems, setOrderItems] = useState([]);
 
   const hasAvailability = remainingOrders > 0;
   const previewNumber = hasAvailability ? formatOrderNumber(nextOrderNumber) : 'MAX';
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreDeliverySettings(
+      (settings) => {
+        setDeliverySettings(settings);
+        setDeliverySettingsError(false);
+      },
+      (error) => {
+        console.error('No se pudo cargar la configuracion de entrega:', error);
+        setDeliverySettingsError(true);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getCurrentCatalogMap()
+      .then((catalogMap) => {
+        if (cancelled) {
+          return;
+        }
+
+        setCatalog(mergeCatalogProducts(catalogMap).filter((product) => product.active !== false));
+        setCatalogError(false);
+      })
+      .catch((error) => {
+        console.error('No se pudo cargar el catalogo para el pedido manual:', error);
+        if (!cancelled) {
+          setCatalogError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCatalogLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const deliveryQuote = useMemo(() => {
+    if (fulfillmentType === ORDER_FULFILLMENT_PICKUP) {
+      return calculateStoreDeliveryQuote({ fulfillmentType });
+    }
+
+    if (!deliverySettings) {
+      return null;
+    }
+
+    return calculateStoreDeliveryQuote({
+      settings: deliverySettings,
+      destination: selectedClient?.ubicacion || null,
+      fulfillmentType,
+    });
+  }, [deliverySettings, fulfillmentType, selectedClient]);
 
   const sugerencias = useMemo(() => {
     if (!allowClientDirectory) {
@@ -65,6 +143,92 @@ export default function OrderForm({
       .slice(0, 6);
   }, [allowClientDirectory, clienteInput, clientes]);
 
+  const productSuggestions = useMemo(() => {
+    const normalizedSearch = normalizar(productSearch || '');
+    if (!normalizedSearch) {
+      return [];
+    }
+
+    return catalog
+      .filter((product) => {
+        const searchText = normalizar(`${product.code || ''} ${product.name || ''}`);
+        return searchText.includes(normalizedSearch);
+      })
+      .slice(0, 8);
+  }, [catalog, productSearch]);
+
+  const manualSubtotal = useMemo(
+    () =>
+      Number(
+        orderItems
+          .reduce(
+            (sum, item) => sum + Number(item.cantidad || 0) * Number(item.precioUnitario || 0),
+            0
+          )
+          .toFixed(2)
+      ),
+    [orderItems]
+  );
+
+  const addCatalogProduct = (product) => {
+    const code = String(product?.code || '').trim();
+    if (!code) {
+      return;
+    }
+
+    const minQuantity = getProductMinQuantity(product);
+    const quantityStep = getProductQuantityStep(product);
+
+    setOrderItems((currentItems) => {
+      const existingIndex = currentItems.findIndex((item) => item.codigo === code);
+      if (existingIndex === -1) {
+        return [
+          ...currentItems,
+          {
+            codigo: code,
+            nombre: product.name,
+            descripcion: product.description || '',
+            unidad: product.unit || 'lb',
+            cantidad: minQuantity,
+            precioUnitario: Number(product.price || 0),
+            minQuantity,
+            quantityStep,
+          },
+        ];
+      }
+
+      return currentItems.map((item, index) =>
+        index === existingIndex
+          ? {
+              ...item,
+              cantidad: Number((Number(item.cantidad || 0) + quantityStep).toFixed(3)),
+            }
+          : item
+      );
+    });
+    setProductSearch('');
+  };
+
+  const updateOrderItemQuantity = (code, value) => {
+    setOrderItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.codigo !== code) {
+          return item;
+        }
+
+        const numericValue = Number(value);
+        return {
+          ...item,
+          cantidad: Number.isFinite(numericValue) && numericValue > 0 ? numericValue : item.minQuantity,
+        };
+      })
+    );
+  };
+
+  const removeOrderItem = (code) => {
+    setOrderItems((currentItems) => currentItems.filter((item) => item.codigo !== code));
+  };
+
   const handleSelectCliente = (client) => {
     setSelectedClient(client);
     setClienteInput(client.nombre || '');
@@ -74,8 +238,8 @@ export default function OrderForm({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!pedido.trim()) {
-      alert('El pedido no puede estar vacio.');
+    if (orderItems.length === 0) {
+      alert('Agrega al menos un producto del catalogo para crear el pedido y su cotizacion.');
       return;
     }
 
@@ -103,6 +267,34 @@ export default function OrderForm({
       telefono: '',
     };
 
+    if (fulfillmentType === ORDER_FULFILLMENT_DELIVERY) {
+      if (deliverySettingsError) {
+        alert('No se pudo consultar la tarifa de envio. Intenta nuevamente antes de guardar el pedido.');
+        return;
+      }
+
+      if (!deliveryQuote) {
+        alert('La tarifa de envio todavia esta cargando. Espera un momento e intenta nuevamente.');
+        return;
+      }
+
+      if (!deliveryQuote.available) {
+        if (deliveryQuote.reason === 'missing_destination') {
+          alert('Este cliente no tiene un pin de ubicacion. Guardalo antes de crear un pedido con delivery.');
+        } else if (deliveryQuote.reason === 'out_of_coverage') {
+          alert(
+            `La ubicacion esta fuera del radio de ${deliveryQuote.coverageRadiusKm} km. Usa Pickup o confirma otra direccion.`
+          );
+        } else {
+          alert('No se pudo calcular el envio. Revisa la ubicacion de la tienda y del cliente.');
+        }
+        return;
+      }
+    }
+
+    const appliedDeliveryQuote =
+      deliveryQuote || calculateStoreDeliveryQuote({ fulfillmentType: ORDER_FULFILLMENT_PICKUP });
+
     setIsSubmitting(true);
 
     try {
@@ -115,9 +307,24 @@ export default function OrderForm({
           ubicacion: orderClient.ubicacion || null,
           telefono: orderClient.telefono || '',
           pedido: pedido.trim(),
+          observaciones: pedido.trim(),
+          items: orderItems,
           fecha: hoyISO(),
           metodoPago,
           fulfillmentType,
+          deliveryDistanceKm: appliedDeliveryQuote.distanceKm,
+          coverageRadiusKm: appliedDeliveryQuote.coverageRadiusKm,
+          deliveryFee: appliedDeliveryQuote.totalFee,
+          deliveryFeeOriginal: appliedDeliveryQuote.originalTotalFee ?? appliedDeliveryQuote.totalFee,
+          deliveryFeeBase: appliedDeliveryQuote.baseFee,
+          deliveryFeeTax: appliedDeliveryQuote.taxAmount,
+          deliveryFeeBaseOriginal: appliedDeliveryQuote.originalBaseFee ?? appliedDeliveryQuote.baseFee,
+          deliveryFeeTaxOriginal: appliedDeliveryQuote.originalTaxAmount ?? appliedDeliveryQuote.taxAmount,
+          deliveryFeeBracket: appliedDeliveryQuote.feeKey,
+          deliveryFree: appliedDeliveryQuote.deliveryFree === true,
+          deliveryPromotionLabel: appliedDeliveryQuote.promotionLabel || '',
+          deliveryPromotionType: appliedDeliveryQuote.promotionType || '',
+          deliveryPromotionDate: appliedDeliveryQuote.promotionDate || '',
         },
         { channel: MANUAL_CHANNEL }
       );
@@ -128,6 +335,8 @@ export default function OrderForm({
       setClienteInput('');
       setSelectedClient(null);
       setPedido('');
+      setOrderItems([]);
+      setProductSearch('');
       setMetodoPago('Efectivo');
       setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
     } catch (error) {
@@ -415,6 +624,36 @@ export default function OrderForm({
               <div style={{ fontSize: '12px', opacity: 0.55, marginTop: '8px' }}>
                 Quedan {remainingOrders} pedidos disponibles hoy
               </div>
+              {fulfillmentType === ORDER_FULFILLMENT_DELIVERY && (
+                <div
+                  style={{
+                    marginTop: '14px',
+                    padding: '14px 16px',
+                    borderRadius: '12px',
+                    border: `1px solid ${deliveryQuote?.available ? 'rgba(56, 189, 248, 0.5)' : 'rgba(248, 113, 113, 0.45)'}`,
+                    background: deliveryQuote?.available
+                      ? 'rgba(56, 189, 248, 0.12)'
+                      : 'rgba(239, 68, 68, 0.1)',
+                    color: deliveryQuote?.available ? '#bae6fd' : '#fecaca',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {!deliverySettings && !deliverySettingsError && 'Calculando tarifa de envio...'}
+                  {deliverySettingsError && 'No se pudo cargar la tarifa de envio.'}
+                  {deliveryQuote?.reason === 'missing_destination' &&
+                    'Selecciona un cliente con pin para calcular el envio.'}
+                  {deliveryQuote?.reason === 'out_of_coverage' &&
+                    `Fuera del radio de ${deliveryQuote.coverageRadiusKm} km.`}
+                  {deliveryQuote?.available && (
+                    <>
+                      Envio: C$ {Number(deliveryQuote.totalFee || 0).toFixed(2)} con IVA
+                      {' | '}
+                      {formatStoreDeliveryDistance(deliveryQuote.distanceKm)}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
@@ -911,33 +1150,165 @@ export default function OrderForm({
             Detalle del Pedido
           </div>
 
-          <textarea
-            placeholder={`Escribi el pedido aqui...
+          <div style={{ position: 'relative', marginBottom: '14px' }}>
+            <input
+              type="search"
+              value={productSearch}
+              onChange={(event) => setProductSearch(event.target.value)}
+              placeholder={catalogLoading ? 'Cargando catalogo...' : 'Buscar producto por nombre o codigo SICAR'}
+              disabled={catalogLoading || catalogError}
+              className="input-focus"
+              style={{
+                width: '100%',
+                padding: '16px 18px',
+                borderRadius: '14px',
+                border: '2px solid rgba(255,255,255,0.12)',
+                background: 'rgba(0,0,0,0.3)',
+                color: 'white',
+                fontSize: '16px',
+                fontWeight: 700,
+                outline: 'none',
+              }}
+            />
 
-Ejemplo:
-- 2 lb Lomo de res
-- 1 lb Molida especial
-- 3 lb Pechuga de pollo
-- 1 Bolsa de hielo 5kg`}
+            {catalogError && (
+              <div style={{ color: '#fecaca', marginTop: '8px', fontSize: '13px', fontWeight: 700 }}>
+                No se pudo cargar el catalogo. Recarga antes de ingresar el pedido.
+              </div>
+            )}
+
+            {productSuggestions.length > 0 && (
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '6px',
+                  marginTop: '8px',
+                  padding: '8px',
+                  borderRadius: '14px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: '#172033',
+                  boxShadow: '0 18px 40px rgba(0,0,0,0.3)',
+                }}
+              >
+                {productSuggestions.map((product) => (
+                  <button
+                    key={product.code}
+                    type="button"
+                    onClick={() => addCatalogProduct(product)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '11px 12px',
+                      border: 0,
+                      borderRadius: '10px',
+                      background: 'rgba(255,255,255,0.06)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontWeight: 800 }}>
+                      {product.name} <small style={{ color: '#93c5fd' }}>[{product.code}]</small>
+                    </span>
+                    <span style={{ color: '#fbbf24', fontWeight: 900, whiteSpace: 'nowrap' }}>
+                      C$ {Number(product.price || 0).toFixed(2)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {orderItems.length > 0 && (
+            <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
+              {orderItems.map((item) => (
+                <div
+                  key={item.codigo}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(180px, 1fr) 110px 92px auto',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.07)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 900 }}>{item.nombre}</div>
+                    <div style={{ color: '#93c5fd', fontSize: '12px', fontWeight: 700 }}>
+                      {item.codigo} | C$ {Number(item.precioUnitario || 0).toFixed(2)}/{item.unidad}
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={item.minQuantity}
+                    step={item.quantityStep}
+                    value={item.cantidad}
+                    onChange={(event) => updateOrderItemQuantity(item.codigo, event.target.value)}
+                    aria-label={`Cantidad de ${item.nombre}`}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '9px',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(0,0,0,0.25)',
+                      color: 'white',
+                      fontWeight: 900,
+                    }}
+                  />
+                  <strong style={{ color: '#fbbf24', textAlign: 'right' }}>
+                    C$ {(Number(item.cantidad || 0) * Number(item.precioUnitario || 0)).toFixed(2)}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={() => removeOrderItem(item.codigo)}
+                    aria-label={`Quitar ${item.nombre}`}
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '9px',
+                      border: 0,
+                      background: 'rgba(239,68,68,0.18)',
+                      color: '#fca5a5',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+              ))}
+              <div style={{ textAlign: 'right', color: '#fbbf24', fontSize: '18px', fontWeight: 900 }}>
+                Productos: C$ {manualSubtotal.toFixed(2)}
+              </div>
+            </div>
+          )}
+
+          <textarea
+            placeholder="Notas adicionales para cocina (opcional)"
             value={pedido}
             onChange={(event) => setPedido(event.target.value)}
             className="input-focus"
             style={{
               width: '100%',
-              minHeight: '200px',
-              padding: '24px',
-              borderRadius: '20px',
+              minHeight: '90px',
+              padding: '16px 18px',
+              borderRadius: '14px',
               border: '2px solid rgba(255,255,255,0.1)',
               background: 'rgba(0,0,0,0.3)',
               color: 'white',
-              fontSize: '20px',
+              fontSize: '15px',
               fontWeight: 600,
-              lineHeight: '1.6',
+              lineHeight: '1.5',
               outline: 'none',
               resize: 'vertical',
               fontFamily: 'inherit',
             }}
-            required
           />
 
           <div
@@ -951,7 +1322,7 @@ Ejemplo:
             }}
           >
             <div style={{ fontSize: '14px', opacity: 0.6, fontWeight: 500 }}>
-              Consejo: usa lineas cortas para que cocina lea el pedido mas rapido.
+              Selecciona los productos por codigo para crear correctamente la cotizacion.
             </div>
 
             <button
@@ -959,7 +1330,7 @@ Ejemplo:
               disabled={
                 isSubmitting ||
                 (!selectedClient && !clienteInput.trim()) ||
-                !pedido.trim() ||
+                orderItems.length === 0 ||
                 !hasAvailability
               }
               className="btn-hover"
@@ -976,10 +1347,10 @@ Ejemplo:
                 fontWeight: 900,
                 fontSize: '18px',
                 cursor:
-                  isSubmitting || (!selectedClient && !clienteInput.trim()) || !pedido.trim() || !hasAvailability
+                  isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0 || !hasAvailability
                     ? 'not-allowed'
                     : 'pointer',
-                opacity: isSubmitting || (!selectedClient && !clienteInput.trim()) || !pedido.trim() ? 0.5 : 1,
+                opacity: isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0 ? 0.5 : 1,
                 boxShadow:
                   isSubmitting || !hasAvailability ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)',
               }}

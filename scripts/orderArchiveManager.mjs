@@ -7,6 +7,7 @@ import {
   getOrderHistoryRetentionStartDate,
   isCanceledOrderStatus,
   isOrderWithinHistoryRetention,
+  ORDER_HISTORY_CLOUD_PATH,
   ORDER_HISTORY_RETENTION_DAYS,
   normalizeCouponCode,
   shouldArchiveRealtimeOrder,
@@ -22,6 +23,7 @@ const ARCHIVE_ROOT_DIR = 'sync-backups/order-history';
 const STATE_FILE_NAME = 'sync-backups/order-archive-state.json';
 const ORDER_ARCHIVE_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const ARCHIVE_BATCH_SIZE = 250;
+const CLOUD_HISTORY_BACKFILL_VERSION = 1;
 const LIVE_ORDER_PATHS = ['orders', 'rutaOrders'];
 
 const normalizeNumber = (value, fallback = 0) => {
@@ -114,6 +116,9 @@ export function createOrderArchiveManager({ repoRoot }) {
       lastArchiveAt: state.lastArchiveAt || '',
       lastArchiveCount: normalizeNumber(state.lastArchiveCount, 0),
       lastError: state.lastError || '',
+      cloudBackfillVersion: normalizeNumber(state.cloudBackfillVersion, 0),
+      cloudBackfillAt: state.cloudBackfillAt || '',
+      cloudBackfillCount: normalizeNumber(state.cloudBackfillCount, 0),
     });
   };
 
@@ -133,16 +138,66 @@ export function createOrderArchiveManager({ repoRoot }) {
     }
   };
 
+  const backfillLocalArchiveToCloud = async () => {
+    if (normalizeNumber(state.cloudBackfillVersion, 0) >= CLOUD_HISTORY_BACKFILL_VERSION) {
+      return normalizeNumber(state.cloudBackfillCount, 0);
+    }
+
+    if (!existsSync(archiveRootDir)) {
+      state.cloudBackfillVersion = CLOUD_HISTORY_BACKFILL_VERSION;
+      state.cloudBackfillAt = new Date().toISOString();
+      state.cloudBackfillCount = 0;
+      persistState();
+      return 0;
+    }
+
+    const retentionStartDate = getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS);
+    const cloudUpdates = {};
+    let backfillCount = 0;
+
+    readdirSync(archiveRootDir)
+      .filter((fileName) => fileName.toLowerCase().endsWith('.json'))
+      .forEach((fileName) => {
+        const bucket = loadJsonFile(resolve(archiveRootDir, fileName), {});
+        Object.entries(bucket || {}).forEach(([orderKey, order]) => {
+          if (!isOrderWithinHistoryRetention(order, retentionStartDate)) {
+            return;
+          }
+
+          const fecha = String(order?.fecha || '').trim();
+          const firebaseKey = String(order?.firebaseKey || orderKey || '').trim();
+          if (!fecha || !firebaseKey) {
+            return;
+          }
+
+          cloudUpdates[`${ORDER_HISTORY_CLOUD_PATH}/${fecha}/${firebaseKey}`] = {
+            firebaseKey,
+            ...order,
+          };
+          backfillCount += 1;
+        });
+      });
+
+    await flushRootUpdates(cloudUpdates);
+    state.cloudBackfillVersion = CLOUD_HISTORY_BACKFILL_VERSION;
+    state.cloudBackfillAt = new Date().toISOString();
+    state.cloudBackfillCount = backfillCount;
+    persistState();
+    return backfillCount;
+  };
+
   const pruneExpiredArchivedOrders = () => {
     if (!existsSync(archiveRootDir)) {
       return {
         removedCount: 0,
+        removedOrders: [],
         retentionStartDate: getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS),
       };
     }
 
     const retentionStartDate = getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS);
     let removedCount = 0;
+    const removedOrders = [];
 
     readdirSync(archiveRootDir)
       .filter((fileName) => fileName.toLowerCase().endsWith('.json'))
@@ -160,6 +215,10 @@ export function createOrderArchiveManager({ repoRoot }) {
 
           changed = true;
           removedCount += 1;
+          removedOrders.push({
+            fecha: String(order?.fecha || '').trim(),
+            firebaseKey: String(order?.firebaseKey || orderKey || '').trim(),
+          });
         });
 
         if (changed) {
@@ -169,6 +228,7 @@ export function createOrderArchiveManager({ repoRoot }) {
 
     return {
       removedCount,
+      removedOrders,
       retentionStartDate,
     };
   };
@@ -185,8 +245,15 @@ export function createOrderArchiveManager({ repoRoot }) {
       state.lastError = '';
 
       try {
+        await backfillLocalArchiveToCloud();
         const todayKey = formatDate(new Date());
         const pruneResult = pruneExpiredArchivedOrders();
+        const rootUpdates = {};
+        pruneResult.removedOrders.forEach(({ fecha, firebaseKey }) => {
+          if (fecha && firebaseKey) {
+            rootUpdates[`${ORDER_HISTORY_CLOUD_PATH}/${fecha}/${firebaseKey}`] = null;
+          }
+        });
         const [ordersSnapshot, routeOrdersSnapshot, archiveUsageSnapshot] = await Promise.all([
           get(query(ref(database, 'orders'), orderByChild('fecha'), endAt(todayKey))),
           get(query(ref(database, 'rutaOrders'), orderByChild('fecha'), endAt(todayKey))),
@@ -194,7 +261,6 @@ export function createOrderArchiveManager({ repoRoot }) {
         ]);
 
         const monthBuckets = new Map();
-        const rootUpdates = {};
         const usageMap = archiveUsageSnapshot.val() || {};
         let archivedCount = 0;
 
@@ -220,11 +286,14 @@ export function createOrderArchiveManager({ repoRoot }) {
 
             const bucket = monthBuckets.get(monthKey);
             if (bucket.data[orderKey]) {
+              rootUpdates[`${ORDER_HISTORY_CLOUD_PATH}/${order.fecha}/${orderKey}`] = bucket.data[orderKey];
               rootUpdates[`${sourcePath}/${orderKey}`] = null;
               return;
             }
 
-            bucket.data[orderKey] = buildArchivedOrderRecord(orderKey, order, sourcePath);
+            const archivedOrder = buildArchivedOrderRecord(orderKey, order, sourcePath);
+            bucket.data[orderKey] = archivedOrder;
+            rootUpdates[`${ORDER_HISTORY_CLOUD_PATH}/${order.fecha}/${orderKey}`] = archivedOrder;
             rootUpdates[`${sourcePath}/${orderKey}`] = null;
             archivedCount += 1;
 
@@ -245,6 +314,9 @@ export function createOrderArchiveManager({ repoRoot }) {
         }
 
         if (archivedCount === 0) {
+          if (Object.keys(rootUpdates).length > 0) {
+            await flushRootUpdates(rootUpdates);
+          }
           state.lastArchiveAt = new Date().toISOString();
           state.lastArchiveCount = 0;
           persistState();

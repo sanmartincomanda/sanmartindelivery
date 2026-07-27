@@ -17,6 +17,10 @@ import {
 } from '../services/clientDirectory';
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import { ORDER_HISTORY_RETENTION_DAYS } from '../services/orderArchive';
+import {
+  fetchCloudOrderHistoryByDateRange,
+  mergeOrderHistoryRecords,
+} from '../services/orderHistoryCloud';
 import { hoyISO, normalizar } from './Utils';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
@@ -314,6 +318,11 @@ const orderMatchesSearch = (order, normalizedTerm) => {
     .some((value) => normalizar(String(value)).includes(normalizedTerm));
 };
 
+const getOrderChannelFilterValue = (order = {}) => {
+  const channel = normalizar(`${order.canal || ''} ${order.canalLabel || ''}`);
+  return channel.includes('tienda') || channel.includes('virtual') ? 'tienda_virtual' : 'manual';
+};
+
 const truncateText = (value = '', maxLength = 180) => {
   const cleanValue = value.replace(/\s+/g, ' ').trim();
   if (cleanValue.length <= maxLength) {
@@ -357,7 +366,7 @@ export default function BaseDatosView({ clientes = [] }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySyncAt, setHistorySyncAt] = useState(null);
   const [historyRange, setHistoryRange] = useState(() => ({
-    dateFrom: shiftIsoDate(hoyISO(), -(ORDER_HISTORY_RETENTION_DAYS - 1)),
+    dateFrom: shiftIsoDate(hoyISO(), -7),
     dateTo: hoyISO(),
   }));
 
@@ -393,32 +402,47 @@ export default function BaseDatosView({ clientes = [] }) {
     setHistoryRange(requestedRange);
 
     try {
-      let nextOrders = [];
-      let loadedFromBridge = false;
+      let liveOrders = [];
+      let cloudOrders = [];
+      let bridgeOrders = [];
+      let cloudLoaded = false;
+
+      try {
+        [cloudOrders, liveOrders] = await Promise.all([
+          fetchCloudOrderHistoryByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
+          fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
+        ]);
+        cloudLoaded = true;
+      } catch (cloudError) {
+        console.warn('Cloud history fallback:', cloudError);
+        liveOrders = await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo);
+      }
 
       if (canUseLocalBridgeHistory()) {
         try {
-          nextOrders = sortOrders(
-            await fetchArchivedOrdersFromBridge(requestedRange.dateFrom, requestedRange.dateTo)
+          bridgeOrders = await fetchArchivedOrdersFromBridge(
+            requestedRange.dateFrom,
+            requestedRange.dateTo
           );
-          loadedFromBridge = true;
         } catch (bridgeError) {
           console.warn('Bridge history fallback:', bridgeError);
         }
       }
 
-      if (!loadedFromBridge) {
-        nextOrders = sortOrders(
-          await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo)
-        );
-      }
+      const nextOrders = sortOrders(
+        mergeOrderHistoryRecords(cloudOrders, bridgeOrders, liveOrders)
+      );
 
       setHistoryOrders(nextOrders);
       setHistoryLoaded(true);
       setHistorySyncAt(Date.now());
 
       if (force) {
-        showToast('Historial actualizado');
+        showToast(
+          cloudLoaded || bridgeOrders.length > 0
+            ? `Historial actualizado: ${nextOrders.length} pedidos`
+            : 'Historial actualizado solo con pedidos activos'
+        );
       }
     } catch (error) {
       console.error('Error loading order history:', error);
@@ -1609,6 +1633,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
   const [dateTo, setDateTo] = useState(hoyISO());
   const [statusFilter, setStatusFilter] = useState('todos');
   const [paymentFilter, setPaymentFilter] = useState('todos');
+  const [channelFilter, setChannelFilter] = useState('todos');
   const [visibleCount, setVisibleCount] = useState(24);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [exporting, setExporting] = useState(false);
@@ -1633,19 +1658,22 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
         const normalizedStatus = normalizeStatus(order.estado);
         const matchesStatus = statusFilter === 'todos' || normalizedStatus === statusFilter;
         const matchesPayment = paymentFilter === 'todos' || (order.metodoPago || 'Efectivo') === paymentFilter;
+        const matchesChannel =
+          channelFilter === 'todos' || getOrderChannelFilterValue(order) === channelFilter;
         const matchesStartDate = !dateFrom || (order.fecha || '') >= dateFrom;
         const matchesEndDate = !dateTo || (order.fecha || '') <= dateTo;
 
         return (
           matchesStatus &&
           matchesPayment &&
+          matchesChannel &&
           matchesStartDate &&
           matchesEndDate &&
           orderMatchesSearch(order, normalizedSearch)
         );
       }),
     );
-  }, [dateFrom, dateTo, deferredSearch, orders, paymentFilter, statusFilter]);
+  }, [channelFilter, dateFrom, dateTo, deferredSearch, orders, paymentFilter, statusFilter]);
 
   const visibleOrders = filteredOrders.slice(0, visibleCount);
   const hasMoreOrders = filteredOrders.length > visibleCount;
@@ -1664,7 +1692,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
 
   useEffect(() => {
     setVisibleCount(24);
-  }, [dateFrom, dateTo, deferredSearch, paymentFilter, statusFilter]);
+  }, [channelFilter, dateFrom, dateTo, deferredSearch, paymentFilter, statusFilter]);
 
   useEffect(() => {
     if (!loaded) {
@@ -1697,6 +1725,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
     setDateTo(hoyISO());
     setStatusFilter('todos');
     setPaymentFilter('todos');
+    setChannelFilter('todos');
     setSearchTerm('');
   };
 
@@ -1835,7 +1864,7 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
           background: 'rgba(15, 23, 42, 0.42)',
         }}
       >
-        <div className="bd-history-filters" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, minmax(0, 1fr))', gap: '12px' }}>
+        <div className="bd-history-filters" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(5, minmax(0, 1fr))', gap: '12px' }}>
           <div style={{ position: 'relative' }}>
             <span
               style={{
@@ -1913,12 +1942,29 @@ function HistorialPanel({ orders, loaded, loading, onRefresh, onToast }) {
               ))}
             </select>
           </FilterField>
+
+          <FilterField label="Canal" icon={Icons.box}>
+            <select
+              className="bd-select"
+              value={channelFilter}
+              onChange={(event) => setChannelFilter(event.target.value)}
+              style={{ padding: '14px 14px', fontSize: '14px' }}
+            >
+              <option value="todos">Todos</option>
+              <option value="tienda_virtual">Tienda Virtual</option>
+              <option value="manual">Manual</option>
+            </select>
+          </FilterField>
         </div>
 
         <div className="bd-actions-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '14px' }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
             <QuickFilterButton label="Hoy" onClick={() => { const today = hoyISO(); setDateFrom(today); setDateTo(today); }} />
             <QuickFilterButton label="Ultimos 7 dias" onClick={() => { setDateFrom(shiftIsoDate(hoyISO(), -7)); setDateTo(hoyISO()); }} />
+            <QuickFilterButton label="Ultimos 30 dias" onClick={() => { setDateFrom(shiftIsoDate(hoyISO(), -29)); setDateTo(hoyISO()); }} />
+            <QuickFilterButton label="60 dias" onClick={() => { setDateFrom(shiftIsoDate(hoyISO(), -(ORDER_HISTORY_RETENTION_DAYS - 1))); setDateTo(hoyISO()); }} />
+            <QuickFilterButton label="Tienda Virtual" onClick={() => setChannelFilter('tienda_virtual')} />
+            <QuickFilterButton label="Manual" onClick={() => setChannelFilter('manual')} />
             <QuickFilterButton label="Preparados" onClick={() => setStatusFilter('Preparado')} />
             <QuickFilterButton label="Enviados" onClick={() => setStatusFilter('Enviado')} />
             <QuickFilterButton label="Entregados" onClick={() => setStatusFilter('Entregado')} />

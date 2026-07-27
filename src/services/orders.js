@@ -427,6 +427,8 @@ export async function createOrder(payload, options = {}) {
   }
 
   const normalizedItems = normalizeStoreItems(payload.items || []);
+  const shouldQueueSicarQuote =
+    channel === STORE_CHANNEL || (channel === MANUAL_CHANNEL && normalizedItems.length > 0);
   const subtotal =
     normalizedItems.length > 0
       ? Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2))
@@ -486,7 +488,7 @@ export async function createOrder(payload, options = {}) {
     rewardRedemption: payload.rewardRedemption,
   });
   const pedidoTexto =
-    channel === STORE_CHANNEL
+    normalizedItems.length > 0
       ? generatedKitchenPedidoTexto || rawPedidoTexto
       : rawPedidoTexto || generatedKitchenPedidoTexto;
 
@@ -523,7 +525,7 @@ export async function createOrder(payload, options = {}) {
     cupon: coupon,
     rewardRedemption: normalizedRewardRedemption,
     total,
-    totalAproximado: channel === STORE_CHANNEL,
+    totalAproximado: shouldQueueSicarQuote,
     estado: 'Pendiente',
     metodoPago: String(payload.metodoPago || 'Efectivo').trim() || 'Efectivo',
     cambioPara: String(payload.cambioPara || '').trim(),
@@ -540,7 +542,7 @@ export async function createOrder(payload, options = {}) {
     timestamp: createdAt,
   };
 
-  if (channel === STORE_CHANNEL) {
+  if (shouldQueueSicarQuote) {
     orderRecord.sicarQuote = {
       status: 'pending',
       appOrderNumber: id,
@@ -548,6 +550,9 @@ export async function createOrder(payload, options = {}) {
       orderNumber: id,
       queuedAt: new Date(createdAt).toISOString(),
     };
+  }
+
+  if (channel === STORE_CHANNEL) {
     orderRecord.rewardPoints = {
       status: 'pending',
       estimatedPoints: Number(payload.estimatedRewardPoints || 0),
@@ -583,12 +588,12 @@ export async function createOrder(payload, options = {}) {
     updates[`storeUsers/${storeUserKey}/welcomeCoupon`] = welcomeCouponReservation;
   }
 
-  if (channel === STORE_CHANNEL) {
+  if (shouldQueueSicarQuote) {
     updates[`${SICAR_QUOTE_QUEUE_PATH}/${orderKey}`] = {
       orderKey,
       fecha,
       id,
-      canal: STORE_CHANNEL,
+      canal: channel,
       status: 'pending',
       requestedAt: createdAt,
       requestedAtIso: new Date(createdAt).toISOString(),

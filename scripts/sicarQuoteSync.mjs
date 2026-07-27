@@ -10,6 +10,7 @@ import {
 } from '../src/services/storeRewards.js';
 
 const STORE_CHANNEL = 'tienda_virtual';
+const MANUAL_CHANNEL = 'manual';
 const STORE_ORDERS_PATH = 'orders';
 const CLIENTS_PATH = 'clients';
 const STORE_USERS_PATH = 'storeUsers';
@@ -181,6 +182,15 @@ const normalizeOrderItems = (items = []) =>
       subtotal: roundMoney(item?.subtotal ?? 0),
     }))
     .filter((item) => item.code && item.quantity > 0);
+
+const isQuoteEligibleOrder = (order = {}) => {
+  const channel = String(order?.canal || '').trim();
+  if (channel === STORE_CHANNEL) {
+    return true;
+  }
+
+  return channel === MANUAL_CHANNEL && normalizeOrderItems(order?.items).length > 0;
+};
 
 const buildCustomerVisibleOrderSignature = (source = {}) =>
   JSON.stringify({
@@ -540,7 +550,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
     Object.entries(orders).forEach(([orderKey, order]) => {
       const cotId = Number(order?.sicarQuote?.cotId || 0);
-      if (String(order?.canal || '').trim() !== STORE_CHANNEL || cotId <= 0) {
+      if (!isQuoteEligibleOrder(order) || cotId <= 0) {
         return;
       }
 
@@ -1135,9 +1145,9 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
           : 0;
       const shouldKeepStorePrice =
         !isReward &&
-        !isDelivery &&
         explicitStoreUnitTotal > 0 &&
         (
+          isDelivery ||
           item.fixedPrice === true ||
           Boolean(item.specialPromotion?.id || item.specialPromotion?.title) ||
           Math.abs(explicitStoreUnitTotal - articleGrossPrice) > 0.009
@@ -1871,8 +1881,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       throw new Error('No se encontro el pedido en Firebase.');
     }
 
-    if (String(order.canal || '').trim() !== STORE_CHANNEL) {
-      throw new Error('Solo los pedidos de tienda virtual pueden sincronizar cotizaciones SICAR.');
+    if (!isQuoteEligibleOrder(order)) {
+      throw new Error('El pedido necesita al menos un articulo con codigo SICAR para crear la cotizacion.');
     }
 
     const sicarCustomer = await ensureSicarCustomerForOrder(orderKey, order);
@@ -1972,7 +1982,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
         try {
           const order = await getOrderByKey(orderKey);
 
-          if (!order || String(order.canal || '').trim() !== STORE_CHANNEL || isFinalStoreStatus(order.estado)) {
+          if (!order || !isQuoteEligibleOrder(order) || isFinalStoreStatus(order.estado)) {
             await updateDatabaseRef(ref(database), {
               [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
             });

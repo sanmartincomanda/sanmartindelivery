@@ -19,6 +19,11 @@
       }
     },
 
+    "orderHistory": {
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
+    },
+
     "rutaOrders": {
       ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin') || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null))",
       ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')",
