@@ -10,7 +10,8 @@ export const STORE_DELIVERY_FEE_BRACKETS = [
   { key: 'under35km', label: '< 3.1 km', maxDistanceKm: 3.1 },
   { key: 'under4km', label: '< 3.9 km', maxDistanceKm: 3.9 },
   { key: 'under6km', label: '< 5.5 km', maxDistanceKm: 5.5 },
-  { key: 'above6km', label: '+ 5.51 km', maxDistanceKm: Number.POSITIVE_INFINITY },
+  { key: 'above6km', label: '5.51 a 8 km', maxDistanceKm: 8 },
+  { key: 'above8km', label: '+ 8 km', maxDistanceKm: Number.POSITIVE_INFINITY },
 ];
 export const STORE_FREE_DELIVERY_PROMOTION = Object.freeze({
   date: '2026-07-08',
@@ -60,6 +61,7 @@ export const DEFAULT_STORE_DELIVERY_SETTINGS = {
     under4km: 45,
     under6km: 60,
     above6km: 100,
+    above8km: 104,
   },
   operationHours: DEFAULT_STORE_OPERATION_HOURS,
   updatedAt: 0,

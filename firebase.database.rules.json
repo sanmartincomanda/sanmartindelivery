@@ -210,8 +210,15 @@
 
     "storeBranches": {
       ".read": true,
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["active", "city", "displayOrder"]
+      ".indexOn": ["active", "city", "displayOrder"],
+      "$branchId": {
+        ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+        "deliverySettings": {
+          "operationHours": {
+            ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && root.child('userRoles').child(auth.uid).child('branchId').val() == $branchId"
+          }
+        }
+      }
     },
 
     "deliveryDrivers": {

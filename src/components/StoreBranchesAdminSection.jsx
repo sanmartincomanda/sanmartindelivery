@@ -7,34 +7,51 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import {
+  getStoreBranchDeliverySettings,
   mergeStoreBranches,
   saveStoreBranch,
   seedDefaultStoreBranchesIfEmpty,
   subscribeStoreBranches,
 } from '../services/storeBranches';
+import {
+  DEFAULT_STORE_DELIVERY_SETTINGS,
+  normalizeStoreOperationHours,
+  subscribeStoreDeliverySettings,
+  validateStoreOperationHours,
+} from '../services/storeDeliverySettings';
+import StoreOperationHoursEditor from './StoreOperationHoursEditor';
 
-const branchToForm = (branch = {}) => ({
-  id: branch.id || '',
-  name: branch.name || '',
-  shortName: branch.shortName || '',
-  brandTitle: branch.brandTitle || '',
-  city: branch.city || '',
-  address: branch.address || '',
-  phone: branch.phone || '',
-  whatsapp: branch.whatsapp || '',
-  lat: branch.storeLocation?.lat ?? '',
-  lng: branch.storeLocation?.lng ?? '',
-  coverageRadiusKm: branch.coverageRadiusKm ?? 7.5,
-  switchPromptRadiusKm: branch.switchPromptRadiusKm ?? 12,
-  active: branch.active !== false,
-  acceptingOrders: branch.acceptingOrders !== false,
-  displayOrder: branch.displayOrder ?? 999,
-});
+const branchToForm = (branch = {}, globalSettings = DEFAULT_STORE_DELIVERY_SETTINGS) => {
+  const effectiveDeliverySettings = getStoreBranchDeliverySettings(branch, globalSettings);
+  return {
+    id: branch.id || '',
+    name: branch.name || '',
+    shortName: branch.shortName || '',
+    brandTitle: branch.brandTitle || '',
+    city: branch.city || '',
+    address: branch.address || '',
+    phone: branch.phone || '',
+    whatsapp: branch.whatsapp || '',
+    lat: branch.storeLocation?.lat ?? '',
+    lng: branch.storeLocation?.lng ?? '',
+    coverageRadiusKm: branch.coverageRadiusKm ?? 7.5,
+    switchPromptRadiusKm: branch.switchPromptRadiusKm ?? 12,
+    operationHours: effectiveDeliverySettings.operationHours,
+    active: branch.active !== false,
+    acceptingOrders: branch.acceptingOrders !== false,
+    displayOrder: branch.displayOrder ?? 999,
+  };
+};
 
 export default function StoreBranchesAdminSection() {
   const [branches, setBranches] = useState(() => mergeStoreBranches());
+  const [globalDeliverySettings, setGlobalDeliverySettings] = useState(
+    DEFAULT_STORE_DELIVERY_SETTINGS
+  );
   const [selectedBranchId, setSelectedBranchId] = useState('granada');
-  const [form, setForm] = useState(() => branchToForm(mergeStoreBranches()[0]));
+  const [form, setForm] = useState(() =>
+    branchToForm(mergeStoreBranches()[0], DEFAULT_STORE_DELIVERY_SETTINGS)
+  );
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState('');
@@ -54,6 +71,14 @@ export default function StoreBranchesAdminSection() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = subscribeStoreDeliverySettings(
+      (settings) => setGlobalDeliverySettings(settings),
+      (error) => console.error('No se pudo cargar el horario base de las sucursales:', error)
+    );
+    return () => unsubscribe();
+  }, []);
+
   const selectedBranch = useMemo(
     () => branches.find((branch) => branch.id === selectedBranchId) || branches[0],
     [branches, selectedBranchId]
@@ -61,9 +86,9 @@ export default function StoreBranchesAdminSection() {
 
   useEffect(() => {
     if (selectedBranch) {
-      setForm(branchToForm(selectedBranch));
+      setForm(branchToForm(selectedBranch, globalDeliverySettings));
     }
-  }, [selectedBranch]);
+  }, [globalDeliverySettings, selectedBranch]);
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -136,6 +161,19 @@ export default function StoreBranchesAdminSection() {
       return;
     }
 
+    const operationHours = normalizeStoreOperationHours(
+      form.operationHours,
+      globalDeliverySettings.operationHours
+    );
+    const scheduleError = validateStoreOperationHours({
+      ...globalDeliverySettings,
+      operationHours,
+    });
+    if (scheduleError) {
+      setMessage(scheduleError);
+      return;
+    }
+
     setSaving(true);
     setMessage('Guardando sucursal...');
     try {
@@ -147,6 +185,10 @@ export default function StoreBranchesAdminSection() {
         coverageRadiusKm: Number(form.coverageRadiusKm),
         switchPromptRadiusKm: Number(form.switchPromptRadiusKm),
         displayOrder: Number(form.displayOrder),
+        deliverySettings: {
+          ...(selectedBranch?.deliverySettings || {}),
+          operationHours,
+        },
       });
       setSelectedBranchId(saved.id);
       setMessage(`${saved.name} guardada. La tienda ya puede detectarla por ubicación.`);
@@ -411,6 +453,14 @@ export default function StoreBranchesAdminSection() {
               Recibiendo pedidos
             </label>
           </div>
+
+          <StoreOperationHoursEditor
+            value={form.operationHours}
+            onChange={(operationHours) => updateField('operationHours', operationHours)}
+            title={`Horario de ${form.shortName || form.city || 'la sucursal'}`}
+            description="Este horario aplica solamente a esta sucursal y se muestra al cliente cuando esta cerrada."
+            disabled={saving}
+          />
 
           <button type="submit" className="cfg-button" disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar sucursal'}

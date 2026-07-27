@@ -4322,9 +4322,9 @@ function DeliverySettingsManager({ settings, saving, onSave }) {
             }}
           >
             <div>
-              <strong style={{ fontSize: 18 }}>Horario de operaciones</strong>
+              <strong style={{ fontSize: 18 }}>Horario base de operaciones</strong>
               <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700, lineHeight: 1.5 }}>
-                Si la tienda esta cerrada, la tienda virtual no permitira enviar pedidos y mostrara el horario de atencion.
+                Funciona como respaldo general. El horario particular de Granada, Masaya o Nindiri se administra en la pestaña Sucursales.
               </div>
             </div>
 

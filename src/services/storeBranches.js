@@ -3,6 +3,8 @@ import { database } from '../firebase';
 import { getDistanceKm, normalizeLocation } from './geo';
 import {
   DEFAULT_STORE_DELIVERY_SETTINGS,
+  DEFAULT_STORE_OPERATION_HOURS,
+  normalizeStoreOperationHours,
   normalizeStoreDeliverySettings,
 } from './storeDeliverySettings';
 
@@ -241,6 +243,23 @@ export const saveStoreBranch = async (branch = {}) => {
 
   await set(ref(database, `${STORE_BRANCHES_PATH}/${cleanId}`), normalized);
   return normalized;
+};
+
+export const saveStoreBranchOperationHours = async (branchId, operationHours = {}) => {
+  const cleanId = String(branchId || '').trim().toLowerCase();
+  if (!cleanId) {
+    throw new Error('La sucursal necesita un codigo para guardar su horario.');
+  }
+
+  const normalizedHours = normalizeStoreOperationHours(
+    operationHours,
+    DEFAULT_STORE_OPERATION_HOURS
+  );
+  await set(
+    ref(database, `${STORE_BRANCHES_PATH}/${cleanId}/deliverySettings/operationHours`),
+    normalizedHours
+  );
+  return normalizedHours;
 };
 
 export const seedDefaultStoreBranchesIfEmpty = async (existingBranches = {}) => {

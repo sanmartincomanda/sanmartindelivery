@@ -14,6 +14,21 @@ import {
   fetchSicarRecentSoldProducts,
   getSicarBridgeHealth,
 } from '../services/sicarCatalog';
+import {
+  DEFAULT_STORE_DELIVERY_SETTINGS,
+  DEFAULT_STORE_OPERATION_HOURS,
+  normalizeStoreOperationHours,
+  subscribeStoreDeliverySettings,
+  validateStoreOperationHours,
+} from '../services/storeDeliverySettings';
+import {
+  getStoreBranchById,
+  getStoreBranchDeliverySettings,
+  mergeStoreBranches,
+  saveStoreBranchOperationHours,
+  subscribeStoreBranches,
+} from '../services/storeBranches';
+import StoreOperationHoursEditor from './StoreOperationHoursEditor';
 
 const money = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 const CATALOG_PAGE_SIZE = 24;
@@ -59,6 +74,12 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
   const [checkingActivity, setCheckingActivity] = useState(false);
   const [applyingActivity, setApplyingActivity] = useState(false);
   const [inactivityPreview, setInactivityPreview] = useState(null);
+  const [branches, setBranches] = useState(() => mergeStoreBranches());
+  const [globalDeliverySettings, setGlobalDeliverySettings] = useState(
+    DEFAULT_STORE_DELIVERY_SETTINGS
+  );
+  const [operationHours, setOperationHours] = useState(DEFAULT_STORE_OPERATION_HOURS);
+  const [savingHours, setSavingHours] = useState(false);
   const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
@@ -75,6 +96,35 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
     );
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribeSettings = subscribeStoreDeliverySettings(
+      (settings) => setGlobalDeliverySettings(settings),
+      (error) => console.error('No se pudo cargar el horario base:', error)
+    );
+    const unsubscribeBranches = subscribeStoreBranches(
+      (nextBranches) => setBranches(nextBranches),
+      (error) => console.error('No se pudo cargar la sucursal:', error)
+    );
+
+    return () => {
+      unsubscribeSettings();
+      unsubscribeBranches();
+    };
+  }, []);
+
+  const currentBranch = useMemo(
+    () => getStoreBranchById(branches, branchId),
+    [branchId, branches]
+  );
+  const effectiveDeliverySettings = useMemo(
+    () => getStoreBranchDeliverySettings(currentBranch, globalDeliverySettings),
+    [currentBranch, globalDeliverySettings]
+  );
+
+  useEffect(() => {
+    setOperationHours(effectiveDeliverySettings.operationHours);
+  }, [effectiveDeliverySettings]);
 
   const scopedProducts = useMemo(
     () => catalog.map((product) => resolveCatalogProductForBranch(product, branchId)),
@@ -236,6 +286,34 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
     }
   };
 
+  const saveOperationHours = async () => {
+    const normalizedHours = normalizeStoreOperationHours(
+      operationHours,
+      effectiveDeliverySettings.operationHours
+    );
+    const scheduleError = validateStoreOperationHours({
+      ...effectiveDeliverySettings,
+      operationHours: normalizedHours,
+    });
+    if (scheduleError) {
+      setMessage(scheduleError);
+      return;
+    }
+
+    setSavingHours(true);
+    setMessage('Guardando horario de la sucursal...');
+    try {
+      await saveStoreBranchOperationHours(branchId, normalizedHours);
+      setOperationHours(normalizedHours);
+      setMessage(`Horario de ${branchName} actualizado correctamente.`);
+    } catch (error) {
+      console.error('No se pudo guardar el horario de la sucursal:', error);
+      setMessage(error?.message || 'No se pudo guardar el horario de la sucursal.');
+    } finally {
+      setSavingHours(false);
+    }
+  };
+
   return (
     <div className="branch-admin">
       <style>{`
@@ -245,13 +323,14 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
         .branch-admin__hero-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.branch-admin__sync{border:0;border-radius:999px;padding:13px 18px;background:#fff;color:#0d4f91;font-weight:900;cursor:pointer;white-space:nowrap}.branch-admin__sync--warning{background:#fff3d8;color:#8a5200}.branch-admin__sync:disabled{opacity:.6;cursor:wait}
         .branch-admin__stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.branch-admin__stat{background:white;border:1px solid #dbe7f4;border-radius:18px;padding:16px}.branch-admin__stat small{color:#64809d;font-weight:800}.branch-admin__stat strong{display:block;font-size:25px;margin-top:5px}
         .branch-admin__catalog-tools{display:grid;gap:12px}.branch-admin__toolbar{display:flex;gap:12px;align-items:center}.branch-admin__toolbar input{flex:1;min-height:48px;border:1px solid #cbdced;border-radius:15px;padding:0 16px;font:inherit}.branch-admin__message{border-radius:14px;padding:12px 15px;background:#eaf4ff;color:#124f87;font-weight:800}
+        .branch-admin__hours{display:grid;gap:10px}.branch-admin__hours-save{justify-self:end;min-width:210px;border:0;border-radius:999px;padding:13px 18px;background:linear-gradient(90deg,#0e5fae,#43a5f5);color:white;font:inherit;font-weight:900;cursor:pointer}.branch-admin__hours-save:disabled{opacity:.6;cursor:wait}
         .branch-admin__categories{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 7px;scrollbar-width:thin}.branch-category{border:1px solid #cbdced;border-radius:999px;background:white;color:#254766;padding:10px 14px;display:flex;align-items:center;gap:8px;white-space:nowrap;font:inherit;font-size:13px;font-weight:900;cursor:pointer}.branch-category span{display:grid;place-items:center;min-width:24px;height:24px;border-radius:999px;background:#edf4fb;color:#54718d;font-size:11px}.branch-category--active{border-color:#1266b1;background:#0d4f91;color:white;box-shadow:0 8px 18px rgba(13,79,145,.18)}.branch-category--active span{background:rgba(255,255,255,.18);color:white}
         .branch-admin__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}.branch-product{background:#fff;border:1px solid #dbe7f4;border-radius:20px;padding:12px;display:grid;grid-template-columns:72px 1fr;gap:12px;text-align:left;cursor:pointer;transition:.15s transform,.15s box-shadow}.branch-product:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(7,29,56,.1)}
         .branch-product img{width:72px;height:72px;object-fit:contain;border-radius:14px;background:#f6f9fc}.branch-product h3{margin:3px 0 6px;font-size:14px;line-height:1.2}.branch-product p{margin:0;font-weight:900;color:#0e5fae}.branch-product small{display:block;color:#6a7c91}.branch-product__off{opacity:.55}
         .branch-admin__load-more{justify-self:center;min-width:220px;border:1px solid #c5d9ec;border-radius:999px;background:white;color:#0d4f91;padding:13px 20px;font:inherit;font-weight:900;cursor:pointer}.branch-admin__empty{padding:34px;text-align:center;border:1px dashed #bfd2e5;border-radius:20px;background:#f8fbfe;color:#60788f}
         .branch-admin__modal{position:fixed;inset:0;z-index:5000;background:rgba(4,17,34,.68);display:grid;place-items:center;padding:18px}.branch-admin__form{width:min(480px,100%);background:white;border-radius:24px;padding:24px;display:grid;gap:14px}.branch-admin__form h2{margin:0}.branch-admin__form label{display:grid;gap:7px;font-weight:900}.branch-admin__form input{min-height:46px;border:1px solid #cbdced;border-radius:13px;padding:0 13px;font:inherit}.branch-admin__actions{display:flex;gap:10px}.branch-admin__actions button{flex:1;min-height:46px;border:0;border-radius:999px;font-weight:900;cursor:pointer}.branch-admin__cancel{background:#edf3f8;color:#17324f}.branch-admin__save{background:linear-gradient(90deg,#0e5fae,#43a5f5);color:white}
         .branch-sales-review{width:min(620px,100%);max-height:min(82vh,720px);overflow:auto;background:white;border-radius:24px;padding:24px;display:grid;gap:16px}.branch-sales-review h2,.branch-sales-review p{margin:0}.branch-sales-review__stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.branch-sales-review__stat{border-radius:16px;padding:14px;background:#edf6ff}.branch-sales-review__stat--warning{background:#fff3d8;color:#7a4900}.branch-sales-review__stat strong{display:block;font-size:25px}.branch-sales-review__list{display:grid;gap:7px;max-height:220px;overflow:auto}.branch-sales-review__item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #dbe7f4;border-radius:12px;font-size:13px}.branch-sales-review__alert{padding:12px;border-radius:14px;background:#fff1f1;color:#982424;font-weight:800}
-        @media(max-width:700px){.branch-admin{padding:16px}.branch-admin__hero{align-items:flex-start;flex-direction:column}.branch-admin__hero-actions{width:100%;justify-content:stretch}.branch-admin__sync{flex:1}.branch-admin__stats{grid-template-columns:1fr}.branch-admin__grid{grid-template-columns:1fr 1fr}.branch-product{grid-template-columns:1fr}.branch-product img{width:100%;height:110px}}
+        @media(max-width:700px){.branch-admin{padding:16px}.branch-admin__hero{align-items:flex-start;flex-direction:column}.branch-admin__hero-actions{width:100%;justify-content:stretch}.branch-admin__sync{flex:1}.branch-admin__stats{grid-template-columns:1fr}.branch-admin__hours-save{width:100%}.branch-admin__grid{grid-template-columns:1fr 1fr}.branch-product{grid-template-columns:1fr}.branch-product img{width:100%;height:110px}}
       `}</style>
 
       <section className="branch-admin__hero">
@@ -282,6 +361,23 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
       </section>
 
       {message && <div className="branch-admin__message">{message}</div>}
+      <section className="branch-admin__hours">
+        <StoreOperationHoursEditor
+          value={operationHours}
+          onChange={setOperationHours}
+          title={`Horario de ${branchName}`}
+          description="Este horario controla exclusivamente cuando esta sucursal recibe pedidos en la tienda virtual."
+          disabled={savingHours}
+        />
+        <button
+          type="button"
+          className="branch-admin__hours-save"
+          onClick={saveOperationHours}
+          disabled={savingHours}
+        >
+          {savingHours ? 'Guardando horario...' : 'Guardar horario'}
+        </button>
+      </section>
       <div className="branch-admin__catalog-tools">
         <div className="branch-admin__toolbar">
           <input

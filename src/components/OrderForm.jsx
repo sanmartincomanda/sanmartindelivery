@@ -19,6 +19,12 @@ import {
   formatStoreDeliveryDistance,
   subscribeStoreDeliverySettings,
 } from '../services/storeDeliverySettings';
+import {
+  getStoreBranchById,
+  getStoreBranchDeliverySettings,
+  mergeStoreBranches,
+  subscribeStoreBranches,
+} from '../services/storeBranches';
 
 const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
 
@@ -58,6 +64,7 @@ export default function OrderForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successNumber, setSuccessNumber] = useState(null);
   const [deliverySettings, setDeliverySettings] = useState(null);
+  const [storeBranches, setStoreBranches] = useState(() => mergeStoreBranches());
   const [deliverySettingsError, setDeliverySettingsError] = useState(false);
   const [catalog, setCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -81,6 +88,26 @@ export default function OrderForm({
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreBranches(
+      (branches) => setStoreBranches(branches),
+      (error) => console.error('No se pudieron cargar las sucursales para el envio:', error)
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const selectedBranch = useMemo(
+    () => getStoreBranchById(storeBranches, branchId),
+    [branchId, storeBranches]
+  );
+  const activeDeliverySettings = useMemo(
+    () =>
+      deliverySettings
+        ? getStoreBranchDeliverySettings(selectedBranch, deliverySettings)
+        : null,
+    [deliverySettings, selectedBranch]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -116,16 +143,16 @@ export default function OrderForm({
       return calculateStoreDeliveryQuote({ fulfillmentType });
     }
 
-    if (!deliverySettings) {
+    if (!activeDeliverySettings) {
       return null;
     }
 
     return calculateStoreDeliveryQuote({
-      settings: deliverySettings,
+      settings: activeDeliverySettings,
       destination: selectedClient?.ubicacion || null,
       fulfillmentType,
     });
-  }, [deliverySettings, fulfillmentType, selectedClient]);
+  }, [activeDeliverySettings, fulfillmentType, selectedClient]);
 
   const sugerencias = useMemo(() => {
     if (!allowClientDirectory) {

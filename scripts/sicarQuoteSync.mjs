@@ -222,6 +222,7 @@ const DELIVERY_SERVICE_CODES_BY_BRACKET = {
   under4km: '00247',
   under6km: '00248',
   above6km: '00249',
+  above8km: '00249',
 };
 const DELIVERY_SERVICE_CODES = new Set(
   Object.values(DELIVERY_SERVICE_CODES_BY_BRACKET).map((code) => normalizeCode(code)).filter(Boolean)
@@ -243,11 +244,12 @@ const resolveDeliveryServiceBracketKey = (order = {}) => {
     return '';
   }
 
-  if (distanceKm < 2) return 'under2km';
-  if (distanceKm < 3.5) return 'under35km';
-  if (distanceKm < 4) return 'under4km';
-  if (distanceKm < 6) return 'under6km';
-  return 'above6km';
+  if (distanceKm <= 1.85) return 'under2km';
+  if (distanceKm <= 3.1) return 'under35km';
+  if (distanceKm <= 3.9) return 'under4km';
+  if (distanceKm <= 5.5) return 'under6km';
+  if (distanceKm <= 8) return 'above6km';
+  return 'above8km';
 };
 
 const buildDeliveryServiceOrderItem = (order = {}) => {
