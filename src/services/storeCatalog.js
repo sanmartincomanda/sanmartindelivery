@@ -99,6 +99,9 @@ const normalizeBranchSettings = (settings = {}, fallback = {}) => {
       active: current.active ?? previous.active ?? true,
       updatedAt: Number(current.updatedAt ?? previous.updatedAt ?? 0) || 0,
       updatedBy: String(current.updatedBy ?? previous.updatedBy ?? '').trim(),
+      inactiveReason: String(current.inactiveReason ?? previous.inactiveReason ?? '').trim(),
+      salesWindowDays: Number(current.salesWindowDays ?? previous.salesWindowDays ?? 0) || 0,
+      lastSalesCheckAt: Number(current.lastSalesCheckAt ?? previous.lastSalesCheckAt ?? 0) || 0,
     };
 
     if (priceValue !== '' && priceValue !== null && priceValue !== undefined && Number.isFinite(Number(priceValue))) {
@@ -457,6 +460,66 @@ export async function applySicarBranchPriceUpdates(priceProducts = [], branchId,
   return {
     appliedCount: Object.keys(updates).length,
     missingCodes,
+  };
+}
+
+export async function inactivateBranchProductsWithoutRecentSales(
+  soldProducts = [],
+  branchId,
+  days = 60,
+  updatedBy = 'sicar-sales-review'
+) {
+  const cleanBranchId = String(branchId || '').trim().toLowerCase();
+  const salesWindowDays = Math.max(1, Math.trunc(Number(days || 60)));
+  if (!cleanBranchId) {
+    throw new Error('Sucursal invalida');
+  }
+
+  const soldCodes = new Set(
+    (Array.isArray(soldProducts) ? soldProducts : [])
+      .map((product) => String(product?.code || '').trim())
+      .filter(Boolean)
+  );
+  const currentMap = await getCurrentCatalogMap();
+  const updates = {};
+  const inactivatedCodes = [];
+  const checkedAt = Date.now();
+
+  Object.entries(currentMap).forEach(([productKey, rawProduct]) => {
+    const product = normalizeCatalogProduct(rawProduct);
+    if (!product.code || soldCodes.has(product.code)) {
+      return;
+    }
+
+    const scopedProduct = resolveCatalogProductForBranch(product, cleanBranchId);
+    if (scopedProduct.active === false) {
+      return;
+    }
+
+    const existingSettings = rawProduct?.branchSettings?.[cleanBranchId] || {};
+    updates[`${productKey}/branchSettings/${cleanBranchId}`] = {
+      ...existingSettings,
+      active: false,
+      inactiveReason: 'no_sales',
+      salesWindowDays,
+      lastSalesCheckAt: checkedAt,
+      updatedAt: checkedAt,
+      updatedBy: String(updatedBy || 'sicar-sales-review').trim(),
+    };
+    inactivatedCodes.push(product.code);
+  });
+
+  if (Object.keys(updates).length > 0) {
+    await update(ref(database, STORE_CATALOG_PATH), updates);
+    await touchCatalogMeta();
+  }
+
+  return {
+    inactivatedCount: inactivatedCodes.length,
+    inactivatedCodes,
+    soldCodesCount: soldCodes.size,
+    salesWindowDays,
+    checkedAt,
   };
 }
 
