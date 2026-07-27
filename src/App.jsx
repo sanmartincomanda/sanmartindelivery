@@ -305,6 +305,7 @@ function App() {
         isKitchenRoute);
 
     if (!shouldSubscribeOrders) {
+      setLoading(false);
       return undefined;
     }
 
