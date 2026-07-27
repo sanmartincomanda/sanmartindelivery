@@ -463,8 +463,21 @@ const buildQuoteFingerprint = (quote = {}) =>
 export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId = 'granada' }) {
   const database = getAuthenticatedFirebaseDatabase();
   const assignedBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
-  const getOrderBranchId = (order = {}) =>
-    String(order?.storeBranchId || order?.storeBranchCode || 'granada').trim().toLowerCase() || 'granada';
+  const getOrderBranchId = (order = {}) => {
+    const explicitBranchId = String(order?.storeBranchId || order?.storeBranchCode || '')
+      .trim()
+      .toLowerCase();
+    if (explicitBranchId) {
+      return explicitBranchId;
+    }
+
+    const orderCode = String(order?.orderNumber || order?.appOrderCode || '')
+      .trim()
+      .toUpperCase();
+    if (orderCode.startsWith('NI-')) return 'nindiri';
+    if (orderCode.startsWith('MY-')) return 'masaya';
+    return 'granada';
+  };
   const isAssignedBranch = (order = {}) => getOrderBranchId(order) === assignedBranchId;
   const getBranchScopedQuery = (path) => {
     const targetRef = ref(database, path);
@@ -2151,6 +2164,11 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
 
       for (const [orderKey, entry] of queueEntries) {
         try {
+          const queuedOrder = await getOrderByKey(orderKey);
+          if (!queuedOrder || !isAssignedBranch(queuedOrder)) {
+            continue;
+          }
+
           const result = await syncOrderQuote(orderKey, { applyToFirebase: true });
           await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
             status: result.missingCodes.length > 0 ? 'partial' : 'synced',
