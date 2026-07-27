@@ -9,7 +9,7 @@ import React, {
 import { push, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
-import { fetchOrdersByDateRange } from '../services/orders';
+import { fetchOrdersByDateRange, formatOrderNumber } from '../services/orders';
 import {
   buildClientDirectoryRootUpdate,
   removeClientDirectoryEntry,
@@ -335,7 +335,7 @@ const truncateText = (value = '', maxLength = 180) => {
 const buildHistoryExportRows = (orders) =>
   orders.map((order) => ({
     Fecha: order.fecha || '-',
-    Pedido: order.id || '-',
+    Pedido: formatOrderNumber(order),
     Cliente: order.cliente || '-',
     Codigo: order.clienteCodigo || '-',
     Telefono: order.telefono || '-',
@@ -2078,7 +2078,7 @@ function HistoryCard({ order, onOpen }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: '11px', opacity: 0.54, letterSpacing: '0.08em', fontWeight: 800 }}>PEDIDO</div>
-          <div style={{ marginTop: '8px', fontSize: '28px', fontWeight: 900 }}>#{order.id || '--'}</div>
+          <div style={{ marginTop: '8px', fontSize: '28px', fontWeight: 900 }}>#{formatOrderNumber(order)}</div>
         </div>
 
         <span
@@ -2200,7 +2200,7 @@ function HistoryDetailModal({ order, onClose }) {
         <div className="bd-history-header" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '18px' }}>
           <div>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '34px', fontWeight: 900 }}>Pedido #{order.id || '--'}</div>
+              <div style={{ fontSize: '34px', fontWeight: 900 }}>Pedido #{formatOrderNumber(order)}</div>
               <span
                 style={{
                   padding: '8px 12px',

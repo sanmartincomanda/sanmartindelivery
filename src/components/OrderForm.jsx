@@ -37,7 +37,7 @@ export default function OrderForm({
   clientes = [],
   allowClientDirectory = true,
   nextOrderNumber = 1,
-  remainingOrders = 0,
+  branchId = 'granada',
 }) {
   const [clienteInput, setClienteInput] = useState('');
   const [pedido, setPedido] = useState('');
@@ -65,8 +65,7 @@ export default function OrderForm({
   const [productSearch, setProductSearch] = useState('');
   const [orderItems, setOrderItems] = useState([]);
 
-  const hasAvailability = remainingOrders > 0;
-  const previewNumber = hasAvailability ? formatOrderNumber(nextOrderNumber) : 'MAX';
+  const previewNumber = formatOrderNumber(nextOrderNumber, branchId);
 
   useEffect(() => {
     const unsubscribe = subscribeStoreDeliverySettings(
@@ -253,11 +252,6 @@ export default function OrderForm({
       return;
     }
 
-    if (!hasAvailability) {
-      alert('Se alcanzo el limite diario de pedidos.');
-      return;
-    }
-
     const orderClient = selectedClient || {
       nombre: manualClientName,
       codigo: '-',
@@ -329,7 +323,7 @@ export default function OrderForm({
         { channel: MANUAL_CHANNEL }
       );
 
-      setSuccessNumber(createdOrder.id);
+      setSuccessNumber(createdOrder);
       window.setTimeout(() => setSuccessNumber(null), 2200);
 
       setClienteInput('');
@@ -469,9 +463,9 @@ export default function OrderForm({
             alignItems: 'center',
             gap: '12px',
             padding: '16px 24px',
-            background: hasAvailability ? 'rgba(255,255,255,0.05)' : 'rgba(239, 68, 68, 0.2)',
+            background: 'rgba(255,255,255,0.05)',
             borderRadius: '16px',
-            border: `2px solid ${hasAvailability ? 'rgba(255,255,255,0.1)' : '#ef4444'}`,
+            border: '2px solid rgba(255,255,255,0.1)',
           }}
         >
           <div>
@@ -482,7 +476,7 @@ export default function OrderForm({
               style={{
                 fontSize: '36px',
                 fontWeight: 900,
-                color: hasAvailability ? '#f59e0b' : '#ef4444',
+                color: '#f59e0b',
                 fontFamily: 'monospace',
                 lineHeight: 1,
               }}
@@ -490,42 +484,17 @@ export default function OrderForm({
               {previewNumber}
             </span>
           </div>
-          {hasAvailability && (
-            <div
-              style={{
-                width: '12px',
-                height: '12px',
-                borderRadius: '50%',
-                background: '#10b981',
-                animation: 'pulse 2s infinite',
-              }}
-            />
-          )}
+          <div
+            style={{
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              background: '#10b981',
+              animation: 'pulse 2s infinite',
+            }}
+          />
         </div>
       </div>
-
-      {!hasAvailability && (
-        <div
-          style={{
-            background: 'rgba(239, 68, 68, 0.2)',
-            border: '2px solid #ef4444',
-            borderRadius: '16px',
-            padding: '20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            color: '#fecaca',
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 800 }}>Limite alcanzado</div>
-            <div style={{ fontSize: '14px', opacity: 0.9 }}>
-              Ya se usaron todos los numeros disponibles para hoy.
-            </div>
-          </div>
-        </div>
-      )}
 
       {successNumber && (
         <div
@@ -619,10 +588,7 @@ export default function OrderForm({
                   lineHeight: 1,
                 }}
               >
-                {hasAvailability ? previewNumber : '---'}
-              </div>
-              <div style={{ fontSize: '12px', opacity: 0.55, marginTop: '8px' }}>
-                Quedan {remainingOrders} pedidos disponibles hoy
+                {previewNumber}
               </div>
               {fulfillmentType === ORDER_FULFILLMENT_DELIVERY && (
                 <div
@@ -1330,36 +1296,29 @@ export default function OrderForm({
               disabled={
                 isSubmitting ||
                 (!selectedClient && !clienteInput.trim()) ||
-                orderItems.length === 0 ||
-                !hasAvailability
+                orderItems.length === 0
               }
               className="btn-hover"
               style={{
                 padding: '20px 48px',
                 borderRadius: '16px',
                 border: 'none',
-                background: !hasAvailability
-                  ? '#ef4444'
-                  : isSubmitting
+                background: isSubmitting
                     ? 'rgba(255,255,255,0.1)'
                     : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 color: 'white',
                 fontWeight: 900,
                 fontSize: '18px',
                 cursor:
-                  isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0 || !hasAvailability
+                  isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0
                     ? 'not-allowed'
                     : 'pointer',
                 opacity: isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0 ? 0.5 : 1,
                 boxShadow:
-                  isSubmitting || !hasAvailability ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)',
+                  isSubmitting ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)',
               }}
             >
-              {isSubmitting
-                ? 'Enviando...'
-                : hasAvailability
-                  ? `Enviar Orden #${previewNumber}`
-                  : 'Limite diario alcanzado'}
+              {isSubmitting ? 'Enviando...' : `Enviar Orden #${previewNumber}`}
             </button>
           </div>
         </div>

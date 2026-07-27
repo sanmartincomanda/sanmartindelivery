@@ -845,7 +845,7 @@ export default function StoreCustomersAdminSection({
                   label="Ultimo pedido"
                   value={
                     selectedCustomerLastOrder
-                      ? `#${formatOrderNumber(selectedCustomerLastOrder.id)} | ${formatDateTime(selectedCustomerLastOrder.timestampIngresoMs || selectedCustomerLastOrder.timestamp)}`
+                      ? `#${formatOrderNumber(selectedCustomerLastOrder)} | ${formatDateTime(selectedCustomerLastOrder.timestampIngresoMs || selectedCustomerLastOrder.timestamp)}`
                       : 'Sin pedidos'
                   }
                 />
@@ -921,7 +921,7 @@ export default function StoreCustomersAdminSection({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
                         <strong>
-                          Pedido #{formatOrderNumber(order.id)} | {order.estado || 'Pendiente'}
+                          Pedido #{formatOrderNumber(order)} | {order.estado || 'Pendiente'}
                         </strong>
                         <strong>{formatCurrency(resolveOrderAmount(order))}</strong>
                       </div>

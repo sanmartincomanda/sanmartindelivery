@@ -3,7 +3,7 @@ import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
 import { DRIVERS_PATH, getDriverPublicName, mergeDrivers } from '../services/drivers';
-import { buildStoreKitchenOrderText, isPickupOrder } from '../services/orders';
+import { buildStoreKitchenOrderText, formatOrderNumber, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
@@ -281,7 +281,7 @@ export default function ListaPedidos({ pedidos = [] }) {
   const handleCancelarPedido = (pedido) => {
     if (!pedido?.firebaseKey) return;
 
-    const confirmCancel = window.confirm(`Quieres anular el pedido #${pedido.id}?`);
+    const confirmCancel = window.confirm(`Quieres anular el pedido #${formatOrderNumber(pedido)}?`);
     if (!confirmCancel) return;
 
     const nowMs = Date.now();
@@ -524,7 +524,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                     : 'Enviar Pedido'}
                 </h2>
                 <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-                  Pedido #{pedidos.find(p => p.firebaseKey === modalRepartidor)?.id}
+                  Pedido #{formatOrderNumber(pedidos.find(p => p.firebaseKey === modalRepartidor))}
                 </p>
               </div>
               <button
@@ -899,7 +899,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                           fontWeight: 900
                         }}
                       >
-                        #{pedido.id}
+                        #{formatOrderNumber(pedido)}
                       </div>
                       <div>
                         <div style={{

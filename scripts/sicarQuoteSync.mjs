@@ -38,6 +38,16 @@ const normalizeText = (value = '') =>
     .replace(/\s+/g, ' ')
     .trim();
 const normalizeCode = (value = '') => String(value ?? '').trim();
+const formatAppOrderCode = (order = {}) => {
+  const explicitCode = String(order?.orderNumber || '').trim().toUpperCase();
+  if (explicitCode) {
+    return explicitCode;
+  }
+
+  const branchId = String(order?.storeBranchId || order?.storeBranchCode || 'granada').trim().toLowerCase();
+  const branchPrefix = { granada: 'GR', nindiri: 'NI', masaya: 'MY' }[branchId] || branchId.slice(0, 2).toUpperCase() || 'GR';
+  return `${branchPrefix}-${String(Number(order?.id || 0)).padStart(3, '0')}`;
+};
 const normalizeEmail = (value = '') => String(value ?? '').trim().toLowerCase();
 const normalizePhone = (value = '') => String(value ?? '').replace(/[^\d+]/g, '').trim();
 const isFirebasePermissionDeniedError = (error) =>
@@ -391,16 +401,17 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
 };
 
 const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
-  const orderNumber = String(order?.id || '').padStart(3, '0');
+  const orderNumber = formatAppOrderCode(order);
   const customerDiscount = roundMoney(
     quote?.customerDiscount ?? quote?.discount ?? order?.descuentoCupon ?? 0
   );
   const customerTotal = roundMoney(
     quote?.customerTotal ?? Math.max(roundMoney(quote?.total || 0) - customerDiscount, 0)
   );
+  const storeName = normalizeText(order?.storeBranchName || 'Carnes San Martin Granada');
   const lines = [
     `Hola ${String(order?.cliente || 'cliente').trim()}.`,
-    `Tu pedido #${orderNumber} en Carnes San Martin Granada fue actualizado.`,
+    `Tu pedido #${orderNumber} en ${storeName} fue actualizado.`,
     '',
     'Detalle actualizado:',
   ];
@@ -522,6 +533,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       cotId: Number(quote.cotId || 0),
       storeBranchId: getOrderBranchId(order),
       appOrderNumber: Number(order.id || 0),
+      appOrderCode: formatAppOrderCode(order),
       orderDate: String(quote.orderDate || order.fecha || '').trim(),
       customerName: String(order.cliente || '').trim(),
       orderStatus: String(order.estado || 'Pendiente').trim(),
@@ -1869,6 +1881,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         status: missingCodes.length > 0 ? 'partial' : 'linked',
         cotId: quote.cotId,
         appOrderNumber: Number(order.id || 0),
+        appOrderCode: formatAppOrderCode(order),
         orderDate: quote.orderDate,
         cliId: Number(sicarCustomer?.cliId || order?.sicarQuote?.cliId || 0),
         clientCode: normalizeCode(sicarCustomer?.clave || order?.sicarQuote?.clientCode || ''),
@@ -1941,6 +1954,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       status: quoteStatus,
       cotId: customerQuote.cotId,
       appOrderNumber: Number(order.id || 0),
+      appOrderCode: formatAppOrderCode(order),
       orderDate: customerQuote.orderDate,
       cliId: Number(sicarCustomer?.cliId || 0),
       clientCode: normalizeCode(sicarCustomer?.clave),
@@ -1969,6 +1983,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     return {
       orderKey,
       appOrderNumber: Number(order.id || 0),
+      appOrderCode: String(order?.orderNumber || '').trim(),
       createdQuote,
       quote: customerQuote,
       missingCodes,
@@ -2139,6 +2154,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
             status: result.missingCodes.length > 0 ? 'partial' : 'synced',
             cotId: result.quote.cotId,
             appOrderNumber: Number(result.appOrderNumber || 0),
+            appOrderCode: String(result.appOrderCode || '').trim(),
             orderDate: result.quote.orderDate,
             subtotal: result.quote.productSubtotal || result.quote.subtotal,
             discount: result.quote.discount,

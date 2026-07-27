@@ -8,7 +8,7 @@ import {
   isStoreWelcomeCouponCoupon,
 } from './storeWelcomeCoupon.js';
 
-export const ORDER_LIMIT_PER_DAY = 125;
+export const ORDER_LIMIT_PER_DAY = 10000;
 export const MANUAL_CHANNEL = 'manual';
 export const STORE_CHANNEL = 'tienda_virtual';
 export const STORE_ORDER_RETENTION_DAYS = 3;
@@ -138,7 +138,49 @@ const buildTimeLabel = () =>
     second: '2-digit',
   });
 
-export const formatOrderNumber = (value) => String(value || 0).padStart(3, '0');
+const ORDER_BRANCH_PREFIXES = Object.freeze({
+  granada: 'GR',
+  nindiri: 'NI',
+  masaya: 'MY',
+});
+
+export const getOrderBranchPrefix = (branchId = 'granada') => {
+  const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  return ORDER_BRANCH_PREFIXES[cleanBranchId] || cleanBranchId.slice(0, 2).toUpperCase() || 'GR';
+};
+
+export const formatOrderNumber = (value, branchId = '') => {
+  const order = value && typeof value === 'object' ? value : null;
+  const explicitNumber = String(order?.orderNumber || order?.displayId || '').trim().toUpperCase();
+  if (explicitNumber) {
+    return explicitNumber;
+  }
+
+  const numericValue = Number(order?.id ?? value ?? 0);
+  const resolvedBranchId = String(
+    order?.storeBranchId || order?.storeBranchCode || branchId || 'granada'
+  ).trim().toLowerCase();
+  return `${getOrderBranchPrefix(resolvedBranchId)}-${String(numericValue || 0).padStart(3, '0')}`;
+};
+
+export const getOrderCounterPath = (date, branchId = 'granada') => {
+  const cleanDate = String(date || '').trim();
+  const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  return cleanBranchId === 'granada'
+    ? `orderCounters/${cleanDate}`
+    : `orderCounters/${cleanDate}-${cleanBranchId}`;
+};
+
+export const subscribeOrderCounter = (date, branchId, onData, onError) => {
+  const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  return onValue(
+    ref(database, getOrderCounterPath(date, cleanBranchId)),
+    (snapshot) => {
+      onData(Number(snapshot.val() || 0));
+    },
+    onError
+  );
+};
 
 export const formatWeight = (value) => {
   const numeric = Number(value || 0);
@@ -309,7 +351,7 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   return lines.join('\n').trim();
 };
 
-const buildOrderKey = (date, number) => `${date}-${formatOrderNumber(number)}`;
+const buildOrderKey = (date, orderNumber) => `${date}-${String(orderNumber || '').trim()}`;
 
 const mapOrdersSnapshot = (snapshot) =>
   Object.entries(snapshot.val() || {}).map(([firebaseKey, value]) => ({
@@ -421,7 +463,6 @@ const createLimitError = () => {
 export async function createOrder(payload, options = {}) {
   const channel = options.channel || MANUAL_CHANNEL;
   const fecha = payload.fecha || hoyISO();
-  const counterRef = ref(database, `orderCounters/${fecha}`);
   const createdAt = Date.now();
   const fulfillmentType = normalizeOrderFulfillmentType(payload.fulfillmentType || payload.tipoEntrega);
   const pickupOrder = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
@@ -432,6 +473,7 @@ export async function createOrder(payload, options = {}) {
   ).trim();
   const storeBranchAddress = String(payload.storeBranchAddress || '').trim();
   const storeBranchLocation = normalizeLocation(payload.storeBranchLocation);
+  const counterRef = ref(database, getOrderCounterPath(fecha, storeBranchId));
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
     const lastNumber = Number(currentValue || 0);
@@ -452,6 +494,8 @@ export async function createOrder(payload, options = {}) {
   }
 
   const normalizedItems = normalizeStoreItems(payload.items || []);
+  const orderPrefix = getOrderBranchPrefix(storeBranchId);
+  const orderNumber = formatOrderNumber(id, storeBranchId);
   const shouldQueueSicarQuote =
     channel === STORE_CHANNEL || (channel === MANUAL_CHANNEL && normalizedItems.length > 0);
   const subtotal =
@@ -558,6 +602,8 @@ export async function createOrder(payload, options = {}) {
     cambioPara: String(payload.cambioPara || '').trim(),
     fecha,
     id,
+    orderNumber,
+    orderPrefix,
     canal: channel,
     canalLabel: channel === STORE_CHANNEL ? 'Tienda Virtual' : 'Ingreso Manual',
     deliveryMode: pickupOrder ? 'pickup' : String(payload.deliveryMode || 'perfil').trim() || 'perfil',
@@ -583,6 +629,7 @@ export async function createOrder(payload, options = {}) {
     orderRecord.sicarQuote = {
       status: 'pending',
       appOrderNumber: id,
+      appOrderCode: orderNumber,
       orderDate: fecha,
       orderNumber: id,
       queuedAt: new Date(createdAt).toISOString(),
@@ -600,7 +647,7 @@ export async function createOrder(payload, options = {}) {
     };
   }
 
-  const orderKey = buildOrderKey(fecha, id);
+  const orderKey = buildOrderKey(fecha, orderNumber);
   const updates = {
     [`orders/${orderKey}`]: orderRecord,
   };
@@ -633,12 +680,15 @@ export async function createOrder(payload, options = {}) {
       orderKey,
       fecha,
       id,
+      orderNumber,
+      orderPrefix,
       canal: channel,
       status: 'pending',
       requestedAt: createdAt,
       requestedAtIso: new Date(createdAt).toISOString(),
       attempts: 0,
       appOrderNumber: id,
+      appOrderCode: orderNumber,
       storeBranchId,
       storeBranchCode,
       storeBranchName,

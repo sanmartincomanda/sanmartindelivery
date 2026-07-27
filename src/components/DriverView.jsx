@@ -658,7 +658,7 @@ export default function DriverView() {
       });
       setConfirmDeliveryOrder(null);
       setSelectedOrder(null);
-      setNotice(`Pedido #${formatOrderNumber(order.id)} marcado como entregado.`);
+      setNotice(`Pedido #${formatOrderNumber(order)} marcado como entregado.`);
     } catch (error) {
       console.error('Error marcando pedido entregado:', error);
       alert('No se pudo marcar el pedido como entregado. Intenta de nuevo.');
@@ -1040,7 +1040,7 @@ function DriverProfileDelayedOrder({ order, nowMs, onOpenDetails, onOpenMap }) {
   return (
     <article className="driver-profile-order">
       <div className="driver-profile-order-head">
-        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-route-badge">{formatOrderNumber(order)}</span>
         <div className="driver-profile-order-copy">
           <strong>{order.cliente}</strong>
           <small>{getAddressPreview(order, 54)}</small>
@@ -1126,12 +1126,12 @@ function DriverOrderCard({ order, nowMs, delivering, locating, onOpenDetails, on
       )}
 
       <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
-        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-route-badge">{formatOrderNumber(order)}</span>
         <span className="driver-card-vector" aria-hidden="true">
           {Icons.bike}
         </span>
         <span className="driver-order-info">
-          <small>Pedido #{formatOrderNumber(order.id)}</small>
+          <small>Pedido #{formatOrderNumber(order)}</small>
           <strong>{order.cliente}</strong>
           <em>{getAddressPreview(order)}</em>
         </span>
@@ -1190,7 +1190,7 @@ function DriverHistoryCard({ order, onOpenDetails, onOpenMap }) {
   return (
     <article className="driver-order-card delivered history">
       <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
-        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-route-badge">{formatOrderNumber(order)}</span>
         <span className="driver-card-vector" aria-hidden="true">
           {Icons.check}
         </span>
@@ -1234,7 +1234,7 @@ function DriverPreviousOrderCard({ order, onOpenDetails, onOpenMap }) {
   return (
     <article className={`driver-order-card history previous ${delivered ? 'delivered' : 'pending'}`}>
       <button type="button" className="driver-order-main" onClick={() => onOpenDetails(order)}>
-        <span className="driver-route-badge">{formatOrderNumber(order.id)}</span>
+        <span className="driver-route-badge">{formatOrderNumber(order)}</span>
         <span className="driver-card-vector" aria-hidden="true">
           {delivered ? Icons.check : Icons.history}
         </span>
@@ -1291,7 +1291,7 @@ function DriverDetailModal({ order, delivering, locating, onClose, onOpenMap, on
       <section className="driver-detail-modal">
         <header className="driver-detail-head">
           <div>
-            <span>Pedido #{formatOrderNumber(order.id)}</span>
+            <span>Pedido #{formatOrderNumber(order)}</span>
             <h2>{order.cliente}</h2>
             <p>{status.message}</p>
           </div>
@@ -1389,7 +1389,7 @@ function DeliveryConfirmModal({ order, delivering, onCancel, onConfirm }) {
       <section className="driver-confirm-modal">
         <span className="driver-confirm-icon">{Icons.check}</span>
         <h2>Confirmar entrega</h2>
-        <p>Vas a marcar el pedido #{formatOrderNumber(order.id)} de {order.cliente} como entregado.</p>
+        <p>Vas a marcar el pedido #{formatOrderNumber(order)} de {order.cliente} como entregado.</p>
         <div className="driver-confirm-actions">
           <button type="button" className="driver-ghost-action dark" onClick={onCancel} disabled={delivering}>
             Cancelar

@@ -3,7 +3,7 @@ import { equalTo, onValue, orderByChild, query, ref, update } from 'firebase/dat
 import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
-import { buildStoreKitchenOrderText, formatWeight, isPickupOrder } from '../services/orders';
+import { buildStoreKitchenOrderText, formatOrderNumber, formatWeight, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
@@ -97,7 +97,7 @@ const buildCustomerWhatsappPhone = (phone) => {
 const buildKitchenWhatsappMessage = (pedido = {}) =>
   [
     `Hola ${pedido.cliente || ''}.`.trim(),
-    `Te escribimos de Carnes San Martin Granada sobre tu pedido #${pedido.id || ''}.`.trim(),
+    `Te escribimos de ${pedido?.storeBranchName || 'Carnes San Martin Granada'} sobre tu pedido #${formatOrderNumber(pedido)}.`.trim(),
     'Tenemos una actualizacion de tu pedido. Por favor escribenos para coordinar cualquier cambio o producto fuera de inventario.',
   ].join('\n');
 
@@ -712,7 +712,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
                   Seleccionar Carnicero
                 </h2>
                 <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-                  Pedido #{pedidosFiltrados.find(p => p.firebaseKey === modalCocinero)?.id}
+                  Pedido #{formatOrderNumber(pedidosFiltrados.find(p => p.firebaseKey === modalCocinero))}
                 </p>
               </div>
               <button
@@ -1052,7 +1052,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
                           fontWeight: 900
                         }}
                       >
-                        #{pedido.id}
+                        #{formatOrderNumber(pedido)}
                       </div>
                       <div>
                         <div style={{

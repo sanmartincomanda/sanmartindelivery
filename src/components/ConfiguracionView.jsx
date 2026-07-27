@@ -4662,7 +4662,7 @@ function StoreOrdersAdminSection({ orders, loading }) {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
-                    <strong style={{ fontSize: 18 }}>Pedido #{formatOrderNumber(order.id)}</strong>
+                    <strong style={{ fontSize: 18 }}>Pedido #{formatOrderNumber(order)}</strong>
                     <div style={{ color: '#64748b', fontWeight: 700, marginTop: 4 }}>
                       {order.cliente || 'Cliente sin nombre'} | {order.telefono || 'Sin telefono'}
                     </div>
@@ -4764,7 +4764,7 @@ function StoreOrdersAdminSection({ orders, loading }) {
                   Pedido tienda virtual
                 </div>
                 <h2 style={{ margin: '6px 0 0', fontSize: 30 }}>
-                  #{formatOrderNumber(selectedOrder.id)} | {selectedOrder.cliente}
+                  #{formatOrderNumber(selectedOrder)} | {selectedOrder.cliente}
                 </h2>
               </div>
               <button type="button" className="cfg-button secondary" onClick={() => setSelectedOrderKey('')}>
@@ -6243,7 +6243,7 @@ function CouponsManager({
                       {row.codigoCliente ? ` | Cliente SICAR: ${row.codigoCliente}` : ''}
                     </div>
                     <div style={{ color: '#166534', fontSize: 13 }}>
-                      Pedido: {row.deliveredOrder ? `#${formatOrderNumber(row.deliveredOrder.id)}` : row.archiveOnlyUsed ? 'Historial archivado' : '-'}
+                      Pedido: {row.deliveredOrder ? `#${formatOrderNumber(row.deliveredOrder)}` : row.archiveOnlyUsed ? 'Historial archivado' : '-'}
                       {row.usedAt ? ` | ${formatAdminDateTime(row.usedAt)}` : ''}
                     </div>
                   </div>
@@ -6345,13 +6345,13 @@ function CouponsManager({
                         ) : null}
                         {assignment.pendingOrder ? (
                           <div>
-                            Pedido pendiente: #{formatOrderNumber(assignment.pendingOrder.id)} | Estado:{' '}
+                            Pedido pendiente: #{formatOrderNumber(assignment.pendingOrder)} | Estado:{' '}
                             {assignment.pendingOrder.estado}
                           </div>
                         ) : null}
                         {assignment.deliveredOrder ? (
                           <div>
-                            Ultimo pedido con cupón: #{formatOrderNumber(assignment.deliveredOrder.id)} | Estado:{' '}
+                            Ultimo pedido con cupón: #{formatOrderNumber(assignment.deliveredOrder)} | Estado:{' '}
                             {assignment.deliveredOrder.estado}
                           </div>
                         ) : null}

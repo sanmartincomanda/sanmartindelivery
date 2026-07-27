@@ -208,10 +208,7 @@ export function createLiveOpsManager() {
     await ensureDate(date);
     const cleanSource = source === 'rutaOrders' ? 'rutaOrders' : 'orders';
     const items = sortCollectionItems(cleanSource, Array.from(caches[cleanSource].values()));
-    const counter =
-      cleanSource === 'orders'
-        ? Number((await get(ref(database, `orderCounters/${String(date || '').trim()}`))).val() || 0)
-        : null;
+    const counter = cleanSource === 'orders' ? items.length : null;
 
     return {
       ok: true,

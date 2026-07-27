@@ -840,11 +840,20 @@ const isSameStoreCustomerOrder = (left, right) => {
     return false;
   }
 
-  if (left.firebaseKey && right.firebaseKey && left.firebaseKey === right.firebaseKey) {
-    return true;
+  if (left.firebaseKey && right.firebaseKey) {
+    return left.firebaseKey === right.firebaseKey;
   }
 
-  return left.id !== undefined && right.id !== undefined && String(left.id) === String(right.id);
+  if (left.orderNumber && right.orderNumber) {
+    return String(left.orderNumber) === String(right.orderNumber);
+  }
+
+  return (
+    left.id !== undefined &&
+    right.id !== undefined &&
+    String(left.id) === String(right.id) &&
+    String(left.storeBranchId || 'granada') === String(right.storeBranchId || 'granada')
+  );
 };
 
 const resolveActiveStoreCustomerOrder = (orders = [], createdOrder = null) => {
@@ -1049,7 +1058,7 @@ const buildOrderItemsMessage = (order = {}) => {
 const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
   const customerName = currentUser?.nombre || order.cliente || 'Cliente';
   const customerPhone = currentUser?.telefono || order.telefono || '';
-  const orderNumber = formatOrderNumber(order.id);
+  const orderNumber = formatOrderNumber(order);
   const storeName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const fulfillmentLabel = getFulfillmentTypeLabel(
@@ -1138,7 +1147,7 @@ const hasPendingStoreOrderUpdateReview = (order = {}, acknowledgements = {}) => 
 };
 
 const buildOrderUpdateReviewWhatsAppMessage = (order = {}, currentUser = {}) => {
-  const orderNumber = formatOrderNumber(order.id);
+  const orderNumber = formatOrderNumber(order);
   const customerName = currentUser?.nombre || order.cliente || 'Cliente';
   const storeName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
   const lines = [
@@ -3159,7 +3168,7 @@ export default function TiendaVirtualView({
     }
 
     const confirmCancel = window.confirm(
-      `Quieres anular el pedido #${formatOrderNumber(order.id)}?`
+      `Quieres anular el pedido #${formatOrderNumber(order)}?`
     );
 
     if (!confirmCancel) {
@@ -3180,9 +3189,7 @@ export default function TiendaVirtualView({
     try {
       await update(ref(database, `orders/${order.firebaseKey}`), cancelPayload);
       setCreatedOrder((current) =>
-        current && (current.firebaseKey === order.firebaseKey || String(current.id) === String(order.id))
-          ? { ...current, ...cancelPayload }
-          : current
+        isSameStoreCustomerOrder(current, order) ? { ...current, ...cancelPayload } : current
       );
     } catch (error) {
       console.error('Error anulando pedido virtual:', error);
@@ -10088,7 +10095,7 @@ function PromotionsStrip({ promotions, onOpen }) {
 
 function FloatingOrderBubble({ order, elevated = false, onOpen }) {
   const meta = getCustomerStatusMeta(order);
-  const orderNumber = formatOrderNumber(order?.id);
+  const orderNumber = formatOrderNumber(order);
 
   return (
     <button
@@ -10337,7 +10344,7 @@ function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
             !
           </div>
           <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
-            Pedido #{formatOrderNumber(order.id)}
+            Pedido #{formatOrderNumber(order)}
           </div>
           <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.05, color: '#0f172a' }}>
             Tu pedido ha sido actualizado
@@ -10597,7 +10604,7 @@ function StoreOrderStatusVisual({ type = 'prep', compact = false }) {
 
 function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder }) {
   const meta = getCustomerStatusMetaV2(order);
-  const orderNumber = formatOrderNumber(order.id);
+  const orderNumber = formatOrderNumber(order);
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const pickupOrder = isPickupOrder(order);
   const riderName = (order.repartidorPublico || order.repartidor)

@@ -6,7 +6,7 @@ import './App.css';
 import { SAN_MARTIN_THEME } from './styles/sanMartinTheme';
 
 import { hoyISO } from './components/Utils';
-import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForBranch, subscribeOrdersForDate } from './services/orders';
+import { createOrder, subscribeOrderCounter, subscribeOrdersForBranch, subscribeOrdersForDate } from './services/orders';
 import {
   assertRole,
   AUTH_ROLES,
@@ -279,17 +279,22 @@ function App() {
   }, [isKitchenRoute]);
 
   useEffect(() => {
-    if (!(isPublicStoreRoute || route === 'dashboard')) {
+    if (route !== 'dashboard' || !isAuthenticated) {
       return undefined;
     }
 
-    const counterRef = ref(database, `orderCounters/${todayKey}`);
-    const unsubscribe = onValue(counterRef, (snapshot) => {
-      setTodayCounter(Number(snapshot.val() || 0));
-    });
+    const counterBranchId = isBranchAdminDashboard && dashboardBranchId
+      ? dashboardBranchId
+      : 'granada';
+    const unsubscribe = subscribeOrderCounter(
+      todayKey,
+      counterBranchId,
+      setTodayCounter,
+      (error) => console.error('Error cargando secuencia de pedidos:', error)
+    );
 
     return () => unsubscribe();
-  }, [isPublicStoreRoute, route, todayKey]);
+  }, [dashboardBranchId, isAuthenticated, isBranchAdminDashboard, route, todayKey]);
 
   useEffect(() => {
     const shouldSubscribeOrders =
@@ -421,15 +426,7 @@ function App() {
     return () => unsubscribe();
   }, [isAdminDashboard, isOperatorDashboard, isPublicStoreRoute, route, view]);
 
-  const nextOrderNumber = useMemo(
-    () => Math.min(todayCounter + 1, ORDER_LIMIT_PER_DAY + 1),
-    [todayCounter]
-  );
-
-  const remainingOrders = useMemo(
-    () => Math.max(ORDER_LIMIT_PER_DAY - todayCounter, 0),
-    [todayCounter]
-  );
+  const nextOrderNumber = useMemo(() => todayCounter + 1, [todayCounter]);
 
   const publicStoreUrl = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -582,8 +579,6 @@ function App() {
     return (
       <TiendaVirtualView
         onCreateOrder={addOrder}
-        nextOrderNumber={nextOrderNumber}
-        remainingOrders={remainingOrders}
         publicStoreUrl={publicStoreUrl}
         mode="public"
       />
@@ -1032,12 +1027,6 @@ function App() {
                 </div>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: APP_THEME.blue }}>{stats.preparando}</div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#f97316', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Cupos
-                </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f97316' }}>{remainingOrders}</div>
-              </div>
             </div>
 
             <div style={{ width: '1px', height: '32px', background: APP_THEME.border }} />
@@ -1060,7 +1049,7 @@ function App() {
               clientes={clientes}
               allowClientDirectory={isAdminDashboard || isOperatorDashboard}
               nextOrderNumber={nextOrderNumber}
-              remainingOrders={remainingOrders}
+              branchId={isBranchAdminDashboard && dashboardBranchId ? dashboardBranchId : 'granada'}
             />
           )}
 
