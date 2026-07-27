@@ -5,6 +5,7 @@ import {
   buildArchivedOrderRecord,
   getArchiveMonthKey,
   getOrderHistoryRetentionStartDate,
+  hasPendingStoreRewardSettlement,
   isCanceledOrderStatus,
   isOrderWithinHistoryRetention,
   ORDER_HISTORY_CLOUD_PATH,
@@ -275,6 +276,10 @@ export function createOrderArchiveManager({ repoRoot }) {
               return;
             }
 
+            if (sourcePath === 'orders' && hasPendingStoreRewardSettlement(order)) {
+              return;
+            }
+
             const monthKey = getArchiveMonthKey(order?.fecha);
             if (!monthKey) {
               return;
@@ -386,6 +391,27 @@ export function createOrderArchiveManager({ repoRoot }) {
     return sortOrdersByDateAndNumberDesc(archivedOrders);
   };
 
+  const patchLocalArchivedOrder = ({ orderKey, orderDate, patch = {} } = {}) => {
+    const cleanOrderKey = String(orderKey || '').trim();
+    const monthKey = getArchiveMonthKey(orderDate);
+    if (!cleanOrderKey || !monthKey || !patch || typeof patch !== 'object') {
+      return false;
+    }
+
+    const bucket = loadArchiveBucket(monthKey);
+    const currentOrder = bucket.data?.[cleanOrderKey];
+    if (!currentOrder) {
+      return false;
+    }
+
+    bucket.data[cleanOrderKey] = {
+      ...currentOrder,
+      ...patch,
+    };
+    saveJsonFile(bucket.filePath, bucket.data);
+    return true;
+  };
+
   const fetchLiveOrdersByDateRange = async (dateFrom, dateTo) => {
     await ensureAuthenticatedFirebaseSession();
 
@@ -474,6 +500,7 @@ export function createOrderArchiveManager({ repoRoot }) {
     initAutoArchive,
     stopAutoArchive,
     archiveOrdersOnce,
+    patchLocalArchivedOrder,
     fetchArchivedOrdersByDateRange,
     fetchLiveOrdersByDateRange,
     fetchHistoryByDateRange,

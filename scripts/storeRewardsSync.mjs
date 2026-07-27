@@ -2,6 +2,7 @@ import {
   get,
   onChildAdded,
   onChildChanged,
+  orderByKey,
   orderByChild,
   query,
   ref,
@@ -22,6 +23,11 @@ import {
   STORE_REWARD_SETTINGS_PATH,
 } from '../src/services/storeRewards.js';
 import {
+  getOrderHistoryRetentionStartDate,
+  ORDER_HISTORY_CLOUD_PATH,
+  ORDER_HISTORY_RETENTION_DAYS,
+} from '../src/services/orderArchive.js';
+import {
   ensureAuthenticatedFirebaseSession,
   getAuthenticatedFirebaseDatabase,
 } from './firebaseScriptAuth.mjs';
@@ -33,6 +39,7 @@ const ORDER_LOOKBACK_DAYS = 60;
 const DATE_WATCH_INTERVAL_MS = 60 * 1000;
 const HOLD_CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
 const STALE_HOLD_MS = 15 * 60 * 1000;
+const HISTORY_RECONCILE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const normalizeText = (value = '') =>
   String(value || '')
@@ -76,7 +83,7 @@ const buildRewardRedemptionRecord = (orderKey, order = {}) => ({
   updatedAt: Date.now(),
 });
 
-export function createStoreRewardsSyncManager() {
+export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
   const database = getAuthenticatedFirebaseDatabase();
   const state = {
     listening: false,
@@ -90,12 +97,18 @@ export function createStoreRewardsSyncManager() {
     lastSyncAt: '',
     lastHoldCleanupAt: '',
     lastReleasedHolds: 0,
+    reconcilingHistory: false,
+    lastHistoryReconcileAt: '',
+    lastHistoryCandidateCount: 0,
+    lastHistoryRepairedCount: 0,
+    lastHistoryRepairs: [],
   };
 
   let unsubscribeAdded = null;
   let unsubscribeChanged = null;
   let dateTimer = null;
   let holdCleanupTimer = null;
+  let historyReconcileTimer = null;
   const runningOrders = new Map();
 
   const handleSyncError = (error) => {
@@ -119,7 +132,7 @@ export function createStoreRewardsSyncManager() {
     return normalizeStoreRewardSettings(snapshot.val());
   };
 
-  const syncOrderRewards = async (orderKey, order = {}) => {
+  const syncOrderRewards = async (orderKey, order = {}, sourcePath = STORE_ORDERS_PATH) => {
     await ensureAuthenticatedFirebaseSession();
 
     if (!isStoreOrder(order) || !orderKey) {
@@ -131,6 +144,7 @@ export function createStoreRewardsSyncManager() {
     const now = Date.now();
     const nowIso = new Date(now).toISOString();
     const rootUpdates = {};
+    const archivedOrderPatch = {};
     let rewardRecordUpdated = false;
     let rewardPointsUpdated = false;
 
@@ -147,12 +161,13 @@ export function createStoreRewardsSyncManager() {
         });
 
         if (refundResult.restored) {
-          rootUpdates[`${STORE_ORDERS_PATH}/${orderKey}/rewardRedemption`] = {
+          rootUpdates[`${sourcePath}/${orderKey}/rewardRedemption`] = {
             ...(order.rewardRedemption || {}),
             status: 'refunded',
             refundedAt: nowIso,
             refundedPoints: Number(refundResult.refundedPoints || 0),
           };
+          archivedOrderPatch.rewardRedemption = rootUpdates[`${sourcePath}/${orderKey}/rewardRedemption`];
           rootUpdates[`${STORE_ORDER_REWARD_REDEMPTIONS_PATH}/${orderKey}`] = {
             ...buildRewardRedemptionRecord(orderKey, order),
             rewardRedemption: {
@@ -175,12 +190,13 @@ export function createStoreRewardsSyncManager() {
         });
 
         if (settleResult.settled) {
-          rootUpdates[`${STORE_ORDERS_PATH}/${orderKey}/rewardRedemption`] = {
+          rootUpdates[`${sourcePath}/${orderKey}/rewardRedemption`] = {
             ...(order.rewardRedemption || {}),
             status: 'redeemed',
             settledAt: nowIso,
             redeemedPoints: Number(settleResult.redeemedPoints || order.rewardRedemption.pointsRedeemed || 0),
           };
+          archivedOrderPatch.rewardRedemption = rootUpdates[`${sourcePath}/${orderKey}/rewardRedemption`];
           rootUpdates[`${STORE_ORDER_REWARD_REDEMPTIONS_PATH}/${orderKey}`] = {
             ...buildRewardRedemptionRecord(orderKey, order),
             rewardRedemption: {
@@ -211,27 +227,29 @@ export function createStoreRewardsSyncManager() {
             userKey: cleanUserKey,
             orderKey,
             points: earnedPoints,
-            note: 'Puntos acreditados por pedido entregado con total final de SICAR.',
+            note: 'Puntos acreditados por pedido entregado con total final actualizado.',
             databaseInstance: database,
           });
 
-          if (earnedResult.applied) {
-            rootUpdates[`${STORE_ORDERS_PATH}/${orderKey}/rewardPoints`] = {
+          if (earnedResult.applied || earnedResult.reason === 'already_applied') {
+            const creditedPoints = Number(earnedResult.points || earnedPoints);
+            rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`] = {
               ...(order.rewardPoints || {}),
               status: 'awarded',
               awarded: true,
               reversed: false,
-              points: earnedPoints,
+              points: creditedPoints,
               basedOnTotal: Number(finalAmount || 0),
               transactionKey: earnedResult.transactionKey,
               awardedAt: nowIso,
               updatedAt: nowIso,
             };
+            archivedOrderPatch.rewardPoints = rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`];
             rewardPointsUpdated = true;
             state.lastEarnedAt = nowIso;
           }
         } else {
-          rootUpdates[`${STORE_ORDERS_PATH}/${orderKey}/rewardPoints`] = {
+          rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`] = {
             ...(order.rewardPoints || {}),
             status: 'not_eligible',
             awarded: false,
@@ -240,8 +258,25 @@ export function createStoreRewardsSyncManager() {
             basedOnTotal: Number(finalAmount || 0),
             updatedAt: nowIso,
           };
+          archivedOrderPatch.rewardPoints = rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`];
           rewardPointsUpdated = true;
         }
+      } else if (
+        settings.enabled !== true &&
+        order.rewardPoints?.awarded !== true &&
+        String(order.rewardPoints?.status || '').trim().toLowerCase() === 'pending'
+      ) {
+        rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`] = {
+          ...(order.rewardPoints || {}),
+          status: 'program_disabled',
+          awarded: false,
+          reversed: false,
+          points: 0,
+          basedOnTotal: Number(finalAmount || 0),
+          updatedAt: nowIso,
+        };
+        archivedOrderPatch.rewardPoints = rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`];
+        rewardPointsUpdated = true;
       }
     } else if (isCanceledStoreOrder(order) && order.rewardPoints?.awarded === true && order.rewardPoints?.reversed !== true) {
       const reverseResult = await reverseStoreRewardEarnedPoints({
@@ -252,7 +287,7 @@ export function createStoreRewardsSyncManager() {
       });
 
       if (reverseResult.reversed) {
-        rootUpdates[`${STORE_ORDERS_PATH}/${orderKey}/rewardPoints`] = {
+        rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`] = {
           ...(order.rewardPoints || {}),
           status: 'reversed',
           reversed: true,
@@ -260,12 +295,22 @@ export function createStoreRewardsSyncManager() {
           reversedPoints: Number(reverseResult.points || 0),
           updatedAt: nowIso,
         };
+        archivedOrderPatch.rewardPoints = rootUpdates[`${sourcePath}/${orderKey}/rewardPoints`];
         rewardPointsUpdated = true;
       }
     }
 
     if (Object.keys(rootUpdates).length > 0) {
       await update(ref(database), rootUpdates);
+      if (sourcePath !== STORE_ORDERS_PATH && Object.keys(archivedOrderPatch).length > 0) {
+        await Promise.resolve(
+          onArchivedOrderUpdated?.({
+            orderKey,
+            orderDate: order?.fecha,
+            patch: archivedOrderPatch,
+          })
+        ).catch(() => {});
+      }
     }
 
     if (rewardRecordUpdated || rewardPointsUpdated) {
@@ -273,6 +318,122 @@ export function createStoreRewardsSyncManager() {
       state.lastProcessedOrderKey = orderKey;
       state.processedCount += 1;
       state.lastError = '';
+    }
+
+    return {
+      updated: rewardRecordUpdated || rewardPointsUpdated,
+      points: Number(archivedOrderPatch.rewardPoints?.points || 0),
+      status: String(archivedOrderPatch.rewardPoints?.status || ''),
+    };
+  };
+
+  const shouldReconcileArchivedOrder = (order = {}) => {
+    if (!isStoreOrder(order)) {
+      return false;
+    }
+
+    const redemptionStatus = String(order?.rewardRedemption?.status || '').trim().toLowerCase();
+    if (
+      order?.rewardRedemption?.reservationId &&
+      !['redeemed', 'refunded'].includes(redemptionStatus) &&
+      (isDeliveredStoreOrder(order) || isCanceledStoreOrder(order))
+    ) {
+      return true;
+    }
+
+    if (isDeliveredStoreOrder(order) && !isCanceledStoreOrder(order)) {
+      const rewardStatus = String(order?.rewardPoints?.status || '').trim().toLowerCase();
+      const hasPendingRewardIntent =
+        rewardStatus === 'pending' || Number(order?.rewardPoints?.estimatedPoints || 0) > 0;
+      return (
+        hasPendingRewardIntent &&
+        order.totalAproximado === false &&
+        resolveStoreRewardOrderFinalAmount(order) > 0 &&
+        order.rewardPoints?.awarded !== true
+      );
+    }
+
+    if (isCanceledStoreOrder(order) && order.rewardPoints?.awarded === true) {
+      return order.rewardPoints?.reversed !== true;
+    }
+
+    return false;
+  };
+
+  const reconcileArchivedRewards = async () => {
+    if (state.reconcilingHistory) {
+      return {
+        ok: true,
+        skipped: true,
+        candidateCount: state.lastHistoryCandidateCount,
+        repairedCount: state.lastHistoryRepairedCount,
+      };
+    }
+
+    await ensureAuthenticatedFirebaseSession();
+    state.reconcilingHistory = true;
+
+    try {
+      const startDate = getOrderHistoryRetentionStartDate(new Date(), ORDER_HISTORY_RETENTION_DAYS);
+      const snapshot = await get(
+        query(ref(database, ORDER_HISTORY_CLOUD_PATH), orderByKey(), startAt(startDate))
+      );
+      const candidates = [];
+
+      Object.entries(snapshot.val() || {}).forEach(([dateKey, orders]) => {
+        Object.entries(orders || {}).forEach(([orderKey, order]) => {
+          if (shouldReconcileArchivedOrder(order)) {
+            candidates.push({ dateKey, orderKey, order });
+          }
+        });
+      });
+
+      const repairs = [];
+      for (const candidate of candidates) {
+        const result = await syncOrderRewards(
+          candidate.orderKey,
+          candidate.order,
+          `${ORDER_HISTORY_CLOUD_PATH}/${candidate.dateKey}`
+        );
+        if (result?.updated) {
+          repairs.push({
+            orderKey: candidate.orderKey,
+            orderNumber: Number(candidate.order?.id || 0),
+            customerName: String(candidate.order?.cliente || '').trim(),
+            points: Number(result.points || 0),
+            status: result.status,
+          });
+        }
+      }
+
+      state.lastHistoryReconcileAt = new Date().toISOString();
+      state.lastHistoryCandidateCount = candidates.length;
+      state.lastHistoryRepairedCount = repairs.length;
+      state.lastHistoryRepairs = repairs.slice(-25);
+      state.lastError = '';
+
+      return {
+        ok: true,
+        startDate,
+        candidateCount: candidates.length,
+        repairedCount: repairs.length,
+        candidates: candidates.slice(0, 50).map(({ orderKey, order }) => ({
+          orderKey,
+          orderNumber: Number(order?.id || 0),
+          customerName: String(order?.cliente || '').trim(),
+          status: String(order?.estado || '').trim(),
+          rewardStatus: String(order?.rewardPoints?.status || '').trim(),
+          rewardAwarded: order?.rewardPoints?.awarded === true,
+          rewardReversed: order?.rewardPoints?.reversed === true,
+          redemptionStatus: String(order?.rewardRedemption?.status || '').trim(),
+        })),
+        repairs,
+      };
+    } catch (error) {
+      handleSyncError(error);
+      throw error;
+    } finally {
+      state.reconcilingHistory = false;
     }
   };
 
@@ -408,6 +569,22 @@ export function createStoreRewardsSyncManager() {
     }, HOLD_CLEANUP_INTERVAL_MS);
   };
 
+  const scheduleHistoryReconcile = () => {
+    if (!state.listening) {
+      return;
+    }
+
+    if (historyReconcileTimer) {
+      clearTimeout(historyReconcileTimer);
+    }
+
+    historyReconcileTimer = setTimeout(() => {
+      reconcileArchivedRewards()
+        .catch(handleSyncError)
+        .finally(scheduleHistoryReconcile);
+    }, HISTORY_RECONCILE_INTERVAL_MS);
+  };
+
   const initAutoSync = async () => {
     if (state.listening) {
       return;
@@ -418,6 +595,8 @@ export function createStoreRewardsSyncManager() {
     state.listening = true;
     subscribeOrders();
     scheduleDateWatcher();
+    await reconcileArchivedRewards();
+    scheduleHistoryReconcile();
     cleanupOrphanedReservations().catch(handleSyncError).finally(() => {
       scheduleHoldCleanup();
     });
@@ -436,11 +615,17 @@ export function createStoreRewardsSyncManager() {
       clearTimeout(holdCleanupTimer);
       holdCleanupTimer = null;
     }
+
+    if (historyReconcileTimer) {
+      clearTimeout(historyReconcileTimer);
+      historyReconcileTimer = null;
+    }
   };
 
   return {
     state,
     initAutoSync,
+    reconcileArchivedRewards,
     stopAutoSync,
   };
 }

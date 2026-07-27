@@ -83,6 +83,40 @@ export const shouldArchiveRealtimeOrder = (order = {}, todayKey = '') => {
   return orderDate < cleanToday;
 };
 
+export const hasPendingStoreRewardSettlement = (order = {}) => {
+  if (
+    String(order?.canal || '').trim() !== 'tienda_virtual' ||
+    !String(order?.storeUserKey || '').trim()
+  ) {
+    return false;
+  }
+
+  const status = normalizeOrderStatusText(order?.estado);
+  const isDelivered = status.includes('entregado');
+  const isCanceled = status.includes('cancel') || status.includes('anulad');
+  const rewardStatus = String(order?.rewardPoints?.status || '').trim().toLowerCase();
+  const redemptionStatus = String(order?.rewardRedemption?.status || '').trim().toLowerCase();
+
+  if (
+    isDelivered &&
+    !isCanceled &&
+    order?.rewardPoints?.awarded !== true &&
+    (rewardStatus === 'pending' || Number(order?.rewardPoints?.estimatedPoints || 0) > 0)
+  ) {
+    return true;
+  }
+
+  if (isCanceled && order?.rewardPoints?.awarded === true && order?.rewardPoints?.reversed !== true) {
+    return true;
+  }
+
+  return Boolean(
+    order?.rewardRedemption?.reservationId &&
+    !['redeemed', 'refunded'].includes(redemptionStatus) &&
+    (isDelivered || isCanceled)
+  );
+};
+
 export const buildArchivedOrderRecord = (orderKey, order = {}, sourcePath = 'orders', archivedAt = Date.now()) => ({
   firebaseKey: String(orderKey || '').trim(),
   archivedSource: String(sourcePath || 'orders').trim() || 'orders',

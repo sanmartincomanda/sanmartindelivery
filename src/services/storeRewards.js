@@ -471,12 +471,23 @@ export const buildStoreRewardRedemptionTextLines = (rewardRedemption = {}) => {
 };
 
 export const resolveStoreRewardOrderFinalAmount = (order = {}) => {
-  const sicarTotal = roundMoney(order?.sicarQuote?.total || 0);
-  if (order?.totalAproximado === false && sicarTotal > 0) {
-    return sicarTotal;
+  const sicarSubtotal = roundMoney(order?.sicarQuote?.subtotal || 0);
+  if (order?.totalAproximado === false && sicarSubtotal > 0) {
+    return sicarSubtotal;
   }
 
-  return roundMoney(order?.total || order?.subtotalEstimado || 0);
+  const sicarTotal = roundMoney(order?.sicarQuote?.total || 0);
+  if (order?.totalAproximado === false && sicarTotal > 0) {
+    const deliveryFee = roundMoney(order?.deliveryFee || 0);
+    return roundMoney(Math.max(0, sicarTotal - deliveryFee));
+  }
+
+  const subtotal = roundMoney(order?.subtotalEstimado || 0);
+  if (subtotal > 0) {
+    return subtotal;
+  }
+
+  return roundMoney(Math.max(0, roundMoney(order?.total || 0) - roundMoney(order?.deliveryFee || 0)));
 };
 
 export const getRewardDisplayStatus = (reward = {}, pointsBalance = 0, cartAmount = 0, settings = DEFAULT_STORE_REWARD_SETTINGS) => {
@@ -905,14 +916,19 @@ export async function applyStoreRewardEarnedPoints({
 
   const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
   let alreadyApplied = false;
+  let existingPoints = 0;
   let balanceBefore = 0;
   let balanceAfter = 0;
 
   const transactionResult = await runTransaction(accountRef, (currentValue) => {
     const account = normalizeStoreRewardAccount(currentValue, cleanUserKey);
 
-    if (account.earnedOrderPoints?.[cleanOrderKey]) {
+    const existingRecord = account.earnedOrderPoints?.[cleanOrderKey];
+    if (existingRecord) {
       alreadyApplied = true;
+      existingPoints = roundPoints(existingRecord.points || 0);
+      balanceBefore = account.pointsBalance;
+      balanceAfter = account.pointsBalance;
       return account;
     }
 
@@ -939,6 +955,9 @@ export async function applyStoreRewardEarnedPoints({
     return {
       applied: false,
       reason: alreadyApplied ? 'already_applied' : 'not_committed',
+      points: existingPoints,
+      transactionKey: alreadyApplied ? getStoreRewardTransactionKey(`earned_${cleanOrderKey}`) : '',
+      balanceAfter,
     };
   }
 
@@ -961,6 +980,7 @@ export async function applyStoreRewardEarnedPoints({
   return {
     applied: true,
     transactionKey,
+    points: safePoints,
     balanceAfter,
   };
 }

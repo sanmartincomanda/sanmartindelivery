@@ -324,12 +324,13 @@ const sicarClientSync = createSicarClientSyncManager({
   repoRoot,
 });
 
-const storeRewardsSync = createStoreRewardsSyncManager();
-const storeWelcomeCouponSync = createStoreWelcomeCouponSyncManager();
-
 const orderArchive = createOrderArchiveManager({
   repoRoot,
 });
+const storeRewardsSync = createStoreRewardsSyncManager({
+  onArchivedOrderUpdated: orderArchive.patchLocalArchivedOrder,
+});
+const storeWelcomeCouponSync = createStoreWelcomeCouponSyncManager();
 
 const getOverallQuantityTotal = async (startDate, endExclusiveDate) => {
   const rows = await runMysqlQuery(`
@@ -845,6 +846,11 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
     });
   }
 
+  if (requestUrl.pathname === '/api/store/rewards/reconcile-history') {
+    const payload = await storeRewardsSync.reconcileArchivedRewards();
+    return json(200, payload);
+  }
+
   if (requestUrl.pathname === '/api/crm/dashboard') {
     const payload = await getCrmDashboardSnapshot({
       force:
@@ -1014,11 +1020,14 @@ const server = createServer(async (request, response) => {
 
 server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
   console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
-  orderArchive.initAutoArchive();
   sicarClientSync.initAutoSync();
-  storeRewardsSync.initAutoSync().catch((error) => {
-    console.error('No se pudo iniciar la sincronizacion de recompensas:', error);
-  });
+  storeRewardsSync.initAutoSync()
+    .catch((error) => {
+      console.error('No se pudo iniciar la sincronizacion de recompensas:', error);
+    })
+    .finally(() => {
+      orderArchive.initAutoArchive();
+    });
   storeWelcomeCouponSync.initAutoSync().catch((error) => {
     console.error('No se pudo iniciar la sincronizacion del cupon de bienvenida:', error);
   });
