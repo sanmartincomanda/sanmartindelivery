@@ -1,0 +1,15 @@
+{
+  "branchId": "masaya",
+  "host": "127.0.0.1",
+  "port": 3307,
+  "database": "sicar",
+  "user": "root",
+  "password": "CAMBIAR_EN_EL_SERVIDOR",
+  "mysqlExePath": "C:\\Program Files (x86)\\SICAR-S-131AB\\MySQL\\MySQL Server 5.6\\bin\\mysql.exe",
+  "bridgePort": 3077,
+  "bindHost": "127.0.0.1",
+  "apiKey": "GENERAR_UNA_CLAVE_LARGA_Y_UNICA",
+  "enableClientSync": false,
+  "enableBackgroundSync": true,
+  "enableQuoteSync": true
+}

@@ -3,11 +3,13 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { get, ref, set, update } from 'firebase/database';
 import { auth, database } from '../firebase';
 
@@ -15,12 +17,18 @@ export const USER_ROLES_PATH = 'userRoles';
 
 export const AUTH_ROLES = {
   ADMIN: 'admin',
+  BRANCH_ADMIN: 'branch_admin',
   OPERATOR: 'operator',
   KITCHEN: 'kitchen',
   DRIVER: 'driver',
   CLIENT: 'client',
   SERVICE: 'service',
 };
+
+export const getRoleBranchId = (roleRecord = {}) =>
+  String(roleRecord?.branchId || roleRecord?.storeBranchId || '')
+    .trim()
+    .toLowerCase();
 
 const AUTH_DOMAIN = 'auth.sanmartinsr.local';
 
@@ -105,6 +113,25 @@ export async function createStoreCustomerAuth({ nombre, email, telefono, passwor
 }
 
 export async function signInStoreCustomerWithGoogle() {
+  if (Capacitor.isNativePlatform()) {
+    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+    const nativeResult = await FirebaseAuthentication.signInWithGoogle({
+      skipNativeAuth: true,
+    });
+    const idToken = nativeResult.credential?.idToken;
+    const accessToken = nativeResult.credential?.accessToken;
+
+    if (!idToken) {
+      const error = new Error('Google no devolvio una credencial valida');
+      error.code = 'auth/missing-google-id-token';
+      throw error;
+    }
+
+    const googleCredential = GoogleAuthProvider.credential(idToken, accessToken || null);
+    const credential = await signInWithCredential(auth, googleCredential);
+    return credential.user;
+  }
+
   const credential = await signInWithPopup(auth, googleProvider);
   return credential.user;
 }

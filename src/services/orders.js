@@ -1,12 +1,12 @@
 import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, startAt, update } from 'firebase/database';
-import { database } from '../firebase';
-import { hoyISO } from '../components/Utils';
-import { normalizeLocation } from './geo';
-import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards';
+import { database } from '../firebase.js';
+import { hoyISO } from '../components/Utils.js';
+import { normalizeLocation } from './geo.js';
+import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards.js';
 import {
   buildStoreWelcomeCouponReservationState,
   isStoreWelcomeCouponCoupon,
-} from './storeWelcomeCoupon';
+} from './storeWelcomeCoupon.js';
 
 export const ORDER_LIMIT_PER_DAY = 125;
 export const MANUAL_CHANNEL = 'manual';
@@ -336,6 +336,24 @@ export const subscribeOrdersForDate = (date, onData, onError) =>
     onError
   );
 
+export const subscribeOrdersForBranch = (branchId, onData, onError, date = '') => {
+  const cleanBranchId = String(branchId || '').trim().toLowerCase();
+  const cleanDate = String(date || '').trim();
+  if (!cleanBranchId) {
+    onData([]);
+    return () => {};
+  }
+
+  return onValue(
+    query(ref(database, 'orders'), orderByChild('storeBranchId'), equalTo(cleanBranchId)),
+    (snapshot) => {
+      const orders = sortOrdersByDateAndNumber(mapOrdersSnapshot(snapshot));
+      onData(cleanDate ? orders.filter((order) => String(order.fecha || '') === cleanDate) : orders);
+    },
+    onError
+  );
+};
+
 export const subscribeOrdersForStoreUser = (userKey, onData, onError, limit = 10) => {
   const cleanUserKey = String(userKey || '').trim();
   const limitNumber = Number(limit || 0);
@@ -407,6 +425,13 @@ export async function createOrder(payload, options = {}) {
   const createdAt = Date.now();
   const fulfillmentType = normalizeOrderFulfillmentType(payload.fulfillmentType || payload.tipoEntrega);
   const pickupOrder = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
+  const storeBranchId = String(payload.storeBranchId || 'granada').trim().toLowerCase();
+  const storeBranchCode = String(payload.storeBranchCode || storeBranchId).trim().toLowerCase();
+  const storeBranchName = String(
+    payload.storeBranchName || 'Carnes San Martin Granada'
+  ).trim();
+  const storeBranchAddress = String(payload.storeBranchAddress || '').trim();
+  const storeBranchLocation = normalizeLocation(payload.storeBranchLocation);
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
     const lastNumber = Number(currentValue || 0);
@@ -500,7 +525,9 @@ export async function createOrder(payload, options = {}) {
       String(payload.clienteCodigo || '').trim() || (channel === STORE_CHANNEL ? 'TIENDA VIRTUAL' : '-'),
     clienteFirebaseKey: String(payload.clienteFirebaseKey || '').trim(),
     storeUserKey: String(payload.storeUserKey || '').trim(),
-    direccion: pickupOrder ? 'Pickup en tienda' : String(payload.direccion || '').trim() || '-',
+    direccion: pickupOrder
+      ? `Pickup en ${storeBranchName}${storeBranchAddress ? ` | ${storeBranchAddress}` : ''}`
+      : String(payload.direccion || '').trim() || '-',
     telefono: String(payload.telefono || '').trim(),
     referencia: pickupOrder ? '' : String(payload.referencia || '').trim(),
     ubicacion: pickupOrder ? null : normalizeLocation(payload.ubicacion || payload.location),
@@ -536,6 +563,16 @@ export async function createOrder(payload, options = {}) {
     deliveryMode: pickupOrder ? 'pickup' : String(payload.deliveryMode || 'perfil').trim() || 'perfil',
     fulfillmentType,
     fulfillmentLabel: pickupOrder ? 'Pickup' : 'Delivery',
+    storeTenantId: String(payload.storeTenantId || 'sanmartinsr').trim(),
+    storeBranchId,
+    storeBranchCode,
+    storeBranchName,
+    storeBranchShortName: String(payload.storeBranchShortName || '').trim(),
+    storeBranchCity: String(payload.storeBranchCity || '').trim(),
+    storeBranchAddress,
+    storeBranchPhone: String(payload.storeBranchPhone || '').replace(/\D/g, ''),
+    storeBranchWhatsapp: String(payload.storeBranchWhatsapp || '').replace(/\D/g, ''),
+    storeBranchLocation,
     timestampIngreso: buildTimeLabel(),
     timestampIngresoMs: createdAt,
     justAdded: true,
@@ -549,6 +586,9 @@ export async function createOrder(payload, options = {}) {
       orderDate: fecha,
       orderNumber: id,
       queuedAt: new Date(createdAt).toISOString(),
+      storeBranchId,
+      storeBranchCode,
+      storeBranchName,
     };
   }
 
@@ -599,6 +639,9 @@ export async function createOrder(payload, options = {}) {
       requestedAtIso: new Date(createdAt).toISOString(),
       attempts: 0,
       appOrderNumber: id,
+      storeBranchId,
+      storeBranchCode,
+      storeBranchName,
     };
   }
 

@@ -31,8 +31,8 @@ $settings = New-ScheduledTaskSettingsSet `
   -DontStopIfGoingOnBatteries `
   -StartWhenAvailable `
   -MultipleInstances IgnoreNew `
-  -RestartCount 999 `
-  -RestartInterval (New-TimeSpan -Minutes 1)
+  -RestartCount 3 `
+  -RestartInterval (New-TimeSpan -Minutes 5)
 
 $installMode = 'startup-system'
 

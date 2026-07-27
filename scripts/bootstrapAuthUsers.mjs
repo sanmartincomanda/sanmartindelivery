@@ -128,6 +128,24 @@ const INTERNAL_USERS = [
     displayName: 'Administrador',
   },
   {
+    username: process.env.NINDIRI_ADMIN_USER || 'adminNi',
+    password: process.env.NINDIRI_ADMIN_PASSWORD || 'adminni',
+    scope: 'admin',
+    role: 'branch_admin',
+    branchId: 'nindiri',
+    branchName: 'Carnes San Martin Nindiri',
+    displayName: 'Administrador Nindiri',
+  },
+  {
+    username: process.env.MASAYA_ADMIN_USER || 'adminMY',
+    password: process.env.MASAYA_ADMIN_PASSWORD || 'adminmy',
+    scope: 'admin',
+    role: 'branch_admin',
+    branchId: 'masaya',
+    branchName: 'Carnes San Martin Masaya',
+    displayName: 'Administrador Masaya',
+  },
+  {
     username: process.env.KITCHEN_USER || 'cocina',
     password: process.env.KITCHEN_PASSWORD || 'cocina2026',
     scope: 'kitchen',
@@ -224,6 +242,8 @@ async function seedInternalUsers() {
       scope: user.scope,
       email,
       displayName: user.displayName,
+      ...(user.branchId ? { branchId: user.branchId, storeBranchId: user.branchId } : {}),
+      ...(user.branchName ? { branchName: user.branchName } : {}),
     });
 
     console.log(`OK ${user.role}: ${email}`);

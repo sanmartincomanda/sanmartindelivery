@@ -1,5 +1,5 @@
 import { get, ref, set, update } from 'firebase/database';
-import { database } from '../firebase';
+import { database } from '../firebase.js';
 
 export const STORE_COUPONS_PATH = 'storeCoupons';
 

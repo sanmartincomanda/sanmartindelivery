@@ -1,0 +1,18 @@
+{
+  "appId": "com.sanmartinsr.tienda",
+  "appName": "Carnes San Martin Granada",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#0d2f51",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}

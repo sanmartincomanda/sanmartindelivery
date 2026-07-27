@@ -6,14 +6,17 @@ import './App.css';
 import { SAN_MARTIN_THEME } from './styles/sanMartinTheme';
 
 import { hoyISO } from './components/Utils';
-import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForDate } from './services/orders';
+import { createOrder, ORDER_LIMIT_PER_DAY, subscribeOrdersForBranch, subscribeOrdersForDate } from './services/orders';
 import {
   assertRole,
   AUTH_ROLES,
   fetchUserRole,
+  getRoleBranchId,
   onFirebaseAuthChange,
   signInInternalUser,
+  signOutCurrentUser,
 } from './services/authRoles';
+import { DEFAULT_STORE_BRANCHES } from './services/storeBranches';
 import {
   KITCHEN_USER_KEY,
   normalizeKitchenUser,
@@ -71,6 +74,13 @@ const Icons = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6 1.7 1.7 0 00-.4 1.1V21a2 2 0 01-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.88.34l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1 1.7 1.7 0 00-1.1-.4H3a2 2 0 010-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.88l-.06-.06a2 2 0 012.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6 1.7 1.7 0 00.4-1.1V3a2 2 0 014 0v.09A1.7 1.7 0 0015 4.6a1.7 1.7 0 001.88-.34l.06-.06a2 2 0 012.83 2.83l-.06.06A1.7 1.7 0 0019.4 9a1.7 1.7 0 00.6 1 1.7 1.7 0 001.1.4H21a2 2 0 010 4h-.09A1.7 1.7 0 0019.4 15z" />
+    </svg>
+  ),
+  logout: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10 17l5-5-5-5" />
+      <path d="M15 12H3" />
+      <path d="M14 3h5a2 2 0 012 2v14a2 2 0 01-2 2h-5" />
     </svg>
   ),
 };
@@ -164,6 +174,7 @@ function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [dashboardRole, setDashboardRole] = useState(null);
+  const [dashboardRoleRecord, setDashboardRoleRecord] = useState(null);
   const [inputUser, setInputUser] = useState('');
   const [inputPass, setInputPass] = useState('');
   const [loginError, setLoginError] = useState(false);
@@ -188,13 +199,22 @@ function App() {
   const isCrmRoute = route === 'crm';
   const todayKey = hoyISO();
   const isAdminDashboard = dashboardRole === AUTH_ROLES.ADMIN;
+  const isBranchAdminDashboard = dashboardRole === AUTH_ROLES.BRANCH_ADMIN;
   const isOperatorDashboard = dashboardRole === AUTH_ROLES.OPERATOR;
+  const dashboardBranchId = getRoleBranchId(dashboardRoleRecord);
+  const dashboardBranch = dashboardBranchId
+    ? DEFAULT_STORE_BRANCHES[dashboardBranchId] || {
+        id: dashboardBranchId,
+        name: dashboardRoleRecord?.branchName || dashboardBranchId,
+      }
+    : null;
 
   useEffect(() => {
     const unsubscribe = onFirebaseAuthChange((user) => {
       if (!user) {
         setIsAuthenticated(false);
         setDashboardRole(null);
+        setDashboardRoleRecord(null);
         setKitchenAuth(false);
         return;
       }
@@ -203,12 +223,19 @@ function App() {
         .then((roleRecord) => {
           const role = roleRecord?.role || null;
           setDashboardRole(role);
-          setIsAuthenticated(role === AUTH_ROLES.ADMIN || role === AUTH_ROLES.OPERATOR);
+          setDashboardRoleRecord(roleRecord || null);
+          if (role === AUTH_ROLES.BRANCH_ADMIN) {
+            setView('tienda_virtual');
+          }
+          setIsAuthenticated(
+            role === AUTH_ROLES.ADMIN || role === AUTH_ROLES.BRANCH_ADMIN || role === AUTH_ROLES.OPERATOR
+          );
           setKitchenAuth(roleRecord?.role === AUTH_ROLES.KITCHEN);
         })
         .catch(() => {
           setIsAuthenticated(false);
           setDashboardRole(null);
+          setDashboardRoleRecord(null);
           setKitchenAuth(false);
         });
     });
@@ -284,8 +311,10 @@ function App() {
       }
     }, 1800);
 
-    const unsubscribe = subscribeOrdersForDate(
-      todayKey,
+    const subscribe = isBranchAdminDashboard && dashboardBranchId
+      ? (onData, onError) => subscribeOrdersForBranch(dashboardBranchId, onData, onError, todayKey)
+      : (onData, onError) => subscribeOrdersForDate(todayKey, onData, onError);
+    const unsubscribe = subscribe(
       (todayOrders) => {
         finishedFirstLoad = true;
         window.clearTimeout(safeUnlockTimer);
@@ -329,7 +358,7 @@ function App() {
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
     };
-  }, [isAuthenticated, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, route, todayKey, view]);
+  }, [dashboardBranchId, isAuthenticated, isBranchAdminDashboard, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, route, todayKey, view]);
 
   useEffect(() => {
     const shouldLoadClients =
@@ -418,7 +447,9 @@ function App() {
     event.preventDefault();
 
     try {
-      const expectedRoles = isCrmRoute ? [AUTH_ROLES.ADMIN] : [AUTH_ROLES.ADMIN, AUTH_ROLES.OPERATOR];
+      const expectedRoles = isCrmRoute
+        ? [AUTH_ROLES.ADMIN]
+        : [AUTH_ROLES.ADMIN, AUTH_ROLES.BRANCH_ADMIN, AUTH_ROLES.OPERATOR];
       const authUser = await signInInternalUser({
         username: inputUser,
         password: inputPass,
@@ -426,6 +457,10 @@ function App() {
       });
       const roleRecord = await assertRole(expectedRoles, authUser.uid);
       setDashboardRole(roleRecord.role);
+      setDashboardRoleRecord(roleRecord);
+      if (roleRecord.role === AUTH_ROLES.BRANCH_ADMIN) {
+        setView('tienda_virtual');
+      }
       setIsAuthenticated(true);
       setLoginError(false);
       return;
@@ -434,6 +469,18 @@ function App() {
     }
 
     setLoginError(true);
+  };
+
+  const handleDashboardLogout = async () => {
+    await signOutCurrentUser().catch((error) => {
+      console.error('Error cerrando sesion admin:', error);
+    });
+    setIsAuthenticated(false);
+    setDashboardRole(null);
+    setDashboardRoleRecord(null);
+    setInputPass('');
+    setLoginError(false);
+    setView('ingreso');
   };
 
   const handleKitchenLogin = async ({ user, password }) => {
@@ -475,7 +522,21 @@ function App() {
   };
 
   const addOrder = async (payload, options = {}) => {
-    return createOrder(payload, options);
+    const branchPayload = isBranchAdminDashboard && dashboardBranch
+      ? {
+          storeTenantId: dashboardBranch.tenantId || 'sanmartinsr',
+          storeBranchId: dashboardBranch.id,
+          storeBranchCode: dashboardBranch.branchCode || dashboardBranch.id,
+          storeBranchName: dashboardBranch.name,
+          storeBranchShortName: dashboardBranch.shortName || dashboardBranch.name,
+          storeBranchCity: dashboardBranch.city || dashboardBranch.name,
+          storeBranchAddress: dashboardBranch.address || '',
+          storeBranchPhone: dashboardBranch.phone || '',
+          storeBranchWhatsapp: dashboardBranch.whatsapp || '',
+          storeBranchLocation: dashboardBranch.storeLocation || null,
+        }
+      : {};
+    return createOrder({ ...payload, ...branchPayload }, options);
   };
 
   const handleEnviarPedido = (orderId, repartidor) => {
@@ -504,7 +565,9 @@ function App() {
 
   const availableNavItems = isAdminDashboard
     ? navItems
-    : navItems.filter((item) => ['ingreso', 'cocina', 'lista'].includes(item.id));
+    : isBranchAdminDashboard
+      ? navItems.filter((item) => ['ingreso', 'cocina', 'lista', 'tienda_virtual'].includes(item.id))
+      : navItems.filter((item) => ['ingreso', 'cocina', 'lista'].includes(item.id));
   const currentViewMeta = availableNavItems.find((item) => item.id === view) || availableNavItems[0];
 
   useEffect(() => {
@@ -825,6 +888,48 @@ function App() {
         </nav>
 
         <button
+          type="button"
+          onClick={handleDashboardLogout}
+          aria-label="Cerrar sesion"
+          title="Cerrar sesion"
+          style={{
+            margin: sidebarCollapsed ? '8px 12px' : '8px 16px',
+            padding: sidebarCollapsed ? '13px' : '12px 14px',
+            border: '1px solid rgba(255,255,255,0.16)',
+            borderRadius: '12px',
+            background: 'rgba(255,255,255,0.08)',
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+            gap: '11px',
+            fontSize: '13px',
+            fontWeight: 800,
+          }}
+        >
+          <span style={{ display: 'flex', color: '#fca5a5' }}>{Icons.logout}</span>
+          {!sidebarCollapsed && (
+            <span style={{ minWidth: 0, textAlign: 'left' }}>
+              <span style={{ display: 'block' }}>Cerrar sesion</span>
+              <small
+                style={{
+                  display: 'block',
+                  marginTop: '2px',
+                  maxWidth: '165px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  opacity: 0.6,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {dashboardRoleRecord?.username || 'Administrador'}
+              </small>
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => setSidebarCollapsed((current) => !current)}
           style={{
             padding: '16px 20px',
@@ -891,6 +996,20 @@ function App() {
               }}
             />
             {currentViewMeta?.label || 'Dashboard'}
+            {dashboardBranch?.name && (
+              <span
+                style={{
+                  borderRadius: 999,
+                  background: APP_THEME.blueSoft,
+                  color: APP_THEME.blueDeep,
+                  padding: '5px 10px',
+                  fontSize: 11,
+                  fontWeight: 900,
+                }}
+              >
+                {dashboardBranch.name}
+              </span>
+            )}
           </h1>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
@@ -949,7 +1068,12 @@ function App() {
 
           {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
 
-          {view === 'tienda_virtual' && isAdminDashboard && <TiendaVirtualAdminView />}
+          {view === 'tienda_virtual' && (isAdminDashboard || isBranchAdminDashboard) && (
+            <TiendaVirtualAdminView
+              branchScope={isBranchAdminDashboard ? dashboardBranch : null}
+              username={dashboardRoleRecord?.username || ''}
+            />
+          )}
 
           {view === 'configuracion' && isAdminDashboard && <ConfiguracionView mode="users" />}
 

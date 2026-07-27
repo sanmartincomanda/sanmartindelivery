@@ -13,6 +13,7 @@ import {
   getProductQuantityStep,
   isUnitMeasure,
   mergeCatalogProducts,
+  resolveCatalogProductForBranch,
   STORE_CATALOG_PATH,
   STORE_CATALOG_META_PATH,
 } from '../services/storeCatalog';
@@ -71,6 +72,15 @@ import {
   subscribeStoreDeliverySettings,
 } from '../services/storeDeliverySettings';
 import {
+  DEFAULT_STORE_BRANCH_ID,
+  getNearestStoreBranch,
+  getStoreBranchById,
+  getStoreBranchDeliverySettings,
+  mergeStoreBranches,
+  STORE_BRANCH_SELECTION_KEY,
+  subscribeStoreBranches,
+} from '../services/storeBranches';
+import {
   buildStoreWelcomeCouponReservationState,
   claimStoreWelcomeCoupon,
   getStoreWelcomeCouponEffectiveStatus,
@@ -105,6 +115,7 @@ import {
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
 import StoreRewardsSheet, { StoreRewardsSummaryCard } from './StoreRewardsSheet';
+import StoreBranchSelector, { StoreBranchButton } from './StoreBranchSelector';
 import {
   buildStoreRewardRedemptionSnapshot,
   calculateEarnedRewardPoints,
@@ -122,12 +133,11 @@ import {
 import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
-const STORE_BRAND_TITLE = 'Delivery Carnes San Martin Granada';
 const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
 const STORE_ORDER_UPDATE_ACK_KEY = 'sanmartin_store_order_update_ack';
-const STORE_WHATSAPP_NUMBER = '50584657949';
+const STORE_FALLBACK_WHATSAPP_NUMBER = '50584657949';
 const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248', '00249']);
 const ORDER_PROGRESS_STEPS = [
   { key: 'preparando', label: 'Preparando', icon: 'prep' },
@@ -876,6 +886,7 @@ const getCustomerStatusMeta = (order = {}) => {
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const riderName = getCustomerDriverName(order, 'Jordin');
   const pickupOrder = isPickupOrder(order);
+  const orderStoreName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
 
   const statusMeta = {
     pendiente: {
@@ -918,8 +929,8 @@ const getCustomerStatusMeta = (order = {}) => {
       emoji: 'OK',
       label: pickupOrder ? 'Pedido recogido' : 'Pedido entregado',
       message: pickupOrder
-        ? 'Tu pedido ya fue recogido. Gracias por comprar en Carnes San Martin Granada.'
-        : 'Tu pedido fue entregado. Gracias por comprar en Carnes San Martin Granada.',
+        ? `Tu pedido ya fue recogido. Gracias por comprar en ${orderStoreName}.`
+        : `Tu pedido fue entregado. Gracias por comprar en ${orderStoreName}.`,
       progress: pickupOrder ? 4 : 5,
     },
     cancelado: {
@@ -939,6 +950,7 @@ const getCustomerStatusMetaV2 = (order = {}) => {
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const pickupOrder = isPickupOrder(order);
   const riderName = getCustomerDriverName(order, 'Por asignar');
+  const orderStoreName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
   const preparingMeta = {
     accent: '#9f1239',
     soft: '#fff1f2',
@@ -966,8 +978,8 @@ const getCustomerStatusMetaV2 = (order = {}) => {
       visual: 'done',
       label: pickupOrder ? 'Pedido recogido' : 'Pedido entregado',
       message: pickupOrder
-        ? 'Entregado - tu pedido fue recogido. Gracias por comprar en Carnes San Martin Granada.'
-        : 'Entregado - tu pedido fue entregado. Gracias por comprar en Carnes San Martin Granada.',
+        ? `Entregado - tu pedido fue recogido. Gracias por comprar en ${orderStoreName}.`
+        : `Entregado - tu pedido fue entregado. Gracias por comprar en ${orderStoreName}.`,
       progress: 3,
     };
   }
@@ -1038,13 +1050,14 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
   const customerName = currentUser?.nombre || order.cliente || 'Cliente';
   const customerPhone = currentUser?.telefono || order.telefono || '';
   const orderNumber = formatOrderNumber(order.id);
+  const storeName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const fulfillmentLabel = getFulfillmentTypeLabel(
     isPickupOrder(order) ? ORDER_FULFILLMENT_PICKUP : ORDER_FULFILLMENT_DELIVERY
   );
 
   return [
-    'Hola Carnes San Martin Granada.',
+    `Hola ${storeName}.`,
     'Tengo este pedido en linea',
     `Pedido #${orderNumber}`,
     `Cliente: ${customerName}`,
@@ -1063,7 +1076,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
 };
 
 const buildOrderWhatsAppLink = (order, currentUser) =>
-  `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+  `https://wa.me/${String(order?.storeBranchWhatsapp || STORE_FALLBACK_WHATSAPP_NUMBER).replace(/\D/g, '')}?text=${encodeURIComponent(
     buildOrderWhatsAppMessage(order, currentUser)
   )}`;
 
@@ -1127,8 +1140,9 @@ const hasPendingStoreOrderUpdateReview = (order = {}, acknowledgements = {}) => 
 const buildOrderUpdateReviewWhatsAppMessage = (order = {}, currentUser = {}) => {
   const orderNumber = formatOrderNumber(order.id);
   const customerName = currentUser?.nombre || order.cliente || 'Cliente';
+  const storeName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
   const lines = [
-    'Hola Carnes San Martin Granada.',
+    `Hola ${storeName}.`,
     `No acepto el cambio del pedido #${orderNumber}.`,
     `Cliente: ${customerName}`,
     '',
@@ -1144,7 +1158,7 @@ const buildOrderUpdateReviewWhatsAppMessage = (order = {}, currentUser = {}) => 
 };
 
 const buildOrderUpdateReviewWhatsAppLink = (order = {}, currentUser = {}) =>
-  `https://wa.me/${STORE_WHATSAPP_NUMBER}?text=${encodeURIComponent(
+  `https://wa.me/${String(order?.storeBranchWhatsapp || STORE_FALLBACK_WHATSAPP_NUMBER).replace(/\D/g, '')}?text=${encodeURIComponent(
     buildOrderUpdateReviewWhatsAppMessage(order, currentUser)
   )}`;
 
@@ -1265,6 +1279,20 @@ export default function TiendaVirtualView({
   const [rewardSettings, setRewardSettings] = useState(DEFAULT_STORE_REWARD_SETTINGS);
   const [deliverySettings, setDeliverySettings] = useState(DEFAULT_STORE_DELIVERY_SETTINGS);
   const [deliverySettingsReady, setDeliverySettingsReady] = useState(false);
+  const [storeBranches, setStoreBranches] = useState(() => mergeStoreBranches());
+  const [storeBranchesReady, setStoreBranchesReady] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    if (typeof window === 'undefined') {
+      return DEFAULT_STORE_BRANCH_ID;
+    }
+
+    return window.localStorage.getItem(STORE_BRANCH_SELECTION_KEY) || DEFAULT_STORE_BRANCH_ID;
+  });
+  const [branchSelectorOpen, setBranchSelectorOpen] = useState(false);
+  const [branchSelectorMode, setBranchSelectorMode] = useState('list');
+  const [nearestBranchCandidate, setNearestBranchCandidate] = useState(null);
+  const [branchLocation, setBranchLocation] = useState(null);
+  const [branchLocating, setBranchLocating] = useState(false);
   const [rewardAccount, setRewardAccount] = useState(() => normalizeStoreRewardAccount({}, ''));
   const [rewardTransactions, setRewardTransactions] = useState([]);
   const [selectedRewardRedemption, setSelectedRewardRedemption] = useState(null);
@@ -1280,6 +1308,7 @@ export default function TiendaVirtualView({
   const autoAppliedCouponRef = useRef('');
   const autoClaimingWelcomeCouponRef = useRef('');
   const popupAdSessionRef = useRef('');
+  const branchLocationRequestedRef = useRef(false);
   const pageTopRef = useRef(null);
   const filtersPanelRef = useRef(null);
 
@@ -1287,6 +1316,15 @@ export default function TiendaVirtualView({
   const isDashboard = mode === 'dashboard';
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const showMobileBottomNav = isPhoneLayout && !isDashboard;
+  const selectedBranch = useMemo(
+    () => getStoreBranchById(storeBranches, selectedBranchId),
+    [selectedBranchId, storeBranches]
+  );
+  const activeDeliverySettings = useMemo(
+    () => getStoreBranchDeliverySettings(selectedBranch, deliverySettings),
+    [deliverySettings, selectedBranch]
+  );
+  const storeBrandTitle = selectedBranch?.brandTitle || 'Delivery Carnes San Martin Granada';
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -1411,6 +1449,86 @@ export default function TiendaVirtualView({
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreBranches(
+      (branches) => {
+        setStoreBranches(branches);
+        setStoreBranchesReady(true);
+      },
+      (error) => {
+        console.error('No se pudieron cargar las sucursales:', error);
+        setStoreBranches(mergeStoreBranches());
+        setStoreBranchesReady(true);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedBranch?.id || selectedBranch.id === selectedBranchId) {
+      return;
+    }
+
+    setSelectedBranchId(selectedBranch.id);
+  }, [selectedBranch?.id, selectedBranchId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedBranch?.id) {
+      return;
+    }
+
+    window.localStorage.setItem(STORE_BRANCH_SELECTION_KEY, selectedBranch.id);
+  }, [selectedBranch?.id]);
+
+  useEffect(() => {
+    if (
+      isDashboard ||
+      !storeBranchesReady ||
+      branchLocationRequestedRef.current ||
+      storeBranches.length === 0
+    ) {
+      return;
+    }
+
+    branchLocationRequestedRef.current = true;
+    let cancelled = false;
+    setBranchLocating(true);
+
+    getBrowserLocation()
+      .then((location) => {
+        if (cancelled || !location) {
+          return;
+        }
+
+        setBranchLocation(location);
+        const nearest = getNearestStoreBranch(location, storeBranches);
+        if (
+          nearest?.branch?.id &&
+          nearest.branch.id !== selectedBranch?.id &&
+          nearest.distanceKm <= Number(nearest.branch.switchPromptRadiusKm || 12)
+        ) {
+          setNearestBranchCandidate(nearest);
+          setBranchSelectorMode('nearby');
+          setBranchSelectorOpen(true);
+        }
+      })
+      .catch((error) => {
+        if (error?.code !== 1) {
+          console.warn('No se pudo detectar la tienda cercana:', error);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBranchLocating(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDashboard, selectedBranch?.id, storeBranches, storeBranchesReady]);
 
   useEffect(() => {
     const unsubscribe = subscribeStoreRewardSettings(
@@ -1755,11 +1873,24 @@ export default function TiendaVirtualView({
   const activeProducts = useMemo(
     () =>
       applyStoreProductPromotionsToCatalog(
-        catalog.filter((product) => product.active !== false),
+        catalog.map((product) => resolveCatalogProductForBranch(product, selectedBranch?.id)).filter((product) => {
+          if (product.active === false) {
+            return false;
+          }
+
+          const branchIds = Array.isArray(product.branchIds)
+            ? product.branchIds
+            : String(product.branchIds || '')
+                .split(',')
+                .map((branchId) => branchId.trim())
+                .filter(Boolean);
+
+          return branchIds.length === 0 || branchIds.includes(selectedBranch?.id);
+        }),
         activeProductPromotions,
         currentTimeMs
       ),
-    [activeProductPromotions, catalog, currentTimeMs]
+    [activeProductPromotions, catalog, currentTimeMs, selectedBranch?.id]
   );
 
   const storeRewards = useMemo(
@@ -2403,33 +2534,33 @@ export default function TiendaVirtualView({
   const deliveryQuote = useMemo(
     () =>
       calculateStoreDeliveryQuote({
-        settings: deliverySettings,
+        settings: activeDeliverySettings,
         destination: activeDeliveryAddress?.ubicacion,
         fulfillmentType,
       }),
-    [activeDeliveryAddress?.ubicacion, deliverySettings, fulfillmentType]
+    [activeDeliveryAddress?.ubicacion, activeDeliverySettings, fulfillmentType]
   );
   const deliverySummary = useMemo(() => buildStoreDeliverySummary(deliveryQuote), [deliveryQuote]);
   const authRegistrationCoverageQuote = useMemo(
     () =>
       calculateStoreDeliveryQuote({
-        settings: deliverySettings,
+        settings: activeDeliverySettings,
         destination: authForm?.ubicacion,
         fulfillmentType: ORDER_FULFILLMENT_DELIVERY,
       }),
-    [authForm?.ubicacion, deliverySettings]
+    [activeDeliverySettings, authForm?.ubicacion]
   );
   const storeOperationStatus = useMemo(
-    () => getStoreOperationStatus(deliverySettings),
-    [deliverySettings]
+    () => getStoreOperationStatus(activeDeliverySettings),
+    [activeDeliverySettings]
   );
   const storeClosedMessage = useMemo(
-    () => buildStoreOperationClosedMessage(deliverySettings),
-    [deliverySettings]
+    () => buildStoreOperationClosedMessage(activeDeliverySettings),
+    [activeDeliverySettings]
   );
   const storeOperationScheduleRows = useMemo(
-    () => buildStoreOperationScheduleRows(deliverySettings),
-    [deliverySettings]
+    () => buildStoreOperationScheduleRows(activeDeliverySettings),
+    [activeDeliverySettings]
   );
   const deliveryFeeAmount = useMemo(() => {
     if (!deliveryQuote?.available || deliveryQuote.isPickup) {
@@ -3327,6 +3458,63 @@ export default function TiendaVirtualView({
     openAuthSheet('login', 'guest');
   };
 
+  const openBranchSelector = () => {
+    setBranchSelectorMode('list');
+    setNearestBranchCandidate(null);
+    setBranchSelectorOpen(true);
+
+    if (!branchLocation && !branchLocating) {
+      setBranchLocating(true);
+      getBrowserLocation()
+        .then((location) => {
+          if (location) {
+            setBranchLocation(location);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setBranchLocating(false));
+    }
+  };
+
+  const selectStoreBranch = (branch) => {
+    if (!branch?.id) {
+      return;
+    }
+
+    const changingBranch = branch.id !== selectedBranch?.id;
+    const hasCartProducts = Object.values(cart).some((quantity) => Number(quantity || 0) > 0);
+    if (
+      changingBranch &&
+      hasCartProducts &&
+      typeof window !== 'undefined' &&
+      !window.confirm('Al cambiar de tienda limpiaremos el carrito actual. ¿Deseas continuar?')
+    ) {
+      return;
+    }
+
+    if (changingBranch) {
+      setSelectedBranchId(branch.id);
+      setCart({});
+      setAppliedCoupon(null);
+      setCouponInput('');
+      setCouponMessage('');
+      setSelectedRewardRedemption(null);
+      setSelectedProduct(null);
+      setActiveCategory('todos');
+      setActiveSubcategory('todas');
+      setQuery('');
+    }
+
+    setNearestBranchCandidate(null);
+    setBranchSelectorOpen(false);
+  };
+
+  const keepCurrentBranchForAlternateAddress = () => {
+    setDeliveryMode('otra');
+    setNearestBranchCandidate(null);
+    setBranchSelectorOpen(false);
+  };
+
   const dismissOrderSuccess = () => {
     setOrderSuccessOpen(false);
     if (createdOrder) {
@@ -3480,6 +3668,12 @@ export default function TiendaVirtualView({
   const submitOrder = async (event) => {
     event?.preventDefault?.();
 
+    if (selectedBranch?.acceptingOrders === false) {
+      alert(`${selectedBranch.name} tiene los pedidos pausados temporalmente. Elige otra tienda para continuar.`);
+      openBranchSelector();
+      return;
+    }
+
     if (!storeOperationStatus.open) {
       setStoreClosedNoticeOpen(true);
       return;
@@ -3609,7 +3803,7 @@ export default function TiendaVirtualView({
           clienteCodigo: currentUser.codigo,
           clienteFirebaseKey: currentUser.clientKey,
           storeUserKey: currentUser.key,
-          direccion: pickupFlow ? 'Pickup en tienda' : fullAddress,
+          direccion: pickupFlow ? `Pickup en ${selectedBranch.name}` : fullAddress,
           telefono: currentUser.telefono,
           referencia: pickupFlow ? '' : activeDeliveryAddress.referencia,
           ubicacion: pickupFlow ? null : activeDeliveryAddress.ubicacion,
@@ -3654,6 +3848,16 @@ export default function TiendaVirtualView({
           cambioPara: paymentMethod === STORE_CASH_PAYMENT ? cashChangeText : '',
           deliveryMode,
           fulfillmentType,
+          storeTenantId: selectedBranch.tenantId,
+          storeBranchId: selectedBranch.id,
+          storeBranchCode: selectedBranch.branchCode,
+          storeBranchName: selectedBranch.name,
+          storeBranchShortName: selectedBranch.shortName,
+          storeBranchCity: selectedBranch.city,
+          storeBranchAddress: selectedBranch.address,
+          storeBranchPhone: selectedBranch.phone,
+          storeBranchWhatsapp: selectedBranch.whatsapp,
+          storeBranchLocation: selectedBranch.storeLocation,
           rewardRedemption: reservedReward?.rewardSnapshot || null,
         },
         { channel: STORE_CHANNEL }
@@ -3776,7 +3980,8 @@ export default function TiendaVirtualView({
     authSheetOpen ||
     orderSuccessOpen ||
     welcomeCouponOpen ||
-    popupAdOpen;
+    popupAdOpen ||
+    branchSelectorOpen;
 
   return (
     <div className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''}`}>
@@ -4109,6 +4314,62 @@ export default function TiendaVirtualView({
           gap: 8px;
           align-items: center;
           flex-shrink: 0;
+        }
+        .store-branch-pill {
+          width: fit-content;
+          max-width: 100%;
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 7px 12px 7px 8px;
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          border-radius: 16px;
+          background: linear-gradient(135deg, #ffffff, #edf7ff);
+          color: var(--sm-text);
+          box-shadow: 0 10px 24px rgba(12, 77, 136, 0.08);
+          font: inherit;
+          text-align: left;
+          cursor: pointer;
+          transition: transform 160ms ease, box-shadow 160ms ease;
+        }
+        .store-branch-pill:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 14px 28px rgba(12, 77, 136, 0.13);
+        }
+        .store-branch-pill-icon {
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 11px;
+          background: linear-gradient(145deg, #0c4d88, #3b91de);
+          color: #ffffff;
+        }
+        .store-branch-pill-icon svg {
+          width: 17px;
+          height: 17px;
+        }
+        .store-branch-pill > span:nth-child(2) {
+          display: grid;
+          gap: 1px;
+        }
+        .store-branch-pill small {
+          color: var(--sm-text-soft);
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+        }
+        .store-branch-pill strong {
+          font-size: 14px;
+          line-height: 1.05;
+        }
+        .store-branch-pill-chevron {
+          color: var(--sm-blue-deep);
+          font-size: 22px;
+          font-weight: 900;
         }
         .store-icon-button,
         .store-order-status-button,
@@ -6999,7 +7260,7 @@ export default function TiendaVirtualView({
       >
         {isDashboard && (
           <div className="store-admin-bar">
-            <strong>{STORE_BRAND_TITLE}</strong>
+            <strong>{storeBrandTitle}</strong>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button type="button" className="store-button secondary" onClick={copyPublicLink}>
                 Copiar enlace
@@ -7021,7 +7282,7 @@ export default function TiendaVirtualView({
             <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
             <div className="store-brand-copy">
               <span className="store-brand-kicker">Tu carne favorita, a un toque de distancia</span>
-              <div className="store-title">{STORE_BRAND_TITLE}</div>
+              <div className="store-title">{storeBrandTitle}</div>
             </div>
           </div>
           <div className="store-brand-actions">
@@ -7065,6 +7326,12 @@ export default function TiendaVirtualView({
             </div>
           </div>
 
+          <StoreBranchButton
+            branch={selectedBranch}
+            locating={branchLocating}
+            onClick={openBranchSelector}
+          />
+
           <label className="store-search-wrap">
             <span className="store-search-tag">Buscar</span>
             <input
@@ -7073,7 +7340,7 @@ export default function TiendaVirtualView({
               onChange={(event) => setQuery(event.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              placeholder="Buscar en Carnes San Martin Granada"
+              placeholder={`Buscar en Carnes San Martin ${selectedBranch.shortName}`}
             />
           </label>
         </header>
@@ -7334,6 +7601,8 @@ export default function TiendaVirtualView({
           welcomeCouponStatus={welcomeCouponStatus}
           welcomeCouponExpiryLabel={welcomeCouponExpiryLabel}
           welcomeCouponActionBusy={welcomeCouponActionBusy}
+          defaultLocation={selectedBranch.storeLocation}
+          selectedBranch={selectedBranch}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
           onFulfillmentTypeChange={setFulfillmentType}
@@ -7388,6 +7657,7 @@ export default function TiendaVirtualView({
 
       {registerOutOfCoverageOpen && (
         <RegisterOutOfCoverageModal
+          branch={selectedBranch}
           onClose={() => setRegisterOutOfCoverageOpen(false)}
         />
       )}
@@ -7395,6 +7665,7 @@ export default function TiendaVirtualView({
       {profileOpen && currentUser && (
         <ProfileSheet
           user={currentUser}
+          defaultLocation={selectedBranch.storeLocation}
           saving={submitting}
           onClose={() => setProfileOpen(false)}
           onSignOut={clearStoreSession}
@@ -7427,6 +7698,8 @@ export default function TiendaVirtualView({
           authLoading={authLoading}
           authLocating={authLocating}
           authProviderDraft={authProviderDraft}
+          brandTitle={storeBrandTitle}
+          defaultLocation={selectedBranch.storeLocation}
           locked={!isDashboard && !currentUser}
           onClose={closeAuthSheet}
           onBrowseCatalog={browseCatalogAsGuest}
@@ -7485,6 +7758,21 @@ export default function TiendaVirtualView({
           }}
         />
       )}
+
+      <StoreBranchSelector
+        open={branchSelectorOpen}
+        mode={branchSelectorMode}
+        branches={storeBranches}
+        selectedBranch={selectedBranch}
+        nearestCandidate={nearestBranchCandidate}
+        userLocation={branchLocation}
+        onSelect={selectStoreBranch}
+        onKeepCurrent={keepCurrentBranchForAlternateAddress}
+        onClose={() => {
+          setNearestBranchCandidate(null);
+          setBranchSelectorOpen(false);
+        }}
+      />
 
       {orderSuccessOpen && <OrderSuccessSheet onClose={dismissOrderSuccess} />}
     </div>
@@ -7751,6 +8039,8 @@ function StoreAuthView({
   authLoading,
   authLocating,
   authProviderDraft,
+  brandTitle = 'Delivery Carnes San Martin Granada',
+  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
   embedded = false,
   onAuthModeChange,
   onCaptureLocation,
@@ -7769,7 +8059,7 @@ function StoreAuthView({
     <section className={`store-auth-card ${embedded ? 'inline' : ''}`}>
       <div className="store-auth-brand">
         <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
-        <h1>{STORE_BRAND_TITLE}</h1>
+        <h1>{brandTitle}</h1>
         <p>Inicia sesion para enviar pedidos y ver el estado de tu pedido.</p>
       </div>
 
@@ -7892,6 +8182,7 @@ function StoreAuthView({
             />
             <LocationCaptureBlock
               location={authForm.ubicacion}
+              defaultLocation={defaultLocation}
               locating={authLocating}
               onCapture={onCaptureLocation}
               onManualLocation={onManualLocation}
@@ -7977,7 +8268,14 @@ function StoreAuthSheet({ onClose, locked = false, ...props }) {
   );
 }
 
-function LocationCaptureBlock({ location, locating, onCapture, onManualLocation, onAddressResolved }) {
+function LocationCaptureBlock({
+  location,
+  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
+  locating,
+  onCapture,
+  onManualLocation,
+  onAddressResolved,
+}) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -8095,6 +8393,7 @@ function LocationCaptureBlock({ location, locating, onCapture, onManualLocation,
       {pickerOpen && (
         <MapPointPicker
           location={location}
+          defaultLocation={defaultLocation}
           onClose={() => setPickerOpen(false)}
           onSave={(nextLocation) => {
             onManualLocation(nextLocation);
@@ -8106,8 +8405,16 @@ function LocationCaptureBlock({ location, locating, onCapture, onManualLocation,
   );
 }
 
-function MapPointPicker({ location, onClose, onSave }) {
-  const initialLocation = normalizeLocation(location) || MAP_PICKER_DEFAULT_LOCATION;
+function MapPointPicker({
+  location,
+  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
+  onClose,
+  onSave,
+}) {
+  const initialLocation =
+    normalizeLocation(location) ||
+    normalizeLocation(defaultLocation) ||
+    MAP_PICKER_DEFAULT_LOCATION;
   const [center, setCenter] = useState(initialLocation);
   const [selected, setSelected] = useState(initialLocation);
   const [zoom, setZoom] = useState(16);
@@ -8369,7 +8676,14 @@ function MapPointPicker({ location, onClose, onSave }) {
   );
 }
 
-function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
+function ProfileSheet({
+  user,
+  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
+  saving,
+  onClose,
+  onSave,
+  onSignOut,
+}) {
   const [profile, setProfile] = useState({
     nombre: user?.nombre || '',
     direccion: user?.direccion || '',
@@ -8443,6 +8757,7 @@ function ProfileSheet({ user, saving, onClose, onSave, onSignOut }) {
           />
           <LocationCaptureBlock
             location={profile.ubicacion}
+            defaultLocation={defaultLocation}
             locating={locating}
             onCapture={captureProfileLocation}
             onManualLocation={(location) => {
@@ -9055,6 +9370,8 @@ function CheckoutSheet({
   welcomeCouponStatus,
   welcomeCouponExpiryLabel,
   welcomeCouponActionBusy,
+  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
+  selectedBranch,
   onClose,
   onApplyCoupon,
   onAlternateDeliveryChange,
@@ -9228,6 +9545,25 @@ function CheckoutSheet({
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
+
+            <button
+              type="button"
+              className="store-status-card"
+              style={{
+                width: '100%',
+                marginTop: 0,
+                marginBottom: 12,
+                borderColor: 'rgba(12, 77, 136, 0.16)',
+                background: 'linear-gradient(135deg, #eef7ff, #ffffff)',
+                color: 'var(--sm-text)',
+                textAlign: 'left',
+                cursor: 'default',
+              }}
+            >
+              <div className="store-status-pill">Tienda seleccionada</div>
+              <h3 style={{ margin: '9px 0 3px' }}>{selectedBranch?.name || 'Carnes San Martin Granada'}</h3>
+              <p style={{ margin: 0 }}>{selectedBranch?.address || ''}</p>
+            </button>
 
             <div className="store-choice-section store-fulfillment-section">
               <div className="store-choice-title">
@@ -9643,6 +9979,7 @@ function CheckoutSheet({
                           />
                           <LocationCaptureBlock
                             location={alternateDelivery.ubicacion}
+                            defaultLocation={defaultLocation}
                             locating={alternateLocating}
                             onCapture={onCaptureAlternateLocation}
                             onManualLocation={(location) => {
@@ -9882,7 +10219,7 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
   );
 }
 
-function RegisterOutOfCoverageModal({ onClose }) {
+function RegisterOutOfCoverageModal({ branch, onClose }) {
   return (
     <div
       style={{
@@ -9932,7 +10269,8 @@ function RegisterOutOfCoverageModal({ onClose }) {
             Direccion fuera de rango
           </h2>
           <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.6 }}>
-            Cubrimos el area de ciudad Granada y alrededores.
+            {branch?.name || 'La tienda seleccionada'} cubre un radio de{' '}
+            {Number(branch?.coverageRadiusKm || 7.5).toFixed(1)} km y sus alrededores.
           </p>
           <p style={{ margin: 0, color: '#0f3b82', fontWeight: 900, lineHeight: 1.6 }}>
             Proximamente abarcaremos nuevas zonas. 🙌

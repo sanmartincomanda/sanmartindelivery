@@ -34,6 +34,7 @@ const localConfig = localConfigPath
   : {};
 
 const bridgeConfig = {
+  branchId: String(process.env.SICAR_BRANCH_ID || localConfig.branchId || 'granada').trim().toLowerCase(),
   host: process.env.SICAR_MYSQL_HOST || localConfig.host || '127.0.0.1',
   port: Number(process.env.SICAR_MYSQL_PORT || localConfig.port || 3307),
   database: process.env.SICAR_MYSQL_DATABASE || localConfig.database || 'sicar',
@@ -44,9 +45,23 @@ const bridgeConfig = {
     localConfig.mysqlExePath ||
     'C:\\Program Files (x86)\\SICAR-S-131AB\\MySQL\\MySQL Server 5.6\\bin\\mysql.exe',
   bridgePort: Number(process.env.SICAR_BRIDGE_PORT || localConfig.bridgePort || 3077),
+  bindHost: String(process.env.SICAR_BRIDGE_BIND_HOST || localConfig.bindHost || '127.0.0.1').trim(),
+  apiKey: String(process.env.SICAR_API_KEY || localConfig.apiKey || '').trim(),
+  enableClientSync:
+    String(process.env.SICAR_ENABLE_CLIENT_SYNC ?? localConfig.enableClientSync ?? 'true')
+      .trim()
+      .toLowerCase() !== 'false',
+  enableBackgroundSync:
+    String(process.env.SICAR_ENABLE_BACKGROUND_SYNC ?? localConfig.enableBackgroundSync ?? 'true')
+      .trim()
+      .toLowerCase() !== 'false',
+  enableQuoteSync:
+    String(process.env.SICAR_ENABLE_QUOTE_SYNC ?? localConfig.enableQuoteSync ?? 'true')
+      .trim()
+      .toLowerCase() !== 'false',
 };
 
-const ENABLE_SICAR_QUOTE_SYNC = true;
+const ENABLE_SICAR_QUOTE_SYNC = bridgeConfig.enableBackgroundSync && bridgeConfig.enableQuoteSync;
 const TRUSTED_PUBLIC_BRIDGE_HOSTS = ['sanmartinsr.com', 'verdant-youtiao-5cd9d3.netlify.app'];
 
 const sqlEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -110,7 +125,7 @@ const resolveCorsHeaders = (request) => {
     return {
       'Access-Control-Allow-Origin': origin,
       Vary: 'Origin',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-SanMartin-Api-Key',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     };
   } catch (error) {
@@ -317,6 +332,7 @@ const runMysqlQuery = (query) =>
 const sicarQuoteSync = createSicarQuoteSyncManager({
   runMysqlQuery,
   sqlEscape,
+  branchId: bridgeConfig.branchId,
 });
 
 const sicarClientSync = createSicarClientSyncManager({
@@ -804,11 +820,37 @@ const getImageForSku = async (code) => {
   };
 };
 
+const isVersionedApiPath = (pathname = '') => String(pathname || '').startsWith('/api/v1/sicar/');
+const readApiKey = (request) => {
+  const directKey = String(request?.headers?.['x-sanmartin-api-key'] || '').trim();
+  if (directKey) return directKey;
+  const authorization = String(request?.headers?.authorization || '').trim();
+  return authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
+};
+const hasApiAccess = (request, pathname) => {
+  if (!isVersionedApiPath(pathname)) return true;
+  if (!bridgeConfig.apiKey) return isLocalBridgeHostname(bridgeConfig.bindHost);
+  return readApiKey(request) === bridgeConfig.apiKey;
+};
+const routeMatches = (pathname, ...routes) => routes.includes(pathname);
+const withBranch = (payload = {}) => ({
+  ...payload,
+  branchId: bridgeConfig.branchId,
+});
+
 const routeRequest = async (request, requestUrl, requestBody = null) => {
-  if (requestUrl.pathname === '/api/sicar/health') {
+  if (!hasApiAccess(request, requestUrl.pathname)) {
+    return json(401, { ok: false, error: 'Credencial de integracion invalida.' });
+  }
+
+  if (routeMatches(requestUrl.pathname, '/api/sicar/health', '/api/v1/sicar/health')) {
     return json(200, {
       ok: true,
+      apiVersion: 'v1',
+      branchId: bridgeConfig.branchId,
       bridgePort: bridgeConfig.bridgePort,
+      bindHost: bridgeConfig.bindHost,
+      apiKeyConfigured: Boolean(bridgeConfig.apiKey),
       configPath: localConfigPath || 'env-only',
       cwd,
       repoRoot,
@@ -817,6 +859,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       host: bridgeConfig.host,
       departments: SICAR_SYNC_DEPARTMENTS.map((entry) => entry.sicarDepartment),
       quoteSyncEnabled: ENABLE_SICAR_QUOTE_SYNC,
+      backgroundSyncEnabled: bridgeConfig.enableBackgroundSync,
       quoteSync: sicarQuoteSync.state,
       clientSync: sicarClientSync.state,
       rewardsSync: storeRewardsSync.state,
@@ -862,18 +905,18 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
     return json(200, payload);
   }
 
-  if (requestUrl.pathname === '/api/sicar/catalog') {
+  if (routeMatches(requestUrl.pathname, '/api/sicar/catalog', '/api/v1/sicar/catalog')) {
     const payload = await buildCatalogSelection();
-    return json(200, payload);
+    return json(200, withBranch(payload));
   }
 
-  if (requestUrl.pathname === '/api/sicar/catalog-recent') {
+  if (routeMatches(requestUrl.pathname, '/api/sicar/catalog-recent', '/api/v1/sicar/catalog/recent')) {
     const days = Number(requestUrl.searchParams.get('days') || 30);
     const payload = await buildRecentSoldCatalogSelection(days);
-    return json(200, payload);
+    return json(200, withBranch(payload));
   }
 
-  if (requestUrl.pathname === '/api/sicar/image') {
+  if (routeMatches(requestUrl.pathname, '/api/sicar/image', '/api/v1/sicar/image')) {
     const code = String(requestUrl.searchParams.get('code') || '').trim();
     if (!code) {
       return json(400, { ok: false, error: 'Falta el codigo del SKU.' });
@@ -884,10 +927,10 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       return json(404, { ok: false, error: 'No se encontro imagen para ese SKU.' });
     }
 
-    return json(200, image);
+    return json(200, withBranch(image));
   }
 
-  if (requestUrl.pathname === '/api/sicar/prices') {
+  if (routeMatches(requestUrl.pathname, '/api/sicar/prices', '/api/v1/sicar/prices')) {
     if (String(request.method || '').toUpperCase() !== 'POST') {
       return json(405, { ok: false, error: 'Metodo no permitido.' });
     }
@@ -895,7 +938,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
     const requestedCodes = Array.isArray(requestBody?.codes) ? requestBody.codes : [];
     const products = await getSicarPriceRowsByCodes(requestedCodes);
 
-    return json(200, {
+    return json(200, withBranch({
       ok: true,
       requestedCodes: Array.from(new Set(requestedCodes.map((code) => String(code || '').trim()).filter(Boolean))).length,
       matchedCodes: products.length,
@@ -912,10 +955,10 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
           taxRatePct: Number(row.taxRatePct.toFixed(4)),
         },
       })),
-    });
+    }));
   }
 
-  if (requestUrl.pathname === '/api/sicar/quote') {
+  if (routeMatches(requestUrl.pathname, '/api/sicar/quote', '/api/v1/sicar/quote')) {
     if (String(request.method || '').toUpperCase() !== 'POST') {
       return json(405, { ok: false, error: 'Metodo no permitido.' });
     }
@@ -940,7 +983,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       applyToFirebase,
     });
 
-    return json(200, {
+    return json(200, withBranch({
       ok: true,
       orderKey: payload.orderKey,
       applyToFirebase,
@@ -950,7 +993,7 @@ const routeRequest = async (request, requestUrl, requestBody = null) => {
       customerName: payload.customerName,
       whatsappMessage: payload.whatsappMessage,
       quote: payload.quote,
-    });
+    }));
   }
 
   return text(404, 'SICAR bridge activo');
@@ -1018,9 +1061,19 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(bridgeConfig.bridgePort, '127.0.0.1', () => {
-  console.log(`SICAR bridge escuchando en http://127.0.0.1:${bridgeConfig.bridgePort}`);
-  sicarClientSync.initAutoSync();
+server.listen(bridgeConfig.bridgePort, bridgeConfig.bindHost, () => {
+  console.log(
+    `SICAR bridge ${bridgeConfig.branchId} escuchando en http://${bridgeConfig.bindHost}:${bridgeConfig.bridgePort}`
+  );
+  if (!bridgeConfig.enableBackgroundSync) {
+    console.log(`Sincronizaciones de fondo desactivadas para ${bridgeConfig.branchId}.`);
+    return;
+  }
+  if (bridgeConfig.enableClientSync) {
+    sicarClientSync.initAutoSync();
+  } else {
+    console.log(`Sincronizacion general de clientes desactivada para ${bridgeConfig.branchId}.`);
+  }
   storeRewardsSync.initAutoSync()
     .catch((error) => {
       console.error('No se pudo iniciar la sincronizacion de recompensas:', error);

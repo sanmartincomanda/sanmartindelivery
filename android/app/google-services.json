@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "41323183250",
+    "firebase_url": "https://comanda-digital-ac1ec-default-rtdb.firebaseio.com",
+    "project_id": "comanda-digital-ac1ec",
+    "storage_bucket": "comanda-digital-ac1ec.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:41323183250:android:64070ec5f0720c40917a4b",
+        "android_client_info": {
+          "package_name": "com.sanmartinsr.tienda"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "41323183250-5pn1ajafd9oi3l68rji2jujd631qamv5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanmartinsr.tienda",
+            "certificate_hash": "ce3ef4990409bc6ca4c5f6555a1f6461e8948b0e"
+          }
+        },
+        {
+          "client_id": "41323183250-c73nickbciujfcrfuttn8bmn1l6oie4f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8psbVmKB6bJWh_yFMTnkcVUiOpQC3-k8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "41323183250-7nhjmln2m2m7v1gumpt58a640s4gg9aq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

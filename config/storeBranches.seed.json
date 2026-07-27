@@ -1,0 +1,68 @@
+{
+  "granada": {
+    "id": "granada",
+    "tenantId": "sanmartinsr",
+    "branchCode": "granada",
+    "name": "Carnes San Martin Granada",
+    "shortName": "Granada",
+    "brandTitle": "Delivery Carnes San Martin Granada",
+    "city": "Granada",
+    "address": "Oficinas Claro 50 metros al este, Granada",
+    "phone": "84657949",
+    "whatsapp": "50584657949",
+    "storeLocation": {
+      "lat": 11.9299,
+      "lng": -85.956,
+      "label": "Carnes San Martin Granada"
+    },
+    "coverageRadiusKm": 7.5,
+    "switchPromptRadiusKm": 12,
+    "active": true,
+    "acceptingOrders": true,
+    "displayOrder": 1
+  },
+  "masaya": {
+    "id": "masaya",
+    "tenantId": "sanmartinsr",
+    "branchCode": "masaya",
+    "name": "Carnes San Martin Masaya",
+    "shortName": "Masaya",
+    "brandTitle": "Delivery Carnes San Martin Masaya",
+    "city": "Masaya",
+    "address": "Del Parque Central 2 cuadras al sur, Masaya",
+    "phone": "89805608",
+    "whatsapp": "50589805608",
+    "storeLocation": {
+      "lat": 11.9751889,
+      "lng": -86.0934278,
+      "label": "Carnes San Martin Masaya"
+    },
+    "coverageRadiusKm": 7.5,
+    "switchPromptRadiusKm": 12,
+    "active": true,
+    "acceptingOrders": false,
+    "displayOrder": 2
+  },
+  "nindiri": {
+    "id": "nindiri",
+    "tenantId": "sanmartinsr",
+    "branchCode": "nindiri",
+    "name": "Carnes San Martin Nindiri",
+    "shortName": "Nindiri",
+    "brandTitle": "Delivery Carnes San Martin Nindiri",
+    "city": "Nindiri",
+    "address": "Costado sur de la rotonda de Nindiri, Plaza Porta's",
+    "phone": "57457960",
+    "whatsapp": "50557457960",
+    "storeLocation": {
+      "lat": 11.9994395,
+      "lng": -86.1162223,
+      "label": "Carnes San Martin Nindiri"
+    },
+    "coverageRadiusKm": 7.5,
+    "switchPromptRadiusKm": 12,
+    "active": true,
+    "acceptingOrders": false,
+    "displayOrder": 3
+  }
+}

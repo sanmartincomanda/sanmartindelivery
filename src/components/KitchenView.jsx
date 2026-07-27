@@ -1163,6 +1163,22 @@ export default function KitchenView({ orders, allowRuta = true }) {
                           TIENDA VIRTUAL
                         </div>
                       )}
+                      {pedido.canal === 'tienda_virtual' && pedido.storeBranchName && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(12, 77, 136, 0.12)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 900,
+                          color: '#0c4d88',
+                          border: '1px solid rgba(12, 77, 136, 0.22)'
+                        }}>
+                          SUCURSAL: {pedido.storeBranchShortName || pedido.storeBranchCity || pedido.storeBranchName}
+                        </div>
+                      )}
                       {isPickupOrder(pedido) && (
                         <div style={{
                           display: 'flex',

@@ -140,6 +140,7 @@ import {
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
+import StoreBranchesAdminSection from './StoreBranchesAdminSection';
 import {
   buildDefaultStoreWelcomeCouponCampaign,
   getStoreWelcomeCouponEffectiveStatus,
@@ -2337,6 +2338,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Entrega',
           title: 'Entrega y cobertura',
         },
+        sucursales: {
+          path: 'Admintv / Tienda Virtual / Sucursales',
+          title: 'Sucursales',
+        },
         pedidos: {
           path: 'Admintv / Tienda Virtual / Pedidos',
           title: 'Pedidos de tienda virtual',
@@ -2698,6 +2703,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('entrega')}
             >
               Entrega
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'sucursales' ? 'active' : ''}`}
+              onClick={() => setSection('sucursales')}
+            >
+              Sucursales
             </button>
             <button
               type="button"
@@ -3172,6 +3184,8 @@ export default function ConfiguracionView({ mode = 'users' }) {
             saving={savingDeliverySettings}
             onSave={saveDeliveryConfig}
           />
+        ) : isStoreMode && section === 'sucursales' ? (
+          <StoreBranchesAdminSection />
         ) : isStoreMode && section === 'pedidos' ? (
           <StoreOrdersAdminSection orders={storeOrders} loading={storeOrdersLoading} />
         ) : isStoreMode && section === 'promociones' ? (

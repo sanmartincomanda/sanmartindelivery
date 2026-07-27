@@ -80,6 +80,41 @@ const normalizeSyncOverrides = (overrides = {}, fallback = {}) => ({
   image: Boolean(overrides?.image ?? fallback?.image),
 });
 
+const normalizeBranchSettings = (settings = {}, fallback = {}) => {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const backup = fallback && typeof fallback === 'object' ? fallback : {};
+  const branchIds = new Set([...Object.keys(backup), ...Object.keys(source)]);
+
+  return Array.from(branchIds).reduce((result, branchId) => {
+    const cleanBranchId = String(branchId || '').trim().toLowerCase();
+    if (!cleanBranchId) {
+      return result;
+    }
+
+    const current = source[branchId] || source[cleanBranchId] || {};
+    const previous = backup[branchId] || backup[cleanBranchId] || {};
+    const priceValue = current.price ?? previous.price;
+    const inventoryValue = current.inventory ?? previous.inventory;
+    const normalized = {
+      active: current.active ?? previous.active ?? true,
+      updatedAt: Number(current.updatedAt ?? previous.updatedAt ?? 0) || 0,
+      updatedBy: String(current.updatedBy ?? previous.updatedBy ?? '').trim(),
+    };
+
+    if (priceValue !== '' && priceValue !== null && priceValue !== undefined && Number.isFinite(Number(priceValue))) {
+      normalized.price = roundPrice(priceValue);
+    }
+
+    const inventory = normalizeOptionalInventory(inventoryValue);
+    if (inventory !== null) {
+      normalized.inventory = inventory;
+    }
+
+    result[cleanBranchId] = normalized;
+    return result;
+  }, {});
+};
+
 const normalizeSyncMetadata = (sync = {}, fallback = {}) => {
   const source = sync || {};
   const backup = fallback || {};
@@ -140,6 +175,7 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
     image: String(source.image ?? fallback.image ?? '').trim(),
     imageStoragePath: String(source.imageStoragePath ?? fallback.imageStoragePath ?? '').trim(),
     description: String(source.description ?? fallback.description ?? '').trim(),
+    branchSettings: normalizeBranchSettings(source.branchSettings, fallback.branchSettings),
     ...(String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim()
       ? { categoryLabel: String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim() }
       : {}),
@@ -149,6 +185,25 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
 
 export const normalizeCatalogProduct = (product = {}, fallback = {}) =>
   buildCatalogProductShape(product || {}, fallback || {});
+
+export const resolveCatalogProductForBranch = (product = {}, branchId = 'granada') => {
+  const normalized = normalizeCatalogProduct(product);
+  const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  const branchSettings = normalized.branchSettings?.[cleanBranchId] || null;
+  const hasBranchPrice = Number(branchSettings?.price || 0) > 0;
+
+  return {
+    ...normalized,
+    active: branchSettings?.active !== undefined ? branchSettings.active !== false : normalized.active !== false,
+    price: hasBranchPrice ? roundPrice(branchSettings.price) : normalized.price,
+    inventory:
+      branchSettings && Object.prototype.hasOwnProperty.call(branchSettings, 'inventory')
+        ? normalizeOptionalInventory(branchSettings.inventory)
+        : normalized.inventory,
+    branchId: cleanBranchId,
+    branchSettingsApplied: Boolean(branchSettings),
+  };
+};
 
 export const isSicarManagedProduct = (product = {}) =>
   String(product?.sync?.source || '').trim().toLowerCase() === SICAR_SYNC_SOURCE;
@@ -331,6 +386,78 @@ export async function updateCatalogProduct(code, patch) {
     ...patch,
   });
   await touchCatalogMeta();
+}
+
+export async function saveCatalogProductBranchSettings(code, branchId, settings = {}, updatedBy = '') {
+  const productKey = getCatalogProductKey(code);
+  const cleanBranchId = String(branchId || '').trim().toLowerCase();
+  if (!productKey || !cleanBranchId) {
+    throw new Error('Producto o sucursal invalida');
+  }
+
+  const payload = {
+    active: settings.active !== false,
+    updatedAt: Date.now(),
+    updatedBy: String(updatedBy || '').trim(),
+  };
+  const price = Number(settings.price);
+  if (Number.isFinite(price) && price > 0) {
+    payload.price = roundPrice(price);
+  }
+  const inventory = normalizeOptionalInventory(settings.inventory);
+  if (inventory !== null) {
+    payload.inventory = inventory;
+  }
+
+  await set(
+    ref(database, `${STORE_CATALOG_PATH}/${productKey}/branchSettings/${cleanBranchId}`),
+    payload
+  );
+  await touchCatalogMeta();
+  return payload;
+}
+
+export async function applySicarBranchPriceUpdates(priceProducts = [], branchId, updatedBy = 'sicar-api') {
+  const cleanBranchId = String(branchId || '').trim().toLowerCase();
+  if (!cleanBranchId) {
+    throw new Error('Sucursal invalida');
+  }
+
+  const currentMap = await getCurrentCatalogMap();
+  const updates = {};
+  const missingCodes = [];
+
+  for (const product of Array.isArray(priceProducts) ? priceProducts : []) {
+    const code = String(product?.code || '').trim();
+    const productKey = getCatalogProductKey(code);
+    const price = roundPrice(product?.price || 0);
+    if (!productKey || !currentMap[productKey]?.code) {
+      if (code) missingCodes.push(code);
+      continue;
+    }
+    if (price <= 0) {
+      continue;
+    }
+
+    const existingSettings = currentMap[productKey]?.branchSettings?.[cleanBranchId] || {};
+    updates[`${productKey}/branchSettings/${cleanBranchId}`] = {
+      ...existingSettings,
+      active: existingSettings.active !== false,
+      price,
+      updatedAt: Date.now(),
+      updatedBy: String(updatedBy || 'sicar-api').trim(),
+    };
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await update(ref(database, STORE_CATALOG_PATH), updates);
+    await touchCatalogMeta();
+  }
+
+  return {
+    appliedCount: Object.keys(updates).length,
+    missingCodes,
+  };
 }
 
 export async function seedDefaultCatalogIfEmpty() {

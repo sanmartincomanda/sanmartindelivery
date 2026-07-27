@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/preserveLegacyChunkAliases.mjs",
+    "build:android:web": "vite build --mode android",
+    "android:sync": "npm run build:android:web && npx cap sync android",
+    "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
@@ -12,6 +15,7 @@
     "crm:publish": "node scripts/publishCrmAnalytics.mjs",
     "catalog:migrate:images": "node scripts/migrateCatalogImagesToStorage.mjs",
     "auth:bootstrap": "node scripts/bootstrapAuthUsers.mjs",
+    "auth:branches:bootstrap": "node scripts/bootstrapBranchAdmins.mjs",
     "auth:drivers:sync": "node scripts/syncDriverAuthCredentials.mjs",
     "auth:cleanup:store-customers": "node scripts/cleanupLegacyStoreCustomers.mjs",
     "clients:sync-directory": "node scripts/syncClientDirectory.mjs",
@@ -22,12 +26,17 @@
     "firebase:deploy:storage": "npx firebase-tools deploy --only storage"
   },
   "dependencies": {
-    "firebase": "^11.9.0",
+    "@capacitor-firebase/authentication": "^8.0.0",
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "firebase": "^12.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.2",
     "@vitejs/plugin-react": "^4.5.2",
     "firebase-admin": "^14.1.0",
     "vite": "^5.4.19"

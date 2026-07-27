@@ -1,4 +1,4 @@
-import { get, onValue, orderByChild, query, ref, startAt, update } from 'firebase/database';
+import { equalTo, get, onValue, orderByChild, query, ref, startAt, update } from 'firebase/database';
 import {
   ensureAuthenticatedFirebaseSession,
   getAuthenticatedFirebaseDatabase,
@@ -447,8 +447,22 @@ const buildQuoteFingerprint = (quote = {}) =>
     })),
   });
 
-export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
+export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId = 'granada' }) {
   const database = getAuthenticatedFirebaseDatabase();
+  const assignedBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  const getOrderBranchId = (order = {}) =>
+    String(order?.storeBranchId || order?.storeBranchCode || 'granada').trim().toLowerCase() || 'granada';
+  const isAssignedBranch = (order = {}) => getOrderBranchId(order) === assignedBranchId;
+  const getBranchScopedQuery = (path) => {
+    const targetRef = ref(database, path);
+
+    // Granada keeps the unfiltered read temporarily so legacy records without branch metadata still sync.
+    if (assignedBranchId === 'granada') {
+      return targetRef;
+    }
+
+    return query(targetRef, orderByChild('storeBranchId'), equalTo(assignedBranchId));
+  };
   const updateDatabaseRef = async (targetRef, payload) => {
     try {
       await update(targetRef, payload);
@@ -462,6 +476,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     }
   };
   const state = {
+    branchId: assignedBranchId,
     listening: false,
     processing: false,
     refreshingLinkedQuotes: false,
@@ -505,6 +520,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     const hasObservedFingerprint = Boolean(String(existingWatch?.lastObservedFingerprint || '').trim());
     const patch = {
       cotId: Number(quote.cotId || 0),
+      storeBranchId: getOrderBranchId(order),
       appOrderNumber: Number(order.id || 0),
       orderDate: String(quote.orderDate || order.fecha || '').trim(),
       customerName: String(order.cliente || '').trim(),
@@ -550,7 +566,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
 
     Object.entries(orders).forEach(([orderKey, order]) => {
       const cotId = Number(order?.sicarQuote?.cotId || 0);
-      if (!isQuoteEligibleOrder(order) || cotId <= 0) {
+      if (!isAssignedBranch(order) || !isQuoteEligibleOrder(order) || cotId <= 0) {
         return;
       }
 
@@ -560,6 +576,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       }
 
       updates[`${LINKED_QUOTES_PATH}/${orderKey}/cotId`] = cotId;
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/storeBranchId`] = getOrderBranchId(order);
       updates[`${LINKED_QUOTES_PATH}/${orderKey}/appOrderNumber`] = Number(order?.id || 0);
       updates[`${LINKED_QUOTES_PATH}/${orderKey}/orderDate`] = String(order?.fecha || '').trim();
       updates[`${LINKED_QUOTES_PATH}/${orderKey}/customerName`] = String(order?.cliente || '').trim();
@@ -1881,6 +1898,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       throw new Error('No se encontro el pedido en Firebase.');
     }
 
+    if (!isAssignedBranch(order)) {
+      throw new Error(`El pedido pertenece a ${getOrderBranchId(order)} y este integrador procesa ${assignedBranchId}.`);
+    }
+
     if (!isQuoteEligibleOrder(order)) {
       throw new Error('El pedido necesita al menos un articulo con codigo SICAR para crear la cotizacion.');
     }
@@ -1970,7 +1991,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     state.lastLinkedRefreshAt = new Date().toISOString();
 
     try {
-      const snapshot = await get(ref(database, LINKED_QUOTES_PATH));
+      const snapshot = await get(getBranchScopedQuery(LINKED_QUOTES_PATH));
       const linkedQuotes = snapshot.val() || {};
       const entries = Object.entries(linkedQuotes).sort(
         (left, right) => Number(left[1]?.appOrderNumber || 0) - Number(right[1]?.appOrderNumber || 0)
@@ -1981,6 +2002,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       for (const [orderKey, watchEntry] of entries) {
         try {
           const order = await getOrderByKey(orderKey);
+
+          if (order && !isAssignedBranch(order)) {
+            continue;
+          }
 
           if (!order || !isQuoteEligibleOrder(order) || isFinalStoreStatus(order.estado)) {
             await updateDatabaseRef(ref(database), {
@@ -2097,10 +2122,12 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
     state.lastError = '';
 
     try {
-      const snapshot = await get(ref(database, QUOTE_QUEUE_PATH));
+      const snapshot = await get(getBranchScopedQuery(QUOTE_QUEUE_PATH));
       const queueData = snapshot.val() || {};
       const queueEntries = Object.entries(queueData)
-        .filter(([, value]) => String(value?.status || '').trim().toLowerCase() === 'pending')
+        .filter(([, value]) =>
+          String(value?.status || '').trim().toLowerCase() === 'pending' && isAssignedBranch(value)
+        )
         .sort((left, right) => Number(left[1]?.requestedAt || 0) - Number(right[1]?.requestedAt || 0));
 
       state.pendingCount = queueEntries.length;
@@ -2156,11 +2183,12 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape }) {
       .then(() => {
         queueListenerStarted = true;
         queueUnsubscribe = onValue(
-          ref(database, QUOTE_QUEUE_PATH),
+          getBranchScopedQuery(QUOTE_QUEUE_PATH),
           (snapshot) => {
             const queueData = snapshot.val() || {};
             state.pendingCount = Object.values(queueData).filter(
-              (entry) => String(entry?.status || '').trim().toLowerCase() === 'pending'
+              (entry) =>
+                String(entry?.status || '').trim().toLowerCase() === 'pending' && isAssignedBranch(entry)
             ).length;
             processQueue().catch(() => {});
           },

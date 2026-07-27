@@ -1,0 +1,602 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  buildGoogleMapsPlaceUrl,
+  getBrowserLocation,
+  normalizeLocation,
+  reverseGeocodeLocation,
+  searchLocationCandidates,
+} from '../services/geo';
+import {
+  mergeStoreBranches,
+  saveStoreBranch,
+  seedDefaultStoreBranchesIfEmpty,
+  subscribeStoreBranches,
+} from '../services/storeBranches';
+
+const branchToForm = (branch = {}) => ({
+  id: branch.id || '',
+  name: branch.name || '',
+  shortName: branch.shortName || '',
+  brandTitle: branch.brandTitle || '',
+  city: branch.city || '',
+  address: branch.address || '',
+  phone: branch.phone || '',
+  whatsapp: branch.whatsapp || '',
+  lat: branch.storeLocation?.lat ?? '',
+  lng: branch.storeLocation?.lng ?? '',
+  coverageRadiusKm: branch.coverageRadiusKm ?? 7.5,
+  switchPromptRadiusKm: branch.switchPromptRadiusKm ?? 12,
+  active: branch.active !== false,
+  acceptingOrders: branch.acceptingOrders !== false,
+  displayOrder: branch.displayOrder ?? 999,
+});
+
+export default function StoreBranchesAdminSection() {
+  const [branches, setBranches] = useState(() => mergeStoreBranches());
+  const [selectedBranchId, setSelectedBranchId] = useState('granada');
+  const [form, setForm] = useState(() => branchToForm(mergeStoreBranches()[0]));
+  const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [message, setMessage] = useState('');
+  const [addressSearch, setAddressSearch] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreBranches(
+      (nextBranches) => setBranches(nextBranches),
+      (error) => {
+        console.error('No se pudieron cargar las sucursales:', error);
+        setMessage('No se pudieron cargar las sucursales guardadas. Se muestran los datos base.');
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const selectedBranch = useMemo(
+    () => branches.find((branch) => branch.id === selectedBranchId) || branches[0],
+    [branches, selectedBranchId]
+  );
+
+  useEffect(() => {
+    if (selectedBranch) {
+      setForm(branchToForm(selectedBranch));
+    }
+  }, [selectedBranch]);
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const chooseSearchResult = (result) => {
+    updateField('lat', result.lat);
+    updateField('lng', result.lng);
+    updateField('address', result.label || result.shortLabel || addressSearch);
+    setAddressSearch(result.label || result.shortLabel || '');
+    setSearchResults([]);
+  };
+
+  const searchAddress = async () => {
+    if (addressSearch.trim().length < 3) {
+      setMessage('Escribe al menos tres letras para buscar la ubicación.');
+      return;
+    }
+
+    setSearching(true);
+    setMessage('');
+    try {
+      const results = await searchLocationCandidates(addressSearch, {
+        countryCode: 'ni',
+        limit: 8,
+        broad: true,
+      });
+      setSearchResults(results);
+      if (results.length === 0) {
+        setMessage('No encontramos coincidencias. Puedes escribir las coordenadas manualmente.');
+      }
+    } catch (error) {
+      console.error('No se pudo buscar la sucursal:', error);
+      setMessage('No pudimos buscar esa ubicación en este momento.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const captureCurrentLocation = async () => {
+    setLocating(true);
+    setMessage('');
+    try {
+      const location = await getBrowserLocation();
+      const resolved = (await reverseGeocodeLocation(location)) || location;
+      updateField('lat', resolved.lat);
+      updateField('lng', resolved.lng);
+      if (resolved.label) {
+        updateField('address', resolved.label);
+      }
+      setMessage('Ubicación capturada. Revisa la dirección y guarda la sucursal.');
+    } catch (error) {
+      console.error('No se pudo capturar la ubicación:', error);
+      setMessage('Activa el permiso de ubicación e intenta nuevamente.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const saveBranch = async (event) => {
+    event.preventDefault();
+    const location = normalizeLocation({
+      lat: form.lat,
+      lng: form.lng,
+      label: form.name,
+    });
+
+    if (!form.id.trim() || !form.name.trim() || !location) {
+      setMessage('Completa código, nombre y coordenadas válidas.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('Guardando sucursal...');
+    try {
+      const saved = await saveStoreBranch({
+        ...selectedBranch,
+        ...form,
+        id: form.id.trim().toLowerCase(),
+        storeLocation: location,
+        coverageRadiusKm: Number(form.coverageRadiusKm),
+        switchPromptRadiusKm: Number(form.switchPromptRadiusKm),
+        displayOrder: Number(form.displayOrder),
+      });
+      setSelectedBranchId(saved.id);
+      setMessage(`${saved.name} guardada. La tienda ya puede detectarla por ubicación.`);
+    } catch (error) {
+      console.error('No se pudo guardar la sucursal:', error);
+      setMessage(error?.message || 'No se pudo guardar la sucursal.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const seedBranches = async () => {
+    setSaving(true);
+    setMessage('Preparando Granada, Masaya y Nindirí...');
+    try {
+      const nextBranches = await seedDefaultStoreBranchesIfEmpty(branches);
+      setBranches(nextBranches);
+      setMessage('Sucursales base verificadas. No se sobrescribieron cambios existentes.');
+    } catch (error) {
+      console.error('No se pudieron inicializar las sucursales:', error);
+      setMessage('No se pudieron guardar las sucursales base.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const mapLocation = normalizeLocation({
+    lat: form.lat,
+    lng: form.lng,
+    label: form.name,
+  });
+  const mapUrl = buildGoogleMapsPlaceUrl(mapLocation);
+
+  return (
+    <section className="cfg-section-card">
+      <div className="branch-admin-head">
+        <div>
+          <span className="branch-admin-kicker">Operación multitienda</span>
+          <h2>Granada, Masaya y Nindirí</h2>
+          <p>
+            Cada pedido quedará asignado a una sucursal. La app sugerirá automáticamente la más cercana,
+            pero el cliente conservará la decisión final.
+          </p>
+        </div>
+        <button type="button" className="cfg-button secondary" onClick={seedBranches} disabled={saving}>
+          Verificar sucursales base
+        </button>
+      </div>
+
+      {message && <div className="branch-admin-message">{message}</div>}
+
+      <div className="branch-admin-layout">
+        <aside className="branch-admin-list">
+          {branches.map((branch) => (
+            <button
+              key={branch.id}
+              type="button"
+              className={`branch-admin-card ${branch.id === selectedBranch?.id ? 'active' : ''}`}
+              onClick={() => setSelectedBranchId(branch.id)}
+            >
+              <span className="branch-admin-pin">●</span>
+              <span>
+                <strong>{branch.name}</strong>
+                <small>{branch.address}</small>
+                <em>
+                  {branch.active === false
+                    ? 'Inactiva'
+                    : branch.acceptingOrders === false
+                      ? 'Pedidos pausados'
+                      : 'Recibiendo pedidos'}
+                </em>
+              </span>
+            </button>
+          ))}
+        </aside>
+
+        <form className="branch-admin-form" onSubmit={saveBranch}>
+          <div className="branch-admin-form-head">
+            <div>
+              <span>Editar sucursal</span>
+              <h3>{form.name || 'Nueva sucursal'}</h3>
+            </div>
+            {mapUrl && (
+              <a href={mapUrl} target="_blank" rel="noreferrer">
+                Ver en mapa
+              </a>
+            )}
+          </div>
+
+          <div className="branch-admin-grid two">
+            <label>
+              Código
+              <input
+                className="cfg-input"
+                value={form.id}
+                onChange={(event) => updateField('id', event.target.value)}
+                disabled={Boolean(selectedBranch?.id)}
+              />
+            </label>
+            <label>
+              Orden
+              <input
+                className="cfg-input"
+                type="number"
+                min="1"
+                value={form.displayOrder}
+                onChange={(event) => updateField('displayOrder', event.target.value)}
+              />
+            </label>
+          </div>
+
+          <label>
+            Nombre público
+            <input
+              className="cfg-input"
+              value={form.name}
+              onChange={(event) => updateField('name', event.target.value)}
+            />
+          </label>
+          <div className="branch-admin-grid two">
+            <label>
+              Nombre corto
+              <input
+                className="cfg-input"
+                value={form.shortName}
+                onChange={(event) => updateField('shortName', event.target.value)}
+              />
+            </label>
+            <label>
+              Ciudad
+              <input
+                className="cfg-input"
+                value={form.city}
+                onChange={(event) => updateField('city', event.target.value)}
+              />
+            </label>
+          </div>
+          <label>
+            Título de la tienda
+            <input
+              className="cfg-input"
+              value={form.brandTitle}
+              onChange={(event) => updateField('brandTitle', event.target.value)}
+            />
+          </label>
+          <label>
+            Dirección
+            <input
+              className="cfg-input"
+              value={form.address}
+              onChange={(event) => updateField('address', event.target.value)}
+            />
+          </label>
+
+          <div className="branch-admin-search">
+            <input
+              className="cfg-input"
+              value={addressSearch}
+              onChange={(event) => setAddressSearch(event.target.value)}
+              placeholder="Buscar ubicación de la sucursal"
+            />
+            <button type="button" className="cfg-button secondary" onClick={searchAddress} disabled={searching}>
+              {searching ? 'Buscando...' : 'Buscar'}
+            </button>
+            <button type="button" className="cfg-button secondary" onClick={captureCurrentLocation} disabled={locating}>
+              {locating ? 'Ubicando...' : 'Usar mi ubicación'}
+            </button>
+          </div>
+          {searchResults.length > 0 && (
+            <div className="branch-admin-results">
+              {searchResults.map((result) => (
+                <button type="button" key={result.placeId || `${result.lat}-${result.lng}`} onClick={() => chooseSearchResult(result)}>
+                  <strong>{result.shortLabel || result.label}</strong>
+                  <span>{result.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="branch-admin-grid two">
+            <label>
+              Latitud
+              <input
+                className="cfg-input"
+                type="number"
+                step="0.0000001"
+                value={form.lat}
+                onChange={(event) => updateField('lat', event.target.value)}
+              />
+            </label>
+            <label>
+              Longitud
+              <input
+                className="cfg-input"
+                type="number"
+                step="0.0000001"
+                value={form.lng}
+                onChange={(event) => updateField('lng', event.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="branch-admin-grid two">
+            <label>
+              Radio de cobertura (km)
+              <input
+                className="cfg-input"
+                type="number"
+                min="0.5"
+                step="0.1"
+                value={form.coverageRadiusKm}
+                onChange={(event) => updateField('coverageRadiusKm', event.target.value)}
+              />
+            </label>
+            <label>
+              Radio para sugerir cambio (km)
+              <input
+                className="cfg-input"
+                type="number"
+                min="1"
+                step="0.5"
+                value={form.switchPromptRadiusKm}
+                onChange={(event) => updateField('switchPromptRadiusKm', event.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="branch-admin-grid two">
+            <label>
+              Teléfono
+              <input
+                className="cfg-input"
+                value={form.phone}
+                onChange={(event) => updateField('phone', event.target.value)}
+              />
+            </label>
+            <label>
+              WhatsApp con código de país
+              <input
+                className="cfg-input"
+                value={form.whatsapp}
+                onChange={(event) => updateField('whatsapp', event.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="branch-admin-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={form.active}
+                onChange={(event) => updateField('active', event.target.checked)}
+              />
+              Visible en la app
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={form.acceptingOrders}
+                onChange={(event) => updateField('acceptingOrders', event.target.checked)}
+              />
+              Recibiendo pedidos
+            </label>
+          </div>
+
+          <button type="submit" className="cfg-button" disabled={saving}>
+            {saving ? 'Guardando...' : 'Guardar sucursal'}
+          </button>
+        </form>
+      </div>
+
+      <style>{`
+        .branch-admin-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
+        }
+        .branch-admin-head h2 {
+          margin: 5px 0;
+          font-size: 28px;
+        }
+        .branch-admin-head p {
+          max-width: 720px;
+          margin: 0;
+          color: #64748b;
+          font-weight: 700;
+          line-height: 1.5;
+        }
+        .branch-admin-kicker {
+          color: #0c4d88;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .branch-admin-message {
+          margin-top: 14px;
+          padding: 12px 14px;
+          border: 1px solid #bfdbfe;
+          border-radius: 12px;
+          background: #eff6ff;
+          color: #1e3a8a;
+          font-weight: 800;
+        }
+        .branch-admin-layout {
+          display: grid;
+          grid-template-columns: minmax(250px, 0.72fr) minmax(0, 1.55fr);
+          gap: 18px;
+          margin-top: 18px;
+          align-items: start;
+        }
+        .branch-admin-list,
+        .branch-admin-form {
+          display: grid;
+          gap: 10px;
+        }
+        .branch-admin-card {
+          display: grid;
+          grid-template-columns: 34px minmax(0, 1fr);
+          gap: 10px;
+          padding: 14px;
+          border: 1px solid #dce7f3;
+          border-radius: 16px;
+          background: #ffffff;
+          color: #0f2f52;
+          text-align: left;
+          cursor: pointer;
+        }
+        .branch-admin-card.active {
+          border-color: #3b82f6;
+          background: #eff7ff;
+          box-shadow: 0 12px 25px rgba(12, 77, 136, 0.1);
+        }
+        .branch-admin-card > span:last-child {
+          display: grid;
+          gap: 4px;
+        }
+        .branch-admin-card small {
+          color: #64748b;
+          font-weight: 700;
+        }
+        .branch-admin-card em {
+          color: #0f8a54;
+          font-size: 12px;
+          font-style: normal;
+          font-weight: 950;
+        }
+        .branch-admin-pin {
+          width: 30px;
+          height: 30px;
+          display: grid;
+          place-items: center;
+          border-radius: 10px;
+          background: #dceeff;
+          color: #0c4d88;
+        }
+        .branch-admin-form {
+          padding: 18px;
+          border: 1px solid #dce7f3;
+          border-radius: 18px;
+          background: #ffffff;
+        }
+        .branch-admin-form label {
+          display: grid;
+          gap: 6px;
+          color: #334155;
+          font-size: 13px;
+          font-weight: 900;
+        }
+        .branch-admin-form-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+        }
+        .branch-admin-form-head span {
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+        }
+        .branch-admin-form-head h3 {
+          margin: 3px 0 0;
+          font-size: 22px;
+        }
+        .branch-admin-form-head a {
+          color: #0c4d88;
+          font-weight: 900;
+        }
+        .branch-admin-grid {
+          display: grid;
+          gap: 10px;
+        }
+        .branch-admin-grid.two {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .branch-admin-search {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          gap: 8px;
+        }
+        .branch-admin-results {
+          display: grid;
+          gap: 6px;
+          max-height: 240px;
+          overflow: auto;
+          padding: 8px;
+          border: 1px solid #dce7f3;
+          border-radius: 12px;
+          background: #f8fbff;
+        }
+        .branch-admin-results button {
+          display: grid;
+          gap: 3px;
+          padding: 10px;
+          border: 0;
+          border-radius: 10px;
+          background: #ffffff;
+          text-align: left;
+          cursor: pointer;
+        }
+        .branch-admin-results span {
+          color: #64748b;
+          font-size: 12px;
+        }
+        .branch-admin-toggles {
+          display: flex;
+          gap: 18px;
+          flex-wrap: wrap;
+          padding: 12px;
+          border-radius: 12px;
+          background: #f8fafc;
+        }
+        .branch-admin-toggles label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        @media (max-width: 900px) {
+          .branch-admin-layout,
+          .branch-admin-grid.two,
+          .branch-admin-search {
+            grid-template-columns: 1fr;
+          }
+          .branch-admin-head {
+            flex-direction: column;
+          }
+        }
+      `}</style>
+    </section>
+  );
+}
