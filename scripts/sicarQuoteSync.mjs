@@ -51,7 +51,7 @@ const formatAppOrderCode = (order = {}) => {
 const normalizeEmail = (value = '') => String(value ?? '').trim().toLowerCase();
 const normalizePhone = (value = '') => String(value ?? '').replace(/[^\d+]/g, '').trim();
 const isFirebasePermissionDeniedError = (error) =>
-  /permission_denied/i.test(String(error?.message || error || '').trim());
+  /permission[_\s-]*denied/i.test(String(error?.message || error || '').trim());
 const normalizePaymentMethodLabel = (value = '') => {
   const normalized = removeTextAccents(value || '');
 
@@ -552,8 +552,15 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     const nowIso = new Date().toISOString();
     const fingerprint = buildQuoteFingerprint(quote);
     const watchRef = ref(database, `${LINKED_QUOTES_PATH}/${orderKey}`);
-    const existingSnapshot = await get(watchRef);
-    const existingWatch = existingSnapshot.val() || {};
+    let existingWatch = {};
+    try {
+      const existingSnapshot = await get(watchRef);
+      existingWatch = existingSnapshot.val() || {};
+    } catch (error) {
+      if (!isFirebasePermissionDeniedError(error)) {
+        throw error;
+      }
+    }
     const hasObservedFingerprint = Boolean(String(existingWatch?.lastObservedFingerprint || '').trim());
     const patch = {
       cotId: Number(quote.cotId || 0),
@@ -647,9 +654,15 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
   };
 
   const clearQueueEntry = async (orderKey) => {
-    await updateDatabaseRef(ref(database), {
-      [`${QUOTE_QUEUE_PATH}/${orderKey}`]: null,
-    });
+    try {
+      await updateDatabaseRef(ref(database), {
+        [`${QUOTE_QUEUE_PATH}/${orderKey}`]: null,
+      });
+    } catch (error) {
+      if (!isFirebasePermissionDeniedError(error)) {
+        throw error;
+      }
+    }
   };
 
   const getOrderByKey = async (orderKey) => {
@@ -664,9 +677,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       return null;
     }
 
-    const snapshot = await get(ref(database, `${CLIENTS_PATH}/${cleanKey}`));
-    const value = snapshot.val();
-    return value ? { firebaseKey: cleanKey, ...value } : null;
+    try {
+      const snapshot = await get(ref(database, `${CLIENTS_PATH}/${cleanKey}`));
+      const value = snapshot.val();
+      return value ? { firebaseKey: cleanKey, ...value } : null;
+    } catch (error) {
+      if (isFirebasePermissionDeniedError(error)) {
+        return null;
+      }
+      throw error;
+    }
   };
 
   const getStoreUserRecord = async (storeUserKey = '') => {
@@ -675,9 +695,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       return null;
     }
 
-    const snapshot = await get(ref(database, `${STORE_USERS_PATH}/${cleanKey}`));
-    const value = snapshot.val();
-    return value ? { firebaseKey: cleanKey, ...value } : null;
+    try {
+      const snapshot = await get(ref(database, `${STORE_USERS_PATH}/${cleanKey}`));
+      const value = snapshot.val();
+      return value ? { firebaseKey: cleanKey, ...value } : null;
+    } catch (error) {
+      if (isFirebasePermissionDeniedError(error)) {
+        return null;
+      }
+      throw error;
+    }
   };
 
   const buildStoreUserFullAddress = (storeUser = {}) => {
@@ -998,7 +1025,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
 
     await updateDatabaseRef(ref(database), criticalUpdates);
 
-    if (Object.keys(auxiliaryUpdates).length > 0) {
+    if (assignedBranchId === 'granada' && Object.keys(auxiliaryUpdates).length > 0) {
       try {
         await updateDatabaseRef(ref(database), auxiliaryUpdates);
       } catch (error) {
@@ -1379,6 +1406,29 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         .map((impId) => `(${cotIdExpression}, ${item.artId}, ${Number(impId)})`)
     );
 
+  const resolveQuoteForeignKeys = async () => {
+    const rows = await runMysqlQuery(`
+      SELECT
+        COALESCE(
+          (SELECT usu_id FROM usuario WHERE usu_id = ${DEFAULT_USER_ID} AND status = 1 LIMIT 1),
+          (SELECT MIN(usu_id) FROM usuario WHERE status = 1)
+        ),
+        COALESCE(
+          (SELECT vnd_id FROM vendedor WHERE vnd_id = ${DEFAULT_VENDOR_ID} AND status = 1 LIMIT 1),
+          (SELECT MIN(vnd_id) FROM vendedor WHERE status = 1)
+        ),
+        COALESCE(
+          (SELECT mon_id FROM moneda WHERE mon_id = ${DEFAULT_CURRENCY_ID} AND status = 1 LIMIT 1),
+          (SELECT MIN(mon_id) FROM moneda WHERE status = 1)
+        );
+    `);
+    const [userId, vendorId, currencyId] = String(rows[0] || '').split('\t').map(Number);
+    if (userId <= 0 || vendorId <= 0 || currencyId <= 0) {
+      throw new Error('SICAR no tiene usuario, vendedor o moneda activos para crear cotizaciones.');
+    }
+    return { userId, vendorId, currencyId };
+  };
+
   const insertQuoteDraft = async (order = {}, draft = {}, sicarCustomer = null) => {
     const header = '';
     const footer = '';
@@ -1386,6 +1436,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     const detailValues = buildQuoteDetailValuesSql('@cotId', draft);
     const quoteTaxValues = buildQuoteTaxValuesSql('@cotId', draft);
     const detailTaxValues = buildDetailTaxValuesSql('@cotId', draft);
+    const foreignKeys = await resolveQuoteForeignKeys();
 
     const rows = await runMysqlQuery(`
       START TRANSACTION;
@@ -1453,10 +1504,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         NULL,
         NULL,
         NULL,
-        ${DEFAULT_USER_ID},
+        ${foreignKeys.userId},
         ${targetCliId},
-        ${DEFAULT_CURRENCY_ID},
-        ${DEFAULT_VENDOR_ID}
+        ${foreignKeys.currencyId},
+        ${foreignKeys.vendorId}
       );
       SET @cotId = LAST_INSERT_ID();
       INSERT INTO detallecot (
@@ -1530,6 +1581,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     const detailValues = buildQuoteDetailValuesSql(cleanQuoteId, draft);
     const quoteTaxValues = buildQuoteTaxValuesSql(cleanQuoteId, draft);
     const detailTaxValues = buildDetailTaxValuesSql(cleanQuoteId, draft);
+    const foreignKeys = await resolveQuoteForeignKeys();
 
     await runMysqlQuery(`
       START TRANSACTION;
@@ -1563,10 +1615,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
           mosDetallePaq = 0,
           mosClaveArt = 0,
           mosPreAntDesc = 1,
-          usu_id = ${DEFAULT_USER_ID},
+          usu_id = ${foreignKeys.userId},
           cli_id = ${targetCliId},
-          mon_id = ${DEFAULT_CURRENCY_ID},
-          vnd_id = ${DEFAULT_VENDOR_ID}
+          mon_id = ${foreignKeys.currencyId},
+          vnd_id = ${foreignKeys.vendorId}
       WHERE cot_id = ${cleanQuoteId};
       INSERT INTO detallecot (
         cot_id,
@@ -2002,7 +2054,9 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       await syncLinkedQuoteWatch(orderKey, order, customerQuote, { applyToFirebase: false });
     }
 
-    await clearQueueEntry(orderKey);
+    if (options.fromQueue === true) {
+      await clearQueueEntry(orderKey);
+    }
 
     return {
       orderKey,
@@ -2178,7 +2232,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
             continue;
           }
 
-          const result = await syncOrderQuote(orderKey, { applyToFirebase: true });
+          const result = await syncOrderQuote(orderKey, { applyToFirebase: true, fromQueue: true });
           await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
             status: result.missingCodes.length > 0 ? 'partial' : 'synced',
             cotId: result.quote.cotId,
