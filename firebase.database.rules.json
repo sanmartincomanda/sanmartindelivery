@@ -2,45 +2,51 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "userRoles": {
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
         ".write": "auth != null && ((auth.uid == $uid && (!data.exists() || data.child('role').val() == 'client') && newData.child('role').val() == 'client') || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')"
       }
     },
-
     "orders": {
-      ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && query.orderByChild == 'fecha') || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && query.orderByChild == 'storeBranchId' && query.equalTo == root.child('userRoles').child(auth.uid).child('branchId').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && query.orderByChild == 'storeUserKey' && query.equalTo == auth.uid) || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && query.orderByChild == 'repartidorCodigo' && query.equalTo == root.child('userRoles').child(auth.uid).child('driverCode').val()))",
-      ".indexOn": ["fecha", "storeBranchId", "storeUserKey", "repartidorCodigo", "timestamp"],
+      ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && query.orderByChild == 'fecha') || ((root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') && query.orderByChild == 'storeBranchId' && query.equalTo == root.child('userRoles').child(auth.uid).child('branchId').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && query.orderByChild == 'storeUserKey' && query.equalTo == auth.uid) || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && query.orderByChild == 'repartidorCodigo' && query.equalTo == root.child('userRoles').child(auth.uid).child('driverCode').val()))",
+      ".indexOn": [
+        "fecha",
+        "storeBranchId",
+        "storeUserKey",
+        "repartidorCodigo",
+        "timestamp"
+      ],
       "$orderId": {
-        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || data.child('storeUserKey').val() == auth.uid || data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val())",
-        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && ((!data.exists() && newData.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) || (data.exists() && data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() && newData.child('storeBranchId').val() == data.child('storeBranchId').val()))) || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid && (!newData.child('rewardRedemption').exists() || (newData.child('rewardRedemption').child('reservationId').isString() && newData.child('rewardRedemption').child('status').val() == 'reserved' && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('status').val() == 'reserved' && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('customerId').val() == auth.uid && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardId').val() == newData.child('rewardRedemption').child('rewardId').val() && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardName').val() == newData.child('rewardRedemption').child('rewardName').val() && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('points').val() == newData.child('rewardRedemption').child('pointsRedeemed').val() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardId').val() == newData.child('rewardRedemption').child('rewardId').val() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child(newData.child('rewardRedemption').child('reservationId').val()).child('points').val() == newData.child('rewardRedemption').child('pointsRedeemed').val() && root.child('storeRewards').child(newData.child('rewardRedemption').child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardRedemption').child('rewardId').val()).child('available').val() == true))) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))))"
+        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || data.child('storeUserKey').val() == auth.uid || data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val() || (root.child('userRoles').child(auth.uid).child('role').val() == 'service' && (data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() || data.child('storeBranchCode').val() == root.child('userRoles').child(auth.uid).child('branchId').val())) || (root.child('userRoles').child(auth.uid).child('role').val() == 'service' && (data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() || data.child('storeBranchCode').val() == root.child('userRoles').child(auth.uid).child('branchId').val())))",
+        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && ((!data.exists() && newData.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) || (data.exists() && data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() && newData.child('storeBranchId').val() == data.child('storeBranchId').val()))) || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && data.exists() && data.child('repartidorCodigo').val() == root.child('userRoles').child(auth.uid).child('driverCode').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && ((!data.exists() && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid && (!newData.child('rewardRedemption').exists() || (newData.child('rewardRedemption').child('reservationId').isString() && newData.child('rewardRedemption').child('status').val() == 'reserved' && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('status').val() == 'reserved' && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('customerId').val() == auth.uid && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardId').val() == newData.child('rewardRedemption').child('rewardId').val() && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardName').val() == newData.child('rewardRedemption').child('rewardName').val() && root.child('storeRewardTransactions').child(auth.uid).child(newData.child('rewardRedemption').child('reservationId').val()).child('points').val() == newData.child('rewardRedemption').child('pointsRedeemed').val() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child(newData.child('rewardRedemption').child('reservationId').val()).child('rewardId').val() == newData.child('rewardRedemption').child('rewardId').val() && root.child('storeRewardAccounts').child(auth.uid).child('holds').child(newData.child('rewardRedemption').child('reservationId').val()).child('points').val() == newData.child('rewardRedemption').child('pointsRedeemed').val() && root.child('storeRewards').child(newData.child('rewardRedemption').child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardRedemption').child('rewardId').val()).child('available').val() == true))) || (data.exists() && data.child('storeUserKey').val() == auth.uid && newData.child('storeUserKey').val() == auth.uid && newData.child('estado').val() == 'Cancelado'))) || (root.child('userRoles').child(auth.uid).child('role').val() == 'service' && data.exists() && (data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() || data.child('storeBranchCode').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) && (newData.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() || newData.child('storeBranchCode').val() == root.child('userRoles').child(auth.uid).child('branchId').val())) || (root.child('userRoles').child(auth.uid).child('role').val() == 'service' && data.exists() && (data.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() || data.child('storeBranchCode').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) && (newData.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val() || newData.child('storeBranchCode').val() == root.child('userRoles').child(auth.uid).child('branchId').val())))"
       }
     },
-
     "orderHistory": {
       ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
     },
-
     "rutaOrders": {
       ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin') || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null))",
       ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')",
-      ".indexOn": ["fecha"]
+      ".indexOn": [
+        "fecha"
+      ]
     },
-
     "orderCounters": {
       "$date": {
         ".read": true,
         ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || root.child('userRoles').child(auth.uid).child('role').val() == 'client') && newData.isNumber() && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1))"
       }
     },
-
     "clients": {
       ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["codigo", "telefono", "storeUserKey"],
+      ".indexOn": [
+        "codigo",
+        "telefono",
+        "storeUserKey"
+      ],
       "$clientId": {
         ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || data.child('storeUserKey').val() == auth.uid)",
         ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && !data.exists() && newData.child('createdByRole').val() == 'operator'))",
@@ -50,11 +56,14 @@
         }
       }
     },
-
     "clientDirectory": {
       ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator')",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["nombre", "codigo", "telefono"],
+      ".indexOn": [
+        "nombre",
+        "codigo",
+        "telefono"
+      ],
       "$clientId": {
         ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || (root.child('userRoles').child(auth.uid).child('role').val() == 'operator' && (!data.exists() || data.child('createdByRole').val() == 'operator') && newData.child('createdByRole').val() == 'operator') || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && newData.child('storeUserKey').val() == auth.uid))",
         ".validate": "root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || newData.child('storeUserKey').val() == auth.uid || newData.hasChildren(['nombre', 'codigo', 'direccion'])",
@@ -63,11 +72,16 @@
         }
       }
     },
-
     "storeUsers": {
       ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["updatedAt", "codigo", "telefono", "authUid", "email"],
+      ".indexOn": [
+        "updatedAt",
+        "codigo",
+        "telefono",
+        "authUid",
+        "email"
+      ],
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
         ".write": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
@@ -76,187 +90,8 @@
         }
       }
     },
-
     "storeCampaigns": {
       ".read": "auth != null",
       ".write": "auth != null",
       "welcomeCoupon200": {
-        ".validate": "newData.hasChildren(['campaignId', 'limit', 'amount', 'minimumPurchase', 'active', 'assignedCount', 'assignments']) && newData.child('campaignId').val() == 'welcome_coupon_200_granada_jun2026' && newData.child('limit').isNumber() && newData.child('limit').val() >= 1 && newData.child('amount').isNumber() && newData.child('amount').val() >= 0 && newData.child('minimumPurchase').isNumber() && newData.child('minimumPurchase').val() >= 0 && newData.child('assignedCount').isNumber() && newData.child('assignedCount').val() >= 0 && newData.child('updatedAt').isNumber() && (!newData.child('createdAt').exists() || newData.child('createdAt').isNumber()) && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (!data.exists() && newData.child('limit').val() == 55 && newData.child('amount').val() == 200 && newData.child('minimumPurchase').val() == 700 && newData.child('active').val() == true && newData.child('assignedCount').val() == 1 && newData.child('assignments').child(auth.uid).exists()) || (data.exists() && newData.child('campaignId').val() == data.child('campaignId').val() && newData.child('limit').val() == data.child('limit').val() && newData.child('amount').val() == data.child('amount').val() && newData.child('minimumPurchase').val() == data.child('minimumPurchase').val() && newData.child('active').val() == data.child('active').val() && newData.child('createdAt').val() == data.child('createdAt').val() && data.child('assignedCount').val() < data.child('limit').val() && newData.child('assignedCount').val() == data.child('assignedCount').val() + 1 && !data.child('assignments').child(auth.uid).exists() && newData.child('assignments').child(auth.uid).exists()))",
-        "assignments": {
-          "$uid": {
-            ".validate": "newData.hasChildren(['slotNumber', 'assignedAt']) && newData.child('slotNumber').isNumber() && newData.child('slotNumber').val() >= 1 && newData.child('assignedAt').isNumber() && (!newData.child('customerName').exists() || newData.child('customerName').isString()) && (!newData.child('phoneSuffix').exists() || newData.child('phoneSuffix').isString()) && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && (!data.exists() || newData.val() == data.val())))"
-          }
-        }
-      }
-    },
-
-    "storeCouponUsageArchive": {
-      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
-        ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
-      }
-    },
-
-    "storeRewardSettings": {
-      ".read": true,
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
-    },
-
-    "storeRewards": {
-      ".read": true,
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".indexOn": ["active", "available", "displayOrder", "pointsRequired"]
-    },
-
-    "storeRewardAccounts": {
-      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-        ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && !data.exists() && newData.child('customerId').val() == $uid && newData.child('pointsBalance').isNumber() && newData.child('pointsBalance').val() == 0 && newData.child('lifetimePointsEarned').isNumber() && newData.child('lifetimePointsEarned').val() == 0 && newData.child('lifetimePointsRedeemed').isNumber() && newData.child('lifetimePointsRedeemed').val() == 0 && (!newData.child('holds').exists() || !newData.child('holds').hasChildren()) && (!newData.child('pendingReservationId').exists() || newData.child('pendingReservationId').val() == '') && (!newData.child('earnedOrderPoints').exists() || !newData.child('earnedOrderPoints').hasChildren()) && (!newData.child('settledReservationIds').exists() || !newData.child('settledReservationIds').hasChildren()) && newData.child('createdAt').isNumber() && newData.child('updatedAt').isNumber() && newData.child('updatedAt').val() >= newData.child('createdAt').val()))",
-        ".indexOn": ["updatedAt"],
-        "pointsBalance": {
-          ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && data.isNumber() && newData.isNumber() && newData.val() >= 0 && newData.val() < data.val() && newData.parent().child('pendingReservationId').isString() && newData.parent().child('pendingReservationId').val() != '' && root.child('storeRewardTransactions').child($uid).child(newData.parent().child('pendingReservationId').val()).child('status').val() == 'requested' && root.child('storeRewardTransactions').child($uid).child(newData.parent().child('pendingReservationId').val()).child('customerId').val() == $uid && root.child('storeRewardTransactions').child($uid).child(newData.parent().child('pendingReservationId').val()).child('balanceBefore').val() == data.val() && root.child('storeRewardTransactions').child($uid).child(newData.parent().child('pendingReservationId').val()).child('balanceAfter').val() == newData.val() && root.child('storeRewardTransactions').child($uid).child(newData.parent().child('pendingReservationId').val()).child('points').val() == data.val() - newData.val()))"
-        },
-        "pendingReservationId": {
-          ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && (!data.exists() || data.val() == '') && newData.isString() && newData.val() != '' && root.child('storeRewardTransactions').child($uid).child(newData.val()).child('status').val() == 'requested' && root.child('storeRewardTransactions').child($uid).child(newData.val()).child('customerId').val() == $uid && root.child('storeRewardTransactions').child($uid).child(newData.val()).child('balanceBefore').val() == data.parent().child('pointsBalance').val() && root.child('storeRewardTransactions').child($uid).child(newData.val()).child('balanceAfter').val() == newData.parent().child('pointsBalance').val() && root.child('storeRewardTransactions').child($uid).child(newData.val()).child('balanceAfter').val() >= 0))"
-        },
-        "updatedAt": {
-          ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && newData.isNumber() && newData.val() >= data.val() && newData.parent().child('pendingReservationId').isString() && newData.parent().child('pendingReservationId').val() != '' && root.child('storeRewardTransactions').child($uid).child(newData.parent().child('pendingReservationId').val()).child('status').val() == 'requested'))"
-        },
-        "holds": {
-          "$reservationId": {
-            ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && !data.exists() && newData.exists() && $reservationId == newData.parent().parent().child('pendingReservationId').val() && root.child('storeRewardTransactions').child($uid).child($reservationId).child('status').val() == 'requested' && root.child('storeRewardTransactions').child($uid).child($reservationId).child('customerId').val() == $uid && root.child('storeRewardTransactions').child($uid).child($reservationId).child('rewardId').val() == newData.child('rewardId').val() && root.child('storeRewardTransactions').child($uid).child($reservationId).child('rewardName').val() == newData.child('rewardName').val() && root.child('storeRewardTransactions').child($uid).child($reservationId).child('points').val() == newData.child('points').val() && root.child('storeRewardTransactions').child($uid).child($reservationId).child('balanceBefore').val() == data.parent().parent().child('pointsBalance').val() && root.child('storeRewardTransactions').child($uid).child($reservationId).child('balanceAfter').val() == newData.parent().parent().child('pointsBalance').val()))",
-            ".validate": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (!data.exists() && newData.exists() && auth.uid == $uid && root.child('storeRewards').child(newData.child('rewardId').val()).exists() && root.child('storeRewards').child(newData.child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardId').val()).child('available').val() == true && newData.child('rewardName').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('name').val() && newData.child('points').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('pointsRequired').val() && newData.child('minPurchaseAmount').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('minPurchaseAmount').val() && newData.child('requestedAt').isNumber()))"
-          }
-        }
-      }
-    },
-
-    "storeRewardTransactions": {
-      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-        "$txId": {
-          ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-          ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && !data.exists() && (!root.child('storeRewardAccounts').child($uid).child('pendingReservationId').exists() || root.child('storeRewardAccounts').child($uid).child('pendingReservationId').val() == '') && root.child('storeRewards').child(newData.child('rewardId').val()).exists() && root.child('storeRewards').child(newData.child('rewardId').val()).child('active').val() == true && root.child('storeRewards').child(newData.child('rewardId').val()).child('available').val() == true && newData.child('customerId').val() == $uid && newData.child('type').val() == 'redeemed' && newData.child('status').val() == 'requested' && newData.child('rewardName').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('name').val() && newData.child('points').val() == root.child('storeRewards').child(newData.child('rewardId').val()).child('pointsRequired').val() && newData.child('signedPoints').isNumber() && newData.child('signedPoints').val() == 0 - newData.child('points').val() && newData.child('balanceBefore').val() == root.child('storeRewardAccounts').child($uid).child('pointsBalance').val() && newData.child('balanceAfter').isNumber() && newData.child('balanceAfter').val() >= 0 && newData.child('balanceAfter').val() == newData.child('balanceBefore').val() - newData.child('points').val() && newData.child('rewardSnapshot').child('reservationId').val() == $txId && newData.child('rewardSnapshot').child('rewardId').val() == newData.child('rewardId').val() && newData.child('rewardSnapshot').child('pointsRedeemed').val() == newData.child('points').val()))",
-          "status": {
-            ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') || (auth.uid == $uid && data.val() == 'requested' && newData.val() == 'reserved' && data.parent().child('customerId').val() == $uid && root.child('storeRewardAccounts').child($uid).child('pendingReservationId').val() == $txId && root.child('storeRewardAccounts').child($uid).child('pointsBalance').val() == data.parent().child('balanceAfter').val() && root.child('storeRewardAccounts').child($uid).child('holds').child($txId).child('rewardId').val() == data.parent().child('rewardId').val() && root.child('storeRewardAccounts').child($uid).child('holds').child($txId).child('points').val() == data.parent().child('points').val()))"
-          }
-        },
-        ".indexOn": ["createdAt"]
-      }
-    },
-
-    "storeOrderRewardRedemptions": {
-      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
-    },
-
-    "storeCatalogMeta": {
-      ".read": true,
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin')"
-    },
-
-    "storeCatalog": {
-      ".read": "(query.orderByChild == 'active' && query.equalTo == true) || (auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin'))",
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["active", "category", "subcategory", "updatedAt", "sicarUpdatedAt"],
-      "$productId": {
-        "branchSettings": {
-          "$branchId": {
-            ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && root.child('userRoles').child(auth.uid).child('branchId').val() == $branchId"
-          }
-        }
-      }
-    },
-
-    "storeCategories": {
-      ".read": true,
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
-    },
-
-    "storeCoupons": {
-      ".read": "(query.orderByChild == 'active' && query.equalTo == true) || (auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["active", "code"]
-    },
-
-    "storePromotions": {
-      ".read": true,
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["active", "sortOrder"]
-    },
-
-    "storeProductPromotions": {
-      ".read": true,
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["active", "sortOrder"]
-    },
-
-    "storePopupAds": {
-      ".read": true,
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".indexOn": ["active", "sortOrder"]
-    },
-
-    "storeDeliverySettings": {
-      ".read": true,
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
-    },
-
-    "storeBranches": {
-      ".read": true,
-      ".indexOn": ["active", "city", "displayOrder"],
-      "$branchId": {
-        ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-        "deliverySettings": {
-          "operationHours": {
-            ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && root.child('userRoles').child(auth.uid).child('branchId').val() == $branchId"
-          }
-        }
-      }
-    },
-
-    "deliveryDrivers": {
-      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator')",
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      "$driverCode": {
-        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('driverCode').val() == $driverCode)",
-        ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
-      }
-    },
-
-    "drivers": {
-      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'"
-    },
-
-    "systemUsers": {
-      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
-      "kitchen": {
-        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')"
-      }
-    },
-
-    "sicarLinkedQuotes": {
-      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".indexOn": ["storeBranchId"]
-    },
-
-    "sicarQuoteQueue": {
-      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-      ".indexOn": ["storeBranchId"],
-      "$orderId": {
-        ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')",
-        ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service' || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && newData.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && !data.exists() && newData.child('status').val() == 'pending'))"
-      }
-    }
-  }
-}
+        ".validate": "newData.hasChildren(['campaignId', 'limit', 'amount', 'minimumPurchase', 'active', 'assignedCount', 'assignments']) && newData.child('campaignId').val() == 'welcome_coupon_200_granada_jun2026' && newData.child('limit').isNumber() && newData.child('limit').val() >= 1 && newData.child('amount').isNumber() && newData.child('amount').val() >= 0 && newData.child('minimumPurchase').isNumber() && newData.child('minimumPurchase').val() >= 0 && newData.child('assignedCount').isNumber() && newData.child('assignedCount').val() >= 0 && newData.child('updatedAt').isNumber() && (!newData.child('createdAt').exists() || newData.child('createdAt').isNumber()) && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userÛ»¶‰žËkºwµç@„ô€œœ€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥±¡¹•Ý…Ñ„¹Á…É•¹Ð ¤¹¡¥± Á•¹‘¥¹I•Í•ÉÙ…Ñ¥½¹%œ¤¹Ù…° ¤¤¹¡¥± ÍÑ…ÑÕÌœ¤¹Ù…° ¤€ôô€É•ÅÕ•ÍÑ•œ¤¤ˆ4(€€€€€€€ô°4(€€€€€€€€‰¡½±‘Ìˆèì4(€€€€€€€€€€ˆ‘É•Í•ÉÙ…Ñ¥½¹%ˆèì4(€€€€€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€ ¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ñð€¡…ÕÑ ¹Õ¥€ôô€‘Õ¥€˜˜€…‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜¹•Ý…Ñ„¹•á¥ÍÑÌ ¤€˜˜€‘É•Í•ÉÙ…Ñ¥½¹%€ôô¹•Ý…Ñ„¹Á…É•¹Ð ¤¹Á…É•¹Ð ¤¹¡¥± Á•¹‘¥¹I•Í•ÉÙ…Ñ¥½¹%œ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± ÍÑ…ÑÕÌœ¤¹Ù…° ¤€ôô€É•ÅÕ•ÍÑ•œ€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± ÕÍÑ½µ•É%œ¤¹Ù…° ¤€ôô€‘Õ¥€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± É•Ý…É‘9…µ”œ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹¡¥± É•Ý…É‘9…µ”œ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± ‰…±…¹•	•™½É”œ¤¹Ù…° ¤€ôô‘…Ñ„¹Á…É•¹Ð ¤¹Á…É•¹Ð ¤¹¡¥± Á½¥¹ÑÍ	…±…¹”œ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìœ¤¹¡¥± ‘Õ¥¤¹¡¥± ‘É•Í•ÉÙ…Ñ¥½¹%¤¹¡¥± ‰…±…¹•™Ñ•Èœ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹Á…É•¹Ð ¤¹Á…É•¹Ð ¤¹¡¥± Á½¥¹ÑÍ	…±…¹”œ¤¹Ù…° ¤¤¤ˆ°4(€€€€€€€€€€€€ˆ¹Ù…±¥‘…Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€ ¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ñð€ …‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜¹•Ý…Ñ„¹•á¥ÍÑÌ ¤€˜˜…ÕÑ ¹Õ¥€ôô€‘Õ¥€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹•á¥ÍÑÌ ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± …Ñ¥Ù”œ¤¹Ù…° ¤€ôôÑÉÕ”€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± …Ù…¥±…‰±”œ¤¹Ù…° ¤€ôôÑÉÕ”€˜˜¹•Ý…Ñ„¹¡¥± É•Ý…É‘9…µ”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± ¹…µ”œ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± Á½¥¹ÑÍI•ÅÕ¥É•œ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± µ¥¹AÕÉ¡…Í•µ½Õ¹Ðœ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± µ¥¹AÕÉ¡…Í•µ½Õ¹Ðœ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± É•ÅÕ•ÍÑ•‘Ðœ¤¹¥Í9Õµ‰•È ¤¤¤ˆ4(€€€€€€€€€ô4(€€€€€€€ô4(€€€€€ô4(€€€ô°4(€€€€‰ÍÑ½É•I•Ý…É‘QÉ…¹Í…Ñ¥½¹Ìˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ˆ°4(€€€€€€ˆ‘Õ¥ˆèì4(€€€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡…ÕÑ ¹Õ¥€ôô€‘Õ¥ñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ˆ°4(€€€€€€€€ˆ‘Ñá%ˆèì4(€€€€€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡…ÕÑ ¹Õ¥€ôô€‘Õ¥ñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ˆ°4(€€€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€ ¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ñð€¡…ÕÑ ¹Õ¥€ôô€‘Õ¥€˜˜€…‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜€ …É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± Á•¹‘¥¹I•Í•ÉÙ…Ñ¥½¹%œ¤¹•á¥ÍÑÌ ¤ñðÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± Á•¹‘¥¹I•Í•ÉÙ…Ñ¥½¹%œ¤¹Ù…° ¤€ôô€œœ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹•á¥ÍÑÌ ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± …Ñ¥Ù”œ¤¹Ù…° ¤€ôôÑÉÕ”€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± …Ù…¥±…‰±”œ¤¹Ù…° ¤€ôôÑÉÕ”€˜˜¹•Ý…Ñ„¹¡¥± ÕÍÑ½µ•É%œ¤¹Ù…° ¤€ôô€‘Õ¥€˜˜¹•Ý…Ñ„¹¡¥± ÑåÁ”œ¤¹Ù…° ¤€ôô€É•‘••µ•œ€˜˜¹•Ý…Ñ„¹¡¥± ÍÑ…ÑÕÌœ¤¹Ù…° ¤€ôô€É•ÅÕ•ÍÑ•œ€˜˜¹•Ý…Ñ„¹¡¥± É•Ý…É‘9…µ”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± ¹…µ”œ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘Ìœ¤¹¡¥±¡¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤¤¹¡¥± Á½¥¹ÑÍI•ÅÕ¥É•œ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± Í¥¹•‘A½¥¹ÑÌœ¤¹¥Í9Õµ‰•È ¤€˜˜¹•Ý…Ñ„¹¡¥± Í¥¹•‘A½¥¹ÑÌœ¤¹Ù…° ¤€ôô€À€´¹•Ý…Ñ„¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± ‰…±…¹•	•™½É”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± Á½¥¹ÑÍ	…±…¹”œ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± ‰…±…¹•™Ñ•Èœ¤¹¥Í9Õµ‰•È ¤€˜˜¹•Ý…Ñ„¹¡¥± ‰…±…¹•™Ñ•Èœ¤¹Ù…° ¤€øô€À€˜˜¹•Ý…Ñ„¹¡¥± ‰…±…¹•™Ñ•Èœ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹¡¥± ‰…±…¹•	•™½É”œ¤¹Ù…° ¤€´¹•Ý…Ñ„¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± É•Ý…É‘M¹…ÁÍ¡½Ðœ¤¹¡¥± É•Í•ÉÙ…Ñ¥½¹%œ¤¹Ù…° ¤€ôô€‘Ñá%€˜˜¹•Ý…Ñ„¹¡¥± É•Ý…É‘M¹…ÁÍ¡½Ðœ¤¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤€˜˜¹•Ý…Ñ„¹¡¥± É•Ý…É‘M¹…ÁÍ¡½Ðœ¤¹¡¥± Á½¥¹ÑÍI•‘••µ•œ¤¹Ù…° ¤€ôô¹•Ý…Ñ„¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤¤¤ˆ°4(€€€€€€€€€€‰ÍÑ…ÑÕÌˆèì4(€€€€€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€ ¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ñð€¡…ÕÑ ¹Õ¥€ôô€‘Õ¥€˜˜‘…Ñ„¹Ù…° ¤€ôô€É•ÅÕ•ÍÑ•œ€˜˜¹•Ý…Ñ„¹Ù…° ¤€ôô€É•Í•ÉÙ•œ€˜˜‘…Ñ„¹Á…É•¹Ð ¤¹¡¥± ÕÍÑ½µ•É%œ¤¹Ù…° ¤€ôô€‘Õ¥€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± Á•¹‘¥¹I•Í•ÉÙ…Ñ¥½¹%œ¤¹Ù…° ¤€ôô€‘Ñá%€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± Á½¥¹ÑÍ	…±…¹”œ¤¹Ù…° ¤€ôô‘…Ñ„¹Á…É•¹Ð ¤¹¡¥± ‰…±…¹•™Ñ•Èœ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± ¡½±‘Ìœ¤¹¡¥± ‘Ñá%¤¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤€ôô‘…Ñ„¹Á…É•¹Ð ¤¹¡¥± É•Ý…É‘%œ¤¹Ù…° ¤€˜˜É½½Ð¹¡¥± ÍÑ½É•I•Ý…É‘½Õ¹ÑÌœ¤¹¡¥± ‘Õ¥¤¹¡¥± ¡½±‘Ìœ¤¹¡¥± ‘Ñá%¤¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤€ôô‘…Ñ„¹Á…É•¹Ð ¤¹¡¥± Á½¥¹ÑÌœ¤¹Ù…° ¤¤¤ˆ4(€€€€€€€€€ô4(€€€€€€€ô°4(€€€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€€€‰É•…Ñ•‘Ðˆ4(€€€€€€€t4(€€€€€ô4(€€€ô°4(€€€€‰ÍÑ½É•=É‘•ÉI•Ý…É‘I•‘•µÁÑ¥½¹Ìˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ¤ˆ4(€€€ô°4(€€€€‰ÍÑ½É•…Ñ…±½5•Ñ„ˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€‰É…¹¡}…‘µ¥¸œ¤ˆ4(€€€ô°4(€€€€‰ÍÑ½É•…Ñ…±½œˆèì4(€€€€€€ˆ¹É•…ˆè€ˆ¡ÅÕ•Éä¹½É‘•É	å¡¥±€ôô€…Ñ¥Ù”œ€˜˜ÅÕ•Éä¹•ÅÕ…±Q¼€ôôÑÉÕ”¤ñð€¡…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€‰É…¹¡}…‘µ¥¸œ¤¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰…Ñ¥Ù”ˆ°4(€€€€€€€€‰…Ñ•½Éäˆ°4(€€€€€€€€‰ÍÕ‰…Ñ•½Éäˆ°4(€€€€€€€€‰ÕÁ‘…Ñ•‘Ðˆ°4(€€€€€€€€‰Í¥…ÉUÁ‘…Ñ•‘Ðˆ4(€€€€€t°4(€€€€€€ˆ‘ÁÉ½‘ÕÑ%ˆèì4(€€€€€€€€‰‰É…¹¡M•ÑÑ¥¹Ìˆèì4(€€€€€€€€€€ˆ‘‰É…¹¡%ˆèì4(€€€€€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€‰É…¹¡}…‘µ¥¸œ€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤€ôô€‘‰É…¹¡%ˆ4(€€€€€€€€€ô4(€€€€€€€ô4(€€€€€ô4(€€€ô°4(€€€€‰ÍÑ½É•…Ñ•½É¥•Ìˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ4(€€€ô°4(€€€€‰ÍÑ½É•½ÕÁ½¹Ìˆèì4(€€€€€€ˆ¹É•…ˆè€ˆ¡ÅÕ•Éä¹½É‘•É	å¡¥±€ôô€…Ñ¥Ù”œ€˜˜ÅÕ•Éä¹•ÅÕ…±Q¼€ôôÑÉÕ”¤ñð€¡…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œ¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰…Ñ¥Ù”ˆ°4(€€€€€€€€‰½‘”ˆ4(€€€€€t4(€€€ô°4(€€€€‰ÍÑ½É•AÉ½µ½Ñ¥½¹Ìˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰…Ñ¥Ù”ˆ°4(€€€€€€€€‰Í½ÉÑ=É‘•Èˆ4(€€€€€t4(€€€ô°4(€€€€‰ÍÑ½É•AÉ½‘ÕÑAÉ½µ½Ñ¥½¹Ìˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰…Ñ¥Ù”ˆ°4(€€€€€€€€‰Í½ÉÑ=É‘•Èˆ4(€€€€€t4(€€€ô°4(€€€€‰ÍÑ½É•A½ÁÕÁ‘Ìˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰…Ñ¥Ù”ˆ°4(€€€€€€€€‰Í½ÉÑ=É‘•Èˆ4(€€€€€t4(€€€ô°4(€€€€‰ÍÑ½É••±¥Ù•ÉåM•ÑÑ¥¹Ìˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ4(€€€ô°4(€€€€‰ÍÑ½É•	É…¹¡•Ìˆèì4(€€€€€€ˆ¹É•…ˆèÑÉÕ”°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰…Ñ¥Ù”ˆ°4(€€€€€€€€‰¥Ñäˆ°4(€€€€€€€€‰‘¥ÍÁ±…å=É‘•Èˆ4(€€€€€t°4(€€€€€€ˆ‘‰É…¹¡%ˆèì4(€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€€€‰‘•±¥Ù•ÉåM•ÑÑ¥¹Ìˆèì4(€€€€€€€€€€‰½Á•É…Ñ¥½¹!½ÕÉÌˆèì4(€€€€€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€‰É…¹¡}…‘µ¥¸œ€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤€ôô€‘‰É…¹¡%ˆ4(€€€€€€€€€ô4(€€€€€€€ô4(€€€€€ô4(€€€ô°4(€€€€‰‘•±¥Ù•ÉåÉ¥Ù•ÉÌˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€½Á•É…Ñ½Èœ¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ‘‘É¥Ù•É½‘”ˆèì4(€€€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‘É¥Ù•É½‘”œ¤¹Ù…° ¤€ôô€‘‘É¥Ù•É½‘”¤ˆ°4(€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ4(€€€€€ô4(€€€ô°4(€€€€‰‘É¥Ù•ÉÌˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ4(€€€ô°4(€€€€‰ÍåÍÑ•µUÍ•ÉÌˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€‰­¥Ñ¡•¸ˆèì4(€€€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñðÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€­¥Ñ¡•¸œ¤ˆ4(€€€€€ô4(€€€ô°4(€€€€‰Í¥…É1¥¹­•‘EÕ½Ñ•Ìˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ€˜˜ÅÕ•Éä¹½É‘•É	å¡¥±€ôô€ÍÑ½É•	É…¹¡%œ€˜˜ÅÕ•Éä¹•ÅÕ…±Q¼€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰ÍÑ½É•	É…¹¡%ˆ4(€€€€€t°4(€€€€€€ˆ‘½É‘•É%ˆèì4(€€€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ€˜˜€¡‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤¤ˆ°4(€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ€˜˜€  …‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜€¡¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤ñð€¡‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜€ ¡‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤ñðÉ½½Ð¹¡¥± ½É‘•ÉÌœ¤¹¡¥± ‘½É‘•É%¤¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñðÉ½½Ð¹¡¥± ½É‘•ÉÌœ¤¹¡¥± ‘½É‘•É%¤¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤€˜˜€ …¹•Ý…Ñ„¹•á¥ÍÑÌ ¤ñð€¡¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤¤¤¤¤ˆ4(€€€€€ô4(€€€ô°4(€€€€‰Í¥…ÉEÕ½Ñ•EÕ•Õ”ˆèì4(€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ€˜˜ÅÕ•Éä¹½É‘•É	å¡¥±€ôô€ÍÑ½É•	É…¹¡%œ€˜˜ÅÕ•Éä¹•ÅÕ…±Q¼€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤ˆ°4(€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œˆ°4(€€€€€€ˆ¹¥¹‘•á=¸ˆèl4(€€€€€€€€‰ÍÑ½É•	É…¹¡%ˆ4(€€€€€t°4(€€€€€€ˆ‘½É‘•É%ˆèì4(€€€€€€€€ˆ¹É•…ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ€˜˜€¡‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤¤ˆ°4(€€€€€€€€ˆ¹ÝÉ¥Ñ”ˆè€‰…ÕÑ €„ô¹Õ±°€˜˜€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€…‘µ¥¸œñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€Í•ÉÙ¥”œ€˜˜‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜€¡‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð‘…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤€˜˜€ …¹•Ý…Ñ„¹•á¥ÍÑÌ ¤ñð€¡¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤ñð¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡½‘”œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤¤¤ñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€‰É…¹¡}…‘µ¥¸œ€˜˜¹•Ý…Ñ„¹¡¥± ÍÑ½É•	É…¹¡%œ¤¹Ù…° ¤€ôôÉ½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± ‰É…¹¡%œ¤¹Ù…° ¤¤ñð€¡É½½Ð¹¡¥± ÕÍ•ÉI½±•Ìœ¤¹¡¥±¡…ÕÑ ¹Õ¥¤¹¡¥± É½±”œ¤¹Ù…° ¤€ôô€±¥•¹Ðœ€˜˜€…‘…Ñ„¹•á¥ÍÑÌ ¤€˜˜¹•Ý…Ñ„¹¡¥± ÍÑ…ÑÕÌœ¤¹Ù…° ¤€ôô€Á•¹‘¥¹œœ¤¤ˆ4(€€€€€ô4(€€€ô4(€ô4)ô4(
