@@ -3,4 +3,5 @@ dist/
 .netlify/
 *.log
 logs/
+sync-backups/
 sicar.local.json

@@ -195,6 +195,7 @@ export default function OrderForm({
       ),
     [orderItems]
   );
+  const hasOrderDetail = orderItems.length > 0 || Boolean(pedido.trim());
 
   const addCatalogProduct = (product) => {
     const code = String(product?.code || '').trim();
@@ -264,8 +265,8 @@ export default function OrderForm({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (orderItems.length === 0) {
-      alert('Agrega al menos un producto del catalogo para crear el pedido y su cotizacion.');
+    if (!hasOrderDetail) {
+      alert('Agrega productos del catalogo o escribe la nota del pedido.');
       return;
     }
 
@@ -330,6 +331,7 @@ export default function OrderForm({
           pedido: pedido.trim(),
           observaciones: pedido.trim(),
           items: orderItems,
+          manualNoteOnly: orderItems.length === 0,
           fecha: hoyISO(),
           metodoPago,
           fulfillmentType,
@@ -1283,7 +1285,11 @@ export default function OrderForm({
           )}
 
           <textarea
-            placeholder="Notas adicionales para cocina (opcional)"
+            placeholder={
+              orderItems.length === 0
+                ? 'Escribe la nota del pedido para cocina'
+                : 'Notas adicionales para cocina (opcional)'
+            }
             value={pedido}
             onChange={(event) => setPedido(event.target.value)}
             className="input-focus"
@@ -1315,7 +1321,7 @@ export default function OrderForm({
             }}
           >
             <div style={{ fontSize: '14px', opacity: 0.6, fontWeight: 500 }}>
-              Selecciona los productos por codigo para crear correctamente la cotizacion.
+              Puedes elegir productos del catalogo o enviar solamente una nota de pedido a cocina.
             </div>
 
             <button
@@ -1323,7 +1329,7 @@ export default function OrderForm({
               disabled={
                 isSubmitting ||
                 (!selectedClient && !clienteInput.trim()) ||
-                orderItems.length === 0
+                !hasOrderDetail
               }
               className="btn-hover"
               style={{
@@ -1337,10 +1343,10 @@ export default function OrderForm({
                 fontWeight: 900,
                 fontSize: '18px',
                 cursor:
-                  isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0
+                  isSubmitting || (!selectedClient && !clienteInput.trim()) || !hasOrderDetail
                     ? 'not-allowed'
                     : 'pointer',
-                opacity: isSubmitting || (!selectedClient && !clienteInput.trim()) || orderItems.length === 0 ? 0.5 : 1,
+                opacity: isSubmitting || (!selectedClient && !clienteInput.trim()) || !hasOrderDetail ? 0.5 : 1,
                 boxShadow:
                   isSubmitting ? 'none' : '0 10px 30px rgba(245, 158, 11, 0.4)',
               }}

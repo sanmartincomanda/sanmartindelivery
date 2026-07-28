@@ -578,6 +578,8 @@ export async function createOrder(payload, options = {}) {
     pedido: pedidoTexto,
     observaciones: String(payload.observaciones || '').trim(),
     items: normalizedItems,
+    manualNoteOnly:
+      channel === MANUAL_CHANNEL && normalizedItems.length === 0 && Boolean(pedidoTexto),
     subtotalEstimado: subtotal,
     descuentoCupon: couponDiscount,
     deliveryFee,
