@@ -1043,6 +1043,22 @@ export default function ListaPedidos({ pedidos = [] }) {
                           PEDIDO PICKUP
                         </div>
                       )}
+                      {pedido.deliveryManualWithoutPin && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(245, 158, 11, 0.14)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(245, 158, 11, 0.32)',
+                          color: '#b45309',
+                          fontSize: '14px',
+                          fontWeight: 900
+                        }}>
+                          ENTREGA MANUAL SIN PIN - TARIFA PENDIENTE
+                        </div>
+                      )}
                       {pedido.canal === 'tienda_virtual' && (
                         <div style={{
                           display: 'flex',

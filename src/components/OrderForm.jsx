@@ -153,6 +153,9 @@ export default function OrderForm({
       fulfillmentType,
     });
   }, [activeDeliverySettings, fulfillmentType, selectedClient]);
+  const manualDeliveryWithoutPin =
+    fulfillmentType === ORDER_FULFILLMENT_DELIVERY &&
+    deliveryQuote?.reason === 'missing_destination';
 
   const sugerencias = useMemo(() => {
     if (!allowClientDirectory) {
@@ -300,10 +303,8 @@ export default function OrderForm({
         return;
       }
 
-      if (!deliveryQuote.available) {
-        if (deliveryQuote.reason === 'missing_destination') {
-          alert('Este cliente no tiene un pin de ubicacion. Guardalo antes de crear un pedido con delivery.');
-        } else if (deliveryQuote.reason === 'out_of_coverage') {
+      if (!deliveryQuote.available && !manualDeliveryWithoutPin) {
+        if (deliveryQuote.reason === 'out_of_coverage') {
           alert(
             `La ubicacion esta fuera del radio de ${deliveryQuote.coverageRadiusKm} km. Usa Pickup o confirma otra direccion.`
           );
@@ -314,8 +315,23 @@ export default function OrderForm({
       }
     }
 
-    const appliedDeliveryQuote =
-      deliveryQuote || calculateStoreDeliveryQuote({ fulfillmentType: ORDER_FULFILLMENT_PICKUP });
+    const appliedDeliveryQuote = manualDeliveryWithoutPin
+      ? {
+          distanceKm: 0,
+          coverageRadiusKm: Number(activeDeliverySettings?.coverageRadiusKm || 0),
+          totalFee: 0,
+          originalTotalFee: 0,
+          baseFee: 0,
+          taxAmount: 0,
+          originalBaseFee: 0,
+          originalTaxAmount: 0,
+          feeKey: 'manual_without_pin',
+          deliveryFree: false,
+          promotionLabel: '',
+          promotionType: '',
+          promotionDate: '',
+        }
+      : deliveryQuote || calculateStoreDeliveryQuote({ fulfillmentType: ORDER_FULFILLMENT_PICKUP });
 
     setIsSubmitting(true);
 
@@ -335,6 +351,9 @@ export default function OrderForm({
           fecha: hoyISO(),
           metodoPago,
           fulfillmentType,
+          deliveryMode: manualDeliveryWithoutPin ? 'manual_without_pin' : 'perfil',
+          deliveryManualWithoutPin: manualDeliveryWithoutPin,
+          deliveryFeePending: manualDeliveryWithoutPin,
           deliveryDistanceKm: appliedDeliveryQuote.distanceKm,
           coverageRadiusKm: appliedDeliveryQuote.coverageRadiusKm,
           deliveryFee: appliedDeliveryQuote.totalFee,
@@ -625,11 +644,11 @@ export default function OrderForm({
                     marginTop: '14px',
                     padding: '14px 16px',
                     borderRadius: '12px',
-                    border: `1px solid ${deliveryQuote?.available ? 'rgba(56, 189, 248, 0.5)' : 'rgba(248, 113, 113, 0.45)'}`,
-                    background: deliveryQuote?.available
+                    border: `1px solid ${deliveryQuote?.available || manualDeliveryWithoutPin ? 'rgba(56, 189, 248, 0.5)' : 'rgba(248, 113, 113, 0.45)'}`,
+                    background: deliveryQuote?.available || manualDeliveryWithoutPin
                       ? 'rgba(56, 189, 248, 0.12)'
                       : 'rgba(239, 68, 68, 0.1)',
-                    color: deliveryQuote?.available ? '#bae6fd' : '#fecaca',
+                    color: deliveryQuote?.available || manualDeliveryWithoutPin ? '#bae6fd' : '#fecaca',
                     fontSize: '13px',
                     fontWeight: 700,
                   }}
@@ -637,7 +656,7 @@ export default function OrderForm({
                   {!deliverySettings && !deliverySettingsError && 'Calculando tarifa de envio...'}
                   {deliverySettingsError && 'No se pudo cargar la tarifa de envio.'}
                   {deliveryQuote?.reason === 'missing_destination' &&
-                    'Selecciona un cliente con pin para calcular el envio.'}
+                    'Entrega manual sin pin. Se guardara sin distancia ni tarifa automatica.'}
                   {deliveryQuote?.reason === 'out_of_coverage' &&
                     `Fuera del radio de ${deliveryQuote.coverageRadiusKm} km.`}
                   {deliveryQuote?.available && (

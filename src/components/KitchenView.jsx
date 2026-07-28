@@ -1195,6 +1195,22 @@ export default function KitchenView({ orders, allowRuta = true }) {
                           PEDIDO PICKUP
                         </div>
                       )}
+                      {pedido.deliveryManualWithoutPin && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: 'rgba(245, 158, 11, 0.14)',
+                          borderRadius: '10px',
+                          fontSize: '14px',
+                          fontWeight: 900,
+                          color: '#b45309',
+                          border: '1px solid rgba(245, 158, 11, 0.32)'
+                        }}>
+                          ENTREGA MANUAL SIN PIN - TARIFA PENDIENTE
+                        </div>
+                      )}
                       <div style={{
                         padding: '10px 16px',
                         background: 'rgba(255,255,255,0.6)',

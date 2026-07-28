@@ -521,6 +521,9 @@ export async function createOrder(payload, options = {}) {
   const deliveryFree = !pickupOrder && payload.deliveryFree === true && deliveryFeeOriginal > 0;
   const deliveryDistanceKm = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryDistanceKm || 0));
   const coverageRadiusKm = pickupOrder ? 0 : Math.max(0, Number(payload.coverageRadiusKm || 0));
+  const deliveryManualWithoutPin =
+    !pickupOrder &&
+    (payload.deliveryManualWithoutPin === true || payload.deliveryMode === 'manual_without_pin');
   const total =
     normalizedItems.length > 0
       ? Number(Math.max(Number(subtotal || 0) - couponDiscount + deliveryFee, 0).toFixed(2))
@@ -608,7 +611,13 @@ export async function createOrder(payload, options = {}) {
     orderPrefix,
     canal: channel,
     canalLabel: channel === STORE_CHANNEL ? 'Tienda Virtual' : 'Ingreso Manual',
-    deliveryMode: pickupOrder ? 'pickup' : String(payload.deliveryMode || 'perfil').trim() || 'perfil',
+    deliveryMode: pickupOrder
+      ? 'pickup'
+      : deliveryManualWithoutPin
+        ? 'manual_without_pin'
+        : String(payload.deliveryMode || 'perfil').trim() || 'perfil',
+    deliveryManualWithoutPin,
+    deliveryFeePending: deliveryManualWithoutPin && payload.deliveryFeePending !== false,
     fulfillmentType,
     fulfillmentLabel: pickupOrder ? 'Pickup' : 'Delivery',
     storeTenantId: String(payload.storeTenantId || 'sanmartinsr').trim(),
