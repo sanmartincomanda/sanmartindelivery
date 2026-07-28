@@ -421,4 +421,1858 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
   (Array.isArray(quote.items) ? quote.items : [])
     .filter((item) => !isDeliveryServiceCode(item?.code || ''))
     .forEach((item) => {
-    lines×½4öÚ$z{-®éÜj×—FV×2ÀÐ¢VF–Fó¢'V–ÆD÷&FW%FW‡B†—FV×2Â÷&FW"æö'6W'f6–öæW2Â°Ð¢7V'F÷FÃ¢&öGV7E7V'F÷FÂÀÐ¢F÷FÃ¢7W7FöÖW%F÷FÂÀÐ¢F—66÷VçC¢7W7FöÖW$F—66÷VçBÀÐ¢FVÆ—fW'”fVS¢÷&FW"æFVÆ—fW'”fVRÀÐ¢FVÆ—fW'”fVT÷&–v–æÃ¢÷&FW"æFVÆ—fW'”fVT÷&–v–æÂÀÐ¢FVÆ—fW'”g&VS¢÷&FW"æFVÆ—fW'”g&VRÀÐ¢FVÆ—fW'”F—7Fæ6T¶Ó¢÷&FW"æFVÆ—fW'”F—7Fæ6T¶ÒÀÐ¢ÖWFöFõvó¢÷&FW"æÖWFöFõvòÀÐ¢F÷FÄÆ&VÃ¢uF÷FÂ7GVÆ—¦FòFRVF–FòrÀÐ¢7V'F÷FÄÆ&VÃ¢u7V'F÷FÂ7GVÆ—¦FòrÀÐ¢&Wv&E&VFV×F–öã¢÷&FW"ç&Wv&E&VFV×F–öâÀÐ¢Ò’ÀÐ¢7V'F÷FÄW7F–ÖFó¢&öGV7E7V'F÷FÂÀÐ¢FW67VVçFô7Wöã¢7W7FöÖW$F—66÷VçBÀÐ¢F÷FÃ¢7W7FöÖW%F÷FÂÀÐ¢F÷FÄ&÷†–ÖFó¢fÇ6RÀÐ¢F÷FÄ7GVÆ—¦Fõ÷%6–6#¢G'VRÀÐ¢F÷FÄ7GVÆ—¦FôC¢æ÷t—6òÀÐ¢6–6%V÷FS¢°Ð¢7FGW3¢Ö—76–æt6öFW2æÆVæwF‚âòw'F–Âr¢vÆ–æ¶VBrÀÐ¢6÷D–C¢V÷FRæ6÷D–BÀÐ¢÷&FW$çVÖ&W#¢çVÖ&W"†÷&FW"æ–BÇÂ’ÀÐ¢÷&FW$6öFS¢f÷&ÖD÷&FW$6öFR†÷&FW"’ÀÐ¢÷&FW$FFS¢V÷FRæ÷&FW$FFRÀÐ¢6Æ”–C¢çVÖ&W"‡6–6$7W7FöÖW#òæ6Æ”–BÇÂ÷&FW#òç6–6%V÷FSòæ6Æ”–BÇÂ’ÀÐ¢6Æ–VçD6öFS¢æ÷&ÖÆ—¦T6öFR‡6–6$7W7FöÖW#òæ6ÆfRÇÂ÷&FW#òç6–6%V÷FSòæ6Æ–VçD6öFRÇÂrr’ÀÐ¢6Æ–VçDæÖS¢æ÷&ÖÆ—¦UFW‡B‡6–6$7W7FöÖW#òææÖRÇÂ÷&FW#òæ6Æ–VçFRÇÂrr’ÀÐ¢7V'F÷FÃ¢&öGV7E7V'F÷FÂÀÐ¢F—66÷VçC¢7W7FöÖW$F—66÷VçBÀÐ¢F÷FÃ¢w&÷75F÷FÂÀÐ¢w&÷75F÷FÂÀÐ¢7W7FöÖW%F÷FÂÀÐ¢Ö—76–æt6öFW2ÀÐ¢Æ7E7–æ6VDC¢æ÷t—6òÀÐ¢Æ7DÆ–VDC¢æ÷t—6òÀÐ¢7W7FöÖW%WFFU&Wf—6–öâÀÐ¢7W7FöÖW%WFFUVæF–æs Ð¢7W7FöÖW%f—6–&ÆT6†ævRÇÂ&ööÆVâ†÷&FW#òç6–6%V÷FSòæ7W7FöÖW%WFFUVæF–ær’ÀÐ¢ÒÀÐ¢Ó°Ð¢Ó°Ð Ð¢6öç7B7–æ4÷&FW%V÷FT–çFW&æÂÒ7–æ2†÷&FW$¶W’Â÷F–öç2Ò·Ò’Óâ°Ð¢v—BVç7W&TWF†VçF–6FVDf—&V&6U6W76–öâ‚“°Ð Ð¢6öç7BÇ•Fôf—&V&6RÒ÷F–öç2æÇ•Fôf—&V&6RÓÓÒG'VS°Ð¢6öç7B÷&FW"Òv—BvWD÷&FW$'”¶W’†÷&FW$¶W’“°Ð Ð¢–b‚÷&FW"’°Ð¢F‡&÷ræWrW'&÷"‚tæò6RVæ6öçG&òVÂVF–FòVâf—&V&6Râr“°Ð¢ÐÐ Ð¢–b‚—476–væVD'&æ6‚†÷&FW"’’°Ð¢F‡&÷ræWrW'&÷"†VÂVF–FòW'FVæV6RG¶vWD÷&FW$'&æ6„–B†÷&FW"—Ò’W7FR–çFVw&F÷"&ö6W6G¶76–væVD'&æ6„–GÒæ“°Ð¢ÐÐ Ð¢–b‚—5V÷FTVÆ–v–&ÆT÷&FW"†÷&FW"’’°Ð¢F‡&÷ræWrW'&÷"‚tVÂVF–FòæV6W6—FÂÖVæ÷2Vâ'F–7VÆò6öâ6öF–vò4”4"&7&V"Æ6÷F—¦6–öââr“°Ð¢ÐÐ Ð¢6öç7B6–6$7W7FöÖW"Òv—BVç7W&U6–6$7W7FöÖW$f÷$÷&FW"†÷&FW$¶W’Â÷&FW"“°Ð¢ÆWBV÷FU&VfW&Væ6RÒv—BvWEV÷FT'”÷&FW%&VfW&Væ6R†÷&FW"“°Ð¢ÆWBÖ—76–æt6öFW2ÒµÓ°Ð¢ÆWB7&VFVEV÷FRÒfÇ6S°Ð¢6öç7BG&gBÒv—B'V–ÆEV÷FTG&gB†÷&FW"“°Ð Ð¢–b‚V÷FU&VfW&Væ6R’°Ð¢6öç7B7&VFVBÒv—B–ç6W'EV÷FTG&gB†÷&FW"ÂG&gBÂ6–6$7W7FöÖW"“°Ð¢7&VFVEV÷FRÒG'VS°Ð¢Ö—76–æt6öFW2Ò'&’æ—4'&’†7&VFVBæÖ—76–æt6öFW2’ò7&VFVBæÖ—76–æt6öFW2¢µÓ°Ð¢V÷FU&VfW&Væ6RÒ²6÷D–C¢7&VFVBæ6÷D–BÓ°Ð¢ÒVÇ6R°Ð¢6öç7B&WÆ6VBÒv—B&WÆ6UV÷FTG&gB‡V÷FU&VfW&Væ6Ræ6÷D–BÂG&gBÂ6–6$7W7FöÖW"“°Ð¢Ö—76–æt6öFW2Ò'&’æ—4'&’‡&WÆ6VBæÖ—76–æt6öFW2’ò&WÆ6VBæÖ—76–æt6öFW2¢µÓ°Ð¢ÐÐ Ð¢–b‚V÷FU&VfW&Væ6Sòæ6÷D–B’°Ð¢F‡&÷ræWrW'&÷"‚tæò6RVFòÆö6Æ—¦"Æ6÷F—¦6–öâ4”4"&W7FRVF–Fòâr“°Ð¢ÐÐ Ð¢6öç7BV÷FRÒv—BvWEV÷FU6æ6†÷B‡V÷FU&VfW&Væ6R“°Ð¢6öç7B7W7FöÖW$F—66÷VçBÒ6Æ7VÆFT÷&FW$6÷WöäF—66÷VçB†÷&FW"Â&÷VæDÖöæW’‡V÷FRçF÷FÂÇÂ’“°Ð¢6öç7B7W7FöÖW%V÷FRÒ°Ð¢ââçV÷FRÀÐ¢F—66÷VçC¢7W7FöÖW$F—66÷VçBÀÐ¢7W7FöÖW$F—66÷VçBÀÐ¢7W7FöÖW%F÷FÃ¢&÷VæDÖöæW’„ÖF‚æÖ‚‡&÷VæDÖöæW’‡V÷FRçF÷FÂÇÂ’Ò7W7FöÖW$F—66÷VçBÂ’’ÀÐ¢6–6%F÷FÃ¢&÷VæDÖöæW’‡V÷FRçF÷FÂÇÂ’ÀÐ¢&öGV7E7V'F÷FÃ¢FW&—fUV÷FVE&öGV7E7V'F÷FÂ‡²ââçV÷FRÂ6–6%F÷FÃ¢&÷VæDÖöæW’‡V÷FRçF÷FÂÇÂ’ÒÂ÷&FW"’ÀÐ¢Ó°Ð¢6öç7BV÷FU7FGW2ÒÖ—76–æt6öFW2æÆVæwF‚âòw'F–Âr¢w7–æ6VBs°Ð¢6öç7BV÷FTÖWFF6‚Ò°Ð¢7FGW3¢V÷FU7FGW2ÀÐ¢6÷D–C¢7W7FöÖW%V÷FRæ6÷D–BÀÐ¢÷&FW$çVÖ&W#¢çVÖ&W"†÷&FW"æ–BÇÂ’ÀÐ¢÷&FW$6öFS¢f÷&ÖD÷&FW$6öFR†÷&FW"’ÀÐ¢÷&FW$FFS¢7W7FöÖW%V÷FRæ÷&FW$FFRÀÐ¢6Æ”–C¢çVÖ&W"‡6–6$7W7FöÖW#òæ6Æ”–BÇÂ’ÀÐ¢6Æ–VçD6öFS¢æ÷&ÖÆ—¦T6öFR‡6–6$7W7FöÖW#òæ6ÆfR’ÀÐ¢6Æ–VçDæÖS¢æ÷&ÖÆ—¦UFW‡B‡6–6$7W7FöÖW#òææÖRÇÂ÷&FW#òæ6Æ–VçFR’ÀÐ¢7V'F÷FÃ¢&÷VæDÖöæW’†7W7FöÖW%V÷FRç&öGV7E7V'F÷FÂÇÂ’ÀÐ¢F—66÷VçC¢&÷VæDÖöæW’†7W7FöÖW%V÷FRæF—66÷VçBÇÂ’ÀÐ¢F÷FÃ¢&÷VæDÖöæW’†7W7FöÖW%V÷FRçF÷FÂÇÂ’ÀÐ¢w&÷75F÷FÃ¢&÷VæDÖöæW’†7W7FöÖW%V÷FRç6–6%F÷FÂÇÂ7W7FöÖW%V÷FRçF÷FÂÇÂ’ÀÐ¢7W7FöÖW%F÷FÃ¢&÷VæDÖöæW’†7W7FöÖW%V÷FRæ7W7FöÖW%F÷FÂÇÂ’ÀÐ¢Ö—76–æt6öFW2ÀÐ¢7–æ6VDC¢æWrFFR‚’çFô•4õ7G&–ær‚’ÀÐ¢Æ7E7–æ6VDC¢æWrFFR‚’çFô•4õ7G&–ær‚’ÀÐ¢Ó°Ð Ð¢–b†Ç•Fôf—&V&6R’°Ð¢6öç7B÷&FW%F6‚Ò'V–ÆDf—&V&6T÷&FW%F6„g&öÕV÷FR†÷&FW"Â7W7FöÖW%V÷FRÂÖ—76–æt6öFW2Â6–6$7W7FöÖW"“°Ð¢v—BWFFTFF&6U&Vb‡&Vb†FF&6RÂGµ5Dõ$Uôõ$DU%5õD‡ÒòG¶÷&FW$¶W—Ö’Â÷&FW%F6‚“°Ð¢v—B7–æ4Æ–æ¶VEV÷FUvF6‚†÷&FW$¶W’Â÷&FW"Â7W7FöÖW%V÷FRÂ²Ç•Fôf—&V&6S¢G'VRÒ“°Ð¢ÒVÇ6R°Ð¢v—BWFFT÷&FW%V÷FU7FGW2†÷&FW$¶W’ÂV÷FTÖWFF6‚“°Ð¢v—B7–æ4Æ–æ¶VEV÷FUvF6‚†÷&FW$¶W’Â÷&FW"Â7W7FöÖW%V÷FRÂ²Ç•Fôf—&V&6S¢fÇ6RÒ“°Ð¢ÐÐ Ð¢v—B6ÆV%VWVTVçG'’†÷&FW$¶W’“°Ð Ð¢&WGW&â°Ð¢÷&FW$¶W’ÀÐ¢÷&FW$çVÖ&W#¢çVÖ&W"†÷&FW"æ–BÇÂ’ÀÐ¢÷&FW$6öFS¢7G&–ær†÷&FW#òæ÷&FW$çVÖ&W"ÇÂrr’çG&–Ò‚’ÀÐ¢7&VFVEV÷FRÀÐ¢V÷FS¢7W7FöÖW%V÷FRÀÐ¢Ö—76–æt6öFW2ÀÐ¢6–6$7W7FöÖW"ÀÐ¢v†G6ÖW76vS¢'V–ÆD7W7FöÖW%V÷FTÖW76vR†÷&FW"Â7W7FöÖW%V÷FR’ÀÐ¢7W7FöÖW%†öæS¢7G&–ær†÷&FW"çFVÆVföæòÇÂrr’çG&–Ò‚’ÀÐ¢7W7FöÖW$æÖS¢7G&–ær†÷&FW"æ6Æ–VçFRÇÂrr’çG&–Ò‚’ÀÐ¢Ó°Ð¢Ó°Ð Ð¢6öç7B&Vg&W6„Æ–æ¶VEV÷FW2Ò7–æ2‚’Óâ°Ð¢v—BVç7W&TWF†VçF–6FVDf—&V&6U6W76–öâ‚“°Ð Ð¢–b†Æ–æ¶VEV÷FW5&Vg&W6†–ær’°Ð¢&WGW&ã°Ð¢ÐÐ Ð¢Æ–æ¶VEV÷FW5&Vg&W6†–ærÒG'VS°Ð¢7FFRç&Vg&W6†–ætÆ–æ¶VEV÷FW2ÒG'VS°Ð¢7FFRæÆ7DÆ–æ¶VE&Vg&W6„BÒæWrFFR‚’çFô•4õ7G&–ær‚“°Ð Ð¢G'’°Ð¢6öç7B6æ6†÷BÒv—BvWB†vWD'&æ6…66÷VEVW'’„Ä”ä´TEõTõDU5õD‚’“°Ð¢6öç7BÆ–æ¶VEV÷FW2Ò6æ6†÷BçfÂ‚’ÇÂ·Ó°Ð¢6öç7BVçG&–W2Òö&¦V7BæVçG&–W2†Æ–æ¶VEV÷FW2’ç6÷'B€Ð¢†ÆVgBÂ&–v‡B’ÓâçVÖ&W"†ÆVgE³Óòæ÷&FW$çVÖ&W"ÇÂ’ÒçVÖ&W"‡&–v‡E³Óòæ÷&FW$çVÖ&W"ÇÂÐ¢“°Ð Ð¢7FFRçvF6†VEV÷FW46÷VçBÒVçG&–W2æÆVæwFƒ°Ð Ð¢f÷"†6öç7B¶÷&FW$¶W’ÂvF6„VçG'•ÒöbVçG&–W2’°Ð¢G'’°Ð¢6öç7B÷&FW"Òv—BvWD÷&FW$'”¶W’†÷&FW$¶W’“°Ð Ð¢–b†÷&FW"bb—476–væVD'&æ6‚†÷&FW"’’°Ð¢6öçF–çVS°Ð¢ÐÐ Ð¢–b‚÷&FW"ÇÂ—5V÷FTVÆ–v–&ÆT÷&FW"†÷&FW"’ÇÂ—4f–æÅ7F÷&U7FGW2†÷&FW"æW7FFò’’°Ð¢v—BWFFTFF&6U&Vb‡&Vb†FF&6R’Â°Ð¢¶G´Ä”ä´TEõTõDU5õD‡ÒòG¶÷&FW$¶W—ÖÓ¢çVÆÂÀÐ¢Ò“°Ð¢6öçF–çVS°Ð¢ÐÐ Ð¢6öç7B6÷D–BÒçVÖ&W"‡vF6„VçG'“òæ6÷D–BÇÂ÷&FW#òç6–6%V÷FSòæ6÷D–BÇÂ“°Ð¢–b†6÷D–BÃÒ’°Ð¢v—BWFFTFF&6U&Vb‡&Vb†FF&6R’Â°Ð¢¶G´Ä”ä´TEõTõDU5õD‡ÒòG¶÷&FW$¶W—ÖÓ¢çVÆÂÀÐ¢Ò“°Ð¢6öçF–çVS°Ð¢ÐÐ Ð¢6öç7BV÷FU6æ6†÷BÒv—BvWEV÷FU6æ6†÷B‡²6÷D–BÒ“°Ð¢6öç7B7W7FöÖW$F—66÷VçBÒ6Æ7VÆFT÷&FW$6÷WöäF—66÷VçB†÷&FW"Â&÷VæDÖöæW’‡V÷FU6æ6†÷BçF÷FÂÇÂ’“°Ð¢6öç7BV÷FRÒ°Ð¢ââçV÷FU6æ6†÷BÀÐ¢F—66÷VçC¢7W7FöÖW$F—66÷VçBÀÐ¢7W7FöÖW$F—66÷VçBÀÐ¢7W7FöÖW%F÷FÃ¢&÷VæDÖöæW’€Ð¢ÖF‚æÖ‚‡&÷VæDÖöæW’‡V÷FU6æ6†÷BçF÷FÂÇÂ’Ò7W7FöÖW$F—66÷VçBÂÐ¢’ÀÐ¢6–6%F÷FÃ¢&÷VæDÖöæW’‡V÷FU6æ6†÷BçF÷FÂÇÂ’ÀÐ¢&öGV7E7V'F÷FÃ¢FW&—fUV÷FVE&öGV7E7V'F÷FÂ€Ð¢²ââçV÷FU6æ6†÷BÂ6–6%F÷FÃ¢&÷VæDÖöæW’‡V÷FU6æ6†÷BçF÷FÂÇÂ’ÒÀÐ¢÷&FW Ð¢’ÀÐ¢Ó°Ð¢6öç7Bf–ævW'&–çBÒ'V–ÆEV÷FTf–ævW'&–çB‡V÷FR“°Ð¢6öç7B¶æ÷väf–ævW'&–çBÒ7G&–ær‡vF6„VçG'“òæÆ7Dö'6W'fVDf–ævW'&–çBÇÂrr’çG&–Ò‚“°Ð Ð¢–b‚¶æ÷väf–ævW'&–çB’°Ð¢v—B7–æ4Æ–æ¶VEV÷FUvF6‚†÷&FW$¶W’Â÷&FW"ÂV÷FRÂ°Ð¢Ç•Fôf—&V&6S¢÷&FW#òçF÷FÄ&÷†–ÖFòÓÓÒfÇ6RÀÐ¢Ò“°Ð¢6öçF–çVS°Ð¢ÐÐ Ð¢–b†¶æ÷väf–ævW'&–çBÓÓÒf–ævW'&–çB’°Ð¢6öçF–çVS°Ð¢ÐÐ Ð¢6öç7BÖ—76–æt6öFW2Ò'&’æ—4'&’†÷&FW#òç6–6%V÷FSòæÖ—76–æt6öFW2Ð¢ò÷&FW"ç6–6%V÷FRæÖ—76–æt6öFW0Ð¢¢µÓ°Ð¢6öç7B÷&FW%F6‚Ò'V–ÆDf—&V&6T÷&FW%F6„g&öÕV÷FR†÷&FW"ÂV÷FRÂÖ—76–æt6öFW2“°Ð¢v—BWFFTFF&6U&Vb‡&Vb†FF&6RÂGµ5Dõ$Uôõ$DU%5õD‡ÒòG¶÷&FW$¶W—Ö’Â÷&FW%F6‚“°Ð¢v—B7–æ4Æ–æ¶VEV÷FUvF6‚†÷&FW$¶W’Â÷&FW"ÂV÷FRÂ²Ç•Fôf—&V&6S¢G'VRÒ“°Ð Ð¢6öç7Bæ÷t—6òÒæWrFFR‚’çFô•4õ7G&–ær‚“°Ð¢7FFRæÆ7DWFôÇ”BÒæ÷t—6ó°Ð¢7FFRæÆ7E7V66W74BÒæ÷t—6ó°Ð¢7FFRæÆ7E&ö6W76VD÷&FW$¶W’Ò÷&FW$¶W“°Ð¢7FFRæÆ7EV÷FT–BÒçVÖ&W"‡V÷FRæ6÷D–BÇÂ“°Ð¢Ò6F6‚†W'&÷"’°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær€Ð¢W'&÷#òæÖW76vRÇÂW'&÷"ÇÂæò6RVFò&Vg&W66"Æ6÷F—¦6–öâ4”4"FVÂVF–FòG¶÷&FW$¶W—Òæ Ð¢“°Ð¢ÐÐ¢ÐÐ¢Ò6F6‚†W'&÷"’°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær†W'&÷#òæÖW76vRÇÂW'&÷"ÇÂtæò6RVF–W&öâ&Vg&W66"Æ26÷F—¦6–öæW2VæÆ¦F2âr“°Ð¢Òf–æÆÇ’°Ð¢Æ–æ¶VEV÷FW5&Vg&W6†–ærÒfÇ6S°Ð¢7FFRç&Vg&W6†–ætÆ–æ¶VEV÷FW2ÒfÇ6S°Ð¢ÐÐ¢Ó°Ð Ð¢6öç7B66†VGVÆTÆ–æ¶VEV÷FW5&Vg&W6‚Ò†FVÆ”×2ÒÄ”ä´TEõTõDU5õ$Te$U4…ôÕ2’Óâ°Ð¢–b†Æ–æ¶VEV÷FW5&Vg&W6…F–ÖW"’°Ð¢6ÆV%F–ÖV÷WB†Æ–æ¶VEV÷FW5&Vg&W6…F–ÖW"“°Ð¢ÐÐ Ð¢Æ–æ¶VEV÷FW5&Vg&W6…F–ÖW"Ò6WEF–ÖV÷WB‚‚’Óâ°Ð¢&Vg&W6„Æ–æ¶VEV÷FW2‚Ð¢æ6F6‚‚‚’Óâ·ÒÐ¢æf–æÆÇ’‚‚’Óâ°Ð¢66†VGVÆTÆ–æ¶VEV÷FW5&Vg&W6‚„Ä”ä´TEõTõDU5õ$Te$U4…ôÕ2“°Ð¢Ò“°Ð¢ÒÂÖF‚æÖ‚ƒÂçVÖ&W"†FVÆ”×2ÇÂÄ”ä´TEõTõDU5õ$Te$U4…ôÕ2’’“°Ð¢Ó°Ð Ð¢6öç7B7–æ4÷&FW%V÷FRÒ7–æ2†÷&FW$¶W’Â÷F–öç2Ò·Ò’Óâ°Ð¢6öç7B6ÆVä÷&FW$¶W’Ò7G&–ær†÷&FW$¶W’ÇÂrr’çG&–Ò‚“°Ð¢–b‚6ÆVä÷&FW$¶W’’°Ð¢F‡&÷ræWrW'&÷"‚tfÇFVÂ–FVçF–f–6F÷"FVÂVF–Fòâr“°Ð¢ÐÐ Ð¢–b‡'Vææ–æt÷&FW%&öÖ—6W2æ†2†6ÆVä÷&FW$¶W’’’°Ð¢&WGW&â'Vææ–æt÷&FW%&öÖ—6W2ævWB†6ÆVä÷&FW$¶W’“°Ð¢ÐÐ Ð¢6öç7B&öÖ—6RÒ&öÖ—6Rç&W6öÇfR‚Ð¢çF†Vâ‚‚’Óâ7–æ4÷&FW%V÷FT–çFW&æÂ†6ÆVä÷&FW$¶W’Â÷F–öç2’Ð¢æf–æÆÇ’‚‚’Óâ°Ð¢'Vææ–æt÷&FW%&öÖ—6W2æFVÆWFR†6ÆVä÷&FW$¶W’“°Ð¢Ò“°Ð Ð¢'Vææ–æt÷&FW%&öÖ—6W2ç6WB†6ÆVä÷&FW$¶W’Â&öÖ—6R“°Ð¢&WGW&â&öÖ—6S°Ð¢Ó°Ð Ð¢6öç7B&ö6W75VWVRÒ7–æ2‚’Óâ°Ð¢–b‡7FFRç&ö6W76–ær’°Ð¢&ö6W75&WVW7FVBÒG'VS°Ð¢&WGW&ã°Ð¢ÐÐ Ð¢7FFRç&ö6W76–ærÒG'VS°Ð¢7FFRæÆ7E'VäBÒæWrFFR‚’çFô•4õ7G&–ær‚“°Ð¢7FFRæÆ7DW'&÷"Òrs°Ð Ð¢G'’°Ð¢6öç7B6æ6†÷BÒv—BvWB†vWD'&æ6…66÷VEVW'’…TõDUõTUTUõD‚’“°Ð¢6öç7BVWVTFFÒ6æ6†÷BçfÂ‚’ÇÂ·Ó°Ð¢6öç7BVWVTVçG&–W2Òö&¦V7BæVçG&–W2‡VWVTFFÐ¢æf–ÇFW"‚…²ÂfÇVUÒ’ÓàÐ¢7G&–ær‡fÇVSòç7FGW2ÇÂrr’çG&–Ò‚’çFôÆ÷vW$66R‚’ÓÓÒwVæF–ærrbb—476–væVD'&æ6‚‡fÇVRÐ¢Ð¢ç6÷'B‚†ÆVgBÂ&–v‡B’ÓâçVÖ&W"†ÆVgE³Óòç&WVW7FVDBÇÂ’ÒçVÖ&W"‡&–v‡E³Óòç&WVW7FVDBÇÂ’“°Ð Ð¢7FFRçVæF–æt6÷VçBÒVWVTVçG&–W2æÆVæwFƒ°Ð Ð¢f÷"†6öç7B¶÷&FW$¶W’ÂVçG'•ÒöbVWVTVçG&–W2’°Ð¢G'’°Ð¢6öç7BVWVVD÷&FW"Òv—BvWD÷&FW$'”¶W’†÷&FW$¶W’“°Ð¢–b‚VWVVD÷&FW"ÇÂ—476–væVD'&æ6‚‡VWVVD÷&FW"’’°Ð¢6öçF–çVS°Ð¢ÐÐ Ð¢6öç7B&W7VÇBÒv—B7–æ4÷&FW%V÷FR†÷&FW$¶W’Â²Ç•Fôf—&V&6S¢G'VRÒ“°Ð¢v—BWFFTFF&6U&Vb‡&Vb†FF&6RÂGµ5Dõ$Uôõ$DU%5õD‡ÒòG¶÷&FW$¶W—Ò÷6–6%V÷FV’Â°Ð¢7FGW3¢&W7VÇBæÖ—76–æt6öFW2æÆVæwF‚âòw'F–Âr¢w7–æ6VBrÀÐ¢6÷D–C¢&W7VÇBçV÷FRæ6÷D–BÀÐ¢÷&FW$çVÖ&W#¢çVÖ&W"‡&W7VÇBæ÷&FW$çVÖ&W"ÇÂ’ÀÐ¢÷&FW$6öFS¢7G&–ær‡&W7VÇBæ÷&FW$6öFRÇÂrr’çG&–Ò‚’ÀÐ¢÷&FW$FFS¢&W7VÇBçV÷FRæ÷&FW$FFRÀÐ¢7V'F÷FÃ¢&W7VÇBçV÷FRç&öGV7E7V'F÷FÂÇÂ&W7VÇBçV÷FRç7V'F÷FÂÀÐ¢F—66÷VçC¢&W7VÇBçV÷FRæF—66÷VçBÀÐ¢F÷FÃ¢&W7VÇBçV÷FRçF÷FÂÀÐ¢w&÷75F÷FÃ¢&W7VÇBçV÷FRç6–6%F÷FÂÇÂ&W7VÇBçV÷FRçF÷FÂÀÐ¢7W7FöÖW%F÷FÃ¢&W7VÇBçV÷FRæ7W7FöÖW%F÷FÂÇÂÀÐ¢Ö—76–æt6öFW3¢&W7VÇBæÖ—76–æt6öFW2ÀÐ¢7–æ6VDC¢æWrFFR‚’çFô•4õ7G&–ær‚’ÀÐ¢7&VFVEV÷FS¢&W7VÇBæ7&VFVEV÷FRÀÐ¢Ò“°Ð¢v—B6ÆV%VWVTVçG'’†÷&FW$¶W’“°Ð¢7FFRç7–æ6VD6÷VçB³Ò°Ð¢7FFRæÆ7E&ö6W76VD÷&FW$¶W’Ò÷&FW$¶W“°Ð¢7FFRæÆ7EV÷FT–BÒçVÖ&W"‡&W7VÇBçV÷FRæ6÷D–BÇÂ“°Ð¢7FFRæÆ7E7V66W74BÒæWrFFR‚’çFô•4õ7G&–ær‚“°Ð¢Ò6F6‚†W'&÷"’°Ð¢v—BÖ&µVWVT4W'&÷"†÷&FW$¶W’ÂVçG'’ÂW'&÷"“°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær†W'&÷#òæÖW76vRÇÂW'&÷"ÇÂtfÆÆòFW66öæö6–FòVâ6öÆ4”4"âr“°Ð¢ÐÐ¢ÐÐ Ð¢7FFRçVæF–æt6÷VçBÒ°Ð¢Ò6F6‚†W'&÷"’°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær†W'&÷#òæÖW76vRÇÂW'&÷"ÇÂtæò6RVFò&ö6W6"Æ6öÆ4”4"âr“°Ð¢Òf–æÆÇ’°Ð¢7FFRç&ö6W76–ærÒfÇ6S°Ð¢–b‡&ö6W75&WVW7FVB’°Ð¢&ö6W75&WVW7FVBÒfÇ6S°Ð¢6WEF–ÖV÷WB‚‚’Óâ°Ð¢&ö6W75VWVR‚’æ6F6‚‚‚’Óâ·Ò“°Ð¢ÒÂS“°Ð¢ÐÐ¢ÐÐ¢Ó°Ð Ð¢6öç7B–æ—DWFõ7–æ2Ò‚’Óâ°Ð¢–b‡VWVTÆ—7FVæW%7F'FVB’°Ð¢&WGW&ã°Ð¢ÐÐ Ð¢Vç7W&TWF†VçF–6FVDf—&V&6U6W76–öâ‚Ð¢çF†Vâ‚‚’Óâ°Ð¢VWVTÆ—7FVæW%7F'FVBÒG'VS°Ð¢VWVUVç7V'67&–&RÒöåfÇVR€Ð¢vWD'&æ6…66÷VEVW'’…TõDUõTUTUõD‚’ÀÐ¢‡6æ6†÷B’Óâ°Ð¢6öç7BVWVTFFÒ6æ6†÷BçfÂ‚’ÇÂ·Ó°Ð¢7FFRçVæF–æt6÷VçBÒö&¦V7BçfÇVW2‡VWVTFF’æf–ÇFW"€Ð¢†VçG'’’ÓàÐ¢7G&–ær†VçG'“òç7FGW2ÇÂrr’çG&–Ò‚’çFôÆ÷vW$66R‚’ÓÓÒwVæF–ærrbb—476–væVD'&æ6‚†VçG'’Ð¢’æÆVæwFƒ°Ð¢&ö6W75VWVR‚’æ6F6‚‚‚’Óâ·Ò“°Ð¢ÒÀÐ¢†W'&÷"’Óâ°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær†W'&÷#òæÖW76vRÇÂW'&÷"ÇÂtæò6RVFòW67V6†"Æ6öÆ4”4"âr“°Ð¢ÐÐ¢“°Ð¢7FFRæÆ—7FVæ–ærÒG'VS°Ð¢6VVDÆ–æ¶VEV÷FUvF6†W4g&öÔ÷&FW'2‚’æ6F6‚‚†W'&÷"’Óâ°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær†W'&÷#òæÖW76vRÇÂW'&÷"ÇÂtæò6RVF–W&öâ&W&"Æ26÷F—¦6–öæW2VæÆ¦F2âr“°Ð¢Ò“°Ð¢66†VGVÆTÆ–æ¶VEV÷FW5&Vg&W6‚ƒS“°Ð¢ÒÐ¢æ6F6‚‚†W'&÷"’Óâ°Ð¢7FFRæÆ7DW'&÷"Ò7G&–ær€Ð¢W'&÷#òæÖW76vRÇÂW'&÷"ÇÂtæò6RVFòWFVçF–6"VÂ–çFVw&F÷"4”4"6öçG&f—&V&6RâpÐ¢“°Ð¢Ò“°Ð¢Ó°Ð Ð¢6öç7B7F÷WFõ7–æ2Ò‚’Óâ°Ð¢–b‡G—VöbVWVUVç7V'67&–&RÓÓÒvgVæ7F–öâr’°Ð¢VWVUVç7V'67&–&R‚“°Ð¢ÐÐ¢VWVUVç7V'67&–&RÒçVÆÃ°Ð¢VWVTÆ—7FVæW%7F'FVBÒfÇ6S°Ð¢7FFRæÆ—7FVæ–ærÒfÇ6S°Ð¢–b†Æ–æ¶VEV÷FW5&Vg&W6…F–ÖW"’°Ð¢6ÆV%F–ÖV÷WB†Æ–æ¶VEV÷FW5&Vg&W6…F–ÖW"“°Ð¢Æ–æ¶VEV÷FW5&Vg&W6…F–ÖW"ÒçVÆÃ°Ð¢ÐÐ¢Æ–æ¶VEV÷FW5&Vg&W6†–ærÒfÇ6S°Ð¢7FFRç&Vg&W6†–ætÆ–æ¶VEV÷FW2ÒfÇ6S°Ð¢Ó°Ð Ð¢&WGW&â°Ð¢7FFRÀÐ¢–æ—DWFõ7–æ2ÀÐ¢7F÷WFõ7–æ2ÀÐ¢7–æ4÷&FW%V÷FRÀÐ¢Ó°Ð§ÐÐ 
+    lines.push(
+      `- ${formatStoreQuantityLabel(item.quantity, item.storeUnit)} ${item.storeUnit} ${item.name} [${item.code}] | C$${formatMoney(item.total)}`
+    );
+  });
+
+  lines.push('');
+  if (customerDiscount > 0) {
+    lines.push(`Cupon aplicado: -C$${formatMoney(customerDiscount)}`);
+  }
+  if (hasFreeDeliveryApplied(order)) {
+    lines.push('Servicio a domicilio: DELIVERY GRATIS');
+  } else if (roundMoney(order?.deliveryFee || 0) > 0) {
+    lines.push(`Servicio a domicilio: C$${formatMoney(order.deliveryFee)}`);
+  }
+  lines.push(`Total actualizado: C$${formatMoney(customerTotal)}`);
+
+  if (order?.observaciones) {
+    lines.push(`Observaciones: ${String(order.observaciones).trim()}`);
+  }
+
+  return lines.filter(Boolean).join('\n').trim();
+};
+
+const buildQuoteFingerprint = (quote = {}) =>
+  JSON.stringify({
+    cotId: Number(quote?.cotId || 0),
+    subtotal: roundMoney(quote?.subtotal || 0),
+    discount: roundMoney(quote?.discount || 0),
+    total: roundMoney(quote?.total || 0),
+    customerTotal: roundMoney(quote?.customerTotal || 0),
+    items: (Array.isArray(quote?.items) ? quote.items : []).map((item) => ({
+      code: String(item?.code || '').trim(),
+      quantity: roundQuantity(item?.quantity || 0),
+      unit: String(item?.storeUnit || item?.unit || '').trim().toLowerCase(),
+      price: roundMoney(item?.price || 0),
+      total: roundMoney(item?.total || 0),
+    })),
+  });
+
+export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId = 'granada' }) {
+  const database = getAuthenticatedFirebaseDatabase();
+  const assignedBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  const getOrderBranchId = (order = {}) => {
+    const explicitBranchId = String(order?.storeBranchId || order?.storeBranchCode || '')
+      .trim()
+      .toLowerCase();
+    if (explicitBranchId) {
+      return explicitBranchId;
+    }
+
+    const orderCode = String(order?.orderNumber || order?.appOrderCode || '')
+      .trim()
+      .toUpperCase();
+    if (orderCode.startsWith('NI-')) return 'nindiri';
+    if (orderCode.startsWith('MY-')) return 'masaya';
+    return 'granada';
+  };
+  const isAssignedBranch = (order = {}) => getOrderBranchId(order) === assignedBranchId;
+  const getBranchScopedQuery = (path) => {
+    const targetRef = ref(database, path);
+
+    // Granada keeps the unfiltered read temporarily so legacy records without branch metadata still sync.
+    if (assignedBranchId === 'granada') {
+      return targetRef;
+    }
+
+    return query(targetRef, orderByChild('storeBranchId'), equalTo(assignedBranchId));
+  };
+  const getLinkedQuoteSeedQuery = () => {
+    if (assignedBranchId !== 'granada') {
+      return getBranchScopedQuery(STORE_ORDERS_PATH);
+    }
+
+    return query(
+      ref(database, STORE_ORDERS_PATH),
+      orderByChild('fecha'),
+      startAt(getLinkedQuoteSeedStartDate())
+    );
+  };
+  const updateDatabaseRef = async (targetRef, payload) => {
+    try {
+      await update(targetRef, payload);
+    } catch (error) {
+      if (!isFirebasePermissionDeniedError(error)) {
+        throw error;
+      }
+
+      await refreshAuthenticatedFirebaseSession();
+      await update(targetRef, payload);
+    }
+  };
+  const state = {
+    branchId: assignedBranchId,
+    listening: false,
+    processing: false,
+    refreshingLinkedQuotes: false,
+    pendingCount: 0,
+    syncedCount: 0,
+    watchedQuotesCount: 0,
+    lastRunAt: '',
+    lastLinkedRefreshAt: '',
+    lastAutoApplyAt: '',
+    lastSuccessAt: '',
+    lastError: '',
+    lastProcessedOrderKey: '',
+    lastQuoteId: 0,
+  };
+
+  const runningOrderPromises = new Map();
+  let queueListenerStarted = false;
+  let queueUnsubscribe = null;
+  let processRequested = false;
+  let linkedQuotesRefreshTimer = null;
+  let linkedQuotesRefreshing = false;
+
+  const updateOrderQuoteStatus = async (orderKey, patch = {}) => {
+    if (!orderKey || !patch || typeof patch !== 'object') {
+      return;
+    }
+
+    await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), patch);
+  };
+
+  const syncLinkedQuoteWatch = async (orderKey, order = {}, quote = {}, options = {}) => {
+    if (!orderKey || !quote?.cotId) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const fingerprint = buildQuoteFingerprint(quote);
+    const watchRef = ref(database, `${LINKED_QUOTES_PATH}/${orderKey}`);
+    const existingSnapshot = await get(watchRef);
+    const existingWatch = existingSnapshot.val() || {};
+    const hasObservedFingerprint = Boolean(String(existingWatch?.lastObservedFingerprint || '').trim());
+    const patch = {
+      cotId: Number(quote.cotId || 0),
+      storeBranchId: getOrderBranchId(order),
+      appOrderNumber: Number(order.id || 0),
+      appOrderCode: formatAppOrderCode(order),
+      orderDate: String(quote.orderDate || order.fecha || '').trim(),
+      customerName: String(order.cliente || '').trim(),
+      orderStatus: String(order.estado || 'Pendiente').trim(),
+      subtotal: deriveQuotedProductSubtotal(quote, order),
+      discount: roundMoney(quote.discount || 0),
+      total: roundMoney(quote.total || 0),
+      customerTotal: roundMoney(quote.customerTotal || 0),
+      grossTotal: roundMoney(quote.sicarTotal || quote.total || 0),
+      autoApply: true,
+      updatedAt: nowIso,
+    };
+
+    if (options.applyToFirebase === true) {
+      patch.lastObservedFingerprint = fingerprint;
+      patch.lastObservedAt = nowIso;
+      patch.lastAppliedFingerprint = fingerprint;
+      patch.lastAppliedAt = nowIso;
+    } else if (!hasObservedFingerprint) {
+      patch.lastObservedFingerprint = fingerprint;
+      patch.lastObservedAt = nowIso;
+
+      if (order?.totalAproximado === false) {
+        patch.lastAppliedFingerprint = fingerprint;
+        patch.lastAppliedAt = nowIso;
+      }
+    }
+
+    await updateDatabaseRef(watchRef, patch);
+  };
+
+  const seedLinkedQuoteWatchesFromOrders = async () => {
+    if (assignedBranchId !== 'granada') {
+      return;
+    }
+
+    const snapshot = await get(getLinkedQuoteSeedQuery());
+    const orders = snapshot.val() || {};
+    const updates = {};
+    const nowIso = new Date().toISOString();
+
+    Object.entries(orders).forEach(([orderKey, order]) => {
+      const cotId = Number(order?.sicarQuote?.cotId || 0);
+      if (!isAssignedBranch(order) || !isQuoteEligibleOrder(order) || cotId <= 0) {
+        return;
+      }
+
+      if (isFinalStoreStatus(order?.estado)) {
+        updates[`${LINKED_QUOTES_PATH}/${orderKey}`] = null;
+        return;
+      }
+
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/cotId`] = cotId;
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/storeBranchId`] = getOrderBranchId(order);
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/appOrderNumber`] = Number(order?.id || 0);
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/orderDate`] = String(order?.fecha || '').trim();
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/customerName`] = String(order?.cliente || '').trim();
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/orderStatus`] = String(order?.estado || 'Pendiente').trim();
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/autoApply`] = true;
+      updates[`${LINKED_QUOTES_PATH}/${orderKey}/updatedAt`] = nowIso;
+    });
+
+    if (Object.keys(updates).length > 0) {
+      await updateDatabaseRef(ref(database), updates);
+    }
+  };
+
+  const markQueueAsError = async (orderKey, queueEntry = {}, error) => {
+    const now = Date.now();
+    const errorMessage = String(error?.message || error || 'No se pudo sincronizar la cotizacion con SICAR.').trim();
+    await updateDatabaseRef(ref(database), {
+      [`${QUOTE_QUEUE_PATH}/${orderKey}`]: {
+        ...queueEntry,
+        status: 'error',
+        attempts: Number(queueEntry?.attempts || 0) + 1,
+        lastAttemptAt: now,
+        lastAttemptAtIso: new Date(now).toISOString(),
+        error: errorMessage,
+      },
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`]: {
+        status: 'error',
+        error: errorMessage,
+        lastAttemptAt: new Date(now).toISOString(),
+      },
+    });
+  };
+
+  const clearQueueEntry = async (orderKey) => {
+    await updateDatabaseRef(ref(database), {
+      [`${QUOTE_QUEUE_PATH}/${orderKey}`]: null,
+    });
+  };
+
+  const getOrderByKey = async (orderKey) => {
+    const snapshot = await get(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`));
+    const value = snapshot.val();
+    return value ? { firebaseKey: orderKey, ...value } : null;
+  };
+
+  const getFirebaseClientRecord = async (clientKey = '') => {
+    const cleanKey = normalizeCode(clientKey);
+    if (!cleanKey) {
+      return null;
+    }
+
+    const snapshot = await get(ref(database, `${CLIENTS_PATH}/${cleanKey}`));
+    const value = snapshot.val();
+    return value ? { firebaseKey: cleanKey, ...value } : null;
+  };
+
+  const getStoreUserRecord = async (storeUserKey = '') => {
+    const cleanKey = normalizeCode(storeUserKey);
+    if (!cleanKey) {
+      return null;
+    }
+
+    const snapshot = await get(ref(database, `${STORE_USERS_PATH}/${cleanKey}`));
+    const value = snapshot.val();
+    return value ? { firebaseKey: cleanKey, ...value } : null;
+  };
+
+  const buildStoreUserFullAddress = (storeUser = {}) => {
+    const baseAddress = normalizeText(storeUser?.direccion);
+    const reference = normalizeText(storeUser?.referencia);
+    return reference ? `${baseAddress} | Ref: ${reference}` : baseAddress;
+  };
+
+  const parseSicarCustomerRow = (line = '') => {
+    const parts = String(line || '').split('\t');
+    return {
+      cliId: Number(parts[0] || 0),
+      clave: normalizeCode(parts[1]),
+      name: normalizeText(parts[2]),
+      address: normalizeText(parts[3]),
+      phone: normalizeText(parts[4]),
+      mobile: normalizeText(parts[5]),
+      email: normalizeEmail(parts[6]),
+      rfc: normalizeText(parts[7]),
+      status: Number(parts[8] || 0),
+    };
+  };
+
+  const getSicarCustomerById = async (cliId) => {
+    const cleanCliId = Number(cliId || 0);
+    if (cleanCliId <= 0) {
+      return null;
+    }
+
+    const rows = await runMysqlQuery(`
+      SELECT
+        cli_id,
+        COALESCE(clave, ''),
+        COALESCE(nombre, ''),
+        COALESCE(domicilio, ''),
+        COALESCE(telefono, ''),
+        COALESCE(celular, ''),
+        COALESCE(mail, ''),
+        COALESCE(rfc, ''),
+        COALESCE(status, 0)
+      FROM cliente
+      WHERE cli_id = ${cleanCliId}
+      LIMIT 1;
+    `);
+
+    return rows.length > 0 ? parseSicarCustomerRow(rows[0]) : null;
+  };
+
+  const getSicarCustomerByClave = async (clave = '') => {
+    const cleanClave = normalizeCode(clave);
+    if (!cleanClave) {
+      return null;
+    }
+
+    const rows = await runMysqlQuery(`
+      SELECT
+        cli_id,
+        COALESCE(clave, ''),
+        COALESCE(nombre, ''),
+        COALESCE(domicilio, ''),
+        COALESCE(telefono, ''),
+        COALESCE(celular, ''),
+        COALESCE(mail, ''),
+        COALESCE(rfc, ''),
+        COALESCE(status, 0)
+      FROM cliente
+      WHERE clave = ${escapeSqlText(cleanClave, sqlEscape)}
+      LIMIT 1;
+    `);
+
+    return rows.length > 0 ? parseSicarCustomerRow(rows[0]) : null;
+  };
+
+  const getActiveSicarCustomerByPhone = async (phone = '') => {
+    const cleanPhone = normalizePhone(phone);
+    if (!cleanPhone) {
+      return null;
+    }
+
+    const rows = await runMysqlQuery(`
+      SELECT
+        cli_id,
+        COALESCE(clave, ''),
+        COALESCE(nombre, ''),
+        COALESCE(domicilio, ''),
+        COALESCE(telefono, ''),
+        COALESCE(celular, ''),
+        COALESCE(mail, ''),
+        COALESCE(rfc, ''),
+        COALESCE(status, 0)
+      FROM cliente
+      WHERE status = 1
+        AND (
+          REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(telefono, ''), ' ', ''), '-', ''), '(', ''), ')', '') = ${escapeSqlText(cleanPhone, sqlEscape)}
+          OR REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(celular, ''), ' ', ''), '-', ''), '(', ''), ')', '') = ${escapeSqlText(cleanPhone, sqlEscape)}
+        )
+      ORDER BY cli_id ASC
+      LIMIT 1;
+    `);
+
+    return rows.length > 0 ? parseSicarCustomerRow(rows[0]) : null;
+  };
+
+  const buildDesiredSicarCustomer = (order = {}, firebaseClient = null, storeUser = null) => {
+    const orderAddress = normalizeText(order?.direccion);
+    const profileAddress = buildStoreUserFullAddress(storeUser) || normalizeText(firebaseClient?.direccion);
+    const preferredAddress = profileAddress || orderAddress || '-';
+
+    return {
+      firebaseClientKey: normalizeCode(order?.clienteFirebaseKey),
+      storeUserKey: normalizeCode(order?.storeUserKey),
+      code: normalizeCode(order?.clienteCodigo || storeUser?.codigo || firebaseClient?.codigo),
+      name: normalizeText(order?.cliente || storeUser?.nombre || firebaseClient?.nombre),
+      address: preferredAddress,
+      phone: normalizePhone(order?.telefono || storeUser?.telefono || firebaseClient?.telefono || firebaseClient?.celular),
+      email: normalizeEmail(storeUser?.mail || storeUser?.email || firebaseClient?.mail || firebaseClient?.email),
+      linkedCliId:
+        Number(storeUser?.sicarCliId || 0) ||
+        Number(firebaseClient?.sicarCliId || 0) ||
+        Number(order?.sicarQuote?.cliId || 0),
+      shouldOverwriteAddress: normalizeText(order?.deliveryMode) !== 'otra',
+    };
+  };
+
+  const createSicarCustomer = async (customer = {}) => {
+    let rows = [];
+
+    try {
+      rows = await runMysqlQuery(`
+        START TRANSACTION;
+        INSERT INTO cliente (
+          nombre,
+          domicilio,
+          noExt,
+          noInt,
+          localidad,
+          ciudad,
+          estado,
+          pais,
+          codigoPostal,
+          colonia,
+          rfc,
+          curp,
+          telefono,
+          celular,
+          mail,
+          comentario,
+          status,
+          limite,
+          precio,
+          diasCredito,
+          retener,
+          desglosarIEPS,
+          notificar,
+          clave
+        ) VALUES (
+          ${escapeSqlText(customer.name || 'Cliente tienda virtual', sqlEscape)},
+          ${escapeSqlText(customer.address || '-', sqlEscape)},
+          '',
+          '',
+          '',
+          '',
+          '',
+          'NICARAGUA',
+          '',
+          '',
+          '',
+          '',
+          ${escapeSqlText(customer.phone || '', sqlEscape)},
+          ${escapeSqlText(customer.phone || '', sqlEscape)},
+          ${escapeSqlText(customer.email || '', sqlEscape)},
+          ${escapeSqlText(STORE_CUSTOMER_COMMENT, sqlEscape)},
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          ${customer.code ? escapeSqlText(customer.code, sqlEscape) : 'NULL'}
+        );
+        SELECT LAST_INSERT_ID();
+        COMMIT;
+      `);
+    } catch (error) {
+      const errorMessage = String(error?.message || error || '').trim();
+      const isDuplicateCode =
+        customer.code &&
+        errorMessage.toLowerCase().includes('duplicate entry') &&
+        errorMessage.toLowerCase().includes('clave_unique');
+
+      if (!isDuplicateCode) {
+        throw error;
+      }
+
+      const existing = await getSicarCustomerByClave(customer.code);
+      if (existing?.cliId) {
+        return {
+          ...existing,
+          created: false,
+          matchedBy: 'duplicate-code',
+        };
+      }
+
+      throw error;
+    }
+
+    const insertedId = Number(rows[rows.length - 1] || 0);
+    if (insertedId <= 0) {
+      throw new Error('No se pudo crear el cliente en SICAR antes de generar la cotizacion.');
+    }
+
+    const inserted = await getSicarCustomerById(insertedId);
+    if (!inserted?.cliId) {
+      throw new Error('SICAR no devolvio el cliente creado para la cotizacion.');
+    }
+
+    return {
+      ...inserted,
+      created: true,
+      matchedBy: 'created',
+    };
+  };
+
+  const updateSicarCustomer = async (existingCustomer = {}, desiredCustomer = {}) => {
+    const nextAddress =
+      desiredCustomer.shouldOverwriteAddress || !normalizeText(existingCustomer?.address)
+        ? desiredCustomer.address || existingCustomer?.address || '-'
+        : existingCustomer?.address || '-';
+
+    const desiredPatch = {
+      nombre: desiredCustomer.name || existingCustomer?.name || 'Cliente tienda virtual',
+      domicilio: nextAddress,
+      telefono: desiredCustomer.phone || existingCustomer?.phone || '',
+      celular: desiredCustomer.phone || existingCustomer?.mobile || '',
+      mail: desiredCustomer.email || existingCustomer?.email || '',
+      comentario: STORE_CUSTOMER_COMMENT,
+      status: 1,
+      notificar: 1,
+      clave: desiredCustomer.code || existingCustomer?.clave || '',
+    };
+
+    const comparableExisting = {
+      nombre: normalizeText(existingCustomer?.name),
+      domicilio: normalizeText(existingCustomer?.address),
+      telefono: normalizeText(existingCustomer?.phone),
+      celular: normalizeText(existingCustomer?.mobile),
+      mail: normalizeEmail(existingCustomer?.email),
+      comentario: STORE_CUSTOMER_COMMENT,
+      status: Number(existingCustomer?.status || 0),
+      notificar: 1,
+      clave: normalizeCode(existingCustomer?.clave),
+    };
+
+    const changedFields = Object.entries(desiredPatch).filter(([field, value]) => {
+      if (field === 'clave' && !value) {
+        return false;
+      }
+      return toComparableValue(comparableExisting[field]) !== toComparableValue(value);
+    });
+
+    if (changedFields.length === 0) {
+      return {
+        ...existingCustomer,
+        created: false,
+        matchedBy: 'existing',
+      };
+    }
+
+    const assignments = changedFields
+      .map(([field, value]) =>
+        `${field} = ${typeof value === 'number' ? Number(value) : escapeSqlText(value, sqlEscape)}`
+      )
+      .join(', ');
+
+    await runMysqlQuery(`
+      UPDATE cliente
+      SET ${assignments}
+      WHERE cli_id = ${Number(existingCustomer.cliId || 0)}
+      LIMIT 1;
+    `);
+
+    const refreshed = await getSicarCustomerById(existingCustomer.cliId);
+    return {
+      ...(refreshed || existingCustomer),
+      created: false,
+      matchedBy: 'existing',
+    };
+  };
+
+  const syncCustomerLinksToFirebase = async (orderKey, order = {}, sicarCustomer = {}) => {
+    if (!orderKey || !sicarCustomer?.cliId) {
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const criticalUpdates = {
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/cliId`]: Number(sicarCustomer.cliId || 0),
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/clientCode`]: normalizeCode(sicarCustomer.clave),
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/clientName`]: normalizeText(sicarCustomer.name),
+      [`${STORE_ORDERS_PATH}/${orderKey}/sicarQuote/customerLinkedAt`]: nowIso,
+    };
+    const auxiliaryUpdates = {};
+
+    if (order?.storeUserKey) {
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
+      auxiliaryUpdates[`${STORE_USERS_PATH}/${order.storeUserKey}/sicarLastSyncedAt`] = nowIso;
+    }
+
+    if (order?.clienteFirebaseKey) {
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarCliId`] = Number(sicarCustomer.cliId || 0);
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarClave`] = normalizeCode(sicarCustomer.clave);
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarStatus`] = Number(sicarCustomer.status || 1);
+      auxiliaryUpdates[`${CLIENTS_PATH}/${order.clienteFirebaseKey}/sicarLastSyncedAt`] = nowIso;
+    }
+
+    await updateDatabaseRef(ref(database), criticalUpdates);
+
+    if (Object.keys(auxiliaryUpdates).length > 0) {
+      try {
+        await updateDatabaseRef(ref(database), auxiliaryUpdates);
+      } catch (error) {
+        if (!isFirebasePermissionDeniedError(error)) {
+          throw error;
+        }
+      }
+    }
+  };
+
+  const ensureSicarCustomerForOrder = async (orderKey, order = {}) => {
+    const [firebaseClient, storeUser] = await Promise.all([
+      getFirebaseClientRecord(order?.clienteFirebaseKey),
+      getStoreUserRecord(order?.storeUserKey),
+    ]);
+
+    const desiredCustomer = buildDesiredSicarCustomer(order, firebaseClient, storeUser);
+    if (!desiredCustomer.name) {
+      throw new Error('Falta el nombre del cliente para crear la cotizacion SICAR.');
+    }
+
+    let existingCustomer = null;
+
+    if (desiredCustomer.linkedCliId > 0) {
+      existingCustomer = await getSicarCustomerById(desiredCustomer.linkedCliId);
+    }
+
+    if (!existingCustomer && desiredCustomer.code) {
+      if (/^\d+$/.test(desiredCustomer.code)) {
+        existingCustomer = await getSicarCustomerById(desiredCustomer.code);
+      }
+
+      if (!existingCustomer) {
+        existingCustomer = await getSicarCustomerByClave(desiredCustomer.code);
+      }
+    }
+
+    if (!existingCustomer && desiredCustomer.phone) {
+      existingCustomer = await getActiveSicarCustomerByPhone(desiredCustomer.phone);
+    }
+
+    const sicarCustomer = existingCustomer
+      ? await updateSicarCustomer(existingCustomer, desiredCustomer)
+      : await createSicarCustomer(desiredCustomer);
+
+    await syncCustomerLinksToFirebase(orderKey, order, sicarCustomer);
+    return sicarCustomer;
+  };
+
+  const getQuoteByOrderReference = async (order = {}) => {
+    const explicitQuoteId = Number(order?.sicarQuote?.cotId || 0);
+    if (explicitQuoteId > 0) {
+      const rows = await runMysqlQuery(`
+        SELECT cot_id, fecha, subtotal, descuento, total
+        FROM cotizacion
+        WHERE cot_id = ${explicitQuoteId}
+        LIMIT 1;
+      `);
+
+      if (rows.length > 0) {
+        const [cotId, fecha, subtotal, descuento, total] = rows[0].split('\t');
+        return {
+          cotId: Number(cotId || 0),
+          fecha: String(fecha || '').trim(),
+          subtotal: roundMoney(subtotal),
+          discount: roundMoney(descuento),
+          total: roundMoney(total),
+        };
+      }
+    }
+
+    return null;
+  };
+
+  const getSicarArticlesByCodes = async (codes = []) => {
+    const uniqueCodes = Array.from(
+      new Set(
+        (Array.isArray(codes) ? codes : [])
+          .map((code) => String(code || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (uniqueCodes.length === 0) {
+      return new Map();
+    }
+
+    const codeList = uniqueCodes.map((code) => escapeSqlText(code, sqlEscape)).join(', ');
+    const rows = await runMysqlQuery(`
+      SELECT
+        a.art_id,
+        a.clave,
+        a.descripcion,
+        UPPER(TRIM(COALESCE(u.nombre, 'PZA'))),
+        ROUND(a.precioCompra, 6),
+        ROUND(a.preCompraProm, 6),
+        ROUND(a.precio1, 6),
+        ROUND(a.precio1 * (1 + COALESCE(tax.taxRatePct, 0) / 100), 6),
+        COALESCE(tax.taxRatePct, 0),
+        COALESCE(tax.impIds, ''),
+        COALESCE(d.nombre, ''),
+        COALESCE(c.nombre, ''),
+        COALESCE(a.caracteristicas, '')
+      FROM articulo a
+      LEFT JOIN unidad u ON u.uni_id = a.unidadVenta
+      LEFT JOIN categoria c ON c.cat_id = a.cat_id
+      LEFT JOIN departamento d ON d.dep_id = c.dep_id
+      LEFT JOIN (
+        SELECT
+          ai.art_id,
+          ROUND(
+            SUM(
+              CASE
+                WHEN COALESCE(imp.status, 1) = 1
+                  AND COALESCE(imp.tras, 0) = 1
+                  AND UPPER(COALESCE(imp.tipoFactor, 'Tasa')) = 'TASA'
+                THEN COALESCE(imp.impuesto, 0)
+                ELSE 0
+              END
+            ),
+            6
+          ) AS taxRatePct,
+          GROUP_CONCAT(
+            DISTINCT CASE WHEN COALESCE(imp.status, 1) = 1 THEN imp.imp_id ELSE NULL END
+            ORDER BY imp.imp_id
+            SEPARATOR ','
+          ) AS impIds
+        FROM articuloimpuesto ai
+        INNER JOIN impuesto imp ON imp.imp_id = ai.imp_id
+        GROUP BY ai.art_id
+      ) tax ON tax.art_id = a.art_id
+      WHERE a.status = 1
+        AND a.clave IN (${codeList})
+      ORDER BY a.clave ASC;
+    `);
+
+    const map = new Map();
+    rows.forEach((row) => {
+      const parts = row.split('\t');
+      map.set(String(parts[1] || '').trim(), {
+        artId: Number(parts[0] || 0),
+        code: String(parts[1] || '').trim(),
+        description: String(parts[2] || '').trim(),
+        unit: String(parts[3] || '').trim() || 'PZA',
+        purchasePrice: roundRate(parts[4]),
+        purchaseAveragePrice: roundRate(parts[5]),
+        basePrice: roundRate(parts[6]),
+        priceWithTax: roundRate(parts[7]),
+        taxRatePct: roundRate(parts[8]),
+        impIds: parseImpIds(parts[9]),
+        department: String(parts[10] || '').trim(),
+        category: String(parts[11] || '').trim(),
+        characteristics: String(parts[12] || '').trim(),
+      });
+    });
+
+    return map;
+  };
+
+  const buildQuoteDraft = async (order = {}) => {
+    const orderItems = normalizeOrderItems(order.items);
+    const deliveryItem = buildDeliveryServiceOrderItem(order);
+    const rewardItems = normalizeRewardOrderItems(order.rewardRedemption);
+    const sourceItems = [...orderItems, ...(deliveryItem ? [deliveryItem] : []), ...rewardItems];
+    const articleMap = await getSicarArticlesByCodes(sourceItems.map((item) => item.code));
+    const missingCodes = [];
+    const detailItems = [];
+
+    sourceItems.forEach((item, index) => {
+      const article = articleMap.get(item.code);
+      if (!article) {
+        if (item.isDelivery === true) {
+          throw new Error(`No existe en SICAR el articulo ${item.code} para servicio a domicilio.`);
+        }
+        missingCodes.push(item.code);
+        return;
+      }
+
+      const quantity = roundQuantity(item.quantity);
+      const taxRatePct = roundRate(article.taxRatePct || 0);
+      const hasTransferredTax = taxRatePct > 0;
+      const isReward = item.isReward === true;
+      const isDelivery = item.isDelivery === true;
+      const isComplimentaryDelivery = isDelivery && item.isComplimentary === true;
+      const isZeroPricedLine = isReward || isComplimentaryDelivery;
+      const articleBasePrice = roundMoney(article.basePrice || 0);
+      const articleGrossPrice = roundMoney(
+        hasTransferredTax ? articleBasePrice * (1 + taxRatePct / 100) : articleBasePrice
+      );
+      const explicitStoreUnitTotal =
+        !isReward && quantity > 0
+          ? roundMoney(
+              Number(item.subtotal || 0) > 0
+                ? Number(item.subtotal || 0) / quantity
+                : Number(item.unitPrice || 0)
+            )
+          : 0;
+      const shouldKeepStorePrice =
+        !isReward &&
+        explicitStoreUnitTotal > 0 &&
+        (
+          isDelivery ||
+          item.fixedPrice === true ||
+          Boolean(item.specialPromotion?.id || item.specialPromotion?.title) ||
+          Math.abs(explicitStoreUnitTotal - articleGrossPrice) > 0.009
+        );
+      const sourceGrossPrice = shouldKeepStorePrice && explicitStoreUnitTotal > 0
+        ? roundMoney(explicitStoreUnitTotal)
+        : articleGrossPrice;
+      const sourceBasePrice = isZeroPricedLine
+        ? 0
+        : roundMoney(
+            hasTransferredTax
+              ? sourceGrossPrice / (1 + taxRatePct / 100)
+              : sourceGrossPrice
+          );
+      const priceNorSin = articleBasePrice;
+      const priceNorCon = articleGrossPrice;
+      const priceSin = isZeroPricedLine ? 0 : truncateMoney(sourceBasePrice);
+      const priceCon = isZeroPricedLine ? 0 : roundMoney(sourceGrossPrice);
+      const purchaseBase = roundRate(article.purchaseAveragePrice || article.purchasePrice || 0);
+      const purchasePrice = roundMoney(
+        hasTransferredTax ? purchaseBase * (1 + taxRatePct / 100) : purchaseBase
+      );
+      const importeCompra = roundMoney(purchasePrice * quantity);
+      const importeNorSin = roundMoney(priceNorSin * quantity);
+      const importeNorCon = roundMoney(priceNorCon * quantity);
+      const initialImporteSin = isZeroPricedLine ? 0 : roundMoney(priceSin * quantity);
+      const initialImporteCon = isZeroPricedLine ? 0 : roundMoney(priceCon * quantity);
+      const initialPriceSin = quantity > 0 ? roundMoney(initialImporteSin / quantity) : 0;
+      const initialPriceCon = quantity > 0 ? roundMoney(initialImporteCon / quantity) : 0;
+      const initialDiscountTotal = isZeroPricedLine
+        ? roundMoney(importeNorCon)
+        : roundMoney(Math.max(importeNorCon - initialImporteCon, 0));
+      const initialDiscountPercent =
+        importeNorCon > 0 ? roundRate((initialDiscountTotal / importeNorCon) * 100) : 0;
+      const diferencia = roundMoney(initialImporteCon - importeCompra);
+      const utilidad = initialImporteCon > 0 ? roundRate((diferencia / initialImporteCon) * 100) : 0;
+      const taxImpIds = (Array.isArray(article.impIds) ? article.impIds : []).filter((impId) => Number(impId) === 1);
+
+      detailItems.push({
+        order: index,
+        artId: article.artId,
+        code: article.code,
+        description: article.description,
+        storeName: item.name || article.description,
+        storeDescription: item.description,
+        quantity,
+        storeUnit: normalizeStoreUnitLabel(item.unit),
+        unit: article.unit || (normalizeStoreUnitLabel(item.unit) === 'unidad' ? 'PZA' : 'LB'),
+        characteristics: article.characteristics || '',
+        purchasePrice,
+        priceNorSin,
+        priceNorCon,
+        priceSin: initialPriceSin,
+        priceCon: initialPriceCon,
+        importeCompra,
+        importeNorSin,
+        importeNorCon,
+        importeSin: initialImporteSin,
+        importeCon: initialImporteCon,
+        diferencia,
+        utilidad,
+        taxRatePct,
+        impIds: taxImpIds,
+        department: article.department,
+        category: article.category,
+        sourceType: isReward ? 'reward' : isDelivery ? 'delivery' : 'order',
+        rewardName: isReward ? String(item.rewardName || '').trim() : '',
+        discountPercent: initialDiscountPercent,
+        discountTotal: initialDiscountTotal,
+        couponDiscountCon: 0,
+      });
+    });
+
+    if (detailItems.length === 0) {
+      throw new Error('No se pudo crear la cotizacion porque ningun SKU del pedido existe en SICAR.');
+    }
+
+    const eligibleCouponItems = detailItems.filter((item) => item.sourceType === 'order');
+    const couponBaseTotal = roundMoney(
+      eligibleCouponItems.reduce((sum, item) => sum + roundMoney(item.importeCon), 0)
+    );
+    const couponDiscount = calculateOrderCouponDiscount(order, couponBaseTotal);
+
+    const subtotal = roundMoney(detailItems.reduce((sum, item) => sum + item.importeSin, 0));
+    const grossTotal = roundMoney(detailItems.reduce((sum, item) => sum + item.importeCon, 0));
+    const customerTotal = roundMoney(Math.max(grossTotal - couponDiscount, 0));
+    const taxableSubtotal = roundMoney(
+      detailItems.reduce((sum, item) => sum + (item.impIds.length > 0 ? item.importeSin : 0), 0)
+    );
+    const transferredTaxTotal = roundMoney(
+      detailItems.reduce((sum, item) => sum + (item.impIds.length > 0 ? item.importeCon - item.importeSin : 0), 0)
+    );
+    const taxRows = [
+      {
+        impId: DEFAULT_ZERO_TAX_IMP_ID,
+        taxTotal: 0,
+        taxableSubtotal: 0,
+        tras: 0,
+      },
+      {
+        impId: 1,
+        taxTotal: transferredTaxTotal,
+        taxableSubtotal,
+        tras: 1,
+      },
+    ];
+
+    return {
+      orderDate: String(order.fecha || '').trim(),
+      subtotal,
+      total: grossTotal,
+      sicarTotal: grossTotal,
+      discount: couponDiscount,
+      customerDiscount: couponDiscount,
+      customerTotal,
+      detailItems,
+      taxRows,
+      missingCodes,
+    };
+  };
+
+  const buildQuoteDetailValuesSql = (cotIdExpression, draft = {}) =>
+    draft.detailItems.map((item) => `
+      (
+        ${cotIdExpression},
+        ${item.artId},
+        ${escapeSqlText(item.code, sqlEscape)},
+        ${escapeSqlText(item.description, sqlEscape)},
+        ${formatQuantity(item.quantity)},
+        ${escapeSqlText(item.unit, sqlEscape)},
+        ${formatMoney(item.purchasePrice)},
+        ${formatMoney(item.priceNorSin)},
+        ${formatMoney(item.priceNorCon)},
+        ${formatMoney(item.priceSin)},
+        ${formatMoney(item.priceCon)},
+        ${formatMoney(item.importeCompra)},
+        ${formatMoney(item.importeNorSin)},
+        ${formatMoney(item.importeNorCon)},
+        ${formatMoney(item.importeSin)},
+        ${formatMoney(item.importeCon)},
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        ${formatMoney(item.diferencia)},
+        ${formatRate(item.utilidad)},
+        ${formatRate(item.discountPercent || 0)},
+        ${formatMoney(item.discountTotal || 0)},
+        ${escapeSqlText(item.characteristics || '', sqlEscape)},
+        ${item.order}
+      )
+    `);
+
+  const buildQuoteTaxValuesSql = (cotIdExpression, draft = {}) =>
+    draft.taxRows.map((item, index) => `
+      (
+        ${cotIdExpression},
+        ${Number(item.impId || 0)},
+        ${formatMoney(item.taxTotal)},
+        NULL,
+        ${formatMoney(item.taxableSubtotal)},
+        NULL,
+        ${Number(item.tras || 0)},
+        ${index}
+      )
+    `);
+
+  const buildDetailTaxValuesSql = (cotIdExpression, draft = {}) =>
+    draft.detailItems.flatMap((item) =>
+      (Array.isArray(item.impIds) ? item.impIds : [])
+        .filter((impId) => Number(impId || 0) === 1)
+        .map((impId) => `(${cotIdExpression}, ${item.artId}, ${Number(impId)})`)
+    );
+
+  const insertQuoteDraft = async (order = {}, draft = {}, sicarCustomer = null) => {
+    const header = '';
+    const footer = '';
+    const targetCliId = Number(sicarCustomer?.cliId || DEFAULT_CLIENT_ID || 1);
+    const detailValues = buildQuoteDetailValuesSql('@cotId', draft);
+    const quoteTaxValues = buildQuoteTaxValuesSql('@cotId', draft);
+    const detailTaxValues = buildDetailTaxValuesSql('@cotId', draft);
+
+    const rows = await runMysqlQuery(`
+      START TRANSACTION;
+      INSERT INTO cotizacion (
+        fecha,
+        header,
+        footer,
+        subtotal,
+        descuento,
+        total,
+        monSubtotal,
+        monDescuento,
+        monTotal,
+        monAbr,
+        monTipoCambio,
+        peso,
+        status,
+        img,
+        caracteristicas,
+        desglosado,
+        mosDescuento,
+        mosPeso,
+        impuestos,
+        mosFirma,
+        leyendaImpuestos,
+        mosParidad,
+        bloqueada,
+        mosDetallePaq,
+        mosClaveArt,
+        folioMovil,
+        serieMovil,
+        totalSipa,
+        mosPreAntDesc,
+        usu_id,
+        cli_id,
+        mon_id,
+        vnd_id
+      ) VALUES (
+        ${escapeSqlText(draft.orderDate, sqlEscape)},
+        ${escapeSqlText(header, sqlEscape)},
+        ${escapeSqlText(footer, sqlEscape)},
+        ${formatMoney(draft.subtotal)},
+        0.00,
+        ${formatMoney(draft.sicarTotal || draft.total)},
+        NULL,
+        NULL,
+        NULL,
+        ${escapeSqlText(DEFAULT_CURRENCY_ABBR, sqlEscape)},
+        ${formatRate(DEFAULT_CURRENCY_EXCHANGE)},
+        0.0000,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        1,
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        ${DEFAULT_USER_ID},
+        ${targetCliId},
+        ${DEFAULT_CURRENCY_ID},
+        ${DEFAULT_VENDOR_ID}
+      );
+      SET @cotId = LAST_INSERT_ID();
+      INSERT INTO detallecot (
+        cot_id,
+        art_id,
+        clave,
+        descripcion,
+        cantidad,
+        unidad,
+        precioCompra,
+        precioNorSin,
+        precioNorCon,
+        precioSin,
+        precioCon,
+        importeCompra,
+        importeNorSin,
+        importeNorCon,
+        importeSin,
+        importeCon,
+        monPrecioNorSin,
+        monPrecioNorCon,
+        monPrecioSin,
+        monPrecioCon,
+        monImporteNorSin,
+        monImporteNorCon,
+        monImporteSin,
+        monImporteCon,
+        diferencia,
+        utilidad,
+        descPorcentaje,
+        descTotal,
+        caracteristicas,
+        orden
+      ) VALUES ${detailValues.join(',')};
+      INSERT INTO cotizacionimp (
+        cot_id,
+        imp_id,
+        total,
+        monTotal,
+        subtotal,
+        monSubtotal,
+        tras,
+        orden
+      ) VALUES ${quoteTaxValues.join(',')};
+      ${detailTaxValues.length > 0 ? `INSERT INTO detallecotimpuesto (cot_id, art_id, imp_id) VALUES ${detailTaxValues.join(',')};` : ''}
+      SELECT @cotId;
+      COMMIT;
+    `);
+
+    const insertedRow = rows[rows.length - 1];
+    const cotId = Number(insertedRow || 0);
+    if (!cotId) {
+      throw new Error('SICAR no devolvio el numero de cotizacion creada.');
+    }
+
+    return {
+      cotId,
+      missingCodes: draft.missingCodes || [],
+    };
+  };
+
+  const replaceQuoteDraft = async (quoteId, draft = {}, sicarCustomer = null) => {
+    const cleanQuoteId = Number(quoteId || 0);
+    if (cleanQuoteId <= 0) {
+      throw new Error('No existe una cotizacion SICAR enlazada para actualizar.');
+    }
+
+    const header = '';
+    const footer = '';
+    const targetCliId = Number(sicarCustomer?.cliId || DEFAULT_CLIENT_ID || 1);
+    const detailValues = buildQuoteDetailValuesSql(cleanQuoteId, draft);
+    const quoteTaxValues = buildQuoteTaxValuesSql(cleanQuoteId, draft);
+    const detailTaxValues = buildDetailTaxValuesSql(cleanQuoteId, draft);
+
+    await runMysqlQuery(`
+      START TRANSACTION;
+      DELETE FROM detallecotimpuesto
+      WHERE cot_id = ${cleanQuoteId};
+      DELETE FROM cotizacionimp
+      WHERE cot_id = ${cleanQuoteId};
+      DELETE FROM detallecot
+      WHERE cot_id = ${cleanQuoteId};
+      UPDATE cotizacion
+      SET fecha = ${escapeSqlText(draft.orderDate, sqlEscape)},
+          header = ${escapeSqlText(header, sqlEscape)},
+          footer = ${escapeSqlText(footer, sqlEscape)},
+          subtotal = ${formatMoney(draft.subtotal)},
+          descuento = 0.00,
+          total = ${formatMoney(draft.sicarTotal || draft.total)},
+          monAbr = ${escapeSqlText(DEFAULT_CURRENCY_ABBR, sqlEscape)},
+          monTipoCambio = ${formatRate(DEFAULT_CURRENCY_EXCHANGE)},
+          peso = 0.0000,
+          status = 1,
+          img = 1,
+          caracteristicas = 0,
+          desglosado = 0,
+          mosDescuento = 0,
+          mosPeso = 1,
+          impuestos = 1,
+          mosFirma = 1,
+          leyendaImpuestos = 1,
+          mosParidad = 0,
+          bloqueada = 0,
+          mosDetallePaq = 0,
+          mosClaveArt = 0,
+          mosPreAntDesc = 1,
+          usu_id = ${DEFAULT_USER_ID},
+          cli_id = ${targetCliId},
+          mon_id = ${DEFAULT_CURRENCY_ID},
+          vnd_id = ${DEFAULT_VENDOR_ID}
+      WHERE cot_id = ${cleanQuoteId};
+      INSERT INTO detallecot (
+        cot_id,
+        art_id,
+        clave,
+        descripcion,
+        cantidad,
+        unidad,
+        precioCompra,
+        precioNorSin,
+        precioNorCon,
+        precioSin,
+        precioCon,
+        importeCompra,
+        importeNorSin,
+        importeNorCon,
+        importeSin,
+        importeCon,
+        monPrecioNorSin,
+        monPrecioNorCon,
+        monPrecioSin,
+        monPrecioCon,
+        monImporteNorSin,
+        monImporteNorCon,
+        monImporteSin,
+        monImporteCon,
+        diferencia,
+        utilidad,
+        descPorcentaje,
+        descTotal,
+        caracteristicas,
+        orden
+      ) VALUES ${detailValues.join(',')};
+      INSERT INTO cotizacionimp (
+        cot_id,
+        imp_id,
+        total,
+        monTotal,
+        subtotal,
+        monSubtotal,
+        tras,
+        orden
+      ) VALUES ${quoteTaxValues.join(',')};
+      ${detailTaxValues.length > 0 ? `INSERT INTO detallecotimpuesto (cot_id, art_id, imp_id) VALUES ${detailTaxValues.join(',')};` : ''}
+      COMMIT;
+    `);
+
+    return {
+      cotId: cleanQuoteId,
+      missingCodes: draft.missingCodes || [],
+    };
+  };
+
+  const assignCustomerToQuote = async (quoteId, sicarCustomer = {}) => {
+    const cleanQuoteId = Number(quoteId || 0);
+    const cleanCliId = Number(sicarCustomer?.cliId || 0);
+    if (cleanQuoteId <= 0 || cleanCliId <= 0) {
+      return;
+    }
+
+    await runMysqlQuery(`
+      UPDATE cotizacion
+      SET cli_id = ${cleanCliId}
+      WHERE cot_id = ${cleanQuoteId}
+        AND cli_id <> ${cleanCliId};
+    `);
+  };
+
+  const getQuoteSnapshot = async (quoteReference = {}) => {
+    const quoteId = Number(quoteReference?.cotId || 0);
+    if (quoteId <= 0) {
+      throw new Error('No existe una cotizacion SICAR enlazada para este pedido.');
+    }
+
+    const headerRows = await runMysqlQuery(`
+      SELECT cot_id, fecha, subtotal, descuento, total
+      FROM cotizacion
+      WHERE cot_id = ${quoteId}
+      LIMIT 1;
+    `);
+
+    if (headerRows.length === 0) {
+      throw new Error('La cotizacion SICAR enlazada ya no existe.');
+    }
+
+    const [cotId, fecha, subtotal, descuento, total] = headerRows[0].split('\t');
+    const detailRows = await runMysqlQuery(`
+      SELECT
+        dc.art_id,
+        dc.clave,
+        dc.descripcion,
+        dc.cantidad,
+        dc.unidad,
+        dc.precioNorSin,
+        dc.precioNorCon,
+        dc.precioSin,
+        dc.precioCon,
+        dc.importeNorSin,
+        dc.importeNorCon,
+        dc.importeSin,
+        dc.importeCon,
+        COALESCE(dc.descPorcentaje, 0),
+        COALESCE(dc.descTotal, 0),
+        COALESCE(tax.impIds, '')
+      FROM detallecot dc
+      LEFT JOIN (
+        SELECT
+          cot_id,
+          art_id,
+          GROUP_CONCAT(imp_id ORDER BY imp_id SEPARATOR ',') AS impIds
+        FROM detallecotimpuesto
+        WHERE cot_id = ${quoteId}
+        GROUP BY cot_id, art_id
+      ) tax ON tax.cot_id = dc.cot_id AND tax.art_id = dc.art_id
+      WHERE dc.cot_id = ${quoteId}
+      ORDER BY dc.orden ASC;
+    `);
+
+    const items = detailRows.map((row) => {
+      const parts = row.split('\t');
+      const quantity = roundQuantity(parts[3]);
+      const normalPriceWithoutTax = roundMoney(parts[5]);
+      const normalPrice = roundMoney(parts[6]);
+      const storedPriceWithoutTax = roundMoney(parts[7]);
+      const storedPrice = roundMoney(parts[8]);
+      const normalSubtotalWithoutTax = roundMoney(parts[9]);
+      const normalTotal = roundMoney(parts[10]);
+      const storedSubtotalWithoutTax = roundMoney(parts[11]);
+      const storedTotal = roundMoney(parts[12]);
+      const discountPercent = roundRate(parts[13]);
+      const discountTotal = roundMoney(parts[14]);
+      const effectiveTotalFromDiscount =
+        discountTotal > 0 ? roundMoney(Math.max(normalTotal - discountTotal, 0)) : storedTotal;
+      const effectiveTotal =
+        discountTotal > 0
+          ? roundMoney(
+              storedTotal > 0
+                ? Math.min(storedTotal, effectiveTotalFromDiscount || storedTotal)
+                : effectiveTotalFromDiscount
+            )
+          : storedTotal;
+      const effectiveSubtotalWithoutTaxFromDiscount =
+        discountTotal > 0 && normalTotal > 0
+          ? roundMoney(normalSubtotalWithoutTax * (effectiveTotal / normalTotal))
+          : storedSubtotalWithoutTax;
+      const effectiveSubtotalWithoutTax =
+        discountTotal > 0
+          ? roundMoney(
+              storedSubtotalWithoutTax > 0
+                ? Math.min(
+                    storedSubtotalWithoutTax,
+                    effectiveSubtotalWithoutTaxFromDiscount || storedSubtotalWithoutTax
+                  )
+                : effectiveSubtotalWithoutTaxFromDiscount
+            )
+          : storedSubtotalWithoutTax;
+
+      return {
+        artId: Number(parts[0] || 0),
+        code: String(parts[1] || '').trim(),
+        name: String(parts[2] || '').trim(),
+        description: String(parts[2] || '').trim(),
+        quantity,
+        unit: String(parts[4] || '').trim() || 'PZA',
+        storeUnit: normalizeStoreUnitLabel(parts[4]),
+        listPriceWithoutTax: normalPriceWithoutTax,
+        listPrice: normalPrice,
+        priceWithoutTax:
+          quantity > 0 ? roundMoney(effectiveSubtotalWithoutTax / quantity) : storedPriceWithoutTax,
+        price: quantity > 0 ? roundMoney(effectiveTotal / quantity) : storedPrice,
+        subtotalWithoutTax: effectiveSubtotalWithoutTax,
+        total: effectiveTotal,
+        discountPercent,
+        discountTotal,
+        impIds: parseImpIds(parts[15]),
+      };
+    });
+
+    const headerDiscount = roundMoney(descuento);
+    const computedSubtotalWithoutTax = roundMoney(
+      items.reduce((sum, item) => sum + roundMoney(item.subtotalWithoutTax || 0), 0)
+    );
+    const computedTotal = roundMoney(items.reduce((sum, item) => sum + roundMoney(item.total || 0), 0));
+    const headerTotal = computedTotal > 0 ? computedTotal : roundMoney(total);
+
+    return {
+      cotId: Number(cotId || 0),
+      orderDate: String(fecha || '').trim(),
+      subtotal: roundMoney(headerTotal + headerDiscount),
+      netSubtotal: computedSubtotalWithoutTax > 0 ? computedSubtotalWithoutTax : roundMoney(subtotal),
+      discount: headerDiscount,
+      total: headerTotal,
+      items,
+    };
+  };
+
+  const buildFirebaseOrderPatchFromQuote = (order = {}, quote = {}, missingCodes = [], sicarCustomer = null) => {
+    const existingItemsByCode = new Map(
+      (Array.isArray(order.items) ? order.items : [])
+        .map((item) => [normalizeCode(item?.codigo ?? item?.code ?? ''), item])
+        .filter(([code]) => Boolean(code))
+    );
+    const rewardCodes = new Set(
+      normalizeRewardOrderItems(order.rewardRedemption).map((item) => normalizeCode(item.code))
+    );
+    const grossTotal = roundMoney(quote?.sicarTotal || quote?.total || 0);
+    const customerDiscount = roundMoney(
+      quote?.customerDiscount ?? quote?.discount ?? calculateOrderCouponDiscount(order, grossTotal)
+    );
+    const customerTotal = roundMoney(
+      quote?.customerTotal ?? Math.max(grossTotal - customerDiscount, 0)
+    );
+
+    const items = (Array.isArray(quote.items) ? quote.items : [])
+      .filter((item) => {
+        const normalizedCode = normalizeCode(item?.code || '');
+        if (!normalizedCode) {
+          return false;
+        }
+
+        if (isDeliveryServiceCode(normalizedCode)) {
+          return false;
+        }
+
+        if (rewardCodes.has(normalizedCode)) {
+          return false;
+        }
+
+        return true;
+      })
+      .map((item) => {
+        const normalizedCode = normalizeCode(item.code);
+        const existingItem = existingItemsByCode.get(normalizedCode) || null;
+        const existingPromotion = normalizeOrderSpecialPromotion(
+          existingItem?.promocionEspecial ?? existingItem?.specialPromotion ?? null
+        );
+        const safeDescription =
+          existingItem?.description && existingItem.description !== item.name
+            ? existingItem.description
+            : '';
+        const requestedQuantity = roundQuantity(
+          existingItem?.cantidadSolicitada ??
+            existingItem?.requestedQuantity ??
+            existingItem?.cantidad ??
+            item.quantity
+        );
+        const actualQuantity = roundQuantity(item.quantity);
+        const shouldPreserveStorePrice =
+          existingItem?.precioFijo === true ||
+          existingItem?.priceLocked === true ||
+          Boolean(existingPromotion) ||
+          (
+            order?.totalAproximado !== false &&
+            Number(existingItem?.precioUnitario ?? 0) > 0 &&
+            Number(item?.listPrice || 0) > 0 &&
+            Number(existingItem?.precioUnitario ?? 0) < Number(item.listPrice || 0)
+          );
+        const resolvedUnitPrice = roundMoney(
+          shouldPreserveStorePrice
+            ? existingItem?.precioUnitario ?? item.price ?? 0
+            : item.price ?? 0
+        );
+        const nextItem = {
+          codigo: item.code,
+          nombre: item.name,
+          descripcion: safeDescription,
+          unidad: item.storeUnit,
+          cantidadSolicitada: requestedQuantity,
+          cantidadReal: actualQuantity,
+          cantidad: actualQuantity,
+          precioUnitario: resolvedUnitPrice,
+          subtotal: roundMoney(actualQuantity * resolvedUnitPrice),
+          sourceType: 'order',
+        };
+
+        if (Number(existingItem?.precioUnitarioOriginal ?? 0) > 0) {
+          nextItem.precioUnitarioOriginal = roundMoney(existingItem.precioUnitarioOriginal);
+        } else if (shouldPreserveStorePrice && Number(item?.listPrice || 0) > 0) {
+          nextItem.precioUnitarioOriginal = roundMoney(item.listPrice);
+        }
+
+        if (shouldPreserveStorePrice) {
+          nextItem.precioFijo = true;
+        }
+
+        if (existingPromotion) {
+          nextItem.promocionEspecial = existingPromotion;
+        }
+
+        if (Number(existingItem?.quantityStep || 0) > 0) {
+          nextItem.quantityStep = Number(existingItem.quantityStep);
+        }
+
+        if (Number(existingItem?.minQuantity || 0) > 0) {
+          nextItem.minQuantity = Number(existingItem.minQuantity);
+        }
+
+        return nextItem;
+      });
+    const productSubtotal = deriveQuotedProductSubtotal({ ...quote, sicarTotal: grossTotal }, order);
+    const nowIso = new Date().toISOString();
+    const nextCustomerSignature = buildCustomerVisibleOrderSignature({
+      items,
+      subtotalEstimado: productSubtotal,
+      descuentoCupon: customerDiscount,
+      deliveryFee: order.deliveryFee,
+      total: customerTotal,
+    });
+    const currentCustomerSignature = buildCustomerVisibleOrderSignature(order);
+    const customerVisibleChange = nextCustomerSignature !== currentCustomerSignature;
+    const currentCustomerUpdateRevision = String(order?.sicarQuote?.customerUpdateRevision || '').trim();
+    const customerUpdateRevision = customerVisibleChange ? nowIso : currentCustomerUpdateRevision;
+
+    return {
+      items,
+      pedido: buildOrderText(items, order.observaciones, {
+        subtotal: productSubtotal,
+        total: customerTotal,
+        discount: customerDiscount,
+        deliveryFee: order.deliveryFee,
+        deliveryFeeOriginal: order.deliveryFeeOriginal,
+        deliveryFree: order.deliveryFree,
+        deliveryDistanceKm: order.deliveryDistanceKm,
+        metodoPago: order.metodoPago,
+        totalLabel: 'Total actualizado de pedido',
+        subtotalLabel: 'Subtotal actualizado',
+        rewardRedemption: order.rewardRedemption,
+      }),
+      subtotalEstimado: productSubtotal,
+      descuentoCupon: customerDiscount,
+      total: customerTotal,
+      totalAproximado: false,
+      totalActualizadoPorSicar: true,
+      totalActualizadoAt: nowIso,
+      sicarQuote: {
+        status: missingCodes.length > 0 ? 'partial' : 'linked',
+        cotId: quote.cotId,
+        appOrderNumber: Number(order.id || 0),
+        appOrderCode: formatAppOrderCode(order),
+        orderDate: quote.orderDate,
+        cliId: Number(sicarCustomer?.cliId || order?.sicarQuote?.cliId || 0),
+        clientCode: normalizeCode(sicarCustomer?.clave || order?.sicarQuote?.clientCode || ''),
+        clientName: normalizeText(sicarCustomer?.name || order?.cliente || ''),
+        subtotal: productSubtotal,
+        discount: customerDiscount,
+        total: grossTotal,
+        grossTotal,
+        customerTotal,
+        missingCodes,
+        lastSyncedAt: nowIso,
+        lastAppliedAt: nowIso,
+        customerUpdateRevision,
+        customerUpdatePending:
+          customerVisibleChange || Boolean(order?.sicarQuote?.customerUpdatePending),
+      },
+    };
+  };
+
+  const syncOrderQuoteInternal = async (orderKey, options = {}) => {
+    await ensureAuthenticatedFirebaseSession();
+
+    const applyToFirebase = options.applyToFirebase === true;
+    const order = await getOrderByKey(orderKey);
+
+    if (!order) {
+      throw new Error('No se encontro el pedido en Firebase.');
+    }
+
+    if (!isAssignedBranch(order)) {
+      throw new Error(`El pedido pertenece a ${getOrderBranchId(order)} y este integrador procesa ${assignedBranchId}.`);
+    }
+
+    if (!isQuoteEligibleOrder(order)) {
+      throw new Error('El pedido necesita al menos un articulo con codigo SICAR para crear la cotizacion.');
+    }
+
+    const sicarCustomer = await ensureSicarCustomerForOrder(orderKey, order);
+    let quoteReference = await getQuoteByOrderReference(order);
+    let missingCodes = [];
+    let createdQuote = false;
+    const draft = await buildQuoteDraft(order);
+
+    if (!quoteReference) {
+      const created = await insertQuoteDraft(order, draft, sicarCustomer);
+      createdQuote = true;
+      missingCodes = Array.isArray(created.missingCodes) ? created.missingCodes : [];
+      quoteReference = { cotId: created.cotId };
+    } else {
+      const replaced = await replaceQuoteDraft(quoteReference.cotId, draft, sicarCustomer);
+      missingCodes = Array.isArray(replaced.missingCodes) ? replaced.missingCodes : [];
+    }
+
+    if (!quoteReference?.cotId) {
+      throw new Error('No se pudo localizar la cotizacion SICAR para este pedido.');
+    }
+
+    const quote = await getQuoteSnapshot(quoteReference);
+    const customerDiscount = calculateOrderCouponDiscount(order, roundMoney(quote.total || 0));
+    const customerQuote = {
+      ...quote,
+      discount: customerDiscount,
+      customerDiscount,
+      customerTotal: roundMoney(Math.max(roundMoney(quote.total || 0) - customerDiscount, 0)),
+      sicarTotal: roundMoney(quote.total || 0),
+      productSubtotal: deriveQuotedProductSubtotal({ ...quote, sicarTotal: roundMoney(quote.total || 0) }, order),
+    };
+    const quoteStatus = missingCodes.length > 0 ? 'partial' : 'synced';
+    const quoteMetaPatch = {
+      status: quoteStatus,
+      cotId: customerQuote.cotId,
+      appOrderNumber: Number(order.id || 0),
+      appOrderCode: formatAppOrderCode(order),
+      orderDate: customerQuote.orderDate,
+      cliId: Number(sicarCustomer?.cliId || 0),
+      clientCode: normalizeCode(sicarCustomer?.clave),
+      clientName: normalizeText(sicarCustomer?.name || order?.cliente),
+      subtotal: roundMoney(customerQuote.productSubtotal || 0),
+      discount: roundMoney(customerQuote.discount || 0),
+      total: roundMoney(customerQuote.total || 0),
+      grossTotal: roundMoney(customerQuote.sicarTotal || customerQuote.total || 0),
+      customerTotal: roundMoney(customerQuote.customerTotal || 0),
+      missingCodes,
+      syncedAt: new Date().toISOString(),
+      lastSyncedAt: new Date().toISOString(),
+    };
+
+    if (applyToFirebase) {
+      const orderPatch = buildFirebaseOrderPatchFromQuote(order, customerQuote, missingCodes, sicarCustomer);
+      await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
+      await syncLinkedQuoteWatch(orderKey, order, customerQuote, { applyToFirebase: true });
+    } else {
+      await updateOrderQuoteStatus(orderKey, quoteMetaPatch);
+      await syncLinkedQuoteWatch(orderKey, order, customerQuote, { applyToFirebase: false });
+    }
+
+    await clearQueueEntry(orderKey);
+
+    return {
+      orderKey,
+      appOrderNumber: Number(order.id || 0),
+      appOrderCode: String(order?.orderNumber || '').trim(),
+      createdQuote,
+      quote: customerQuote,
+      missingCodes,
+      sicarCustomer,
+      whatsappMessage: buildCustomerQuoteMessage(order, customerQuote),
+      customerPhone: String(order.telefono || '').trim(),
+      customerName: String(order.cliente || '').trim(),
+    };
+  };
+
+  const refreshLinkedQuotes = async () => {
+    await ensureAuthenticatedFirebaseSession();
+
+    if (linkedQuotesRefreshing) {
+      return;
+    }
+
+    linkedQuotesRefreshing = true;
+    state.refreshingLinkedQuotes = true;
+    state.lastLinkedRefreshAt = new Date().toISOString();
+
+    try {
+      const snapshot = await get(getBranchScopedQuery(LINKED_QUOTES_PATH));
+      const linkedQuotes = snapshot.val() || {};
+      const entries = Object.entries(linkedQuotes).sort(
+        (left, right) => Number(left[1]?.appOrderNumber || 0) - Number(right[1]?.appOrderNumber || 0)
+      );
+
+      state.watchedQuotesCount = entries.length;
+
+      for (const [orderKey, watchEntry] of entries) {
+        try {
+          const order = await getOrderByKey(orderKey);
+
+          if (order && !isAssignedBranch(order)) {
+            continue;
+          }
+
+          if (!order || !isQuoteEligibleOrder(order) || isFinalStoreStatus(order.estado)) {
+            await updateDatabaseRef(ref(database), {
+              [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
+            });
+            continue;
+          }
+
+          const cotId = Number(watchEntry?.cotId || order?.sicarQuote?.cotId || 0);
+          if (cotId <= 0) {
+            await updateDatabaseRef(ref(database), {
+              [`${LINKED_QUOTES_PATH}/${orderKey}`]: null,
+            });
+            continue;
+          }
+
+          const quoteSnapshot = await getQuoteSnapshot({ cotId });
+          const customerDiscount = calculateOrderCouponDiscount(order, roundMoney(quoteSnapshot.total || 0));
+          const quote = {
+            ...quoteSnapshot,
+            discount: customerDiscount,
+            customerDiscount,
+            customerTotal: roundMoney(
+              Math.max(roundMoney(quoteSnapshot.total || 0) - customerDiscount, 0)
+            ),
+            sicarTotal: roundMoney(quoteSnapshot.total || 0),
+            productSubtotal: deriveQuotedProductSubtotal(
+              { ...quoteSnapshot, sicarTotal: roundMoney(quoteSnapshot.total || 0) },
+              order
+            ),
+          };
+          const fingerprint = buildQuoteFingerprint(quote);
+          const knownFingerprint = String(watchEntry?.lastObservedFingerprint || '').trim();
+
+          if (!knownFingerprint) {
+            await syncLinkedQuoteWatch(orderKey, order, quote, {
+              applyToFirebase: order?.totalAproximado === false,
+            });
+            continue;
+          }
+
+          if (knownFingerprint === fingerprint) {
+            continue;
+          }
+
+          const missingCodes = Array.isArray(order?.sicarQuote?.missingCodes)
+            ? order.sicarQuote.missingCodes
+            : [];
+          const orderPatch = buildFirebaseOrderPatchFromQuote(order, quote, missingCodes);
+          await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}`), orderPatch);
+          await syncLinkedQuoteWatch(orderKey, order, quote, { applyToFirebase: true });
+
+          const nowIso = new Date().toISOString();
+          state.lastAutoApplyAt = nowIso;
+          state.lastSuccessAt = nowIso;
+          state.lastProcessedOrderKey = orderKey;
+          state.lastQuoteId = Number(quote.cotId || 0);
+        } catch (error) {
+          state.lastError = String(
+            error?.message || error || `No se pudo refrescar la cotizacion SICAR del pedido ${orderKey}.`
+          );
+        }
+      }
+    } catch (error) {
+      state.lastError = String(error?.message || error || 'No se pudieron refrescar las cotizaciones enlazadas.');
+    } finally {
+      linkedQuotesRefreshing = false;
+      state.refreshingLinkedQuotes = false;
+    }
+  };
+
+  const scheduleLinkedQuotesRefresh = (delayMs = LINKED_QUOTES_REFRESH_MS) => {
+    if (linkedQuotesRefreshTimer) {
+      clearTimeout(linkedQuotesRefreshTimer);
+    }
+
+    linkedQuotesRefreshTimer = setTimeout(() => {
+      refreshLinkedQuotes()
+        .catch(() => {})
+        .finally(() => {
+          scheduleLinkedQuotesRefresh(LINKED_QUOTES_REFRESH_MS);
+        });
+    }, Math.max(1000, Number(delayMs || LINKED_QUOTES_REFRESH_MS)));
+  };
+
+  const syncOrderQuote = async (orderKey, options = {}) => {
+    const cleanOrderKey = String(orderKey || '').trim();
+    if (!cleanOrderKey) {
+      throw new Error('Falta el identificador del pedido.');
+    }
+
+    if (runningOrderPromises.has(cleanOrderKey)) {
+      return runningOrderPromises.get(cleanOrderKey);
+    }
+
+    const promise = Promise.resolve()
+      .then(() => syncOrderQuoteInternal(cleanOrderKey, options))
+      .finally(() => {
+        runningOrderPromises.delete(cleanOrderKey);
+      });
+
+    runningOrderPromises.set(cleanOrderKey, promise);
+    return promise;
+  };
+
+  const processQueue = async () => {
+    if (state.processing) {
+      processRequested = true;
+      return;
+    }
+
+    state.processing = true;
+    state.lastRunAt = new Date().toISOString();
+    state.lastError = '';
+
+    try {
+      const snapshot = await get(getBranchScopedQuery(QUOTE_QUEUE_PATH));
+      const queueData = snapshot.val() || {};
+      const queueEntries = Object.entries(queueData)
+        .filter(([, value]) =>
+          String(value?.status || '').trim().toLowerCase() === 'pending' && isAssignedBranch(value)
+        )
+        .sort((left, right) => Number(left[1]?.requestedAt || 0) - Number(right[1]?.requestedAt || 0));
+
+      state.pendingCount = queueEntries.length;
+
+      for (const [orderKey, entry] of queueEntries) {
+        try {
+          const queuedOrder = await getOrderByKey(orderKey);
+          if (!queuedOrder || !isAssignedBranch(queuedOrder)) {
+            continue;
+          }
+
+          const result = await syncOrderQuote(orderKey, { applyToFirebase: true });
+          await updateDatabaseRef(ref(database, `${STORE_ORDERS_PATH}/${orderKey}/sicarQuote`), {
+            status: result.missingCodes.length > 0 ? 'partial' : 'synced',
+            cotId: result.quote.cotId,
+            appOrderNumber: Number(result.appOrderNumber || 0),
+            appOrderCode: String(result.appOrderCode || '').trim(),
+            orderDate: result.quote.orderDate,
+            subtotal: result.quote.productSubtotal || result.quote.subtotal,
+            discount: result.quote.discount,
+            total: result.quote.total,
+            grossTotal: result.quote.sicarTotal || result.quote.total,
+            customerTotal: result.quote.customerTotal || 0,
+            missingCodes: result.missingCodes,
+            syncedAt: new Date().toISOString(),
+            createdQuote: result.createdQuote,
+          });
+          await clearQueueEntry(orderKey);
+          state.syncedCount += 1;
+          state.lastProcessedOrderKey = orderKey;
+          state.lastQuoteId = Number(result.quote.cotId || 0);
+          state.lastSuccessAt = new Date().toISOString();
+        } catch (error) {
+          await markQueueAsError(orderKey, entry, error);
+          state.lastError = String(error?.message || error || 'Fallo desconocido en cola SICAR.');
+        }
+      }
+
+      state.pendingCount = 0;
+    } catch (error) {
+      state.lastError = String(error?.message || error || 'No se pudo procesar la cola SICAR.');
+    } finally {
+      state.processing = false;
+      if (processRequested) {
+        processRequested = false;
+        setTimeout(() => {
+          processQueue().catch(() => {});
+        }, 50);
+      }
+    }
+  };
+
+  const initAutoSync = () => {
+    if (queueListenerStarted) {
+      return;
+    }
+
+    ensureAuthenticatedFirebaseSession()
+      .then(() => {
+        queueListenerStarted = true;
+        queueUnsubscribe = onValue(
+          getBranchScopedQuery(QUOTE_QUEUE_PATH),
+          (snapshot) => {
+            const queueData = snapshot.val() || {};
+            state.pendingCount = Object.values(queueData).filter(
+              (entry) =>
+                String(entry?.status || '').trim().toLowerCase() === 'pending' && isAssignedBranch(entry)
+            ).length;
+            processQueue().catch(() => {});
+          },
+          (error) => {
+            state.lastError = String(error?.message || error || 'No se pudo escuchar la cola SICAR.');
+          }
+        );
+        state.listening = true;
+        seedLinkedQuoteWatchesFromOrders().catch((error) => {
+          state.lastError = String(error?.message || error || 'No se pudieron preparar las cotizaciones enlazadas.');
+        });
+        scheduleLinkedQuotesRefresh(1500);
+      })
+      .catch((error) => {
+        state.lastError = String(
+          error?.message || error || 'No se pudo autenticar el integrador SICAR contra Firebase.'
+        );
+      });
+  };
+
+  const stopAutoSync = () => {
+    if (typeof queueUnsubscribe === 'function') {
+      queueUnsubscribe();
+    }
+    queueUnsubscribe = null;
+    queueListenerStarted = false;
+    state.listening = false;
+    if (linkedQuotesRefreshTimer) {
+      clearTimeout(linkedQuotesRefreshTimer);
+      linkedQuotesRefreshTimer = null;
+    }
+    linkedQuotesRefreshing = false;
+    state.refreshingLinkedQuotes = false;
+  };
+
+  return {
+    state,
+    initAutoSync,
+    stopAutoSync,
+    syncOrderQuote,
+  };
+}
