@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import TiendaVirtualView from './components/TiendaVirtualView';
 import { createOrder } from './services/orders';
+import './styles/storeNativeApp.css';
 
 const STORE_CANONICAL_ORIGIN = 'https://tienda.sanmartinsr.com';
 
@@ -15,10 +16,12 @@ export default function StoreApp() {
   }, []);
 
   return (
-    <TiendaVirtualView
-      onCreateOrder={(payload, options = {}) => createOrder(payload, options)}
-      publicStoreUrl={STORE_CANONICAL_ORIGIN}
-      mode="public"
-    />
+    <div className="native-store-app">
+      <TiendaVirtualView
+        onCreateOrder={(payload, options = {}) => createOrder(payload, options)}
+        publicStoreUrl={STORE_CANONICAL_ORIGIN}
+        mode="public"
+      />
+    </div>
   );
 }

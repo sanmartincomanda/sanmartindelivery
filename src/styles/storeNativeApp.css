@@ -1,0 +1,1240 @@
+.native-store-app {
+  --native-blue-950: #071d34;
+  --native-blue-900: #0b3158;
+  --native-blue-800: #0c4d88;
+  --native-blue-700: #1267b1;
+  --native-blue-500: #2f8fe6;
+  --native-red: #ed1c2e;
+  --native-gold: #d6ad3a;
+  --native-ink: #101820;
+  --native-muted: #5f6b76;
+  --native-line: #dfe5ea;
+  --native-canvas: #f4f6f8;
+  --native-surface: #ffffff;
+  --native-safe-top: env(safe-area-inset-top, 0px);
+  --native-safe-right: env(safe-area-inset-right, 0px);
+  --native-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --native-safe-left: env(safe-area-inset-left, 0px);
+  min-height: 100dvh;
+  color: var(--native-ink);
+  background: var(--native-canvas);
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+.native-store-app,
+.native-store-app * {
+  box-sizing: border-box;
+}
+
+.native-store-app button,
+.native-store-app input,
+.native-store-app textarea,
+.native-store-app select {
+  font: inherit;
+}
+
+.native-store-app button {
+  margin-top: 0;
+  touch-action: manipulation;
+}
+
+.native-store-app input,
+.native-store-app textarea,
+.native-store-app select {
+  font-size: 16px;
+}
+
+.native-store-app .store-shell {
+  min-height: 100dvh !important;
+  overflow-x: clip !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(47, 143, 230, 0.1), transparent 28rem),
+    linear-gradient(180deg, #ffffff 0%, var(--native-canvas) 30%, #edf2f6 100%) !important;
+}
+
+.native-store-app .store-page {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100dvh !important;
+  padding:
+    calc(var(--native-safe-top) + 6px)
+    max(14px, var(--native-safe-right))
+    calc(104px + var(--native-safe-bottom))
+    max(14px, var(--native-safe-left)) !important;
+}
+
+.native-store-app .store-page.with-mobile-nav {
+  padding-bottom: calc(108px + var(--native-safe-bottom)) !important;
+}
+
+.native-store-app .store-top {
+  margin: 0 -14px 12px !important;
+  padding: 8px 14px 12px !important;
+  border: 0 !important;
+  border-radius: 0 0 24px 24px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 10px 30px rgba(7, 29, 52, 0.08) !important;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+.native-store-app .store-brand-row {
+  min-height: 52px;
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+.native-store-app .store-brand-main {
+  min-width: 0;
+  gap: 10px !important;
+}
+
+.native-store-app .store-logo {
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px;
+  border-radius: 15px !important;
+  object-fit: cover;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-brand-copy {
+  min-width: 0;
+}
+
+.native-store-app .store-brand-kicker {
+  margin-bottom: 2px !important;
+  font-size: 8px !important;
+  letter-spacing: 0.12em !important;
+  color: var(--native-blue-700) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.native-store-app .store-title {
+  max-width: 100%;
+  margin: 0 !important;
+  color: var(--native-ink) !important;
+  font-size: clamp(16px, 4.4vw, 19px) !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.035em !important;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.native-store-app .store-brand-actions {
+  flex: 0 0 auto;
+  gap: 8px !important;
+}
+
+.native-store-app .store-order-status-button,
+.native-store-app .store-icon-button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 15px !important;
+  background: var(--native-surface) !important;
+  color: var(--native-blue-900) !important;
+  box-shadow: 0 7px 18px rgba(7, 29, 52, 0.08) !important;
+}
+
+.native-store-app .store-order-status-button {
+  padding: 0 13px !important;
+  background: var(--native-blue-950) !important;
+  border-color: var(--native-blue-950) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+
+.native-store-app .store-branch-coverage-row {
+  margin-top: 8px !important;
+  gap: 8px !important;
+}
+
+.native-store-app .store-branch-pill {
+  min-height: 44px !important;
+  max-width: min(100%, 210px);
+  padding: 6px 12px 6px 7px !important;
+  border: 1px solid #d6e1eb !important;
+  border-radius: 16px !important;
+  background: #f3f7fa !important;
+  color: var(--native-blue-950) !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-branch-pill-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 11px !important;
+  background: var(--native-blue-700) !important;
+  color: #ffffff !important;
+}
+
+.native-store-app .store-branch-pill-chevron {
+  margin-left: auto;
+}
+
+.native-store-app .store-search-wrap {
+  position: sticky !important;
+  top: calc(var(--native-safe-top) + 4px);
+  z-index: 42;
+  min-height: 52px !important;
+  margin-top: 10px !important;
+  padding: 5px 8px !important;
+  border: 1px solid rgba(11, 49, 88, 0.08) !important;
+  border-radius: 18px !important;
+  background: rgba(244, 246, 248, 0.96) !important;
+  box-shadow: 0 12px 28px rgba(7, 29, 52, 0.12) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.native-store-app .store-search-tag {
+  min-width: 42px !important;
+  height: 38px !important;
+  padding: 0 8px !important;
+  border-radius: 13px !important;
+  background: var(--native-blue-950) !important;
+  color: #ffffff !important;
+  font-size: 0 !important;
+}
+
+.native-store-app .store-search-tag::before {
+  content: "";
+  width: 17px;
+  height: 17px;
+  display: block;
+  margin: auto;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.native-store-app .store-search-tag::after {
+  content: "";
+  width: 7px;
+  height: 2px;
+  display: block;
+  margin: -4px 0 0 23px;
+  border-radius: 999px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+
+.native-store-app .store-search {
+  min-width: 0;
+  height: 40px !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--native-ink) !important;
+  font-size: 16px !important;
+  font-weight: 750 !important;
+  text-overflow: ellipsis;
+}
+
+.native-store-app .store-search::placeholder {
+  color: #78838c !important;
+  opacity: 1;
+}
+
+.native-store-app .sm-reward-summary-card {
+  border-radius: 20px !important;
+  background:
+    radial-gradient(circle at 90% 20%, rgba(214, 173, 58, 0.24), transparent 28%),
+    linear-gradient(135deg, var(--native-blue-950), var(--native-blue-800)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 15px 34px rgba(7, 29, 52, 0.2) !important;
+}
+
+.native-store-app .sm-reward-summary-card--winner {
+  border-color: rgba(214, 173, 58, 0.85) !important;
+  box-shadow: 0 16px 36px rgba(7, 29, 52, 0.24), 0 0 0 3px rgba(214, 173, 58, 0.13) !important;
+}
+
+.native-store-app .sm-reward-summary-card > div > div:nth-child(2) > div {
+  color: #ffffff !important;
+}
+
+.native-store-app .sm-reward-summary-card > div > div:nth-child(2) > div:not(:first-child) {
+  color: rgba(255, 255, 255, 0.68) !important;
+}
+
+.native-store-app .store-filters-panel {
+  margin: 0 0 14px !important;
+  padding: 13px 0 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-filter-strip {
+  padding: 0 2px 7px !important;
+}
+
+.native-store-app .store-filter-kicker {
+  color: var(--native-ink) !important;
+  font-size: 18px !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.03em !important;
+  text-transform: none !important;
+}
+
+.native-store-app .store-tabs {
+  display: flex !important;
+  gap: 8px !important;
+  margin: 0 -14px !important;
+  padding: 1px 14px 8px !important;
+  overflow-x: auto !important;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.native-store-app .store-tabs::-webkit-scrollbar,
+.native-store-app .store-grid::-webkit-scrollbar,
+.native-store-app .store-qty-row::-webkit-scrollbar {
+  display: none;
+}
+
+.native-store-app .store-filter-chip {
+  flex: 0 0 auto !important;
+  min-width: 104px !important;
+  min-height: 52px !important;
+  padding: 9px 13px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 16px !important;
+  background: var(--native-surface) !important;
+  color: var(--native-ink) !important;
+  box-shadow: none !important;
+  scroll-snap-align: start;
+}
+
+.native-store-app .store-filter-chip.active,
+.native-store-app .store-filter-chip[aria-pressed="true"] {
+  background: var(--native-blue-950) !important;
+  border-color: var(--native-blue-950) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(7, 29, 52, 0.18) !important;
+}
+
+.native-store-app .store-filter-label {
+  font-size: 14px !important;
+  font-weight: 850 !important;
+}
+
+.native-store-app .store-filter-meta {
+  margin-top: 3px !important;
+  font-size: 10px !important;
+  font-weight: 750 !important;
+  opacity: 0.68;
+}
+
+.native-store-app .store-product-head {
+  margin: 0 0 12px !important;
+  padding: 0 2px !important;
+  align-items: center !important;
+}
+
+.native-store-app .store-count {
+  color: var(--native-ink) !important;
+  font-size: 24px !important;
+  letter-spacing: -0.045em !important;
+}
+
+.native-store-app .store-product-head .store-button {
+  min-height: 42px !important;
+  padding: 0 15px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  color: var(--native-blue-900) !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-grouped-sections {
+  display: grid !important;
+  gap: 18px !important;
+}
+
+.native-store-app .store-product-group {
+  margin: 0 !important;
+  padding: 15px 0 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-product-group + .store-product-group {
+  border-top: 1px solid var(--native-line) !important;
+}
+
+.native-store-app .store-product-group-head {
+  margin-bottom: 12px !important;
+  padding: 0 2px !important;
+  align-items: end !important;
+}
+
+.native-store-app .store-product-group-kicker {
+  margin-bottom: 4px !important;
+  color: var(--native-blue-700) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.12em !important;
+}
+
+.native-store-app .store-product-group-title {
+  color: var(--native-ink) !important;
+  font-size: 21px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.native-store-app .store-product-group-actions {
+  gap: 6px !important;
+}
+
+.native-store-app .store-product-group-meta {
+  color: var(--native-muted) !important;
+  font-size: 9px !important;
+}
+
+.native-store-app .store-product-group-link {
+  min-height: 38px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #e8f1f8 !important;
+  color: var(--native-blue-900) !important;
+  font-size: 11px !important;
+}
+
+.native-store-app .store-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px 10px !important;
+}
+
+.native-store-app .store-product {
+  min-width: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  animation: native-card-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.native-store-app .store-product-card {
+  min-width: 0;
+  padding: 0 !important;
+  background: transparent !important;
+  text-align: left !important;
+}
+
+.native-store-app .store-product-media,
+.native-store-app .store-product-image-shell {
+  position: relative !important;
+  width: 100% !important;
+  aspect-ratio: 1 / 0.92 !important;
+  min-height: 0 !important;
+  border: 1px solid #e4e8ec !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(7, 29, 52, 0.07) !important;
+}
+
+.native-store-app .store-product-image {
+  width: 100% !important;
+  height: 100% !important;
+  padding: 7px !important;
+  object-fit: contain !important;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.native-store-app .store-product:active .store-product-image {
+  transform: scale(0.97) !important;
+}
+
+.native-store-app .store-product-code {
+  display: inline-flex !important;
+  margin: 8px 0 4px !important;
+  padding: 3px 7px !important;
+  border-radius: 999px !important;
+  background: #eaf0f5 !important;
+  color: var(--native-blue-900) !important;
+  font-size: 8px !important;
+  letter-spacing: 0.08em !important;
+}
+
+.native-store-app .store-product-name {
+  min-height: 34px !important;
+  margin: 0 0 4px !important;
+  color: var(--native-ink) !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.012em;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.native-store-app .store-price-stack {
+  gap: 3px !important;
+}
+
+.native-store-app .store-price {
+  color: var(--native-blue-950) !important;
+  font-size: 17px !important;
+  line-height: 1.1 !important;
+  font-weight: 900 !important;
+}
+
+.native-store-app .store-unit {
+  margin-top: 3px !important;
+  color: var(--native-muted) !important;
+  font-size: 10px !important;
+  line-height: 1.3 !important;
+}
+
+.native-store-app .store-add {
+  top: 8px !important;
+  right: 8px !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  border: 3px solid #ffffff !important;
+  border-radius: 14px !important;
+  background: var(--native-red) !important;
+  color: #ffffff !important;
+  font-size: 21px !important;
+  box-shadow: 0 9px 18px rgba(237, 28, 46, 0.3) !important;
+  transition: transform 120ms ease, box-shadow 120ms ease !important;
+}
+
+.native-store-app .store-add:active {
+  transform: scale(0.9) !important;
+  box-shadow: 0 3px 8px rgba(237, 28, 46, 0.24) !important;
+}
+
+.native-store-app .store-product-group-footer {
+  margin-top: 14px !important;
+}
+
+.native-store-app .store-product-group-more {
+  min-width: 150px !important;
+  min-height: 44px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  color: var(--native-blue-900) !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-mobile-bottom-nav {
+  position: fixed !important;
+  left: max(10px, var(--native-safe-left)) !important;
+  right: max(10px, var(--native-safe-right)) !important;
+  bottom: max(8px, var(--native-safe-bottom)) !important;
+  z-index: 90 !important;
+  height: 72px !important;
+  padding: 7px 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 24px !important;
+  background: rgba(7, 29, 52, 0.96) !important;
+  box-shadow: 0 18px 44px rgba(7, 29, 52, 0.32) !important;
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+.native-store-app .store-mobile-nav-button {
+  position: relative;
+  min-width: 0 !important;
+  min-height: 56px !important;
+  padding: 5px 2px !important;
+  border-radius: 18px !important;
+  color: rgba(255, 255, 255, 0.58) !important;
+  transition: color 150ms ease, background 150ms ease, transform 120ms ease !important;
+}
+
+.native-store-app .store-mobile-nav-button.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+.native-store-app .store-mobile-nav-button:active {
+  transform: scale(0.94) !important;
+}
+
+.native-store-app .store-mobile-nav-icon {
+  width: 27px !important;
+  height: 27px !important;
+  margin: 0 auto 2px !important;
+}
+
+.native-store-app .store-mobile-nav-icon svg,
+.native-store-app .store-checkout-icon svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.native-store-app .store-mobile-nav-label {
+  font-size: 9px !important;
+  line-height: 1 !important;
+  font-weight: 750 !important;
+  white-space: nowrap;
+}
+
+.native-store-app .store-mobile-nav-badge {
+  top: 3px !important;
+  right: calc(50% - 22px) !important;
+  min-width: 17px !important;
+  height: 17px !important;
+  padding: 0 4px !important;
+  border: 2px solid var(--native-blue-950) !important;
+  background: var(--native-red) !important;
+  font-size: 8px !important;
+}
+
+.native-store-app .store-mobile-cart {
+  left: 14px !important;
+  right: 14px !important;
+  bottom: calc(88px + var(--native-safe-bottom)) !important;
+  min-height: 58px !important;
+  padding: 9px 14px !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: var(--native-red) !important;
+  color: #ffffff !important;
+  box-shadow: 0 16px 34px rgba(237, 28, 46, 0.3) !important;
+}
+
+.native-store-app .store-sheet-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 120 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+  background: rgba(7, 29, 52, 0.52) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  animation: native-overlay-in 160ms ease both;
+}
+
+.native-store-app .store-sheet,
+.native-store-app .store-sheet.full,
+.native-store-app .store-auth-sheet {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding:
+    calc(var(--native-safe-top) + 12px)
+    max(16px, var(--native-safe-right))
+    calc(20px + var(--native-safe-bottom))
+    max(16px, var(--native-safe-left)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  background: var(--native-canvas) !important;
+  box-shadow: none !important;
+  animation: native-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.native-store-app .store-sheet-head {
+  position: sticky !important;
+  top: calc(-1 * var(--native-safe-top) - 12px) !important;
+  z-index: 8 !important;
+  min-height: 54px !important;
+  margin: 0 -16px 14px !important;
+  padding: calc(var(--native-safe-top) + 8px) 16px 8px !important;
+  background: rgba(244, 246, 248, 0.94) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.native-store-app .store-sheet-head strong {
+  color: var(--native-ink) !important;
+  font-size: 17px !important;
+  font-weight: 850 !important;
+}
+
+.native-store-app .store-back {
+  min-width: 46px !important;
+  min-height: 46px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 15px !important;
+  background: #ffffff !important;
+  color: var(--native-ink) !important;
+  box-shadow: 0 7px 18px rgba(7, 29, 52, 0.08) !important;
+}
+
+.native-store-app .store-back-icon {
+  font-size: 0 !important;
+}
+
+.native-store-app .store-back-icon::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  display: block;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.native-store-app .store-back-label {
+  display: none !important;
+}
+
+.native-store-app .store-auth-sheet {
+  background:
+    radial-gradient(circle at 90% 12%, rgba(47, 143, 230, 0.16), transparent 24rem),
+    var(--native-canvas) !important;
+}
+
+.native-store-app .store-auth-sheet::before {
+  display: none !important;
+}
+
+.native-store-app .store-auth-card.inline {
+  width: 100% !important;
+  max-width: 500px !important;
+  margin: 0 auto !important;
+  padding: 20px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 26px !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 50px rgba(7, 29, 52, 0.1) !important;
+}
+
+.native-store-app .store-auth-brand {
+  margin-bottom: 14px !important;
+  text-align: left !important;
+}
+
+.native-store-app .store-auth-brand .store-logo {
+  width: 54px !important;
+  height: 54px !important;
+  margin: 0 0 16px !important;
+}
+
+.native-store-app .store-auth-brand h1 {
+  margin: 0 !important;
+  color: var(--native-ink) !important;
+  font-size: 26px !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.045em !important;
+}
+
+.native-store-app .store-auth-brand p {
+  margin: 8px 0 0 !important;
+  color: var(--native-muted) !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+}
+
+.native-store-app .store-auth-toggle {
+  min-height: 50px !important;
+  margin-bottom: 18px !important;
+  padding: 4px !important;
+  border-radius: 16px !important;
+  background: #eef2f5 !important;
+}
+
+.native-store-app .store-auth-toggle button {
+  min-height: 42px !important;
+  border-radius: 13px !important;
+  color: var(--native-muted) !important;
+  font-size: 13px !important;
+}
+
+.native-store-app .store-auth-toggle button.active {
+  background: var(--native-blue-950) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(7, 29, 52, 0.18) !important;
+}
+
+.native-store-app .store-form {
+  gap: 10px !important;
+}
+
+.native-store-app .store-field,
+.native-store-app .store-input,
+.native-store-app .store-form input,
+.native-store-app .store-form textarea {
+  min-height: 52px !important;
+  margin: 0 !important;
+  padding: 0 15px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 15px !important;
+  background: #f7f8fa !important;
+  color: var(--native-ink) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.native-store-app .store-field:focus,
+.native-store-app .store-input:focus,
+.native-store-app .store-form input:focus,
+.native-store-app .store-form textarea:focus {
+  border-color: var(--native-blue-500) !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 4px rgba(47, 143, 230, 0.12) !important;
+}
+
+.native-store-app .store-button {
+  min-height: 50px !important;
+  padding: 0 18px !important;
+  border: 0 !important;
+  border-radius: 15px !important;
+  background: var(--native-blue-950) !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 850 !important;
+  box-shadow: 0 12px 24px rgba(7, 29, 52, 0.18) !important;
+  transition: transform 120ms ease, opacity 120ms ease !important;
+}
+
+.native-store-app .store-button.secondary {
+  border: 1px solid var(--native-line) !important;
+  background: #ffffff !important;
+  color: var(--native-blue-950) !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-button:active:not(:disabled) {
+  transform: scale(0.98) !important;
+}
+
+.native-store-app .store-button:disabled {
+  opacity: 0.46 !important;
+}
+
+.native-store-app .store-google-button {
+  background: #ffffff !important;
+}
+
+.native-store-app .store-google-mark {
+  flex: 0 0 auto;
+}
+
+.native-store-app .store-auth-link-button {
+  min-height: 44px !important;
+  padding: 0 4px !important;
+  color: var(--native-blue-700) !important;
+}
+
+.native-store-app .store-auth-inline-note {
+  color: var(--native-muted) !important;
+  font-size: 11px !important;
+}
+
+.native-store-app .product-overlay .store-product-sheet {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.native-store-app .store-sheet-head.product {
+  flex: 0 0 auto;
+  margin-bottom: 6px !important;
+}
+
+.native-store-app .store-product-sheet-heading span {
+  color: var(--native-red) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.12em !important;
+}
+
+.native-store-app .store-detail-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: minmax(156px, 31dvh) minmax(0, 1fr) !important;
+  gap: 10px !important;
+  overflow: hidden !important;
+}
+
+.native-store-app .store-detail-image {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  padding: 8px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 22px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-detail-image img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+.native-store-app .store-product-sheet-copy {
+  min-height: 0 !important;
+  padding: 4px 2px 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.native-store-app .store-product-sheet-title {
+  margin: 0 0 5px !important;
+  color: var(--native-ink) !important;
+  font-size: clamp(20px, 6vw, 28px) !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.045em !important;
+}
+
+.native-store-app .store-price-sheet .store-price {
+  color: var(--native-red) !important;
+  font-size: 25px !important;
+}
+
+.native-store-app .store-qty-row {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  margin: 12px -2px 0 !important;
+  padding: 2px 2px 8px !important;
+  overflow-x: auto !important;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.native-store-app .store-qty-row .store-chip {
+  flex: 0 0 auto !important;
+  min-width: 62px !important;
+  min-height: 44px !important;
+  padding: 0 12px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  color: var(--native-ink) !important;
+  scroll-snap-align: start;
+}
+
+.native-store-app .store-qty-row .store-chip.active {
+  border-color: var(--native-blue-950) !important;
+  background: var(--native-blue-950) !important;
+  color: #ffffff !important;
+}
+
+.native-store-app .store-stepper {
+  display: grid !important;
+  grid-template-columns: 50px minmax(0, 1fr) 50px !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+}
+
+.native-store-app .store-stepper button {
+  width: 50px !important;
+  height: 50px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  color: var(--native-blue-950) !important;
+  font-size: 24px !important;
+}
+
+.native-store-app .store-qty-input {
+  min-width: 0 !important;
+  height: 50px !important;
+  margin: 0 !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  color: var(--native-ink) !important;
+  text-align: center !important;
+}
+
+.native-store-app .store-product-sheet-footer {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 5;
+  margin: 10px -2px 0 !important;
+  padding: 8px 2px 2px !important;
+  background: linear-gradient(180deg, rgba(244, 246, 248, 0), var(--native-canvas) 24%) !important;
+}
+
+.native-store-app .store-product-sheet-selection {
+  margin: 0 0 6px !important;
+}
+
+.native-store-app .store-checkout-sheet {
+  padding-bottom: calc(24px + var(--native-safe-bottom)) !important;
+}
+
+.native-store-app .store-checkout-primary-action {
+  position: sticky !important;
+  bottom: max(4px, var(--native-safe-bottom)) !important;
+  z-index: 10 !important;
+  width: 100% !important;
+  min-height: 52px !important;
+  margin-top: 14px !important;
+  border: 0 !important;
+  box-shadow:
+    0 -14px 24px rgba(244, 246, 248, 0.96),
+    0 12px 28px rgba(7, 29, 52, 0.24) !important;
+}
+
+.native-store-app .store-checkout-progress {
+  position: sticky !important;
+  top: calc(var(--native-safe-top) + 50px) !important;
+  z-index: 7 !important;
+  margin: -8px -2px 14px !important;
+  padding: 6px 2px 10px !important;
+  background: rgba(244, 246, 248, 0.95) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.native-store-app .store-checkout-progress span {
+  min-height: 38px !important;
+  border-radius: 12px !important;
+  background: #e8edf1 !important;
+  color: var(--native-muted) !important;
+}
+
+.native-store-app .store-checkout-progress span.active {
+  background: var(--native-blue-950) !important;
+  color: #ffffff !important;
+}
+
+.native-store-app .store-order-line,
+.native-store-app .store-status-card,
+.native-store-app .store-coupon-card,
+.native-store-app .store-total-note,
+.native-store-app .store-location-card,
+.native-store-app .store-location-selected,
+.native-store-app .store-payment-note,
+.native-store-app .store-cash-change {
+  border: 1px solid var(--native-line) !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-choice-grid {
+  gap: 9px !important;
+}
+
+.native-store-app .store-choice-card {
+  min-height: 92px !important;
+  padding: 13px !important;
+  border: 1px solid var(--native-line) !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  color: var(--native-ink) !important;
+  box-shadow: none !important;
+}
+
+.native-store-app .store-choice-card.active {
+  border-color: var(--native-blue-900) !important;
+  background: #eaf3fb !important;
+  color: var(--native-blue-950) !important;
+  box-shadow: 0 0 0 2px rgba(11, 49, 88, 0.08) !important;
+}
+
+.native-store-app .store-total-note {
+  background: var(--native-blue-950) !important;
+  color: #ffffff !important;
+}
+
+.native-store-app .store-total-note span,
+.native-store-app .store-total-note p {
+  color: rgba(255, 255, 255, 0.74) !important;
+}
+
+.native-store-app .store-total-note strong {
+  color: #ffffff !important;
+}
+
+.native-store-app .sm-rewards-progress-card {
+  border-radius: 26px !important;
+  background:
+    radial-gradient(circle at 88% 16%, rgba(214, 173, 58, 0.26), transparent 25%),
+    linear-gradient(145deg, var(--native-blue-950), var(--native-blue-700)) !important;
+  box-shadow: 0 22px 52px rgba(7, 29, 52, 0.26) !important;
+}
+
+.native-store-app .sm-reward-victory-card,
+.native-store-app .sm-reward-preview-card--available,
+.native-store-app .sm-reward-detail-card--available {
+  animation: native-reward-glow 2.2s ease-in-out infinite !important;
+}
+
+.native-store-app .sm-reward-detail-card {
+  border-radius: 22px !important;
+}
+
+.native-store-app .sm-reward-redeem-button {
+  min-height: 48px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border-radius: 15px !important;
+  background: var(--native-blue-950) !important;
+}
+
+@keyframes native-card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes native-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes native-sheet-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes native-reward-glow {
+  0%, 100% { box-shadow: 0 15px 34px rgba(154, 116, 18, 0.14); }
+  50% { box-shadow: 0 18px 42px rgba(214, 173, 58, 0.32), 0 0 0 4px rgba(214, 173, 58, 0.09); }
+}
+
+@media (max-width: 360px) {
+  .native-store-app .store-page {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .native-store-app .store-top {
+    margin-left: -10px !important;
+    margin-right: -10px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .native-store-app .store-brand-kicker,
+  .native-store-app .store-order-status-button {
+    display: none !important;
+  }
+
+  .native-store-app .store-title {
+    font-size: 15px !important;
+  }
+
+  .native-store-app .store-grid {
+    gap: 13px 8px !important;
+  }
+
+  .native-store-app .store-product-name {
+    font-size: 12px !important;
+  }
+
+  .native-store-app .store-mobile-nav-label {
+    font-size: 8px !important;
+  }
+}
+
+@media (min-width: 600px) {
+  .native-store-app .store-page {
+    max-width: 920px !important;
+    margin: 0 auto !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  .native-store-app .store-top {
+    margin-left: -24px !important;
+    margin-right: -24px !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  .native-store-app .store-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 20px 14px !important;
+  }
+
+  .native-store-app .store-detail-grid {
+    grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    gap: 22px !important;
+  }
+
+  .native-store-app .store-mobile-bottom-nav {
+    left: 50% !important;
+    right: auto !important;
+    width: min(560px, calc(100% - 32px)) !important;
+    transform: translateX(-50%);
+  }
+}
+
+@media (min-width: 900px) {
+  .native-store-app .store-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-height: 700px) and (orientation: portrait) {
+  .native-store-app .store-detail-grid {
+    grid-template-rows: minmax(120px, 25dvh) minmax(0, 1fr) !important;
+  }
+
+  .native-store-app .store-auth-card.inline {
+    padding: 16px !important;
+  }
+
+  .native-store-app .store-auth-brand .store-logo {
+    width: 44px !important;
+    height: 44px !important;
+    margin-bottom: 10px !important;
+  }
+
+  .native-store-app .store-auth-brand p {
+    display: none !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .native-store-app .store-page {
+    padding-top: calc(var(--native-safe-top) + 4px) !important;
+  }
+
+  .native-store-app .store-detail-grid {
+    grid-template-columns: minmax(210px, 0.85fr) minmax(0, 1.15fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .native-store-app .store-mobile-bottom-nav {
+    height: 62px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .native-store-app *,
+  .native-store-app *::before,
+  .native-store-app *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

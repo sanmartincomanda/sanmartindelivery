@@ -4004,6 +4004,22 @@ export default function TiendaVirtualView({
     popupAdOpen ||
     branchSelectorOpen;
 
+  useEffect(() => {
+    if (!mobileOverlayOpen || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [Boolean(mobileOverlayOpen)]);
+
   return (
     <div className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''}`}>
       <style>{`
@@ -9883,7 +9899,7 @@ function CheckoutSheet({
 
             <button
               type="button"
-              className="store-button"
+              className="store-button store-checkout-primary-action"
               onClick={handleContinueCheckout}
               disabled={submitting || storeClosed}
             >
@@ -10174,7 +10190,11 @@ function CheckoutSheet({
               onChange={(event) => onNotesChange(event.target.value)}
               placeholder="Notas para tu pedido"
             />
-            <button type="submit" className="store-button" disabled={submitting || !canSubmitDelivery || storeClosed}>
+            <button
+              type="submit"
+              className="store-button store-checkout-primary-action"
+              disabled={submitting || !canSubmitDelivery || storeClosed}
+            >
               {submitting ? 'Enviando...' : storeClosed ? 'Tienda cerrada' : 'Realizar pedido en linea'}
             </button>
           </form>
