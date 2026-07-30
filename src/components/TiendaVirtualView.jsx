@@ -62,6 +62,10 @@ import {
   searchLocationCandidates,
 } from '../services/geo';
 import {
+  hasGoogleMapsApiKey,
+  importGoogleMapsLibrary,
+} from '../services/googleMaps';
+import {
   buildStoreOperationClosedMessage,
   buildStoreOperationScheduleRows,
   calculateStoreDeliveryQuote,
@@ -767,14 +771,6 @@ const worldPointToLocation = (x, y, zoom) => {
     updatedAt: Date.now(),
   });
 };
-
-const buildManualLocation = (lat, lng) =>
-  normalizeLocation({
-    lat: clampLatitude(lat),
-    lng: normalizeLongitude(lng),
-    label: 'Punto seleccionado en mapa',
-    updatedAt: Date.now(),
-  });
 
 const removeTextAccents = (value) =>
   String(value || '')
@@ -6063,11 +6059,12 @@ export default function TiendaVirtualView({
         }
         .store-location-card {
           display: grid;
-          gap: 10px;
-          border: 1px solid #ead8da;
-          border-radius: 16px;
-          padding: 12px;
-          background: #fff7f4;
+          gap: 12px;
+          border: 1px solid rgba(12, 77, 136, 0.15);
+          border-radius: 20px;
+          padding: 14px;
+          background: linear-gradient(145deg, #f5faff 0%, #ffffff 72%);
+          box-shadow: 0 16px 34px rgba(12, 77, 136, 0.08);
         }
         .store-location-card strong {
           display: block;
@@ -6076,7 +6073,7 @@ export default function TiendaVirtualView({
         .store-location-card span {
           display: block;
           margin-top: 3px;
-          color: #7c5b5f;
+          color: #58718d;
           font-size: 12px;
           font-weight: 800;
           line-height: 1.35;
@@ -6088,10 +6085,10 @@ export default function TiendaVirtualView({
           text-decoration: none;
         }
         .store-location-map {
-          height: 180px;
-          border-radius: 14px;
+          height: 190px;
+          border-radius: 18px;
           overflow: hidden;
-          border: 1px solid #ead8da;
+          border: 1px solid rgba(12, 77, 136, 0.16);
           background: #f3f4f6;
         }
         .store-location-map iframe {
@@ -6121,16 +6118,24 @@ export default function TiendaVirtualView({
         .store-location-results {
           display: grid;
           gap: 8px;
+          max-height: 250px;
+          overflow-y: auto;
+          overscroll-behavior: contain;
         }
         .store-location-result {
           width: 100%;
-          border: 1px solid #ead8da;
+          border: 1px solid rgba(12, 77, 136, 0.14);
           border-radius: 14px;
           padding: 10px 12px;
           background: #ffffff;
           color: #111827;
           text-align: left;
           cursor: pointer;
+          display: grid;
+          grid-template-columns: 28px minmax(0, 1fr);
+          gap: 9px;
+          align-items: center;
+          box-shadow: 0 8px 20px rgba(12, 77, 136, 0.06);
         }
         .store-location-result strong {
           display: block;
@@ -6138,8 +6143,74 @@ export default function TiendaVirtualView({
           color: #111827;
           font-size: 13px;
         }
+        .store-location-result small {
+          display: block;
+          margin-top: 3px;
+          color: #6b7f96;
+          font-size: 11px;
+          font-weight: 750;
+          line-height: 1.35;
+        }
+        .store-location-result-pin {
+          width: 28px;
+          height: 28px;
+          display: grid !important;
+          place-items: center;
+          margin: 0 !important;
+          border-radius: 999px;
+          background: #e9f3ff;
+          color: #0c4d88 !important;
+        }
+        .store-location-result-pin svg {
+          width: 15px;
+          height: 15px;
+        }
+        .store-map-search-field {
+          min-height: 50px;
+          display: grid;
+          grid-template-columns: 32px minmax(0, 1fr);
+          align-items: center;
+          border: 1px solid rgba(12, 77, 136, 0.16);
+          border-radius: 16px;
+          padding: 0 13px;
+          background: #ffffff;
+          box-shadow: 0 12px 28px rgba(12, 77, 136, 0.1);
+        }
+        .store-map-search-field input {
+          width: 100%;
+          min-width: 0;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: #102a48;
+          font: inherit;
+          font-size: 14px;
+          font-weight: 750;
+        }
+        .store-map-search-icon {
+          display: grid !important;
+          place-items: center;
+          margin: 0 !important;
+          color: #0c4d88 !important;
+        }
+        .store-map-search-icon svg {
+          width: 21px;
+          height: 21px;
+        }
+        .store-google-places-field,
+        .store-google-places-field > div,
+        .store-google-places-field gmp-place-autocomplete {
+          width: 100%;
+        }
+        .store-google-places-field gmp-place-autocomplete {
+          min-height: 50px;
+          color-scheme: light;
+          --gmpx-color-primary: #0c4d88;
+          --gmpx-color-on-surface: #102a48;
+          --gmpx-font-family-base: inherit;
+        }
         .store-location-selected {
-          border: 1px solid #ead8da;
+          border: 1px solid rgba(12, 77, 136, 0.14);
           border-radius: 14px;
           padding: 10px 12px;
           background: rgba(255, 255, 255, 0.92);
@@ -6152,16 +6223,30 @@ export default function TiendaVirtualView({
         .store-location-selected span {
           display: block;
           margin-top: 4px;
-          color: #7c5b5f;
+          color: #58718d;
           font-size: 12px;
           font-weight: 800;
         }
+        .store-location-confirmed-badge {
+          width: fit-content;
+          margin: 0 0 5px !important;
+          border-radius: 999px;
+          padding: 4px 8px;
+          background: #dcfce7;
+          color: #047857 !important;
+          font-size: 9px !important;
+          font-weight: 950 !important;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
         .store-map-picker {
-          width: min(430px, calc(100vw - 32px));
-          border-radius: 24px;
+          width: min(720px, calc(100vw - 32px));
+          max-height: min(900px, calc(100dvh - 28px));
+          border-radius: 28px;
           padding: 18px;
-          background: #ffffff;
-          box-shadow: 0 28px 80px rgba(38, 6, 12, 0.28);
+          overflow-y: auto;
+          background: #f5f8fc;
+          box-shadow: 0 32px 90px rgba(7, 29, 52, 0.3);
         }
         .store-map-picker-head {
           display: flex;
@@ -6178,9 +6263,22 @@ export default function TiendaVirtualView({
         .store-map-picker-head span {
           display: block;
           margin-top: 3px;
-          color: #7c5b5f;
+          color: #58718d;
           font-size: 12px;
           font-weight: 800;
+        }
+        .store-map-picker-search {
+          position: relative;
+          z-index: 8;
+          margin-bottom: 12px;
+        }
+        .store-map-stage {
+          position: relative;
+          min-height: ${MAP_PICKER_HEIGHT}px;
+          border-radius: 22px;
+          overflow: hidden;
+          background: #dce7f1;
+          box-shadow: inset 0 0 0 1px rgba(12, 77, 136, 0.12);
         }
         .store-map-canvas {
           position: relative;
@@ -6189,8 +6287,8 @@ export default function TiendaVirtualView({
           height: ${MAP_PICKER_HEIGHT}px;
           margin: 0 auto;
           overflow: hidden;
-          border: 1px solid #ead8da;
-          border-radius: 18px;
+          border: 0;
+          border-radius: 22px;
           background: #f3f4f6;
           cursor: grab;
           touch-action: none;
@@ -6212,8 +6310,8 @@ export default function TiendaVirtualView({
           height: 30px;
           border: 4px solid #ffffff;
           border-radius: 999px 999px 999px 0;
-          background: #b91c1c;
-          box-shadow: 0 10px 25px rgba(185, 28, 28, 0.35);
+          background: #f22439;
+          box-shadow: 0 10px 25px rgba(242, 36, 57, 0.35);
           transform: translate(-50%, -100%) rotate(-45deg);
           pointer-events: none;
         }
@@ -6238,14 +6336,223 @@ export default function TiendaVirtualView({
           text-align: center;
           pointer-events: none;
         }
+        .store-google-map-shell,
+        .store-google-map-canvas {
+          position: absolute;
+          inset: 0;
+        }
+        .store-google-map-shell {
+          overflow: hidden;
+          border-radius: 22px;
+        }
+        .store-map-center-pin {
+          position: absolute;
+          z-index: 4;
+          left: 50%;
+          top: 50%;
+          width: 34px;
+          height: 34px;
+          border: 4px solid #ffffff;
+          border-radius: 999px 999px 999px 0;
+          background: #f22439;
+          box-shadow: 0 12px 28px rgba(242, 36, 57, 0.38);
+          transform: translate(-50%, -100%) rotate(-45deg);
+          pointer-events: none;
+        }
+        .store-map-center-pin::after {
+          content: '';
+          position: absolute;
+          inset: 8px;
+          border-radius: 999px;
+          background: #ffffff;
+        }
+        .store-map-center-shadow {
+          position: absolute;
+          z-index: 3;
+          left: 50%;
+          top: 50%;
+          width: 22px;
+          height: 8px;
+          border-radius: 999px;
+          background: rgba(7, 29, 52, 0.22);
+          filter: blur(2px);
+          transform: translate(-50%, 4px);
+          pointer-events: none;
+        }
+        .store-map-loading {
+          position: absolute;
+          z-index: 6;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          background: rgba(245, 248, 252, 0.9);
+          color: #0c4d88;
+          font-size: 13px;
+          font-weight: 900;
+        }
+        .store-map-current-location {
+          position: absolute;
+          z-index: 7;
+          right: 14px;
+          bottom: 14px;
+          min-height: 42px;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          border: 0;
+          border-radius: 999px;
+          padding: 0 14px;
+          background: #ffffff;
+          color: #0c4d88;
+          box-shadow: 0 12px 28px rgba(7, 29, 52, 0.2);
+          font: inherit;
+          font-size: 12px;
+          font-weight: 950;
+          cursor: pointer;
+        }
+        .store-map-current-location:disabled {
+          opacity: 0.7;
+          cursor: wait;
+        }
+        .store-map-current-location span {
+          display: grid !important;
+          place-items: center;
+          margin: 0 !important;
+          color: inherit !important;
+        }
+        .store-map-current-location svg {
+          width: 20px;
+          height: 20px;
+        }
+        .store-map-confirm-panel {
+          display: grid;
+          gap: 10px;
+          margin-top: 12px;
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          border-radius: 20px;
+          padding: 14px;
+          background: #ffffff;
+          box-shadow: 0 16px 34px rgba(12, 77, 136, 0.08);
+        }
+        .store-map-confirm-address {
+          display: grid;
+          grid-template-columns: 34px minmax(0, 1fr);
+          gap: 10px;
+          align-items: start;
+        }
+        .store-map-confirm-icon {
+          width: 34px;
+          height: 34px;
+          display: grid !important;
+          place-items: center;
+          margin: 0 !important;
+          border-radius: 999px;
+          background: #ffe9ec;
+          color: #f22439 !important;
+        }
+        .store-map-confirm-icon svg {
+          width: 17px;
+          height: 17px;
+        }
+        .store-map-confirm-address small {
+          display: block;
+          color: #68809a;
+          font-size: 10px;
+          font-weight: 950;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+        }
+        .store-map-confirm-address strong {
+          display: block;
+          margin-top: 2px;
+          color: #102a48;
+          font-size: 14px;
+          line-height: 1.35;
+        }
+        .store-map-confirm-address span {
+          margin-top: 3px;
+          color: #68809a;
+          font-size: 11px;
+          font-weight: 750;
+        }
+        .store-map-google-link {
+          color: #0c4d88;
+          font-size: 12px;
+          font-weight: 900;
+          text-decoration: none;
+        }
+        .store-map-picker-actions {
+          display: grid;
+          grid-template-columns: minmax(110px, 0.7fr) minmax(190px, 1.6fr);
+          gap: 9px;
+          margin-top: 2px;
+        }
+        .store-map-picker-search .store-location-results {
+          position: absolute;
+          top: calc(100% + 8px);
+          left: 0;
+          right: 0;
+          z-index: 12;
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          border-radius: 16px;
+          padding: 8px;
+          background: rgba(255, 255, 255, 0.98);
+          box-shadow: 0 18px 44px rgba(7, 29, 52, 0.22);
+        }
+        @media (max-width: 640px) {
+          .store-map-picker {
+            width: 100vw;
+            height: 100dvh;
+            max-height: none;
+            border-radius: 0;
+            padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(10px, env(safe-area-inset-bottom, 0px));
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .store-map-picker-head {
+            flex: 0 0 auto;
+            padding: 0 2px;
+          }
+          .store-map-picker-head strong {
+            font-size: 20px;
+          }
+          .store-map-picker-search {
+            flex: 0 0 auto;
+          }
+          .store-map-stage {
+            flex: 1 1 auto;
+            min-height: 280px;
+            border-radius: 20px;
+          }
+          .store-map-canvas {
+            width: 100%;
+            height: 100%;
+          }
+          .store-map-confirm-panel {
+            flex: 0 0 auto;
+            margin-top: 10px;
+            padding: 12px;
+          }
+          .store-map-picker-actions {
+            grid-template-columns: 0.72fr 1.55fr;
+          }
+          .store-map-picker-actions .store-button {
+            min-height: 46px;
+            padding: 0 10px;
+            font-size: 11px;
+          }
+          .store-map-google-link {
+            display: none;
+          }
+        }
         .store-map-fields {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 8px;
           margin-top: 12px;
         }
-        .store-map-tools,
-        .store-map-picker-actions {
+        .store-map-tools {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
@@ -6450,7 +6757,7 @@ export default function TiendaVirtualView({
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          color: #7b1022;
+          color: var(--sm-blue-deep);
           background: rgba(123, 16, 34, 0.08);
           flex: 0 0 auto;
         }
@@ -6463,7 +6770,7 @@ export default function TiendaVirtualView({
           height: 22px;
         }
         .store-choice-card.active .store-checkout-icon {
-          color: #7b1022;
+          color: var(--sm-blue-deep);
           background: #ffffff;
         }
         .store-checkout-sheet .store-choice-card.active .store-checkout-icon {
@@ -6486,7 +6793,7 @@ export default function TiendaVirtualView({
           background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
         }
         .store-cash-change span {
-          color: #7b1022;
+          color: var(--sm-blue-deep);
           font-size: 13px;
           font-weight: 950;
         }
@@ -8459,19 +8766,6 @@ function StoreAuthView({
         )}
         {isRegister && (
           <>
-            <input
-              className="store-field"
-              value={authForm.direccion}
-              onChange={(event) => onFormChange('direccion', event.target.value)}
-              placeholder="Direccion de entrega"
-              required
-            />
-            <input
-              className="store-field"
-              value={authForm.referencia}
-              onChange={(event) => onFormChange('referencia', event.target.value)}
-              placeholder="Referencia"
-            />
             <LocationCaptureBlock
               location={authForm.ubicacion}
               defaultLocation={defaultLocation}
@@ -8484,6 +8778,27 @@ function StoreAuthView({
                 }
               }}
             />
+            <label className="store-field-stack">
+              <span className="store-field-caption">Direccion seleccionada</span>
+              <input
+                className="store-field"
+                value={authForm.direccion}
+                onChange={(event) => onFormChange('direccion', event.target.value)}
+                placeholder="Confirma o completa tu direccion"
+                autoComplete="street-address"
+                required
+              />
+            </label>
+            <label className="store-field-stack">
+              <span className="store-field-caption">Referencia <strong>(opcional)</strong></span>
+              <input
+                className="store-field"
+                value={authForm.referencia}
+                onChange={(event) => onFormChange('referencia', event.target.value)}
+                placeholder="Ejemplo: porton negro frente al parque"
+                autoComplete="off"
+              />
+            </label>
           </>
         )}
         <button type="submit" className="store-button" disabled={authLoading}>
@@ -8560,21 +8875,156 @@ function StoreAuthSheet({ onClose, locked = false, ...props }) {
   );
 }
 
-function LocationCaptureBlock({
-  location,
-  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
-  locating,
-  onCapture,
-  onManualLocation,
-  onAddressResolved,
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false);
+const getGoogleLatLngValue = (location, key) => {
+  if (!location) {
+    return Number.NaN;
+  }
+
+  const value = location[key];
+  return Number(typeof value === 'function' ? value.call(location) : value);
+};
+
+function StoreMapSearchGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" strokeWidth="2" />
+      <path d="m15.5 15.5 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StoreMapPinGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z"
+        fill="currentColor"
+      />
+      <circle cx="12" cy="10" r="2.4" fill="#fff" />
+    </svg>
+  );
+}
+
+function StoreLocateGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+      <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GooglePlacesSearchInput({ defaultLocation, onSelect, onUnavailable }) {
+  const hostRef = useRef(null);
+  const onSelectRef = useRef(onSelect);
+  const onUnavailableRef = useRef(onUnavailable);
+  const [loading, setLoading] = useState(true);
+  const normalizedDefaultLocation = normalizeLocation(defaultLocation);
+  const defaultLat = Number(normalizedDefaultLocation?.lat || 0);
+  const defaultLng = Number(normalizedDefaultLocation?.lng || 0);
+
+  onSelectRef.current = onSelect;
+  onUnavailableRef.current = onUnavailable;
+
+  useEffect(() => {
+    let disposed = false;
+    let autocompleteElement = null;
+    let selectHandler = null;
+
+    const initializeAutocomplete = async () => {
+      try {
+        const { PlaceAutocompleteElement } = await importGoogleMapsLibrary('places');
+        if (disposed || !hostRef.current) {
+          return;
+        }
+
+        autocompleteElement = new PlaceAutocompleteElement();
+        autocompleteElement.placeholder = 'Busca tu direccion, negocio o restaurante';
+        autocompleteElement.style.width = '100%';
+
+        try {
+          autocompleteElement.includedRegionCodes = ['ni'];
+          if (defaultLat && defaultLng) {
+            autocompleteElement.locationBias = {
+              center: { lat: defaultLat, lng: defaultLng },
+              radius: 45000,
+            };
+          }
+        } catch (error) {
+          console.warn('No se pudo aplicar el sesgo local de Google Places:', error);
+        }
+
+        selectHandler = async ({ placePrediction }) => {
+          try {
+            const place = placePrediction?.toPlace?.();
+            if (!place) {
+              return;
+            }
+
+            await place.fetchFields({
+              fields: ['displayName', 'formattedAddress', 'location', 'id', 'googleMapsURI'],
+            });
+            const lat = getGoogleLatLngValue(place.location, 'lat');
+            const lng = getGoogleLatLngValue(place.location, 'lng');
+            const nextLocation = normalizeLocation({
+              lat,
+              lng,
+              label: place.formattedAddress || place.displayName || '',
+              placeId: place.id || '',
+              mapsUrl: place.googleMapsURI || '',
+              updatedAt: Date.now(),
+            });
+
+            if (nextLocation) {
+              onSelectRef.current?.({
+                ...nextLocation,
+                shortLabel: String(place.displayName || place.formattedAddress || '').trim(),
+                provider: 'google',
+              });
+              autocompleteElement.value = '';
+            }
+          } catch (error) {
+            console.error('No se pudo abrir la ubicacion elegida en Google Maps:', error);
+          }
+        };
+
+        autocompleteElement.addEventListener('gmp-select', selectHandler);
+        hostRef.current.replaceChildren(autocompleteElement);
+        setLoading(false);
+      } catch (error) {
+        console.warn('Google Places no esta disponible; se usara la busqueda alternativa.', error);
+        if (!disposed) {
+          setLoading(false);
+          onUnavailableRef.current?.();
+        }
+      }
+    };
+
+    initializeAutocomplete();
+
+    return () => {
+      disposed = true;
+      if (autocompleteElement && selectHandler) {
+        autocompleteElement.removeEventListener('gmp-select', selectHandler);
+      }
+      hostRef.current?.replaceChildren();
+    };
+  }, [defaultLat, defaultLng]);
+
+  return (
+    <div className="store-google-places-field">
+      <div ref={hostRef} />
+      {loading && <div className="store-location-feedback">Conectando con Google Maps...</div>}
+    </div>
+  );
+}
+
+function FallbackLocationSearch({ onSelect }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searchError, setSearchError] = useState('');
-  const mapUrl = buildGoogleMapsPlaceUrl(location);
-  const embedUrl = buildGoogleMapsEmbedUrl(location);
 
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
@@ -8602,7 +9052,7 @@ function LocationCaptureBlock({
       } catch (error) {
         console.error('No se pudieron buscar direcciones:', error);
         setSearchResults([]);
-        setSearchError('No pudimos buscar direcciones en este momento.');
+        setSearchError('No pudimos buscar direcciones en este momento. Tambien puedes usar tu ubicacion actual.');
       } finally {
         setSearching(false);
       }
@@ -8612,19 +9062,15 @@ function LocationCaptureBlock({
   }, [searchQuery]);
 
   return (
-    <div className="store-location-card">
-      <div>
-        <strong>Ubicacion exacta</strong>
-        <span>
-          Busca tu direccion o negocio, elige un resultado y ajusta el pin si hace falta.
-        </span>
-      </div>
-      <input
-        className="store-field"
-        value={searchQuery}
-        onChange={(event) => setSearchQuery(event.target.value)}
-        placeholder="Buscar direccion, restaurante o negocio"
-      />
+    <>
+      <label className="store-map-search-field">
+        <span className="store-map-search-icon"><StoreMapSearchGlyph /></span>
+        <input
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Busca tu direccion, negocio o restaurante"
+        />
+      </label>
       {searching && <div className="store-location-feedback">Buscando ubicaciones...</div>}
       {searchError && <div className="store-location-feedback error">{searchError}</div>}
       {searchQuery.trim().length >= 3 && (
@@ -8634,7 +9080,7 @@ function LocationCaptureBlock({
           target="_blank"
           rel="noreferrer"
         >
-          Buscar esta direccion en Google Maps
+          Ver esta busqueda en Google Maps
         </a>
       )}
       {searchResults.length > 0 && (
@@ -8645,34 +9091,173 @@ function LocationCaptureBlock({
               type="button"
               className="store-location-result"
               onClick={() => {
-                onManualLocation(result);
-                onAddressResolved?.(result.label || result.shortLabel || '');
+                onSelect(result);
                 setSearchQuery('');
                 setSearchResults([]);
                 setSearchError('');
               }}
             >
-              <strong>{result.shortLabel || 'Direccion encontrada'}</strong>
-              <span>{result.label}</span>
+              <span className="store-location-result-pin"><StoreMapPinGlyph /></span>
+              <span>
+                <strong>{result.shortLabel || 'Direccion encontrada'}</strong>
+                <small>{result.label}</small>
+              </span>
             </button>
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+function LocationSearchControl({ defaultLocation, onSelect }) {
+  const [useGooglePlaces, setUseGooglePlaces] = useState(() => hasGoogleMapsApiKey());
+
+  return useGooglePlaces ? (
+    <GooglePlacesSearchInput
+      defaultLocation={defaultLocation}
+      onSelect={onSelect}
+      onUnavailable={() => setUseGooglePlaces(false)}
+    />
+  ) : (
+    <FallbackLocationSearch onSelect={onSelect} />
+  );
+}
+
+function GoogleMapPickerCanvas({ selected, onCenterChange, onUnavailable }) {
+  const hostRef = useRef(null);
+  const mapRef = useRef(null);
+  const onCenterChangeRef = useRef(onCenterChange);
+  const onUnavailableRef = useRef(onUnavailable);
+  const [loading, setLoading] = useState(true);
+
+  onCenterChangeRef.current = onCenterChange;
+  onUnavailableRef.current = onUnavailable;
+
+  useEffect(() => {
+    let disposed = false;
+    let idleListener = null;
+    let clickListener = null;
+
+    const initializeMap = async () => {
+      try {
+        const { Map } = await importGoogleMapsLibrary('maps');
+        if (disposed || !hostRef.current) {
+          return;
+        }
+
+        mapRef.current = new Map(hostRef.current, {
+          center: { lat: selected.lat, lng: selected.lng },
+          zoom: 17,
+          disableDefaultUI: true,
+          clickableIcons: true,
+          gestureHandling: 'greedy',
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          keyboardShortcuts: false,
+        });
+
+        idleListener = mapRef.current.addListener('idle', () => {
+          const center = mapRef.current?.getCenter?.();
+          const lat = getGoogleLatLngValue(center, 'lat');
+          const lng = getGoogleLatLngValue(center, 'lng');
+          const nextLocation = normalizeLocation({ lat, lng, updatedAt: Date.now() });
+          if (nextLocation) {
+            onCenterChangeRef.current?.(nextLocation);
+          }
+        });
+        clickListener = mapRef.current.addListener('click', (event) => {
+          if (event?.latLng) {
+            mapRef.current?.panTo(event.latLng);
+          }
+        });
+        setLoading(false);
+      } catch (error) {
+        console.warn('Google Maps no esta disponible; se usara el mapa alternativo.', error);
+        if (!disposed) {
+          setLoading(false);
+          onUnavailableRef.current?.();
+        }
+      }
+    };
+
+    initializeMap();
+
+    return () => {
+      disposed = true;
+      idleListener?.remove?.();
+      clickListener?.remove?.();
+      mapRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const mapCenter = map?.getCenter?.();
+    if (!map || !mapCenter) {
+      return;
+    }
+
+    const currentLat = getGoogleLatLngValue(mapCenter, 'lat');
+    const currentLng = getGoogleLatLngValue(mapCenter, 'lng');
+    if (Math.abs(currentLat - selected.lat) + Math.abs(currentLng - selected.lng) > 0.00002) {
+      map.panTo({ lat: selected.lat, lng: selected.lng });
+    }
+  }, [selected.lat, selected.lng]);
+
+  return (
+    <div className="store-google-map-shell">
+      <div ref={hostRef} className="store-google-map-canvas" />
+      <span className="store-map-center-pin" aria-hidden="true" />
+      <span className="store-map-center-shadow" aria-hidden="true" />
+      {loading && <div className="store-map-loading">Cargando Google Maps...</div>}
+    </div>
+  );
+}
+
+function LocationCaptureBlock({
+  location,
+  defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
+  locating,
+  onCapture,
+  onManualLocation,
+  onAddressResolved,
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const mapUrl = buildGoogleMapsPlaceUrl(location);
+  const embedUrl = buildGoogleMapsEmbedUrl(location);
+
+  const selectSearchResult = (result) => {
+    onManualLocation(result);
+    onAddressResolved?.(result.label || result.shortLabel || '');
+  };
+
+  return (
+    <div className="store-location-card">
+      <div>
+        <strong>Ubica tu direccion en el mapa</strong>
+        <span>
+          Busca un negocio, barrio o direccion. Luego mueve el pin hasta el punto exacto de entrega.
+        </span>
+      </div>
+      <LocationSearchControl
+        defaultLocation={location || defaultLocation}
+        onSelect={selectSearchResult}
+      />
       <div className="store-location-actions">
         <button type="button" className="store-button secondary" onClick={onCapture} disabled={locating}>
-          {locating ? 'Tomando ubicacion...' : hasLocation(location) ? 'Usar mi ubicacion actual' : 'Ubicacion actual'}
+          {locating ? 'Buscando tu ubicacion...' : 'Usar mi ubicacion actual'}
         </button>
-        <button type="button" className="store-button secondary" onClick={() => setPickerOpen(true)}>
-          Ajustar en mapa
+        <button type="button" className="store-button" onClick={() => setPickerOpen(true)}>
+          {hasLocation(location) ? 'Ajustar pin en el mapa' : 'Elegir punto en el mapa'}
         </button>
       </div>
       {hasLocation(location) && (
         <>
           <div className="store-location-selected">
-            <strong>{location?.label || 'Punto guardado'}</strong>
-            <span>
-              {Number(location?.lat || 0).toFixed(6)}, {Number(location?.lng || 0).toFixed(6)}
-            </span>
+            <span className="store-location-confirmed-badge">Ubicacion confirmada</span>
+            <strong>{location?.label || 'Punto exacto guardado'}</strong>
           </div>
           <div className="store-location-map">
             <iframe title="Ubicacion de entrega" src={embedUrl} loading="lazy" />
@@ -8689,6 +9274,7 @@ function LocationCaptureBlock({
           onClose={() => setPickerOpen(false)}
           onSave={(nextLocation) => {
             onManualLocation(nextLocation);
+            onAddressResolved?.(nextLocation?.label || '');
             setPickerOpen(false);
           }}
         />
@@ -8703,23 +9289,22 @@ function MapPointPicker({
   onClose,
   onSave,
 }) {
-  const initialLocation =
-    normalizeLocation(location) ||
-    normalizeLocation(defaultLocation) ||
-    MAP_PICKER_DEFAULT_LOCATION;
+  const initialLocationRef = useRef(null);
+  if (!initialLocationRef.current) {
+    initialLocationRef.current =
+      normalizeLocation(location) ||
+      normalizeLocation(defaultLocation) ||
+      MAP_PICKER_DEFAULT_LOCATION;
+  }
+  const initialLocation = initialLocationRef.current;
   const [center, setCenter] = useState(initialLocation);
   const [selected, setSelected] = useState(initialLocation);
   const [zoom, setZoom] = useState(16);
-  const [latDraft, setLatDraft] = useState(initialLocation.lat.toFixed(6));
-  const [lngDraft, setLngDraft] = useState(initialLocation.lng.toFixed(6));
   const [savingPoint, setSavingPoint] = useState(false);
   const [draggingMap, setDraggingMap] = useState(false);
+  const [locatingPoint, setLocatingPoint] = useState(false);
+  const [useGoogleMap, setUseGoogleMap] = useState(() => hasGoogleMapsApiKey());
   const dragStateRef = useRef(null);
-
-  useEffect(() => {
-    setLatDraft(selected.lat.toFixed(6));
-    setLngDraft(selected.lng.toFixed(6));
-  }, [selected.lat, selected.lng]);
 
   const mapGeometry = useMemo(() => {
     const centerPoint = locationToWorldPoint(center, zoom);
@@ -8761,16 +9346,6 @@ function MapPointPicker({
     };
   }, [mapGeometry.topLeft.x, mapGeometry.topLeft.y, selected, zoom]);
 
-  const applyManualCoordinates = () => {
-    const nextLocation = buildManualLocation(latDraft, lngDraft);
-    if (!nextLocation) {
-      return;
-    }
-
-    setSelected(nextLocation);
-    setCenter(nextLocation);
-  };
-
   const getMapEventPoint = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
@@ -8780,12 +9355,27 @@ function MapPointPicker({
   };
 
   const movePinToLocation = (nextLocation) => {
-    if (!nextLocation) {
+    const normalized = normalizeLocation(nextLocation);
+    if (!normalized) {
       return;
     }
 
-    setSelected(nextLocation);
-    setCenter(nextLocation);
+    setSelected(normalized);
+    setCenter(normalized);
+  };
+
+  const captureCurrentPoint = async () => {
+    setLocatingPoint(true);
+    try {
+      const currentLocation = await getBrowserLocation();
+      const resolvedLocation = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
+      movePinToLocation(resolvedLocation);
+    } catch (error) {
+      console.error('No se pudo obtener la ubicacion actual en el mapa:', error);
+      alert('No pudimos encontrar tu ubicacion. Revisa el permiso de ubicacion e intenta nuevamente.');
+    } finally {
+      setLocatingPoint(false);
+    }
   };
 
   const handleMapPointerDown = (event) => {
@@ -8867,101 +9457,116 @@ function MapPointPicker({
     }
   };
 
+  const updatePinFromMapCenter = (nextLocation) => {
+    const normalized = normalizeLocation(nextLocation);
+    if (!normalized) {
+      return;
+    }
+
+    setSelected((current) => {
+      const samePoint =
+        Math.abs(Number(current?.lat || 0) - normalized.lat) +
+          Math.abs(Number(current?.lng || 0) - normalized.lng) <
+        0.00002;
+      return samePoint ? current : { ...normalized, label: '' };
+    });
+    setCenter(normalized);
+  };
+
   return (
     <div className="store-sheet-overlay">
       <div className="store-map-picker">
         <div className="store-map-picker-head">
           <div>
-            <strong>Ubicar punto de entrega</strong>
-            <span>Arrastra el mapa o toca el punto exacto donde debe llegar el entregador.</span>
+            <strong>Confirma tu direccion</strong>
+            <span>Mueve el mapa hasta dejar el pin exactamente donde debemos entregar.</span>
           </div>
           <StoreBackButton onClick={onClose} />
         </div>
 
-        <div
-          className={`store-map-canvas ${draggingMap ? 'dragging' : ''}`}
-          onPointerDown={handleMapPointerDown}
-          onPointerMove={handleMapPointerMove}
-          onPointerUp={finishMapPointer}
-          onPointerCancel={cancelMapPointer}
-        >
-          {mapGeometry.tiles.map((tile) => (
-            <img
-              key={tile.key}
-              src={tile.src}
-              alt=""
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              style={{ left: tile.left, top: tile.top }}
+        <div className="store-map-picker-search">
+          <LocationSearchControl
+            defaultLocation={initialLocation}
+            onSelect={movePinToLocation}
+          />
+        </div>
+
+        <div className="store-map-stage">
+          {useGoogleMap ? (
+            <GoogleMapPickerCanvas
+              selected={selected}
+              onCenterChange={updatePinFromMapCenter}
+              onUnavailable={() => setUseGoogleMap(false)}
             />
-          ))}
-          <span className="store-map-pin" style={{ left: selectedPoint.left, top: selectedPoint.top }} />
-          <div className="store-map-hint">Arrastra el mapa o toca para mover el pin</div>
-        </div>
-
-        <div className="store-map-tools">
-          <button type="button" className="store-mini-button" onClick={() => setZoom((value) => Math.min(18, value + 1))}>
-            Acercar
-          </button>
-          <button type="button" className="store-mini-button" onClick={() => setZoom((value) => Math.max(12, value - 1))}>
-            Alejar
-          </button>
-          <button type="button" className="store-mini-button" onClick={() => setCenter(selected)}>
-            Centrar pin
-          </button>
-        </div>
-
-        <div className="store-map-fields">
-          <input
-            className="store-field"
-            value={latDraft}
-            onChange={(event) => setLatDraft(event.target.value)}
-            placeholder="Latitud"
-          />
-          <input
-            className="store-field"
-            value={lngDraft}
-            onChange={(event) => setLngDraft(event.target.value)}
-            placeholder="Longitud"
-          />
-        </div>
-        <div className="store-location-selected">
-          <strong>{selected?.label || 'Punto seleccionado'}</strong>
-          <span>{latDraft}, {lngDraft}</span>
-        </div>
-        <div className="store-map-tools">
-          <button type="button" className="store-mini-button" onClick={applyManualCoordinates}>
-            Aplicar coordenadas
-          </button>
-          <a className="store-mini-button" href={buildGoogleMapsPlaceUrl(selected)} target="_blank" rel="noreferrer">
-            Ver en Google Maps
-          </a>
-        </div>
-
-        <div className="store-map-picker-actions">
-          <button type="button" className="store-button secondary" style={{ flex: 1 }} onClick={onClose}>
-            Cancelar
-          </button>
+          ) : (
+            <div
+              className={`store-map-canvas ${draggingMap ? 'dragging' : ''}`}
+              onPointerDown={handleMapPointerDown}
+              onPointerMove={handleMapPointerMove}
+              onPointerUp={finishMapPointer}
+              onPointerCancel={cancelMapPointer}
+            >
+              {mapGeometry.tiles.map((tile) => (
+                <img
+                  key={tile.key}
+                  src={tile.src}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  style={{ left: tile.left, top: tile.top }}
+                />
+              ))}
+              <span className="store-map-pin" style={{ left: selectedPoint.left, top: selectedPoint.top }} />
+              <div className="store-map-hint">Arrastra el mapa o toca para mover el pin</div>
+            </div>
+          )}
           <button
             type="button"
-            className="store-button"
-            style={{ flex: 2 }}
-            disabled={savingPoint}
-            onClick={async () => {
-              setSavingPoint(true);
-              try {
-                const resolvedLocation = (await reverseGeocodeLocation(selected)) || selected;
-                onSave(resolvedLocation);
-              } catch (error) {
-                console.error('No se pudo resolver el punto seleccionado:', error);
-                onSave(selected);
-              } finally {
-                setSavingPoint(false);
-              }
-            }}
+            className="store-map-current-location"
+            onClick={captureCurrentPoint}
+            disabled={locatingPoint}
           >
-            {savingPoint ? 'Guardando punto...' : 'Guardar este punto'}
+            <span><StoreLocateGlyph /></span>
+            {locatingPoint ? 'Buscando...' : 'Mi ubicacion'}
           </button>
+        </div>
+
+        <div className="store-map-confirm-panel">
+          <div className="store-map-confirm-address">
+            <span className="store-map-confirm-icon"><StoreMapPinGlyph /></span>
+            <div>
+              <small>Punto de entrega</small>
+              <strong>{selected?.label || 'Punto seleccionado en el mapa'}</strong>
+              <span>El repartidor llegara exactamente a este pin.</span>
+            </div>
+          </div>
+          <a className="store-map-google-link" href={buildGoogleMapsPlaceUrl(selected)} target="_blank" rel="noreferrer">
+            Ver punto en Google Maps
+          </a>
+          <div className="store-map-picker-actions">
+            <button type="button" className="store-button secondary" onClick={onClose}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="store-button"
+              disabled={savingPoint}
+              onClick={async () => {
+                setSavingPoint(true);
+                try {
+                  const resolvedLocation = (await reverseGeocodeLocation(selected)) || selected;
+                  onSave(resolvedLocation);
+                } catch (error) {
+                  console.error('No se pudo resolver el punto seleccionado:', error);
+                  onSave(selected);
+                } finally {
+                  setSavingPoint(false);
+                }
+              }}
+            >
+              {savingPoint ? 'Confirmando direccion...' : 'Confirmar esta direccion'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -9045,7 +9650,7 @@ function ProfileSheet({
             className="store-field"
             value={profile.referencia}
             onChange={(event) => updateProfile('referencia', event.target.value)}
-            placeholder="Referencia"
+            placeholder="Referencia para encontrar el lugar (opcional)"
           />
           <LocationCaptureBlock
             location={profile.ubicacion}
@@ -10267,7 +10872,7 @@ function CheckoutSheet({
                             className="store-field"
                             value={alternateDelivery.referencia}
                             onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
-                            placeholder="Referencia"
+                            placeholder="Referencia para encontrar el lugar (opcional)"
                           />
                           <LocationCaptureBlock
                             location={alternateDelivery.ubicacion}
