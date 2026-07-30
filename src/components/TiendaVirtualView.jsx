@@ -8874,7 +8874,9 @@ function StoreAuthView({
               />
             </label>
             <label className="store-field-stack">
-              <span className="store-field-caption">Referencia <strong>(opcional)</strong></span>
+              <span className="store-field-caption">
+                Referencia <strong>(opcional)</strong> - Direccion escrita
+              </span>
               <input
                 className="store-field"
                 value={authForm.referencia}
@@ -9734,7 +9736,7 @@ function ProfileSheet({
             className="store-field"
             value={profile.referencia}
             onChange={(event) => updateProfile('referencia', event.target.value)}
-            placeholder="Referencia para encontrar el lugar (opcional)"
+            placeholder="Referencia (opcional) - Direccion escrita"
           />
           <LocationCaptureBlock
             location={profile.ubicacion}
@@ -10979,7 +10981,7 @@ function CheckoutSheet({
                             className="store-field"
                             value={alternateDelivery.referencia}
                             onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
-                            placeholder="Referencia para encontrar el lugar (opcional)"
+                            placeholder="Referencia (opcional) - Direccion escrita"
                           />
                           <LocationCaptureBlock
                             location={alternateDelivery.ubicacion}
