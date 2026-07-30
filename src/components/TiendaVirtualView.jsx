@@ -8927,7 +8927,7 @@ function StoreAuthView({
                 className="store-field"
                 value={authForm.referencia}
                 onChange={(event) => onFormChange('referencia', event.target.value)}
-                placeholder="Ejemplo: porton negro frente al parque"
+                placeholder="Ejemplo: Claro 3 1/2 cuadra al lago. Porton negro"
                 autoComplete="off"
               />
             </label>
@@ -9782,7 +9782,7 @@ function ProfileSheet({
             className="store-field"
             value={profile.referencia}
             onChange={(event) => updateProfile('referencia', event.target.value)}
-            placeholder="Referencia (opcional) - Direccion escrita"
+            placeholder="Ejemplo: Claro 3 1/2 cuadra al lago. Porton negro"
           />
           <LocationCaptureBlock
             location={profile.ubicacion}
@@ -11027,7 +11027,7 @@ function CheckoutSheet({
                             className="store-field"
                             value={alternateDelivery.referencia}
                             onChange={(event) => onAlternateDeliveryChange('referencia', event.target.value)}
-                            placeholder="Referencia (opcional) - Direccion escrita"
+                            placeholder="Ejemplo: Claro 3 1/2 cuadra al lago. Porton negro"
                           />
                           <LocationCaptureBlock
                             location={alternateDelivery.ubicacion}
