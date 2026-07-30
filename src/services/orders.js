@@ -22,6 +22,31 @@ const roundToHalf = (value) => Math.round(Number(value || 0) * 2) / 2;
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
 const formatDistanceAmount = (value) => Number(value || 0).toFixed(2).replace(/\.00$/, '');
+const normalizeOrderDiscountBenefit = (value = {}, discount = 0) => {
+  const source = String(value?.source || (Number(discount || 0) > 0 ? 'coupon' : 'none'))
+    .trim()
+    .toLowerCase();
+  const percent = Math.min(Math.max(Number(value?.percent || 0), 0), 100);
+  const amount = Math.max(0, Number(value?.amount ?? discount ?? 0));
+
+  return {
+    source,
+    label: String(value?.label || (source === 'coupon' ? 'Cupon' : 'Descuento especial')).trim(),
+    type: String(value?.type || (percent > 0 ? 'percent' : 'amount')).trim().toLowerCase(),
+    percent,
+    amount: Number(amount.toFixed(2)),
+    savings: Math.max(0, Number(value?.savings ?? amount ?? 0)),
+  };
+};
+const getOrderDiscountLabel = (benefit = {}, couponCode = '') => {
+  if (benefit?.source === 'customer') {
+    return `${benefit.label || 'Descuento especial'}${benefit.percent > 0 ? ` ${benefit.percent}%` : ''}`;
+  }
+  if (couponCode) {
+    return `Cupon ${couponCode}`;
+  }
+  return benefit?.label || 'Descuento';
+};
 const getOrderDeliveryOriginalFee = (source = {}) =>
   Math.max(
     0,
@@ -271,6 +296,7 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
 
   const subtotal = normalizedItems.reduce((sum, item) => sum + item.subtotal, 0);
   const discount = Number(summary.discount || 0);
+  const discountBenefit = normalizeOrderDiscountBenefit(summary.discountBenefit, discount);
   const total = Number(summary.total ?? Math.max(subtotal - discount, 0));
   const deliveryFee = Math.max(0, Number(summary.deliveryFee || 0));
   const deliveryFree = hasFreeDeliveryApplied(summary);
@@ -279,7 +305,7 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
     if (discount > 0) {
-      const discountLabel = summary.couponCode ? `Cupon ${summary.couponCode}` : 'Descuento cupon';
+      const discountLabel = getOrderDiscountLabel(discountBenefit, summary.couponCode);
       lines.push(`${discountLabel}: -C$${formatAmount(discount)}`);
     }
     if (deliveryFree) {
@@ -306,11 +332,13 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   const deliveryDistanceKm = Math.max(0, Number(summary.deliveryDistanceKm || 0));
   const deliveryFree = hasFreeDeliveryApplied(summary);
   const discount = Math.max(0, Number(summary.discount || summary.couponDiscount || 0));
+  const discountBenefit = normalizeOrderDiscountBenefit(summary.discountBenefit, discount);
   const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
   const lines = [];
 
   if (discount > 0) {
-    lines.push(`ALERTA APLICA CUPON C$${formatAmount(discount)}`);
+    const discountLabel = getOrderDiscountLabel(discountBenefit, summary.couponCode);
+    lines.push(`APLICA ${discountLabel.toUpperCase()}: -C$${formatAmount(discount)}`);
     lines.push('');
   }
 
@@ -336,7 +364,7 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
       lines.push(`${deliveryLabel}: C$${formatAmount(deliveryFee)}`);
     }
     if (discount > 0) {
-      lines.push(`Cupon aplicado: -C$${formatAmount(discount)}`);
+      lines.push(`${getOrderDiscountLabel(discountBenefit, summary.couponCode)}: -C$${formatAmount(discount)}`);
       lines.push(`Metodo de pago: ${paymentMethodLabel}`);
     }
     lines.push(`${totalLabel}: C$${formatAmount(total)}`);
@@ -544,12 +572,14 @@ export async function createOrder(payload, options = {}) {
         expiresAt: Math.max(0, Number(payload.cupon.expiresAt || 0)),
       }
     : null;
+  const discountBenefit = normalizeOrderDiscountBenefit(payload.discountBenefit, couponDiscount);
 
   const rawPedidoTexto = String(payload.pedido || '').trim();
   const generatedKitchenPedidoTexto = buildStoreKitchenOrderText(normalizedItems, {
     couponCode: coupon?.code,
     subtotal,
     discount: couponDiscount,
+    discountBenefit,
     deliveryFee,
     deliveryFeeOriginal,
     deliveryFree,
@@ -599,6 +629,7 @@ export async function createOrder(payload, options = {}) {
     coverageRadiusKm,
     deliveryFeeBracket: String(payload.deliveryFeeBracket || '').trim(),
     cupon: coupon,
+    discountBenefit,
     rewardRedemption: normalizedRewardRedemption,
     total,
     totalAproximado: shouldQueueSicarQuote,

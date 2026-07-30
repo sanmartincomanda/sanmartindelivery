@@ -111,7 +111,7 @@ export async function hashStorePassword(phone, password) {
   return fallbackHash(rawValue);
 }
 
-const sanitizeStoreUser = (user, key) => {
+export const sanitizeStoreUser = (user, key) => {
   if (!user) {
     return null;
   }

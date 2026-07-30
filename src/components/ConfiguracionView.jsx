@@ -140,6 +140,7 @@ import {
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
+import StoreCustomerDiscountsAdminSection from './StoreCustomerDiscountsAdminSection';
 import StoreBranchesAdminSection from './StoreBranchesAdminSection';
 import {
   buildDefaultStoreWelcomeCouponCampaign,
@@ -931,7 +932,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
   useEffect(() => {
     if (
-      (isStoreMode && !['cupones', 'recompensas', 'clientes'].includes(section)) ||
+      (isStoreMode && !['cupones', 'recompensas', 'clientes', 'descuentos'].includes(section)) ||
       (!isStoreMode && usersTab !== 'clientes')
     ) {
       return undefined;
@@ -2330,6 +2331,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Clientes',
           title: 'Clientes de tienda virtual',
         },
+        descuentos: {
+          path: 'Admintv / Tienda Virtual / Descuentos',
+          title: 'Descuentos por cliente',
+        },
         recompensas: {
           path: 'Admintv / Tienda Virtual / Programa de Recompensas',
           title: 'Club San Martin Granada',
@@ -2689,6 +2694,13 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('clientes')}
             >
               Clientes
+            </button>
+            <button
+              type="button"
+              className={`cfg-tab ${section === 'descuentos' ? 'active' : ''}`}
+              onClick={() => setSection('descuentos')}
+            >
+              Descuentos
             </button>
             <button
               type="button"
@@ -3258,6 +3270,8 @@ export default function ConfiguracionView({ mode = 'users' }) {
             storeUsers={storeUsers}
             storeOrders={storeOrders}
           />
+        ) : isStoreMode && section === 'descuentos' ? (
+          <StoreCustomerDiscountsAdminSection storeUsers={storeUsers} />
         ) : (
           <UsersManager
             usersTab={usersTab}

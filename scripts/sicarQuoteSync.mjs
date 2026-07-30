@@ -306,10 +306,30 @@ const calculateOrderCouponDiscount = (order = {}, baseTotal = 0) => {
     return 0;
   }
 
+  const discountBenefit = order?.discountBenefit || {};
+  const discountSource = String(discountBenefit?.source || '').trim().toLowerCase();
+  const discountType = String(discountBenefit?.type || '').trim().toLowerCase();
+  const discountPercent = Math.min(
+    Math.max(Number(discountBenefit?.percent || 0), 0),
+    100
+  );
+  const benefitAmount = roundMoney(discountBenefit?.amount || 0);
   const coupon = order?.cupon || {};
   const couponType = String(coupon?.type || '').trim().toLowerCase();
   const couponValue = roundMoney(coupon?.value || 0);
   const explicitDiscount = roundMoney(order?.descuentoCupon || 0);
+
+  if (discountSource === 'promotion' || discountSource === 'none') {
+    return 0;
+  }
+
+  if (discountSource === 'customer' && discountType === 'percent' && discountPercent > 0) {
+    return roundMoney((safeBaseTotal * discountPercent) / 100);
+  }
+
+  if (discountSource === 'customer' && benefitAmount > 0) {
+    return roundMoney(Math.min(benefitAmount, safeBaseTotal));
+  }
 
   if (couponType === 'percent') {
     const percent = Math.min(Math.max(Number(couponValue || 0), 0), 100);
@@ -325,6 +345,23 @@ const calculateOrderCouponDiscount = (order = {}, baseTotal = 0) => {
   }
 
   return 0;
+};
+
+const getOrderDiscountLabel = (order = {}) => {
+  const benefit = order?.discountBenefit || {};
+  const source = String(benefit?.source || '').trim().toLowerCase();
+  const label = normalizeText(benefit?.label || '');
+  const percent = Math.min(Math.max(Number(benefit?.percent || 0), 0), 100);
+
+  if (source === 'customer') {
+    return `${label || 'Descuento especial'}${percent > 0 ? ` ${percent}%` : ''}`;
+  }
+
+  if (order?.cupon?.code) {
+    return `Cupon ${String(order.cupon.code).trim()}`;
+  }
+
+  return label || 'Descuento';
 };
 
 const deriveQuotedProductSubtotal = (quote = {}, order = {}) => {
@@ -357,9 +394,10 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   const lines = [];
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
   const cleanNotes = normalizeText(notes || summary.notes || '');
+  const discountLabel = getOrderDiscountLabel(summary.order || summary);
 
   if (discount > 0) {
-    lines.push(`ALERTA APLICA CUPON C$${formatMoney(discount)}`);
+    lines.push(`APLICA ${discountLabel.toUpperCase()}: -C$${formatMoney(discount)}`);
     lines.push('');
   }
 
@@ -387,7 +425,7 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
       lines.push(`${deliveryLabel}: C$${formatMoney(deliveryFee)}`);
     }
     if (discount > 0) {
-      lines.push(`Cupon aplicado: -C$${formatMoney(discount)}`);
+      lines.push(`${discountLabel}: -C$${formatMoney(discount)}`);
       lines.push(`Metodo de pago: ${paymentMethodLabel}`);
     }
     lines.push(`${totalLabel}: C$${formatMoney(total)}`);
@@ -428,7 +466,7 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
 
   lines.push('');
   if (customerDiscount > 0) {
-    lines.push(`Cupon aplicado: -C$${formatMoney(customerDiscount)}`);
+    lines.push(`${getOrderDiscountLabel(order)}: -C$${formatMoney(customerDiscount)}`);
   }
   if (hasFreeDeliveryApplied(order)) {
     lines.push('Servicio a domicilio: DELIVERY GRATIS');
@@ -1825,8 +1863,14 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       normalizeRewardOrderItems(order.rewardRedemption).map((item) => normalizeCode(item.code))
     );
     const grossTotal = roundMoney(quote?.sicarTotal || quote?.total || 0);
+    const productSubtotal = deriveQuotedProductSubtotal(
+      { ...quote, sicarTotal: grossTotal },
+      order
+    );
     const customerDiscount = roundMoney(
-      quote?.customerDiscount ?? quote?.discount ?? calculateOrderCouponDiscount(order, grossTotal)
+      quote?.customerDiscount ??
+        quote?.discount ??
+        calculateOrderCouponDiscount(order, productSubtotal)
     );
     const customerTotal = roundMoney(
       quote?.customerTotal ?? Math.max(grossTotal - customerDiscount, 0)
@@ -1918,7 +1962,6 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
 
         return nextItem;
       });
-    const productSubtotal = deriveQuotedProductSubtotal({ ...quote, sicarTotal: grossTotal }, order);
     const nowIso = new Date().toISOString();
     const nextCustomerSignature = buildCustomerVisibleOrderSignature({
       items,
@@ -1946,9 +1989,17 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         totalLabel: 'Total actualizado de pedido',
         subtotalLabel: 'Subtotal actualizado',
         rewardRedemption: order.rewardRedemption,
+        order,
       }),
       subtotalEstimado: productSubtotal,
       descuentoCupon: customerDiscount,
+      discountBenefit: order?.discountBenefit
+        ? {
+            ...order.discountBenefit,
+            amount: customerDiscount,
+            savings: customerDiscount,
+          }
+        : null,
       total: customerTotal,
       totalAproximado: false,
       totalActualizadoPorSicar: true,
@@ -2016,14 +2067,18 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     }
 
     const quote = await getQuoteSnapshot(quoteReference);
-    const customerDiscount = calculateOrderCouponDiscount(order, roundMoney(quote.total || 0));
+    const productSubtotal = deriveQuotedProductSubtotal(
+      { ...quote, sicarTotal: roundMoney(quote.total || 0) },
+      order
+    );
+    const customerDiscount = calculateOrderCouponDiscount(order, productSubtotal);
     const customerQuote = {
       ...quote,
       discount: customerDiscount,
       customerDiscount,
       customerTotal: roundMoney(Math.max(roundMoney(quote.total || 0) - customerDiscount, 0)),
       sicarTotal: roundMoney(quote.total || 0),
-      productSubtotal: deriveQuotedProductSubtotal({ ...quote, sicarTotal: roundMoney(quote.total || 0) }, order),
+      productSubtotal,
     };
     const quoteStatus = missingCodes.length > 0 ? 'partial' : 'synced';
     const quoteMetaPatch = {
@@ -2116,7 +2171,11 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
           }
 
           const quoteSnapshot = await getQuoteSnapshot({ cotId });
-          const customerDiscount = calculateOrderCouponDiscount(order, roundMoney(quoteSnapshot.total || 0));
+          const productSubtotal = deriveQuotedProductSubtotal(
+            { ...quoteSnapshot, sicarTotal: roundMoney(quoteSnapshot.total || 0) },
+            order
+          );
+          const customerDiscount = calculateOrderCouponDiscount(order, productSubtotal);
           const quote = {
             ...quoteSnapshot,
             discount: customerDiscount,
@@ -2125,10 +2184,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
               Math.max(roundMoney(quoteSnapshot.total || 0) - customerDiscount, 0)
             ),
             sicarTotal: roundMoney(quoteSnapshot.total || 0),
-            productSubtotal: deriveQuotedProductSubtotal(
-              { ...quoteSnapshot, sicarTotal: roundMoney(quoteSnapshot.total || 0) },
-              order
-            ),
+            productSubtotal,
           };
           const fingerprint = buildQuoteFingerprint(quote);
           const knownFingerprint = String(watchEntry?.lastObservedFingerprint || '').trim();

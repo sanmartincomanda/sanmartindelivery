@@ -1,6 +1,6 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { equalTo, get, orderByChild, query as databaseQuery, ref, update } from 'firebase/database';
+import { equalTo, get, onValue, orderByChild, query as databaseQuery, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import {
   QUICK_WEIGHTS,
@@ -107,8 +107,16 @@ import {
   loginStoreUser,
   registerStoreUser,
   requestStorePasswordReset,
+  sanitizeStoreUser,
   updateStoreUserProfile,
 } from '../services/storeUsers';
+import {
+  buildStoreCheckoutItems,
+  buildStoreDiscountSnapshot,
+  getStoreCartOriginalSubtotal,
+  resolveStoreDiscountBenefit,
+  STORE_DISCOUNT_SOURCE,
+} from '../services/storeDiscounts';
 import {
   isPickupOrder,
   ORDER_FULFILLMENT_DELIVERY,
@@ -415,6 +423,18 @@ const orderStoreSubcategories = (categoryId, subcategories = []) => {
 };
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
+const getStoreDiscountBenefitLabel = (benefit = {}) => {
+  if (benefit?.source === STORE_DISCOUNT_SOURCE.CUSTOMER) {
+    return `${benefit.label || 'Descuento especial'}${Number(benefit.percent || 0) > 0 ? ` ${benefit.percent}%` : ''}`;
+  }
+  if (benefit?.source === STORE_DISCOUNT_SOURCE.COUPON) {
+    return benefit.label || 'Cupon';
+  }
+  if (benefit?.source === STORE_DISCOUNT_SOURCE.PROMOTION) {
+    return 'Promocion de tienda';
+  }
+  return '';
+};
 const formatPromotionPercent = (value) => `${Number(value || 0).toFixed(2).replace(/\.00$/, '')}%`;
 const hasDiscountedStorePrice = (product = {}) =>
   Number(product?.hasSpecialPromotion ? product?.originalPrice : 0) > Number(product?.price || 0);
@@ -2343,20 +2363,32 @@ export default function TiendaVirtualView({
     [activeProducts, cart]
   );
 
-  const totalAmount = useMemo(
-    () => cartItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0),
+  const originalProductTotal = useMemo(
+    () => getStoreCartOriginalSubtotal(cartItems),
     [cartItems]
   );
 
-  const couponDiscount = useMemo(
-    () => calculateCouponDiscount(appliedCoupon, totalAmount),
-    [appliedCoupon, totalAmount]
+  const discountBenefit = useMemo(
+    () =>
+      resolveStoreDiscountBenefit({
+        items: cartItems,
+        coupon: appliedCoupon,
+        couponDiscount: calculateCouponDiscount(appliedCoupon, originalProductTotal),
+        customerDiscount: currentUser?.customerDiscount,
+      }),
+    [appliedCoupon, cartItems, currentUser?.customerDiscount, originalProductTotal]
   );
 
-  const discountedProductTotal = useMemo(
-    () => Number(Math.max(totalAmount - couponDiscount, 0).toFixed(2)),
-    [couponDiscount, totalAmount]
+  const checkoutCartItems = useMemo(
+    () => buildStoreCheckoutItems(cartItems, discountBenefit),
+    [cartItems, discountBenefit]
   );
+
+  const couponDiscount =
+    discountBenefit.source === STORE_DISCOUNT_SOURCE.COUPON
+      ? discountBenefit.orderLevelDiscount
+      : 0;
+  const discountedProductTotal = discountBenefit.finalSubtotal;
 
   const couponUsageByCode = useMemo(() => {
     const counts = {};
@@ -2488,7 +2520,11 @@ export default function TiendaVirtualView({
       return false;
     }
 
-    if (!allowBelowMinimum && normalizedCoupon.minimum > 0 && totalAmount < normalizedCoupon.minimum) {
+    if (
+      !allowBelowMinimum &&
+      normalizedCoupon.minimum > 0 &&
+      originalProductTotal < normalizedCoupon.minimum
+    ) {
       setAppliedCoupon(null);
       if (!silent) {
         setCouponMessage(`Este cupon aplica desde ${formatCurrency(normalizedCoupon.minimum)}.`);
@@ -2505,7 +2541,7 @@ export default function TiendaVirtualView({
       return false;
     }
 
-    const discount = calculateCouponDiscount(normalizedCoupon, totalAmount);
+    const discount = calculateCouponDiscount(normalizedCoupon, originalProductTotal);
     if (!allowBelowMinimum && discount <= 0) {
       setAppliedCoupon(null);
       if (!silent) {
@@ -2517,7 +2553,22 @@ export default function TiendaVirtualView({
     setAppliedCoupon(normalizedCoupon);
     setCouponInput(normalizedCoupon.code);
     if (!silent) {
-      setCouponMessage(`Cupon aplicado: -${formatCurrency(discount)}.`);
+      const nextBenefit = resolveStoreDiscountBenefit({
+        items: cartItems,
+        coupon: normalizedCoupon,
+        couponDiscount: discount,
+        customerDiscount: currentUser?.customerDiscount,
+      });
+
+      if (nextBenefit.source === STORE_DISCOUNT_SOURCE.COUPON) {
+        setCouponMessage(`Cupon aplicado: -${formatCurrency(discount)}.`);
+      } else if (nextBenefit.source === STORE_DISCOUNT_SOURCE.CUSTOMER) {
+        setCouponMessage(
+          `Tu ${nextBenefit.label.toLowerCase()} de ${nextBenefit.percent}% te ahorra mas. El cupon no se usara.`
+        );
+      } else {
+        setCouponMessage('La promocion de los productos te ahorra mas. El cupon no se usara.');
+      }
     }
     autoAppliedCouponRef.current = normalizedCoupon.code;
     return true;
@@ -2733,7 +2784,10 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (appliedCoupon?.code || totalAmount < Number(welcomeCouponPersonalCoupon.minimum || STORE_WELCOME_COUPON_MINIMUM)) {
+    if (
+      appliedCoupon?.code ||
+      originalProductTotal < Number(welcomeCouponPersonalCoupon.minimum || STORE_WELCOME_COUPON_MINIMUM)
+    ) {
       return;
     }
 
@@ -2778,7 +2832,7 @@ export default function TiendaVirtualView({
     appliedCoupon?.code,
     currentUser?.key,
     currentUser,
-    totalAmount,
+    originalProductTotal,
     welcomeCoupon,
     welcomeCouponPersonalCoupon,
     welcomeCouponStatus,
@@ -2880,15 +2934,21 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (appliedCoupon.minimum > 0 && totalAmount < appliedCoupon.minimum) {
+    if (appliedCoupon.minimum > 0 && originalProductTotal < appliedCoupon.minimum) {
       setCouponMessage(`Este cupon aplica desde ${formatCurrency(appliedCoupon.minimum)}.`);
       return;
     }
 
     if (couponDiscount > 0) {
       setCouponMessage(`Cupon aplicado: -${formatCurrency(couponDiscount)}.`);
+    } else if (discountBenefit.source === STORE_DISCOUNT_SOURCE.CUSTOMER) {
+      setCouponMessage(
+        `Tu ${discountBenefit.label.toLowerCase()} de ${discountBenefit.percent}% te ahorra mas. El cupon no se usara.`
+      );
+    } else if (discountBenefit.source === STORE_DISCOUNT_SOURCE.PROMOTION) {
+      setCouponMessage('La promocion de los productos te ahorra mas. El cupon no se usara.');
     }
-  }, [appliedCoupon, couponDiscount, totalAmount]);
+  }, [appliedCoupon, couponDiscount, discountBenefit, originalProductTotal]);
 
   const showQuantityNotice = (message) => {
     setQuantityNotice(message);
@@ -3134,44 +3194,50 @@ export default function TiendaVirtualView({
       return undefined;
     }
 
-    let cancelled = false;
-
-    const verifyStoredSession = async () => {
-      try {
-        const snapshot = await get(ref(database, `storeUsers/${currentUser.key}`));
-        if (cancelled || snapshot.exists()) {
+    const userKey = currentUser.key;
+    return onValue(
+      ref(database, `storeUsers/${userKey}`),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          setCurrentUser(null);
+          setCreatedOrder(null);
+          setCustomerOrders([]);
+          setRewardTransactions([]);
+          setRewardAccount(normalizeStoreRewardAccount({}, ''));
+          setSelectedRewardRedemption(null);
+          setOrdersOpen(false);
+          setRewardsOpen(false);
+          setRewardsReturnTarget('');
+          setProfileOpen(false);
+          setAuthPromptDismissed(allowsDirectGuestCatalog);
+          setAuthSheetOpen(!allowsDirectGuestCatalog);
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(STORE_SESSION_KEY);
+          }
+          signOutCurrentUser().catch(() => {});
           return;
         }
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-        console.warn('Sesion de tienda no valida:', error);
+
+        const storedUser = sanitizeStoreUser(snapshot.val(), userKey);
+        setCurrentUser((current) => {
+          if (!current || current.key !== userKey) {
+            return current;
+          }
+
+          const nextUser = {
+            ...current,
+            ...storedUser,
+          };
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem(STORE_SESSION_KEY, JSON.stringify(nextUser));
+          }
+          return nextUser;
+        });
+      },
+      (error) => {
+        console.warn('No se pudo actualizar el perfil activo de tienda:', error);
       }
-
-      setCurrentUser(null);
-      setCreatedOrder(null);
-      setCustomerOrders([]);
-      setRewardTransactions([]);
-      setRewardAccount(normalizeStoreRewardAccount({}, ''));
-      setSelectedRewardRedemption(null);
-      setOrdersOpen(false);
-      setRewardsOpen(false);
-      setRewardsReturnTarget('');
-      setProfileOpen(false);
-      setAuthPromptDismissed(allowsDirectGuestCatalog);
-      setAuthSheetOpen(!allowsDirectGuestCatalog);
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(STORE_SESSION_KEY);
-      }
-      await signOutCurrentUser().catch(() => {});
-    };
-
-    verifyStoredSession();
-
-    return () => {
-      cancelled = true;
-    };
+    );
   }, [allowsDirectGuestCatalog, currentUser?.key, isDashboard]);
 
   useEffect(() => {
@@ -3628,12 +3694,12 @@ export default function TiendaVirtualView({
       setWelcomeCouponOpen(false);
 
       if (
-        Number(totalAmount || 0) >= Number(claimedCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
+        Number(originalProductTotal || 0) >= Number(claimedCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
       ) {
         applyResolvedCoupon(claimedCoupon.coupon);
       } else {
         setCouponInput(claimedCoupon.coupon.code || '');
-        setCouponMessage(getWelcomeCouponCartMessage(claimedCoupon, totalAmount));
+        setCouponMessage(getWelcomeCouponCartMessage(claimedCoupon, originalProductTotal));
       }
     } catch (error) {
       console.error('No se pudo activar el cupon de bienvenida:', error);
@@ -3769,7 +3835,7 @@ export default function TiendaVirtualView({
           STORE_WELCOME_COUPON_MINIMUM
       );
 
-      if (checkoutWelcomeCoupon.code && totalAmount >= welcomeMinimum) {
+      if (checkoutWelcomeCoupon.code && originalProductTotal >= welcomeMinimum) {
         if (welcomeCouponStatus === 'available') {
           try {
             const claimedCoupon = await claimStoreWelcomeCoupon({
@@ -3810,6 +3876,22 @@ export default function TiendaVirtualView({
       }
     }
 
+    const checkoutDiscountBenefit = resolveStoreDiscountBenefit({
+      items: cartItems,
+      coupon: resolvedAppliedCoupon,
+      couponDiscount: calculateCouponDiscount(resolvedAppliedCoupon, originalProductTotal),
+      customerDiscount: currentUser?.customerDiscount,
+    });
+    const checkoutItems = buildStoreCheckoutItems(cartItems, checkoutDiscountBenefit);
+    const checkoutSubtotal = checkoutDiscountBenefit.checkoutSubtotal;
+    const checkoutOrderDiscount = checkoutDiscountBenefit.orderLevelDiscount;
+    const checkoutProductTotal = checkoutDiscountBenefit.finalSubtotal;
+    const checkoutTotal = Number((checkoutProductTotal + deliveryFeeAmount).toFixed(2));
+    const winningCoupon =
+      checkoutDiscountBenefit.source === STORE_DISCOUNT_SOURCE.COUPON
+        ? resolvedAppliedCoupon
+        : null;
+
     setSubmitting(true);
 
     let reservedReward = null;
@@ -3842,7 +3924,7 @@ export default function TiendaVirtualView({
             choices: selectedRewardRedemption?.choiceSelections || {},
           },
           catalog: activeProducts,
-          cartAmount: discountedProductTotal,
+          cartAmount: checkoutProductTotal,
           settings: rewardSettings,
         });
       }
@@ -3857,9 +3939,10 @@ export default function TiendaVirtualView({
           telefono: currentUser.telefono,
           referencia: pickupFlow ? '' : activeDeliveryAddress.referencia,
           ubicacion: pickupFlow ? null : activeDeliveryAddress.ubicacion,
-          items: cartItems,
-          subtotalEstimado: totalAmount,
-          descuentoCupon: couponDiscount,
+          items: checkoutItems,
+          subtotalEstimado: checkoutSubtotal,
+          descuentoCupon: checkoutOrderDiscount,
+          discountBenefit: buildStoreDiscountSnapshot(checkoutDiscountBenefit),
           deliveryFee: deliveryFeeAmount,
           deliveryFeeOriginal: pickupFlow ? 0 : deliveryOriginalFeeAmount,
           deliveryFeeBase: pickupFlow ? 0 : Number(deliveryQuote?.baseFee || 0),
@@ -3873,26 +3956,26 @@ export default function TiendaVirtualView({
           deliveryDistanceKm: pickupFlow ? 0 : Number(deliveryQuote?.distanceKm || 0),
           coverageRadiusKm: pickupFlow ? 0 : Number(deliveryQuote?.coverageRadiusKm || 0),
           deliveryFeeBracket: pickupFlow ? '' : String(deliveryQuote?.feeKey || ''),
-          cupon: resolvedAppliedCoupon
+          cupon: winningCoupon
             ? {
-                code: resolvedAppliedCoupon.code,
-                title: resolvedAppliedCoupon.title,
-                type: resolvedAppliedCoupon.type,
-                value: resolvedAppliedCoupon.value,
-                minimum: resolvedAppliedCoupon.minimum || 0,
-                maxUsesPerUser: resolvedAppliedCoupon.maxUsesPerUser || 0,
-                assignedUserKey: resolvedAppliedCoupon.assignedUserKey || '',
-                campaignId: resolvedAppliedCoupon.campaignId || '',
-                autoApply: resolvedAppliedCoupon.autoApply === true,
-                personal: resolvedAppliedCoupon.personal === true,
-                welcomeCoupon: resolvedAppliedCoupon.welcomeCoupon === true,
-                expiresAt: resolvedAppliedCoupon.expiresAt || 0,
+                code: winningCoupon.code,
+                title: winningCoupon.title,
+                type: winningCoupon.type,
+                value: winningCoupon.value,
+                minimum: winningCoupon.minimum || 0,
+                maxUsesPerUser: winningCoupon.maxUsesPerUser || 0,
+                assignedUserKey: winningCoupon.assignedUserKey || '',
+                campaignId: winningCoupon.campaignId || '',
+                autoApply: winningCoupon.autoApply === true,
+                personal: winningCoupon.personal === true,
+                welcomeCoupon: winningCoupon.welcomeCoupon === true,
+                expiresAt: winningCoupon.expiresAt || 0,
               }
             : null,
           welcomeCouponRecord:
-            resolvedAppliedCoupon?.welcomeCoupon === true ? resolvedWelcomeCouponRecord : null,
-          total: approximateTotalAmount,
-          estimatedRewardPoints,
+            winningCoupon?.welcomeCoupon === true ? resolvedWelcomeCouponRecord : null,
+          total: checkoutTotal,
+          estimatedRewardPoints: calculateEarnedRewardPoints(checkoutProductTotal, rewardSettings),
           observaciones: checkoutNotes,
           metodoPago: paymentMethod,
           cambioPara: paymentMethod === STORE_CASH_PAYMENT ? cashChangeText : '',
@@ -3914,7 +3997,7 @@ export default function TiendaVirtualView({
       );
 
       if (
-        resolvedAppliedCoupon?.welcomeCoupon === true &&
+        winningCoupon?.welcomeCoupon === true &&
         resolvedWelcomeCouponRecord &&
         currentUser?.key
       ) {
@@ -8124,9 +8207,9 @@ export default function TiendaVirtualView({
           />
         ) : (
           <FloatingCart
-            cartItems={cartItems}
+            cartItems={checkoutCartItems}
             cartCount={cartCount}
-            couponDiscount={couponDiscount}
+            discountBenefit={discountBenefit}
             approximateTotalAmount={approximateTotalAmount}
             onCheckout={() => setCheckoutOpen(true)}
             onQuantityChange={updateQuantity}
@@ -8171,7 +8254,7 @@ export default function TiendaVirtualView({
 
       {checkoutOpen && (
         <CheckoutSheet
-          cartItems={cartItems}
+          cartItems={checkoutCartItems}
           currentUser={currentUser}
           customer={customer}
           fulfillmentType={fulfillmentType}
@@ -8182,6 +8265,7 @@ export default function TiendaVirtualView({
           submitting={submitting}
           appliedCoupon={appliedCoupon}
           couponDiscount={couponDiscount}
+          discountBenefit={discountBenefit}
           couponInput={couponInput}
           couponMessage={couponMessage}
           approximateTotalAmount={approximateTotalAmount}
@@ -8192,7 +8276,7 @@ export default function TiendaVirtualView({
           estimatedRewardPoints={estimatedRewardPoints}
           storeOperationStatus={storeOperationStatus}
           storeClosedMessage={storeClosedMessage}
-          totalAmount={totalAmount}
+          totalAmount={originalProductTotal}
           rewardSettings={rewardSettings}
           selectedReward={selectedRewardRedemption}
           welcomeCoupon={welcomeCoupon}
@@ -8332,7 +8416,7 @@ export default function TiendaVirtualView({
           status={welcomeCouponStatus}
           canApply={
             welcomeCouponStatus === 'claimed' &&
-            Number(totalAmount || 0) >= Number(welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
+            Number(originalProductTotal || 0) >= Number(welcomeCoupon.minimumPurchase || STORE_WELCOME_COUPON_MINIMUM)
           }
           expiresLabel={welcomeCouponExpiryLabel}
           heroImage={welcomeCouponHeroImage}
@@ -9864,7 +9948,7 @@ function QuantityInput({ value, step, className, onChange, ariaLabel }) {
 function FloatingCart({
   cartItems,
   cartCount,
-  couponDiscount,
+  discountBenefit,
   approximateTotalAmount,
   onCheckout,
   onQuantityChange,
@@ -9934,7 +10018,11 @@ function FloatingCart({
       <div className="store-floating-cart-total">
         <div>
           <small>Total</small>
-          {couponDiscount > 0 && <span>-{formatCurrency(couponDiscount)} en cupon</span>}
+          {Number(discountBenefit?.amount || 0) > 0 && (
+            <span>
+              {getStoreDiscountBenefitLabel(discountBenefit)}: -{formatCurrency(discountBenefit.amount)}
+            </span>
+          )}
           <strong>{formatCurrency(approximateTotalAmount)}</strong>
           <em>Nota: Total puede variar por diferencia en pesos de sus productos.</em>
         </div>
@@ -10250,6 +10338,7 @@ function CheckoutSheet({
   submitting,
   appliedCoupon,
   couponDiscount,
+  discountBenefit,
   couponInput,
   couponMessage,
   approximateTotalAmount,
@@ -10439,6 +10528,24 @@ function CheckoutSheet({
               <strong>Total productos</strong>
               <strong>{formatCurrency(discountedProductTotal)}</strong>
             </div>
+            {Number(discountBenefit?.amount || 0) > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  margin: '0 0 12px',
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  background: '#ecfdf5',
+                  color: '#166534',
+                  fontWeight: 900,
+                }}
+              >
+                <span>Mejor beneficio: {getStoreDiscountBenefitLabel(discountBenefit)}</span>
+                <strong>-{formatCurrency(discountBenefit.amount)}</strong>
+              </div>
+            )}
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
