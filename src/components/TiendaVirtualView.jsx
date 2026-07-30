@@ -1337,7 +1337,7 @@ export default function TiendaVirtualView({
   const [rewardActionBusy, setRewardActionBusy] = useState(false);
   const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
   const [storeClosedNoticeOpen, setStoreClosedNoticeOpen] = useState(false);
-  const [registerOutOfCoverageOpen, setRegisterOutOfCoverageOpen] = useState(false);
+  const [registerCoverageNotice, setRegisterCoverageNotice] = useState(null);
   const [storeClosedNoticeDismissed, setStoreClosedNoticeDismissed] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
@@ -2646,6 +2646,30 @@ export default function TiendaVirtualView({
       }),
     [activeDeliverySettings, authForm?.ubicacion]
   );
+  const authRegistrationBranchCandidate = useMemo(() => {
+    if (!hasLocation(authForm?.ubicacion)) {
+      return null;
+    }
+
+    return storeBranches
+      .filter((branch) => branch.active !== false && branch.id !== selectedBranch?.id)
+      .map((branch) => {
+        const quote = calculateStoreDeliveryQuote({
+          settings: getStoreBranchDeliverySettings(branch, deliverySettings),
+          destination: authForm.ubicacion,
+          fulfillmentType: ORDER_FULFILLMENT_DELIVERY,
+        });
+        const parsedDistance = Number(quote?.distanceKm);
+
+        return {
+          branch,
+          quote,
+          distanceKm: Number.isFinite(parsedDistance) ? parsedDistance : Number.POSITIVE_INFINITY,
+        };
+      })
+      .filter((candidate) => candidate.quote?.available === true)
+      .sort((left, right) => left.distanceKm - right.distanceKm)[0] || null;
+  }, [authForm?.ubicacion, deliverySettings, selectedBranch?.id, storeBranches]);
   const storeOperationStatus = useMemo(
     () => getStoreOperationStatus(activeDeliverySettings),
     [activeDeliverySettings]
@@ -3439,9 +3463,16 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (authRegistrationCoverageQuote?.reason === 'out_of_coverage') {
+    const suggestedBranch = authRegistrationBranchCandidate?.branch || null;
+    const selectedBranchIsOutOfCoverage =
+      authRegistrationCoverageQuote?.reason === 'out_of_coverage';
+
+    if (selectedBranchIsOutOfCoverage && !suggestedBranch) {
       setAuthLoading(false);
-      setRegisterOutOfCoverageOpen(true);
+      setRegisterCoverageNotice({
+        branch: selectedBranch,
+        suggestedBranch: null,
+      });
       return;
     }
 
@@ -3456,7 +3487,12 @@ export default function TiendaVirtualView({
       persistStoreSession(user);
       const nextIntent = pendingAuthIntent;
       closeAuthSheet({ force: true });
-      if (nextIntent === 'orders') {
+      if (selectedBranchIsOutOfCoverage && suggestedBranch) {
+        setRegisterCoverageNotice({
+          branch: selectedBranch,
+          suggestedBranch,
+        });
+      } else if (nextIntent === 'orders') {
         setOrdersOpen(true);
       }
       setAuthForm({ ...EMPTY_STORE_AUTH_FORM });
@@ -3587,7 +3623,7 @@ export default function TiendaVirtualView({
     }
   };
 
-  const selectStoreBranch = (branch) => {
+  const selectStoreBranch = (branch, options = {}) => {
     if (!branch?.id) {
       return;
     }
@@ -3597,6 +3633,7 @@ export default function TiendaVirtualView({
     if (
       changingBranch &&
       hasCartProducts &&
+      options.skipConfirmation !== true &&
       typeof window !== 'undefined' &&
       !window.confirm('Al cambiar de tienda limpiaremos el carrito actual. ¿Deseas continuar?')
     ) {
@@ -8337,10 +8374,19 @@ export default function TiendaVirtualView({
         />
       )}
 
-      {registerOutOfCoverageOpen && (
+      {registerCoverageNotice && (
         <RegisterOutOfCoverageModal
-          branch={selectedBranch}
-          onClose={() => setRegisterOutOfCoverageOpen(false)}
+          branch={registerCoverageNotice.branch || selectedBranch}
+          suggestedBranch={registerCoverageNotice.suggestedBranch}
+          onSwitch={() => {
+            if (registerCoverageNotice.suggestedBranch) {
+              selectStoreBranch(registerCoverageNotice.suggestedBranch, {
+                skipConfirmation: true,
+              });
+            }
+            setRegisterCoverageNotice(null);
+          }}
+          onClose={() => setRegisterCoverageNotice(null)}
         />
       )}
 
@@ -11229,7 +11275,9 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
   );
 }
 
-function RegisterOutOfCoverageModal({ branch, onClose }) {
+function RegisterOutOfCoverageModal({ branch, suggestedBranch, onSwitch, onClose }) {
+  const hasSuggestedBranch = Boolean(suggestedBranch?.id);
+
   return (
     <div
       style={{
@@ -11243,7 +11291,7 @@ function RegisterOutOfCoverageModal({ branch, onClose }) {
         background: 'rgba(15, 23, 42, 0.56)',
         backdropFilter: 'blur(8px)',
       }}
-      onClick={onClose}
+      onClick={hasSuggestedBranch ? undefined : onClose}
     >
       <div
         style={{
@@ -11276,19 +11324,32 @@ function RegisterOutOfCoverageModal({ branch, onClose }) {
             !
           </div>
           <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.05, color: '#0f172a' }}>
-            Direccion fuera de rango
+            {hasSuggestedBranch
+              ? `Tu tienda es ${suggestedBranch.shortName}`
+              : 'Direccion fuera de rango'}
           </h2>
           <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.6 }}>
-            {branch?.name || 'La tienda seleccionada'} cubre un radio de{' '}
-            {Number(branch?.coverageRadiusKm || 7.5).toFixed(1)} km y sus alrededores.
+            {hasSuggestedBranch
+              ? `Tu direccion esta dentro del area de ${suggestedBranch.name}. Tu cuenta y tu sesion continuaran abiertas.`
+              : `${branch?.name || 'La tienda seleccionada'} cubre un radio de ${Number(
+                  branch?.coverageRadiusKm || 7.5
+                ).toFixed(1)} km y sus alrededores.`}
           </p>
-          <p style={{ margin: 0, color: '#0f3b82', fontWeight: 900, lineHeight: 1.6 }}>
-            Proximamente abarcaremos nuevas zonas. 🙌
-          </p>
+          {!hasSuggestedBranch && (
+            <p style={{ margin: 0, color: '#0f3b82', fontWeight: 900, lineHeight: 1.6 }}>
+              Proximamente abarcaremos nuevas zonas. 🙌
+            </p>
+          )}
         </div>
 
-        <button type="button" className="store-button" onClick={onClose}>
-          Entendido
+        <button
+          type="button"
+          className="store-button"
+          onClick={hasSuggestedBranch ? onSwitch : onClose}
+        >
+          {hasSuggestedBranch
+            ? `Cambiar a Tienda ${suggestedBranch.shortName}`
+            : 'Entendido'}
         </button>
       </div>
     </div>
