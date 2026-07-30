@@ -81,6 +81,32 @@ export const DEFAULT_STORE_BRANCHES = Object.freeze({
   },
 });
 
+const STORE_BRANCH_ROUTE_ALIASES = Object.freeze({
+  gr: 'granada',
+  granada: 'granada',
+  my: 'masaya',
+  masaya: 'masaya',
+  ni: 'nindiri',
+  nindiri: 'nindiri',
+});
+
+export const getStoreBranchIdFromPathname = (pathname = '') => {
+  const firstSegment = String(pathname || '')
+    .trim()
+    .toLowerCase()
+    .split(/[?#]/, 1)[0]
+    .split('/')
+    .filter(Boolean)[0];
+
+  return STORE_BRANCH_ROUTE_ALIASES[firstSegment] || '';
+};
+
+export const buildStoreBranchPath = (branchId = DEFAULT_STORE_BRANCH_ID) => {
+  const normalizedId = String(branchId || '').trim().toLowerCase();
+  const routeId = STORE_BRANCH_ROUTE_ALIASES[normalizedId] || DEFAULT_STORE_BRANCH_ID;
+  return `/${routeId}`;
+};
+
 const cleanPhone = (value = '') => String(value || '').replace(/\D/g, '');
 const normalizePositiveNumber = (value, fallback) => {
   const numeric = Number(value);
@@ -154,11 +180,18 @@ export const mergeStoreBranches = (remoteBranches = {}) => {
     });
 };
 
-export const getStoreBranchById = (branches = [], branchId = DEFAULT_STORE_BRANCH_ID) => {
+export const getStoreBranchById = (
+  branches = [],
+  branchId = DEFAULT_STORE_BRANCH_ID,
+  includeInactive = false
+) => {
   const list = Array.isArray(branches) ? branches : mergeStoreBranches(branches);
   const cleanId = String(branchId || '').trim().toLowerCase();
   return (
-    list.find((branch) => branch.id === cleanId && branch.active !== false) ||
+    list.find(
+      (branch) =>
+        branch.id === cleanId && (includeInactive || branch.active !== false)
+    ) ||
     list.find((branch) => branch.id === DEFAULT_STORE_BRANCH_ID) ||
     list.find((branch) => branch.active !== false) ||
     normalizeStoreBranch(DEFAULT_STORE_BRANCHES[DEFAULT_STORE_BRANCH_ID])

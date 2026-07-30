@@ -135,7 +135,14 @@ function ClubSparkleIcon({ size = 16, color = '#f7d96b' }) {
   );
 }
 
-function RewardsProgressCard({ settings, pointsBalance, closestReward, availableReward, onOpenRewards }) {
+function RewardsProgressCard({
+  settings,
+  pointsBalance,
+  closestReward,
+  availableReward,
+  displayName = CLUB_DISPLAY_NAME,
+  onOpenRewards,
+}) {
   void settings;
   const rawTargetPoints = Math.max(0, Number(closestReward?.pointsRequired || 0));
   const targetPoints = Math.max(rawTargetPoints, 1);
@@ -175,7 +182,7 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward, available
         <div style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1.05, color: '#ffffff' }}>
-              {CLUB_DISPLAY_NAME}
+              {displayName}
             </div>
             <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
               {hasUnlockedReward ? 'Tu constancia ya tiene premio.' : "\u00A1Acumula puntos para obtener los mejores cortes!"}
@@ -216,7 +223,7 @@ function RewardsProgressCard({ settings, pointsBalance, closestReward, available
             {featuredReward?.image ? (
               <img
                 src={featuredReward.image}
-                alt={featuredReward.name || CLUB_DISPLAY_NAME}
+                alt={featuredReward.name || displayName}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 loading="lazy"
                 decoding="async"
@@ -524,7 +531,7 @@ function RewardCard({
   );
 }
 
-function GuestRewardsPrompt({ onOpenAuth }) {
+function GuestRewardsPrompt({ displayName = CLUB_DISPLAY_NAME, onOpenAuth }) {
   return (
     <div
       style={{
@@ -535,7 +542,7 @@ function GuestRewardsPrompt({ onOpenAuth }) {
         boxShadow: '0 20px 38px rgba(24, 93, 160, 0.12)',
       }}
     >
-      <h2 style={{ margin: 0, fontSize: 28, color: CLUB_THEME.blueDeep }}>{CLUB_DISPLAY_NAME}</h2>
+      <h2 style={{ margin: 0, fontSize: 28, color: CLUB_THEME.blueDeep }}>{displayName}</h2>
       <p style={{ margin: '10px 0 0', color: CLUB_THEME.textSoft, lineHeight: 1.6 }}>
         Inicia sesion para acumular puntos, ver tus premios y canjear uno en tu proximo pedido.
       </p>
@@ -565,6 +572,7 @@ export function StoreRewardsSummaryCard({
   rewards,
   cartAmount = 0,
   selectedReward,
+  displayName = CLUB_DISPLAY_NAME,
   onOpen,
   compact = false,
 }) {
@@ -574,8 +582,8 @@ export function StoreRewardsSummaryCard({
     [rewards, pointsBalance, cartAmount, settings]
   );
   const hasAvailableReward = Boolean(currentUser && summary.availableRewards.length > 0);
-  const compactTitle = compact ? 'Miembro Gold' : CLUB_DISPLAY_NAME;
-  const compactSubtitle = 'San Martin Granada';
+  const compactTitle = compact ? 'Miembro Gold' : displayName;
+  const compactSubtitle = displayName.replace(/^Miembro Gold\s+/i, '') || 'San Martin';
 
   return (
     <button
@@ -1054,6 +1062,7 @@ export default function StoreRewardsSheet({
   transactions,
   cartAmount = 0,
   selectedReward,
+  displayName = CLUB_DISPLAY_NAME,
   rewardActionBusy = false,
   onSelectReward,
   onClearSelectedReward,
@@ -1271,7 +1280,7 @@ export default function StoreRewardsSheet({
         </div>
 
         {!currentUser ? (
-          <GuestRewardsPrompt onOpenAuth={onOpenAuth} />
+          <GuestRewardsPrompt displayName={displayName} onOpenAuth={onOpenAuth} />
         ) : (
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             <div style={getPaneStyle('home')}>
@@ -1293,6 +1302,7 @@ export default function StoreRewardsSheet({
                   pointsBalance={pointsBalance}
                   closestReward={rewardSummary.closestReward}
                   availableReward={rewardSummary.bestReward}
+                  displayName={displayName}
                   onOpenRewards={() => openView('rewards')}
                 />
 

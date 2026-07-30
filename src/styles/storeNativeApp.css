@@ -158,6 +158,16 @@
   gap: 8px !important;
 }
 
+.native-store-app .store-guest-invite {
+  margin: 8px 0 6px !important;
+  border-radius: 18px !important;
+  box-shadow: 0 14px 30px rgba(7, 29, 52, 0.18) !important;
+}
+
+.native-store-app .store-guest-invite-button {
+  min-height: 44px !important;
+}
+
 .native-store-app .store-branch-pill {
   min-height: 44px !important;
   max-width: min(100%, 210px);

@@ -72,8 +72,10 @@ import {
   subscribeStoreDeliverySettings,
 } from '../services/storeDeliverySettings';
 import {
+  buildStoreBranchPath,
   DEFAULT_STORE_BRANCH_ID,
   getNearestStoreBranch,
+  getStoreBranchIdFromPathname,
   getStoreBranchById,
   getStoreBranchDeliverySettings,
   mergeStoreBranches,
@@ -1176,6 +1178,9 @@ export default function TiendaVirtualView({
   mode = 'public',
   publicStoreUrl = 'https://tienda.sanmartinsr.com',
 }) {
+  const directBranchRouteId =
+    typeof window !== 'undefined' ? getStoreBranchIdFromPathname(window.location.pathname) : '';
+  const allowsDirectGuestCatalog = mode !== 'dashboard' && Boolean(directBranchRouteId);
   const [catalogState] = useState(() => getInitialCatalogState());
   const [catalog, setCatalog] = useState(() => catalogState.catalog);
   const [catalogLoading, setCatalogLoading] = useState(() => catalogState.loading);
@@ -1259,8 +1264,12 @@ export default function TiendaVirtualView({
   const [authNotice, setAuthNotice] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authLocating, setAuthLocating] = useState(false);
-  const [authSheetOpen, setAuthSheetOpen] = useState(() => mode !== 'dashboard' && !currentUser);
-  const [authPromptDismissed, setAuthPromptDismissed] = useState(() => Boolean(currentUser));
+  const [authSheetOpen, setAuthSheetOpen] = useState(
+    () => mode !== 'dashboard' && !currentUser && !allowsDirectGuestCatalog
+  );
+  const [authPromptDismissed, setAuthPromptDismissed] = useState(
+    () => Boolean(currentUser) || allowsDirectGuestCatalog
+  );
   const [pendingAuthIntent, setPendingAuthIntent] = useState('');
   const [customerOrders, setCustomerOrders] = useState([]);
   const [couponHistoryOrders, setCouponHistoryOrders] = useState([]);
@@ -1295,7 +1304,11 @@ export default function TiendaVirtualView({
       return DEFAULT_STORE_BRANCH_ID;
     }
 
-    return window.localStorage.getItem(STORE_BRANCH_SELECTION_KEY) || DEFAULT_STORE_BRANCH_ID;
+    return (
+      getStoreBranchIdFromPathname(window.location.pathname) ||
+      window.localStorage.getItem(STORE_BRANCH_SELECTION_KEY) ||
+      DEFAULT_STORE_BRANCH_ID
+    );
   });
   const [branchSelectorOpen, setBranchSelectorOpen] = useState(false);
   const [branchSelectorMode, setBranchSelectorMode] = useState('list');
@@ -1326,14 +1339,15 @@ export default function TiendaVirtualView({
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const showMobileBottomNav = isPhoneLayout && !isDashboard;
   const selectedBranch = useMemo(
-    () => getStoreBranchById(storeBranches, selectedBranchId),
-    [selectedBranchId, storeBranches]
+    () => getStoreBranchById(storeBranches, selectedBranchId, allowsDirectGuestCatalog),
+    [allowsDirectGuestCatalog, selectedBranchId, storeBranches]
   );
   const activeDeliverySettings = useMemo(
     () => getStoreBranchDeliverySettings(selectedBranch, deliverySettings),
     [deliverySettings, selectedBranch]
   );
   const storeBrandTitle = selectedBranch?.brandTitle || 'Delivery Carnes San Martin Granada';
+  const rewardProgramName = `Miembro Gold San Martin ${selectedBranch?.shortName || 'Granada'}`;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -1489,7 +1503,19 @@ export default function TiendaVirtualView({
     }
 
     window.localStorage.setItem(STORE_BRANCH_SELECTION_KEY, selectedBranch.id);
-  }, [selectedBranch?.id]);
+
+    const isNativeRuntime = Boolean(window.Capacitor?.isNativePlatform?.());
+    if (!isDashboard && !isNativeRuntime) {
+      const nextPath = buildStoreBranchPath(selectedBranch.id);
+      if (window.location.pathname !== nextPath) {
+        window.history.replaceState(window.history.state, '', `${nextPath}${window.location.search}${window.location.hash}`);
+      }
+    }
+
+    if (!isDashboard && selectedBranch.shortName) {
+      document.title = `Delivery Carnes San Martin ${selectedBranch.shortName}`;
+    }
+  }, [isDashboard, selectedBranch?.id, selectedBranch?.shortName]);
 
   useEffect(() => {
     if (
@@ -3063,7 +3089,7 @@ export default function TiendaVirtualView({
     setAuthSheetOpen(false);
     setWelcomeCouponOpen(false);
     setAuthProviderDraft(null);
-    setAuthPromptDismissed(false);
+    setAuthPromptDismissed(allowsDirectGuestCatalog);
     setPendingAuthIntent('');
     autoAppliedCouponRef.current = '';
     if (typeof window !== 'undefined') {
@@ -3083,7 +3109,9 @@ export default function TiendaVirtualView({
       }
 
       if (!authUser && !currentUser) {
-        setAuthSheetOpen(true);
+        if (!allowsDirectGuestCatalog) {
+          setAuthSheetOpen(true);
+        }
         return;
       }
 
@@ -3097,13 +3125,13 @@ export default function TiendaVirtualView({
       setRewardsOpen(false);
       setRewardsReturnTarget('');
       setProfileOpen(false);
-      setAuthPromptDismissed(false);
-      setAuthSheetOpen(true);
+      setAuthPromptDismissed(allowsDirectGuestCatalog);
+      setAuthSheetOpen(!allowsDirectGuestCatalog);
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(STORE_SESSION_KEY);
       }
     });
-  }, [currentUser, isDashboard]);
+  }, [allowsDirectGuestCatalog, currentUser, isDashboard]);
 
   useEffect(() => {
     if (isDashboard || !currentUser?.key) {
@@ -3135,8 +3163,8 @@ export default function TiendaVirtualView({
       setRewardsOpen(false);
       setRewardsReturnTarget('');
       setProfileOpen(false);
-      setAuthPromptDismissed(false);
-      setAuthSheetOpen(true);
+      setAuthPromptDismissed(allowsDirectGuestCatalog);
+      setAuthSheetOpen(!allowsDirectGuestCatalog);
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(STORE_SESSION_KEY);
       }
@@ -3148,10 +3176,10 @@ export default function TiendaVirtualView({
     return () => {
       cancelled = true;
     };
-  }, [currentUser?.key, isDashboard]);
+  }, [allowsDirectGuestCatalog, currentUser?.key, isDashboard]);
 
   useEffect(() => {
-    if (isDashboard) {
+    if (isDashboard || allowsDirectGuestCatalog) {
       return undefined;
     }
 
@@ -3173,7 +3201,7 @@ export default function TiendaVirtualView({
     return () => {
       window.clearTimeout(openTimer);
     };
-  }, [authPromptDismissed, authSheetOpen, currentUser, isDashboard]);
+  }, [allowsDirectGuestCatalog, authPromptDismissed, authSheetOpen, currentUser, isDashboard]);
 
   const cancelCustomerOrder = async (order) => {
     if (!order?.firebaseKey) {
@@ -3524,6 +3552,11 @@ export default function TiendaVirtualView({
       setActiveCategory('todos');
       setActiveSubcategory('todas');
       setQuery('');
+
+      if (typeof window !== 'undefined' && !window.Capacitor?.isNativePlatform?.()) {
+        const nextPath = buildStoreBranchPath(branch.id);
+        window.history.replaceState(window.history.state, '', `${nextPath}${window.location.search}${window.location.hash}`);
+      }
     }
 
     setNearestBranchCandidate(null);
@@ -4468,6 +4501,75 @@ export default function TiendaVirtualView({
           border-color: transparent;
           background: linear-gradient(135deg, #0c4d88, #2f8cdb);
           color: #ffffff;
+        }
+        .store-guest-invite {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 14px;
+          margin: 10px 0 4px;
+          padding: 13px 14px;
+          border: 1px solid rgba(47, 145, 222, 0.24);
+          border-radius: 20px;
+          background:
+            radial-gradient(circle at 12% 0%, rgba(83, 168, 236, 0.28), transparent 42%),
+            linear-gradient(135deg, #082a4c, #0c4d88 68%, #236fae);
+          color: #ffffff;
+          box-shadow: 0 16px 34px rgba(7, 42, 76, 0.18);
+        }
+        .store-guest-invite-copy {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+        }
+        .store-guest-invite-icon {
+          width: 38px;
+          height: 38px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 38px;
+          border-radius: 13px;
+          background: rgba(255, 255, 255, 0.14);
+          color: #ffffff;
+        }
+        .store-guest-invite-icon svg {
+          width: 20px;
+          height: 20px;
+        }
+        .store-guest-invite-message {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+        }
+        .store-guest-invite-message strong {
+          font-size: 14px;
+          line-height: 1.15;
+        }
+        .store-guest-invite-message span {
+          color: rgba(255, 255, 255, 0.76);
+          font-size: 11px;
+          font-weight: 750;
+          line-height: 1.25;
+        }
+        .store-guest-invite-button {
+          min-height: 40px;
+          padding: 0 15px;
+          border: 0;
+          border-radius: 13px;
+          background: #ffffff;
+          color: #082a4c;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 950;
+          white-space: nowrap;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(4, 24, 43, 0.18);
+          transition: transform 150ms ease, box-shadow 150ms ease;
+        }
+        .store-guest-invite-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 12px 24px rgba(4, 24, 43, 0.24);
         }
         .store-icon-button,
         .store-order-status-button,
@@ -7193,6 +7295,29 @@ export default function TiendaVirtualView({
           .store-coverage-alert-button {
             min-height: 36px;
           }
+          .store-guest-invite {
+            gap: 9px;
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 18px;
+          }
+          .store-guest-invite-icon {
+            width: 34px;
+            height: 34px;
+            flex-basis: 34px;
+            border-radius: 11px;
+          }
+          .store-guest-invite-message strong {
+            font-size: 12px;
+          }
+          .store-guest-invite-message span {
+            font-size: 9px;
+          }
+          .store-guest-invite-button {
+            min-height: 38px;
+            padding: 0 11px;
+            font-size: 10px;
+          }
           .store-icon-button {
             width: 40px;
             height: 40px;
@@ -7486,6 +7611,30 @@ export default function TiendaVirtualView({
           </label>
         </header>
 
+        {!currentUser && !isDashboard && (
+          <section className="store-guest-invite" aria-label="Beneficios de iniciar sesion">
+            <div className="store-guest-invite-copy">
+              <span className="store-guest-invite-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 3v18" />
+                  <path d="M7 8.5C7 6.6 8.8 5 11 5h2c2.2 0 4 1.4 4 3.2S15.2 11 13 11h-2c-2.2 0-4 1.6-4 3.5S8.8 18 11 18h2c2.2 0 4-1.6 4-3.5" />
+                </svg>
+              </span>
+              <span className="store-guest-invite-message">
+                <strong>Pide en linea y gana puntos</strong>
+                <span>Inicia sesion para comprar, seguir tu pedido y disfrutar Miembro Gold.</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              className="store-guest-invite-button"
+              onClick={() => openAuthSheet('login', 'guest')}
+            >
+              Iniciar sesion
+            </button>
+          </section>
+        )}
+
         {rewardSettings.enabled !== false && (
           <section style={{ marginTop: isMobileLayout ? 10 : 18, marginBottom: isMobileLayout ? 4 : 8 }}>
             <StoreRewardsSummaryCard
@@ -7495,6 +7644,7 @@ export default function TiendaVirtualView({
               rewards={storeRewards}
               cartAmount={approximateTotalAmount}
               selectedReward={selectedRewardRedemption}
+              displayName={rewardProgramName}
               onOpen={openRewardsPanel}
               compact={isMobileLayout}
             />
@@ -7823,6 +7973,7 @@ export default function TiendaVirtualView({
         transactions={rewardTransactions}
         cartAmount={approximateTotalAmount}
         selectedReward={selectedRewardRedemption}
+        displayName={rewardProgramName}
         rewardActionBusy={rewardActionBusy}
         onSelectReward={handleSelectReward}
         onClearSelectedReward={clearSelectedReward}
@@ -8201,7 +8352,7 @@ function StoreAuthView({
       <div className="store-auth-brand">
         <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
         <h1>{brandTitle}</h1>
-        <p>Inicia sesion para enviar pedidos y ver el estado de tu pedido.</p>
+        <p>Inicia sesion para pedir en linea, acumular puntos y seguir tus pedidos.</p>
       </div>
 
       <div className="store-auth-toggle">
@@ -9870,7 +10021,7 @@ function CheckoutSheet({
               </h3>
               {!currentUser && (
                 <p style={{ margin: 0 }}>
-                  Como invitado puedes comprar normal, pero Miembro Gold San Martin Granada necesita cuenta para guardar tus puntos.
+                  Como invitado puedes comprar normal, pero {rewardProgramName} necesita cuenta para guardar tus puntos.
                 </p>
               )}
               {rewardSettings?.enabled !== false && (

@@ -16,7 +16,7 @@ import {
   signInInternalUser,
   signOutCurrentUser,
 } from './services/authRoles';
-import { DEFAULT_STORE_BRANCHES } from './services/storeBranches';
+import { DEFAULT_STORE_BRANCHES, getStoreBranchIdFromPathname } from './services/storeBranches';
 import {
   KITCHEN_USER_KEY,
   normalizeKitchenUser,
@@ -141,6 +141,10 @@ const getRouteFromLocation = () => {
     return publicHostRoute;
   }
 
+  if (getStoreBranchIdFromPathname(window.location.pathname)) {
+    return 'tienda';
+  }
+
   if (!isLocalHostname(hostname)) {
     return 'tienda';
   }
@@ -156,8 +160,12 @@ const getRouteFromLocation = () => {
 
 const getDocumentTitle = (route) => {
   switch (route) {
-    case 'tienda':
-      return 'Delivery Carnes San Martin Granada';
+    case 'tienda': {
+      const branchId =
+        typeof window !== 'undefined' ? getStoreBranchIdFromPathname(window.location.pathname) : '';
+      const branch = DEFAULT_STORE_BRANCHES[branchId] || DEFAULT_STORE_BRANCHES.granada;
+      return branch.brandTitle || `Delivery Carnes San Martin ${branch.shortName}`;
+    }
     case 'cocina':
       return 'Carnes San Martin | Cocina';
     case 'driver':
