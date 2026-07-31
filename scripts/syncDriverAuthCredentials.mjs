@@ -9,10 +9,10 @@ const AUTH_DOMAIN = 'auth.sanmartinsr.local';
 const FIREBASE_TOOLS_CONFIG = path.join(os.homedir(), '.config', 'configstore', 'firebase-tools.json');
 
 const DEFAULT_DRIVERS = [
-  { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
-  { code: 'E-002', name: 'NOEL', phone: '', active: true, sortOrder: 20 },
-  { code: 'E-003', name: 'CARLOS MORA', phone: '', active: true, sortOrder: 30 },
-  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', active: true, sortOrder: 40 },
+  { code: 'E-001', name: 'JORDIN', phone: '', branchId: 'granada', active: true, sortOrder: 10 },
+  { code: 'E-002', name: 'NOEL', phone: '', branchId: 'granada', active: true, sortOrder: 20 },
+  { code: 'E-003', name: 'CARLOS MORA', phone: '', branchId: 'granada', active: true, sortOrder: 30 },
+  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', branchId: 'granada', active: true, sortOrder: 40 },
 ];
 
 const normalizeDriverLoginToken = (value = '') =>
@@ -62,10 +62,14 @@ const normalizeDriver = (driver = {}, fallback = {}) => {
     .trim();
   const [firstName = code || 'driver'] = name.split(/\s+/).filter(Boolean);
   const lastName = name.split(/\s+/).filter(Boolean).at(-1) || code || 'driver';
+  const savedLoginUsername = String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase();
   const loginUsername =
-    String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
-    `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(code)}`;
-  const loginPassword = `${normalizeDriverLoginToken(lastName) || 'driver'}${getDriverCodeSuffix(code)}`;
+    code === 'E-005' && normalizeDriverLoginToken(firstName) === 'michael' && savedLoginUsername === 'harvey005'
+      ? 'michael005'
+      : savedLoginUsername || `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(code)}`;
+  const loginPassword = `${normalizeDriverLoginToken(lastName) || 'driver'}${
+    getDriverCodeSuffix(loginUsername) || getDriverCodeSuffix(code)
+  }`;
 
   return {
     ...backup,
@@ -74,6 +78,9 @@ const normalizeDriver = (driver = {}, fallback = {}) => {
     name,
     publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
+    branchId: String(source.branchId ?? source.storeBranchId ?? backup.branchId ?? backup.storeBranchId ?? 'granada')
+      .trim()
+      .toLowerCase() || 'granada',
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
     loginUsername,
@@ -288,6 +295,8 @@ async function main() {
         name: driver.name,
         publicName: driver.publicName || driver.name,
         phone: driver.phone,
+        branchId: driver.branchId,
+        storeBranchId: driver.branchId,
         active: driver.active,
         sortOrder: driver.sortOrder,
         loginUsername: driver.loginUsername,
@@ -305,6 +314,8 @@ async function main() {
         driverUsername: driver.loginUsername,
         email: authAccount.email,
         displayName: driver.name,
+        branchId: driver.branchId,
+        storeBranchId: driver.branchId,
         updatedAt: now,
       },
       accessToken

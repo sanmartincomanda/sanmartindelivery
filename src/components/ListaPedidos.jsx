@@ -191,6 +191,14 @@ export default function ListaPedidos({ pedidos = [] }) {
   const [repartidores, setRepartidores] = useState(() => mergeDrivers().filter((driver) => driver.active !== false));
   const [quoteActions, setQuoteActions] = useState({});
 
+  const selectedOrder = pedidos.find((pedido) => pedido.firebaseKey === modalRepartidor) || null;
+  const selectedOrderBranchId = String(
+    selectedOrder?.storeBranchId || selectedOrder?.storeBranchCode || 'granada'
+  ).trim().toLowerCase();
+  const availableDrivers = repartidores.filter(
+    (driver) => String(driver?.branchId || 'granada').trim().toLowerCase() === selectedOrderBranchId
+  );
+
   useEffect(() => {
     const unsubscribe = onValue(ref(database, DRIVERS_PATH), (snapshot) => {
       setRepartidores(mergeDrivers(snapshot.val()).filter((driver) => driver.active !== false));
@@ -629,7 +637,7 @@ export default function ListaPedidos({ pedidos = [] }) {
               gap: '12px',
               marginBottom: '24px'
             }}>
-              {repartidores.map((repartidor) => (
+              {availableDrivers.map((repartidor) => (
                 <button
                   key={repartidor.code}
                   type="button"
@@ -662,6 +670,12 @@ export default function ListaPedidos({ pedidos = [] }) {
                 </button>
               ))}
             </div>
+
+            {availableDrivers.length === 0 && (
+              <div style={{ margin: '-8px 0 24px', color: '#b45309', fontWeight: 800 }}>
+                No hay entregadores activos asignados a esta sucursal.
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <button

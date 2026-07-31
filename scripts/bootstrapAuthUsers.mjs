@@ -61,10 +61,14 @@ const normalizeDriverRecord = (driver = {}, fallback = {}) => {
   const nameParts = name.split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] || code || 'driver';
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : firstName;
+  const savedLoginUsername = String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase();
   const loginUsername =
-    String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
-    `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(code)}`;
-  const loginPassword = `${normalizeDriverLoginToken(lastName) || 'driver'}${getDriverCodeSuffix(code)}`;
+    code === 'E-005' && normalizeDriverLoginToken(firstName) === 'michael' && savedLoginUsername === 'harvey005'
+      ? 'michael005'
+      : savedLoginUsername || `${normalizeDriverLoginToken(firstName) || 'driver'}${getDriverCodeSuffix(code)}`;
+  const loginPassword = `${normalizeDriverLoginToken(lastName) || 'driver'}${
+    getDriverCodeSuffix(loginUsername) || getDriverCodeSuffix(code)
+  }`;
 
   return {
     ...backup,
@@ -73,6 +77,9 @@ const normalizeDriverRecord = (driver = {}, fallback = {}) => {
     name,
     publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
+    branchId: String(source.branchId ?? source.storeBranchId ?? backup.branchId ?? backup.storeBranchId ?? 'granada')
+      .trim()
+      .toLowerCase() || 'granada',
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
     loginUsername,
@@ -106,10 +113,10 @@ const mergeDrivers = (remoteDrivers = {}) => {
 };
 
 const DEFAULT_DRIVERS = [
-  { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
-  { code: 'E-002', name: 'NOEL', phone: '', active: true, sortOrder: 20 },
-  { code: 'E-003', name: 'CARLOS MORA', phone: '', active: true, sortOrder: 30 },
-  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', active: true, sortOrder: 40 },
+  { code: 'E-001', name: 'JORDIN', phone: '', branchId: 'granada', active: true, sortOrder: 10 },
+  { code: 'E-002', name: 'NOEL', phone: '', branchId: 'granada', active: true, sortOrder: 20 },
+  { code: 'E-003', name: 'CARLOS MORA', phone: '', branchId: 'granada', active: true, sortOrder: 30 },
+  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', branchId: 'granada', active: true, sortOrder: 40 },
 ];
 
 const INTERNAL_USERS = [
@@ -283,12 +290,16 @@ async function seedDrivers() {
       driverUsername: driver.loginUsername,
       email,
       displayName: driver.name,
+      branchId: driver.branchId,
+      storeBranchId: driver.branchId,
     });
 
     await db.ref(`deliveryDrivers/${getDriverKey(code)}`).update({
       ...driver,
       code,
       loginUsername: driver.loginUsername,
+      branchId: driver.branchId,
+      storeBranchId: driver.branchId,
       authUid: authUser.uid,
       updatedAt: Date.now(),
     });

@@ -5,10 +5,10 @@ import { hashStorePassword } from './storeUsers';
 export const DRIVERS_PATH = 'deliveryDrivers';
 
 export const DEFAULT_DRIVERS = [
-  { code: 'E-001', name: 'JORDIN', phone: '', active: true, sortOrder: 10 },
-  { code: 'E-002', name: 'NOEL', phone: '', active: true, sortOrder: 20 },
-  { code: 'E-003', name: 'CARLOS MORA', phone: '', active: true, sortOrder: 30 },
-  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', active: true, sortOrder: 40 },
+  { code: 'E-001', name: 'JORDIN', phone: '', branchId: 'granada', active: true, sortOrder: 10 },
+  { code: 'E-002', name: 'NOEL', phone: '', branchId: 'granada', active: true, sortOrder: 20 },
+  { code: 'E-003', name: 'CARLOS MORA', phone: '', branchId: 'granada', active: true, sortOrder: 30 },
+  { code: 'E-004', name: 'CHIMI', publicName: 'Noel Hernandez', phone: '', branchId: 'granada', active: true, sortOrder: 40 },
 ];
 
 const normalizeDriverLoginToken = (value = '') =>
@@ -57,12 +57,16 @@ export const getDriverCodeSuffix = (code = '') => {
 
 export const getDriverLoginUsername = (driver = {}) => {
   const identity = resolveDriverIdentity(driver);
-  return `${normalizeDriverLoginToken(identity.firstName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
+  return (
+    normalizeDriverLoginToken(driver?.loginUsername) ||
+    `${normalizeDriverLoginToken(identity.firstName) || 'driver'}${getDriverCodeSuffix(identity.code)}`
+  );
 };
 
 export const getDriverLoginPassword = (driver = {}) => {
   const identity = resolveDriverIdentity(driver);
-  return `${normalizeDriverLoginToken(identity.lastName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
+  const loginSuffix = getDriverCodeSuffix(driver?.loginUsername) || getDriverCodeSuffix(identity.code);
+  return `${normalizeDriverLoginToken(identity.lastName) || 'driver'}${loginSuffix}`;
 };
 
 export const getDriverPublicName = (driver = {}) => {
@@ -90,18 +94,27 @@ export const normalizeDriver = (driver = {}, fallback = {}) => {
   const source = driver || {};
   const backup = fallback || {};
   const identity = resolveDriverIdentity(source, backup);
+  const savedLoginUsername = String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase();
   const loginUsername =
-    String(source.loginUsername ?? backup.loginUsername ?? '').trim().toLowerCase() ||
-    `${normalizeDriverLoginToken(identity.firstName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
+    identity.code === 'E-005' &&
+    normalizeDriverLoginToken(identity.firstName) === 'michael' &&
+    savedLoginUsername === 'harvey005'
+      ? 'michael005'
+      : savedLoginUsername ||
+        `${normalizeDriverLoginToken(identity.firstName) || 'driver'}${getDriverCodeSuffix(identity.code)}`;
 
   return {
     code: identity.code,
     name: identity.name,
     publicName: identity.publicName,
     phone: String(source.phone ?? backup.phone ?? '').trim(),
+    branchId: String(source.branchId ?? source.storeBranchId ?? backup.branchId ?? backup.storeBranchId ?? 'granada')
+      .trim()
+      .toLowerCase() || 'granada',
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
     loginUsername,
+    authUid: String(source.authUid ?? backup.authUid ?? '').trim(),
     passwordHash: String(source.passwordHash ?? backup.passwordHash ?? '').trim(),
     createdAt: Number(source.createdAt ?? backup.createdAt ?? Date.now()),
     updatedAt: Number(source.updatedAt ?? backup.updatedAt ?? Date.now()),

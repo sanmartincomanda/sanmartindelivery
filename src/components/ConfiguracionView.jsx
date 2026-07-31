@@ -90,6 +90,8 @@ import {
   seedDefaultDriversIfEmpty,
   updateDriver,
 } from '../services/drivers';
+import { provisionDriverAuthAccount } from '../services/authRoles';
+import { DEFAULT_STORE_BRANCHES } from '../services/storeBranches';
 import {
   KITCHEN_USER_KEY,
   normalizeKitchenUser,
@@ -282,7 +284,9 @@ const emptyDriver = {
   code: '',
   name: '',
   publicName: '',
+  loginUsername: '',
   phone: '',
+  branchId: 'granada',
   active: true,
   sortOrder: '',
 };
@@ -1247,7 +1251,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
       code: driver.code || '',
       name: driver.name || '',
       publicName: driver.publicName || '',
+      loginUsername: driver.loginUsername || '',
       phone: driver.phone || '',
+      branchId: driver.branchId || 'granada',
       active: driver.active !== false,
       sortOrder: driver.sortOrder ?? '',
       password: '',
@@ -1260,7 +1266,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
       code: driver.code || '',
       name: driver.name || '',
       publicName: driver.publicName || current.publicName || '',
+      loginUsername: driver.loginUsername || current.loginUsername || '',
       phone: driver.phone || current.phone || '',
+      branchId: driver.branchId || current.branchId || 'granada',
       active: driver.active !== false,
       sortOrder: driver.sortOrder ?? current.sortOrder,
       password: current.code === driver.code ? current.password : '',
@@ -1669,16 +1677,39 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
     try {
       const existingDriver = drivers.find((driver) => driver.code === driverForm.code);
-      await saveDriver({
+      const driverPayload = {
         ...(existingDriver || {}),
         ...driverForm,
         sortOrder: driverForm.sortOrder === '' ? drivers.length * 10 : Number(driverForm.sortOrder || 0),
+      };
+      const loginUsername = getDriverLoginUsername(driverPayload);
+      const loginPassword = getDriverLoginPassword(driverPayload);
+      const duplicatedUsername = drivers.find(
+        (driver) =>
+          driver.code !== driverPayload.code && getDriverLoginUsername(driver) === loginUsername
+      );
+      if (duplicatedUsername) {
+        throw new Error(
+          `El usuario ${loginUsername} ya pertenece a ${duplicatedUsername.name || duplicatedUsername.code}.`
+        );
+      }
+      const authAccount = await provisionDriverAuthAccount({
+        username: loginUsername,
+        password: loginPassword,
+        driverCode: driverPayload.code,
+        displayName: driverPayload.name,
+        branchId: driverPayload.branchId,
+      });
+      await saveDriver({
+        ...driverPayload,
+        loginUsername,
+        authUid: authAccount.uid,
       });
       setDriverForm(emptyDriver);
-      setMessage('Entregador guardado con su acceso estandar de Driver.');
+      setMessage(`Entregador guardado. Acceso verificado: ${loginUsername}.`);
     } catch (error) {
       console.error('Error guardando entregador:', error);
-      setMessage('No se pudo guardar el entregador.');
+      setMessage(error?.message || 'No se pudo guardar el entregador.');
     } finally {
       setSavingDriver(false);
     }
@@ -3773,6 +3804,9 @@ function DriversManager({
                 <div style={{ color: '#64748b', marginTop: 4, fontWeight: 700 }}>
                   Publico: {driver.publicName || driver.name}
                 </div>
+                <div style={{ color: '#0369a1', marginTop: 4, fontWeight: 800 }}>
+                  Sucursal: {DEFAULT_STORE_BRANCHES[driver.branchId]?.shortName || driver.branchId || 'Granada'}
+                </div>
                 <div style={{ color: '#1e3a8a', marginTop: 6, fontWeight: 800 }}>
                   Usuario: {getDriverLoginUsername(driver)} | Clave: {getDriverLoginPassword(driver)}
                 </div>
@@ -3869,6 +3903,7 @@ function DriversManager({
         <input
           className="cfg-input"
           value={driverForm.code}
+          disabled={isEditingExistingDriver}
           onChange={(event) =>
             updateDriverForm('code', event.target.value.toUpperCase().replace(/\s+/g, ''))
           }
@@ -3888,10 +3923,38 @@ function DriversManager({
         />
         <input
           className="cfg-input"
+          value={driverForm.loginUsername || ''}
+          disabled={isEditingExistingDriver}
+          onChange={(event) =>
+            updateDriverForm(
+              'loginUsername',
+              event.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')
+            )
+          }
+          placeholder="Usuario Driver (opcional; se genera automaticamente)"
+        />
+        {isEditingExistingDriver && (
+          <small style={{ color: '#64748b', fontWeight: 700 }}>
+            El codigo y el usuario quedan fijos despues de crear el acceso.
+          </small>
+        )}
+        <input
+          className="cfg-input"
           value={driverForm.phone}
           onChange={(event) => updateDriverForm('phone', event.target.value)}
           placeholder="Telefono"
         />
+        <select
+          className="cfg-select"
+          value={driverForm.branchId || 'granada'}
+          onChange={(event) => updateDriverForm('branchId', event.target.value)}
+        >
+          {Object.values(DEFAULT_STORE_BRANCHES).map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              Sucursal {branch.shortName}
+            </option>
+          ))}
+        </select>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <input
             className="cfg-input"
@@ -3976,6 +4039,7 @@ function DriversManager({
                   <span className="cfg-driver-picker-icon">Moto</span>
                   <strong>{driver.name}</strong>
                   <small>{driver.code}</small>
+                  <small>{DEFAULT_STORE_BRANCHES[driver.branchId]?.shortName || driver.branchId || 'Granada'}</small>
                   <em>{driver.active === false ? 'Inactivo' : 'Activo'}</em>
                 </button>
               ))}

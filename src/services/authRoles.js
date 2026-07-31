@@ -92,6 +92,92 @@ export const buildInternalEmail = (username, scope = 'internal') => {
 
 export const buildDriverEmail = (driverIdentifier) => buildInternalEmail(driverIdentifier, 'drivers');
 
+const requestFirebaseAuth = async (action, payload) => {
+  const apiKey = String(auth?.app?.options?.apiKey || '').trim();
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:${action}?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, returnSecureToken: true }),
+    }
+  );
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error = new Error(data?.error?.message || `Firebase Auth HTTP ${response.status}`);
+    error.code = data?.error?.message || 'auth/request-failed';
+    throw error;
+  }
+
+  return data;
+};
+
+export async function provisionDriverAuthAccount({
+  username,
+  password,
+  driverCode,
+  displayName,
+  branchId = 'granada',
+}) {
+  await assertRole(AUTH_ROLES.ADMIN);
+
+  const cleanUsername = String(username || '').trim().toLowerCase();
+  const cleanPassword = String(password || '').trim();
+  const cleanDriverCode = String(driverCode || '').trim().toUpperCase();
+  const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+  const email = buildDriverEmail(cleanUsername);
+
+  if (!cleanUsername || !cleanDriverCode || cleanPassword.length < 6) {
+    throw new Error('Credenciales Driver incompletas');
+  }
+
+  let authAccount;
+  try {
+    authAccount = await requestFirebaseAuth('signUp', {
+      email,
+      password: cleanPassword,
+      displayName: String(displayName || cleanDriverCode).trim(),
+    });
+  } catch (error) {
+    if (error?.code !== 'EMAIL_EXISTS') {
+      throw error;
+    }
+
+    try {
+      authAccount = await requestFirebaseAuth('signInWithPassword', {
+        email,
+        password: cleanPassword,
+      });
+    } catch (signInError) {
+      const credentialError = new Error(
+        `El usuario ${cleanUsername} ya existe, pero su clave no coincide con la clave mostrada.`
+      );
+      credentialError.code = signInError?.code || 'auth/driver-credential-conflict';
+      throw credentialError;
+    }
+  }
+
+  const uid = String(authAccount?.localId || '').trim();
+  if (!uid) {
+    throw new Error('Firebase no devolvio el identificador del entregador');
+  }
+
+  await set(ref(database, `${USER_ROLES_PATH}/${uid}`), {
+    role: AUTH_ROLES.DRIVER,
+    driverCode: cleanDriverCode,
+    driverUsername: cleanUsername,
+    username: cleanUsername,
+    email,
+    displayName: String(displayName || cleanDriverCode).trim(),
+    branchId: cleanBranchId,
+    storeBranchId: cleanBranchId,
+    updatedAt: Date.now(),
+  });
+
+  return { uid, email };
+}
+
 export const getCurrentAuthUser = () => auth.currentUser;
 
 export const onFirebaseAuthChange = (callback) => onAuthStateChanged(auth, callback);
