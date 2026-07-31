@@ -113,6 +113,40 @@ const buildCustomerWhatsappPhone = (phone) => {
   return `505${cleanPhone.slice(-8)}`;
 };
 
+const ORDER_CANCELLATION_PIN = '1997';
+
+const getCancellationSource = (pedido = {}) => {
+  const explicitSource = String(pedido.canceladoOrigen || '').trim().toLowerCase();
+  const canceledBy = String(pedido.canceladoPor || '').trim().toLowerCase();
+
+  if (explicitSource === 'cliente' || canceledBy.includes('cliente')) {
+    return {
+      key: 'cliente',
+      label: 'Anulado por cliente',
+      detail: pedido.canceladoPor || 'Cliente tienda virtual',
+    };
+  }
+
+  if (
+    explicitSource === 'tienda' ||
+    canceledBy.includes('admin') ||
+    canceledBy.includes('lista de pedidos') ||
+    canceledBy.includes('cocina')
+  ) {
+    return {
+      key: 'tienda',
+      label: 'Anulado por tienda',
+      detail: pedido.canceladoPor || 'Administracion',
+    };
+  }
+
+  return {
+    key: 'desconocido',
+    label: 'Origen de anulacion no registrado',
+    detail: pedido.canceladoPor || '',
+  };
+};
+
 const formatCurrency = (value) => `C$${Number(value || 0).toFixed(2)}`;
 
 // Alias para cocineros
@@ -281,6 +315,13 @@ export default function ListaPedidos({ pedidos = [] }) {
   const handleCancelarPedido = (pedido) => {
     if (!pedido?.firebaseKey) return;
 
+    const cancellationPin = window.prompt('Ingresa el PIN para anular este pedido:');
+    if (cancellationPin === null) return;
+    if (String(cancellationPin).trim() !== ORDER_CANCELLATION_PIN) {
+      alert('PIN incorrecto. El pedido no fue anulado.');
+      return;
+    }
+
     const confirmCancel = window.confirm(`Quieres anular el pedido #${formatOrderNumber(pedido)}?`);
     if (!confirmCancel) return;
 
@@ -297,6 +338,8 @@ export default function ListaPedidos({ pedidos = [] }) {
     update(ref(database, `${getBasePath()}/${pedido.firebaseKey}`), {
       estado: 'Cancelado',
       canceladoPor: 'Administracion - lista de pedidos',
+      canceladoOrigen: 'tienda',
+      canceladoDetalle: 'Anulado por tienda desde Lista de pedidos',
       repartidor: null,
       repartidorPublico: null,
       repartidorCodigo: null,
@@ -839,6 +882,7 @@ export default function ListaPedidos({ pedidos = [] }) {
             const isAnimating = animatingCards.has(pedido.firebaseKey);
             const metodoPagoColor = getMetodoPagoColor(pedido.metodoPago);
             const pickupOrder = isPickupOrder(pedido);
+            const cancellationSource = status === 'Cancelado' ? getCancellationSource(pedido) : null;
             
             return (
               <div
@@ -928,7 +972,13 @@ export default function ListaPedidos({ pedidos = [] }) {
                           gap: '8px'
                         }}>
                           <span style={{ fontSize: '18px' }}>⏱️</span>
-                          {getTimeElapsed(pedido.timestamp)} {status === 'Entregado' ? (pickupOrder ? 'recogido' : 'entregado') : status === 'Enviado' ? 'enviado' : 'en cola'}
+                          {getTimeElapsed(pedido.timestamp)} {status === 'Cancelado'
+                            ? 'cancelado'
+                            : status === 'Entregado'
+                              ? (pickupOrder ? 'recogido' : 'entregado')
+                              : status === 'Enviado'
+                                ? 'enviado'
+                                : 'en cola'}
                         </div>
                       </div>
                     </div>
@@ -1009,6 +1059,24 @@ export default function ListaPedidos({ pedidos = [] }) {
                           fontWeight: 800
                         }}>
                           TIENDA VIRTUAL
+                        </div>
+                      )}
+                      {cancellationSource && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '10px 16px',
+                          background: cancellationSource.key === 'cliente'
+                            ? 'rgba(239, 68, 68, 0.14)'
+                            : 'rgba(185, 28, 28, 0.12)',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          color: '#b91c1c',
+                          fontSize: '14px',
+                          fontWeight: 900
+                        }}>
+                          {cancellationSource.label}
                         </div>
                       )}
                       {pedido.canal === 'tienda_virtual' && pedido.storeBranchName && (
@@ -1108,19 +1176,46 @@ export default function ListaPedidos({ pedidos = [] }) {
                         {pedido.clienteCodigo || 'Sin código'}
                       </div>
                       {pedido.telefono && (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '10px 16px',
-                          background: 'rgba(16, 185, 129, 0.12)',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          fontWeight: 700,
-                          color: '#34d399'
-                        }}>
-                          TEL {pedido.telefono}
-                        </div>
+                        <a
+                          href={`tel:${String(pedido.telefono).replace(/[^\d+]/g, '')}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 16px',
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            fontWeight: 700,
+                            color: '#15803d',
+                            textDecoration: 'none'
+                          }}>
+                          Llamar {pedido.telefono}
+                        </a>
+                      )}
+                      {pedido.telefono && buildCustomerWhatsappPhone(pedido.telefono) && (
+                        <a
+                          href={`https://wa.me/${buildCustomerWhatsappPhone(pedido.telefono)}?text=${encodeURIComponent(
+                            `Hola ${pedido.cliente || ''}, te contactamos de Carnes San Martin sobre tu pedido #${formatOrderNumber(pedido)}.`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '10px 16px',
+                            background: 'rgba(34, 197, 94, 0.14)',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(34, 197, 94, 0.26)',
+                            fontSize: '14px',
+                            fontWeight: 800,
+                            color: '#15803d',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          WhatsApp
+                        </a>
                       )}
                       {pedido.total && (
                         <div style={{

@@ -3308,6 +3308,8 @@ export default function TiendaVirtualView({
     const cancelPayload = {
       estado: 'Cancelado',
       canceladoPor: 'Cliente tienda virtual',
+      canceladoOrigen: 'cliente',
+      canceladoDetalle: 'Anulado por cliente desde la tienda virtual',
       timestampCancelado: now,
       timestampCanceladoMs: nowMs,
       timestampFinalizado: nowMs,
