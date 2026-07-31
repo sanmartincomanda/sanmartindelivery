@@ -118,6 +118,8 @@ const INTERNAL_USERS = [
     password: process.env.OPERATOR_PASSWORD || 'delivery2026',
     scope: 'admin',
     role: 'operator',
+    branchId: 'granada',
+    branchName: 'Carnes San Martin Granada',
     displayName: 'Delivery Operativo',
   },
   {
@@ -150,6 +152,8 @@ const INTERNAL_USERS = [
     password: process.env.KITCHEN_PASSWORD || 'cocina2026',
     scope: 'kitchen',
     role: 'kitchen',
+    branchId: 'granada',
+    branchName: 'Carnes San Martin Granada',
     displayName: 'Cocina',
   },
 ];

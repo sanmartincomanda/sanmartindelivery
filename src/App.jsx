@@ -11,6 +11,7 @@ import {
   assertRole,
   AUTH_ROLES,
   fetchUserRole,
+  getOrdersBranchScope,
   getRoleBranchId,
   onFirebaseAuthChange,
   signInInternalUser,
@@ -210,6 +211,9 @@ function App() {
   const isBranchAdminDashboard = dashboardRole === AUTH_ROLES.BRANCH_ADMIN;
   const isOperatorDashboard = dashboardRole === AUTH_ROLES.OPERATOR;
   const dashboardBranchId = getRoleBranchId(dashboardRoleRecord);
+  const ordersBranchId = getOrdersBranchScope(dashboardRoleRecord, {
+    forceKitchenScope: isKitchenRoute && kitchenAuth,
+  });
   const dashboardBranch = dashboardBranchId
     ? DEFAULT_STORE_BRANCHES[dashboardBranchId] || {
         id: dashboardBranchId,
@@ -291,9 +295,7 @@ function App() {
       return undefined;
     }
 
-    const counterBranchId = isBranchAdminDashboard && dashboardBranchId
-      ? dashboardBranchId
-      : 'granada';
+    const counterBranchId = ordersBranchId || 'granada';
     const unsubscribe = subscribeOrderCounter(
       todayKey,
       counterBranchId,
@@ -302,7 +304,7 @@ function App() {
     );
 
     return () => unsubscribe();
-  }, [dashboardBranchId, isAuthenticated, isBranchAdminDashboard, route, todayKey]);
+  }, [isAuthenticated, ordersBranchId, route, todayKey]);
 
   useEffect(() => {
     const shouldSubscribeOrders =
@@ -325,8 +327,8 @@ function App() {
       }
     }, 1800);
 
-    const subscribe = isBranchAdminDashboard && dashboardBranchId
-      ? (onData, onError) => subscribeOrdersForBranch(dashboardBranchId, onData, onError, todayKey)
+    const subscribe = ordersBranchId
+      ? (onData, onError) => subscribeOrdersForBranch(ordersBranchId, onData, onError, todayKey)
       : (onData, onError) => subscribeOrdersForDate(todayKey, onData, onError);
     const unsubscribe = subscribe(
       (todayOrders) => {
@@ -372,7 +374,7 @@ function App() {
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
     };
-  }, [dashboardBranchId, isAuthenticated, isBranchAdminDashboard, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, route, todayKey, view]);
+  }, [isAuthenticated, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, ordersBranchId, route, todayKey, view]);
 
   useEffect(() => {
     const shouldLoadClients =
@@ -1058,7 +1060,7 @@ function App() {
               clientes={clientes}
               allowClientDirectory={isAdminDashboard || isOperatorDashboard}
               nextOrderNumber={nextOrderNumber}
-              branchId={isBranchAdminDashboard && dashboardBranchId ? dashboardBranchId : 'granada'}
+              branchId={ordersBranchId || 'granada'}
             />
           )}
 

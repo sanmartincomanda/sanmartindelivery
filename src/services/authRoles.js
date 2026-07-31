@@ -30,6 +30,36 @@ export const getRoleBranchId = (roleRecord = {}) =>
     .trim()
     .toLowerCase();
 
+const FIXED_ORDER_BRANCH_BY_USERNAME = Object.freeze({
+  delivery: 'granada',
+  cocina: 'granada',
+  adminni: 'nindiri',
+  adminmy: 'masaya',
+});
+
+export const getOrdersBranchScope = (roleRecord = {}, { forceKitchenScope = false } = {}) => {
+  const role = String(roleRecord?.role || '').trim().toLowerCase();
+  if (role === AUTH_ROLES.ADMIN) {
+    return '';
+  }
+
+  const username = String(roleRecord?.username || '').trim().toLowerCase();
+  if (FIXED_ORDER_BRANCH_BY_USERNAME[username]) {
+    return FIXED_ORDER_BRANCH_BY_USERNAME[username];
+  }
+
+  const branchId = getRoleBranchId(roleRecord);
+  if (branchId) {
+    return branchId;
+  }
+
+  if (role === AUTH_ROLES.OPERATOR || role === AUTH_ROLES.KITCHEN || forceKitchenScope) {
+    return 'granada';
+  }
+
+  return '';
+};
+
 const AUTH_DOMAIN = 'auth.sanmartinsr.local';
 
 export const cleanAuthPhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
