@@ -1,6 +1,6 @@
 {
   "appId": "com.sanmartinsr.tienda",
-  "appName": "Carnes San Martin Granada",
+  "appName": "Carnes San Martin",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"
