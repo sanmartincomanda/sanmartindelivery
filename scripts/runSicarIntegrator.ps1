@@ -196,8 +196,17 @@ while ($true) {
     $lastExistingBridgePid = 0
     Set-CircuitState -State 'starting' -Reason 'Iniciando puente SICAR.' -FailureCount $script:RapidFailureTimes.Count
     Write-IntegratorLog 'Levantando puente SICAR.'
-    & $NodeExePath $BridgeScriptPath *>> $script:LogPath
-    $exitCode = $LASTEXITCODE
+    # Windows PowerShell 5.1 materializes native stderr as ErrorRecord objects. With the
+    # supervisor-wide Stop preference, a warning written by Node would otherwise terminate
+    # the bridge even when the application has already handled it.
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = 'Continue'
+      & $NodeExePath $BridgeScriptPath *>> $script:LogPath
+      $exitCode = $LASTEXITCODE
+    } finally {
+      $ErrorActionPreference = $previousErrorActionPreference
+    }
     $failureReason = "Puente SICAR finalizo con codigo $exitCode."
   } catch {
     $failureReason = "Fallo del supervisor: $($_.Exception.Message)"
