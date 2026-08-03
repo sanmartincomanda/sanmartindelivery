@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { onValue, ref, update } from 'firebase/database';
+import { database } from '../firebase';
 import { formatOrderNumber } from '../services/orders';
 import {
   adjustStoreRewardPoints,
@@ -18,6 +20,7 @@ import {
 } from '../services/storeWelcomeCoupon';
 import { updateStoreUserPassword } from '../services/storeUsers';
 import { buildGoogleMapsAddressUrl, buildGoogleMapsPlaceUrl } from '../services/geo';
+import { STORE_ACCOUNT_DELETION_REQUESTS_PATH } from '../services/storeLegal';
 
 const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 
@@ -229,6 +232,7 @@ export default function StoreCustomersAdminSection({
   const [adjustmentForm, setAdjustmentForm] = useState({ mode: 'sumar', points: '', note: '' });
   const [adjustingPoints, setAdjustingPoints] = useState(false);
   const [message, setMessage] = useState('');
+  const [deletionRequests, setDeletionRequests] = useState([]);
 
   useEffect(() => {
     const unsubscribeSettings = subscribeStoreRewardSettings(
@@ -249,6 +253,19 @@ export default function StoreCustomersAdminSection({
       unsubscribeRewards();
       unsubscribeAccounts();
     };
+  }, []);
+
+  useEffect(() => {
+    return onValue(
+      ref(database, STORE_ACCOUNT_DELETION_REQUESTS_PATH),
+      (snapshot) => {
+        const rows = Object.entries(snapshot.val() || {})
+          .map(([key, value]) => ({ key, ...(value || {}) }))
+          .sort((left, right) => Number(right.requestedAt || 0) - Number(left.requestedAt || 0));
+        setDeletionRequests(rows);
+      },
+      (error) => console.error('No se pudieron cargar las solicitudes de eliminacion:', error)
+    );
   }, []);
 
   useEffect(() => {
@@ -449,6 +466,27 @@ export default function StoreCustomersAdminSection({
     }
   };
 
+  const updateDeletionRequestStatus = async (request, status) => {
+    if (!request?.key) {
+      return;
+    }
+
+    try {
+      await update(ref(database, `${STORE_ACCOUNT_DELETION_REQUESTS_PATH}/${request.key}`), {
+        status,
+        updatedAt: Date.now(),
+      });
+      setMessage(
+        status === 'completed'
+          ? 'Solicitud marcada como completada.'
+          : 'Solicitud marcada en proceso.'
+      );
+    } catch (error) {
+      console.error('No se pudo actualizar la solicitud de eliminacion:', error);
+      setMessage('No se pudo actualizar la solicitud de eliminacion.');
+    }
+  };
+
   return (
     <section className="cfg-section-card" style={{ display: 'grid', gap: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -480,6 +518,38 @@ export default function StoreCustomersAdminSection({
           }}
         >
           {message}
+        </div>
+      )}
+
+      {deletionRequests.some((request) => request.status === 'pending' || request.status === 'processing') && (
+        <div style={{ padding: 16, borderRadius: 18, border: '1px solid #fecaca', background: '#fff7f7', display: 'grid', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0, color: '#991b1b' }}>Solicitudes de eliminacion de cuenta</h3>
+            <p style={{ margin: '4px 0 0', color: '#7f1d1d', fontWeight: 700 }}>
+              Atiende estas solicitudes y elimina o anonimiza los datos correspondientes en un plazo de hasta 30 dias.
+            </p>
+          </div>
+          {deletionRequests
+            .filter((request) => request.status === 'pending' || request.status === 'processing')
+            .map((request) => (
+              <div key={request.key} style={{ padding: 14, borderRadius: 14, background: '#fff', border: '1px solid #fee2e2', display: 'grid', gap: 8 }}>
+                <strong>{request.name || 'Cliente sin nombre'} · {request.customerCode || request.key}</strong>
+                <span style={{ color: '#64748b', fontWeight: 700 }}>
+                  {request.email || 'Sin correo'} | {request.phone || 'Sin telefono'} | Solicitado: {formatDateTime(request.requestedAt)}
+                </span>
+                {request.reason ? <span style={{ color: '#475569' }}>Motivo: {request.reason}</span> : null}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {request.status === 'pending' && (
+                    <button type="button" className="cfg-button secondary" onClick={() => updateDeletionRequestStatus(request, 'processing')}>
+                      Marcar en proceso
+                    </button>
+                  )}
+                  <button type="button" className="cfg-button" onClick={() => updateDeletionRequestStatus(request, 'completed')}>
+                    Marcar completada
+                  </button>
+                </div>
+              </div>
+            ))}
         </div>
       )}
 

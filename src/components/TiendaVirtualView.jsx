@@ -111,6 +111,11 @@ import {
   updateStoreUserProfile,
 } from '../services/storeUsers';
 import {
+  requestStoreAccountDeletion,
+  STORE_ACCOUNT_DELETION_URL,
+  STORE_PRIVACY_URL,
+} from '../services/storeLegal';
+import {
   buildStoreCheckoutItems,
   buildStoreDiscountSnapshot,
   getStoreCartOriginalSubtotal,
@@ -3530,6 +3535,31 @@ export default function TiendaVirtualView({
           ? 'Debes guardar la ubicacion exacta del mapa para actualizar tu perfil.'
           : 'No se pudo actualizar tu perfil.'
       );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAccountDeletionRequest = async (reason = '') => {
+    if (!currentUser) {
+      throw new Error('Debes iniciar sesion para solicitar la eliminacion.');
+    }
+
+    setSubmitting(true);
+    try {
+      await requestStoreAccountDeletion(currentUser, reason);
+      window.alert(
+        'Recibimos tu solicitud. Cerraremos la sesion y procesaremos la eliminacion de tu cuenta en un plazo de hasta 30 dias.'
+      );
+      await clearStoreSession();
+    } catch (error) {
+      console.error('No se pudo solicitar la eliminacion de cuenta:', error);
+      window.alert(
+        error?.code === 'AUTH_REQUIRED'
+          ? 'Por seguridad, inicia sesion nuevamente antes de solicitar la eliminacion.'
+          : 'No pudimos registrar la solicitud. Tambien puedes solicitarla desde tienda.sanmartinsr.com/eliminar-cuenta.'
+      );
+      throw error;
     } finally {
       setSubmitting(false);
     }
@@ -8400,6 +8430,7 @@ export default function TiendaVirtualView({
           onClose={() => setProfileOpen(false)}
           onSignOut={clearStoreSession}
           onSave={handleProfileSave}
+          onRequestDeletion={handleAccountDeletionRequest}
         />
       )}
 
@@ -8953,6 +8984,17 @@ function StoreAuthView({
           </>
         )}
       </form>
+      <p style={{ margin: '14px 0 0', textAlign: 'center', color: '#64748b', fontSize: 13, lineHeight: 1.5 }}>
+        Al crear una cuenta aceptas nuestra{' '}
+        <a
+          href={STORE_PRIVACY_URL}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: '#0b5ea8', fontWeight: 900 }}
+        >
+          politica de privacidad
+        </a>.
+      </p>
     </section>
   );
 
@@ -9714,6 +9756,7 @@ function ProfileSheet({
   onClose,
   onSave,
   onSignOut,
+  onRequestDeletion,
 }) {
   const [profile, setProfile] = useState({
     nombre: user?.nombre || '',
@@ -9722,6 +9765,9 @@ function ProfileSheet({
     ubicacion: user?.ubicacion || null,
   });
   const [locating, setLocating] = useState(false);
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deletionReason, setDeletionReason] = useState('');
+  const [deletionBusy, setDeletionBusy] = useState(false);
 
   const updateProfile = (field, value) => {
     setProfile((current) => ({
@@ -9755,6 +9801,26 @@ function ProfileSheet({
       alert('No pudimos tomar tu ubicacion. Activa permisos o intenta de nuevo.');
     } finally {
       setLocating(false);
+    }
+  };
+
+  const submitDeletionRequest = async () => {
+    if (!onRequestDeletion || deletionBusy) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Quieres solicitar la eliminacion de tu cuenta? Tus puntos, cupones y beneficios dejaran de estar disponibles.'
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletionBusy(true);
+    try {
+      await onRequestDeletion(deletionReason);
+    } catch {
+      setDeletionBusy(false);
     }
   };
 
@@ -9809,6 +9875,59 @@ function ProfileSheet({
           <button type="button" className="store-button secondary" onClick={onSignOut}>
             Cerrar sesion
           </button>
+          <div style={{ borderTop: '1px solid #dbe5ef', marginTop: 8, paddingTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <a
+                className="store-button secondary"
+                href={STORE_PRIVACY_URL}
+                target="_blank"
+                rel="noreferrer"
+                style={{ textDecoration: 'none' }}
+              >
+                Privacidad
+              </a>
+              <button
+                type="button"
+                className="store-button secondary"
+                onClick={() => setDeletionOpen((current) => !current)}
+              >
+                Eliminar cuenta
+              </button>
+            </div>
+            {deletionOpen && (
+              <div style={{ marginTop: 12, padding: 14, borderRadius: 16, background: '#fff4f4', border: '1px solid #fecaca' }}>
+                <strong style={{ display: 'block', color: '#991b1b' }}>Solicitar eliminacion</strong>
+                <p style={{ margin: '6px 0 10px', color: '#7f1d1d', fontSize: 13, lineHeight: 1.45 }}>
+                  Procesaremos tu solicitud en un plazo de hasta 30 dias. Algunos registros pueden conservarse por obligaciones legales.
+                </p>
+                <textarea
+                  className="store-field"
+                  value={deletionReason}
+                  onChange={(event) => setDeletionReason(event.target.value)}
+                  placeholder="Motivo (opcional)"
+                  maxLength={500}
+                  style={{ minHeight: 78, resize: 'vertical' }}
+                />
+                <button
+                  type="button"
+                  className="store-button"
+                  disabled={deletionBusy}
+                  onClick={submitDeletionRequest}
+                  style={{ marginTop: 10, background: '#b91c1c' }}
+                >
+                  {deletionBusy ? 'Enviando solicitud...' : 'Confirmar solicitud'}
+                </button>
+                <a
+                  href={STORE_ACCOUNT_DELETION_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'block', marginTop: 10, textAlign: 'center', color: '#7f1d1d', fontWeight: 800, fontSize: 12 }}
+                >
+                  Solicitar desde la pagina web
+                </a>
+              </div>
+            )}
+          </div>
         </form>
       </div>
     </div>

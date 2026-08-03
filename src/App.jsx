@@ -34,6 +34,8 @@ import ConfiguracionView from './components/ConfiguracionView';
 import DriverView from './components/DriverView';
 import BaseDatosView from './components/BaseDatosView';
 import CrmView from './components/CrmView';
+import PrivacyPolicyView from './components/PrivacyPolicyView';
+import AccountDeletionView from './components/AccountDeletionView';
 
 const Icons = {
   plus: (
@@ -137,6 +139,10 @@ const getRouteFromLocation = () => {
   }
 
   const hostname = window.location.hostname;
+  const pathname = String(window.location.pathname || '').replace(/\/+$/, '').toLowerCase();
+  if (pathname === '/privacidad') return 'privacy';
+  if (pathname === '/eliminar-cuenta') return 'account-deletion';
+
   const publicHostRoute = getPublicHostRoute(hostname);
   if (publicHostRoute) {
     return publicHostRoute;
@@ -173,6 +179,10 @@ const getDocumentTitle = (route) => {
       return 'Carnes San Martin | Driver';
     case 'crm':
       return 'Carnes San Martin | CRM';
+    case 'privacy':
+      return 'Politica de privacidad | Carnes San Martin';
+    case 'account-deletion':
+      return 'Eliminar cuenta | Carnes San Martin';
     default:
       return 'Carnes San Martin | Comanda Digital';
   }
@@ -585,6 +595,14 @@ function App() {
 
     setView('ingreso');
   }, [availableNavItems, isAuthenticated, view]);
+
+  if (route === 'privacy') {
+    return <PrivacyPolicyView />;
+  }
+
+  if (route === 'account-deletion') {
+    return <AccountDeletionView />;
+  }
 
   if (isPublicStoreRoute) {
     return (

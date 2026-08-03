@@ -90,6 +90,15 @@
         }
       }
     },
+    "storeAccountDeletionRequests": {
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')",
+        ".write": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin') || (auth.uid == $uid && newData.child('uid').val() == $uid && newData.child('status').val() == 'pending' && newData.child('requestedAt').isNumber() && newData.child('updatedAt').isNumber() && (!data.exists() || data.child('status').val() == 'pending')))",
+        ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'status', 'requestedAt', 'updatedAt', 'source']) && newData.child('uid').val() == $uid && (newData.child('status').val() == 'pending' || newData.child('status').val() == 'processing' || newData.child('status').val() == 'completed' || newData.child('status').val() == 'rejected') && newData.child('requestedAt').isNumber() && newData.child('updatedAt').isNumber() && newData.child('source').isString() && (!newData.child('name').exists() || newData.child('name').isString()) && (!newData.child('email').exists() || newData.child('email').isString()) && (!newData.child('phone').exists() || newData.child('phone').isString()) && (!newData.child('customerCode').exists() || newData.child('customerCode').isString()) && (!newData.child('reason').exists() || newData.child('reason').isString()))"
+      }
+    },
     "storeCampaigns": {
       ".read": "auth != null",
       ".write": "auth != null",
