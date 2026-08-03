@@ -10556,6 +10556,7 @@ function CheckoutSheet({
   const canSubmitDelivery = pickupFlow || deliveryQuote?.available;
   const storeClosed = storeOperationStatus?.open === false;
   const deliveryFreeActive = Boolean(deliveryQuote?.deliveryFree) && !pickupFlow;
+  const rewardProgramName = `Miembro Gold San Martin ${selectedBranch?.shortName || 'Granada'}`;
   const rewardCartPreview = getRewardCartPreview(selectedReward);
   const deliveryChoices = [
     {
