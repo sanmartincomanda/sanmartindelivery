@@ -503,7 +503,9 @@
 
 .store-shell.storefront-public-v2 .store-category-photo {
   z-index: -2;
-  background: var(--sf-navy-950);
+  background:
+    radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.16), transparent 34%),
+    linear-gradient(145deg, var(--sf-blue-700), var(--sf-navy-950));
 }
 
 .store-shell.storefront-public-v2 .store-category-photo img {
@@ -511,9 +513,15 @@
   height: 100%;
   display: block;
   object-fit: cover;
-  transform: scale(1.015);
+  opacity: 0;
+  transform: scale(1.04);
   filter: saturate(0.96) contrast(1.03);
-  transition: transform 260ms ease, filter 180ms ease;
+  transition: opacity 180ms ease, transform 260ms ease, filter 180ms ease;
+}
+
+.store-shell.storefront-public-v2 .store-category-photo.is-ready img {
+  opacity: 1;
+  transform: scale(1.015);
 }
 
 .store-shell.storefront-public-v2 .store-category-shade {

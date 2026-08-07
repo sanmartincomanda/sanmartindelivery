@@ -155,6 +155,7 @@ import '../styles/storefrontPublic.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
+const STORE_FAST_STATIC_ORIGIN = 'https://verdant-youtiao-5cd9d3.netlify.app';
 const STORE_CATEGORY_IMAGE_BY_KEY = Object.freeze({
   todos: '/tienda/categorias/todos-v1.webp',
   promociones: '/tienda/categorias/combos-v1.webp',
@@ -298,15 +299,23 @@ const getStoreCategoryImagePath = (category = {}) => {
   const categoryKey = normalizeStorePriorityText(category.id || category.label).replace(/\s+/g, '-');
   const categoryDescriptor = normalizeStorePriorityText(`${category.id || ''} ${category.label || ''}`);
 
-  if (STORE_CATEGORY_IMAGE_BY_KEY[categoryKey]) {
-    return STORE_CATEGORY_IMAGE_BY_KEY[categoryKey];
+  let imagePath = STORE_CATEGORY_IMAGE_BY_KEY[categoryKey];
+
+  if (!imagePath) {
+    const matchingKey = Object.keys(STORE_CATEGORY_IMAGE_BY_KEY).find((key) =>
+      categoryDescriptor.includes(key)
+    );
+    imagePath = STORE_CATEGORY_IMAGE_BY_KEY[matchingKey] || STORE_CATEGORY_IMAGE_BY_KEY.todos;
   }
 
-  const matchingKey = Object.keys(STORE_CATEGORY_IMAGE_BY_KEY).find((key) =>
-    categoryDescriptor.includes(key)
-  );
+  if (
+    typeof window !== 'undefined' &&
+    String(window.location.hostname || '').toLowerCase() === 'tienda.sanmartinsr.com'
+  ) {
+    return `${STORE_FAST_STATIC_ORIGIN}${imagePath}`;
+  }
 
-  return STORE_CATEGORY_IMAGE_BY_KEY[matchingKey] || STORE_CATEGORY_IMAGE_BY_KEY.todos;
+  return imagePath;
 };
 
 const STORE_ALL_PRODUCTS_PRIORITY_GROUPS = [
@@ -1234,6 +1243,7 @@ export default function TiendaVirtualView({
   const [catalogState] = useState(() => getInitialCatalogState());
   const [catalog, setCatalog] = useState(() => catalogState.catalog);
   const [catalogLoading, setCatalogLoading] = useState(() => catalogState.loading);
+  const [categoryMediaReady, setCategoryMediaReady] = useState(false);
   const [categories, setCategories] = useState(() =>
     getInitialStoreCollection(
       STORE_CATEGORIES_CACHE_KEY,
@@ -1407,6 +1417,26 @@ export default function TiendaVirtualView({
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (catalogLoading) return undefined;
+
+    let idleId;
+    const timeoutId = window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(() => setCategoryMediaReady(true), { timeout: 1800 });
+        return;
+      }
+      setCategoryMediaReady(true);
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (idleId && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
+    };
+  }, [catalogLoading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -8162,7 +8192,7 @@ export default function TiendaVirtualView({
             </div>
 
             <nav className="store-tabs store-category-gallery" aria-label="Categorias del catalogo">
-              {categoryOptions.map((category, categoryIndex) => {
+              {categoryOptions.map((category) => {
                 const categoryIsActive = activeCategory === category.id;
                 const categoryProductCount = Number(categoryProductCounts[category.id] || 0);
 
@@ -8178,14 +8208,19 @@ export default function TiendaVirtualView({
                       setActiveSubcategory('todas');
                     }}
                   >
-                    <span className="store-category-photo" aria-hidden="true">
-                      <img
-                        src={getStoreCategoryImagePath(category)}
-                        alt=""
-                        loading={categoryIndex < 3 ? 'eager' : 'lazy'}
-                        decoding="async"
-                        fetchPriority={categoryIndex === 0 ? 'high' : 'auto'}
-                      />
+                    <span
+                      className={`store-category-photo ${categoryMediaReady ? 'is-ready' : ''}`}
+                      aria-hidden="true"
+                    >
+                      {categoryMediaReady ? (
+                        <img
+                          src={getStoreCategoryImagePath(category)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          fetchPriority="low"
+                        />
+                      ) : null}
                     </span>
                     <span className="store-category-shade" aria-hidden="true" />
                     <span className="store-category-copy">
