@@ -122,6 +122,7 @@ import {
   resolveStoreDiscountBenefit,
   STORE_DISCOUNT_SOURCE,
 } from '../services/storeDiscounts';
+import { applyStoreImageFallback, getStoreImageUrl } from '../services/storeImageCdn';
 import {
   isPickupOrder,
   ORDER_FULFILLMENT_DELIVERY,
@@ -4136,15 +4137,15 @@ export default function TiendaVirtualView({
             <span className="store-product-image-shell">
               <span className="store-product-image">
                 <img
-                  src={product.image || LOGO_PATH}
+                  src={getStoreImageUrl(product.image || LOGO_PATH, { width: 520, quality: 74 })}
                   alt={product.name}
                   loading="lazy"
                   decoding="async"
                   onError={(event) => {
-                    if (event.currentTarget.dataset.fallbackApplied === 'true') return;
-                    event.currentTarget.dataset.fallbackApplied = 'true';
-                    event.currentTarget.src = LOGO_PATH;
-                    event.currentTarget.classList.add('store-product-image-fallback');
+                    applyStoreImageFallback(event, product.image, LOGO_PATH);
+                    if (event.currentTarget.dataset.fallbackApplied === 'true') {
+                      event.currentTarget.classList.add('store-product-image-fallback');
+                    }
                   }}
                 />
               </span>
