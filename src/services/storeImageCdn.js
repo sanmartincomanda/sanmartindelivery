@@ -28,6 +28,7 @@ export const getStoreImageUrl = (source, { width = 520, quality = 75 } = {}) => 
       url: cleanSource,
       w: String(Math.max(64, Math.round(Number(width) || 520))),
       q: String(Math.min(100, Math.max(1, Math.round(Number(quality) || 75)))),
+      fm: 'webp',
     });
 
     return `/.netlify/images?${params.toString()}`;
