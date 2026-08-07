@@ -154,6 +154,7 @@ import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartin
 import '../styles/storefrontPublic.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
+const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_PUBLIC_ASSET_ORIGIN = 'https://tiendavirtual-2ced1.web.app';
 const STORE_CATEGORY_IMAGE_BY_KEY = Object.freeze({
@@ -4186,12 +4187,12 @@ export default function TiendaVirtualView({
             <span className="store-product-image-shell">
               <span className="store-product-image">
                 <img
-                  src={getStoreImageUrl(product.image || LOGO_PATH, { width: 520, quality: 74 })}
+                  src={getStoreImageUrl(product.image || PRODUCT_PLACEHOLDER_PATH)}
                   alt={product.name}
                   loading="lazy"
                   decoding="async"
                   onError={(event) => {
-                    applyStoreImageFallback(event, product.image, LOGO_PATH);
+                    applyStoreImageFallback(event, product.image, PRODUCT_PLACEHOLDER_PATH);
                     if (event.currentTarget.dataset.fallbackApplied === 'true') {
                       event.currentTarget.classList.add('store-product-image-fallback');
                     }
@@ -10405,12 +10406,12 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
         <div className="store-detail-grid">
           <div className="store-detail-image">
             <img
-              src={product.image || LOGO_PATH}
+              src={product.image || PRODUCT_PLACEHOLDER_PATH}
               alt={product.name}
               onError={(event) => {
                 if (event.currentTarget.dataset.fallbackApplied === 'true') return;
                 event.currentTarget.dataset.fallbackApplied = 'true';
-                event.currentTarget.src = LOGO_PATH;
+                event.currentTarget.src = PRODUCT_PLACEHOLDER_PATH;
                 event.currentTarget.classList.add('store-product-image-fallback');
               }}
             />

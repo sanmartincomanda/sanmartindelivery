@@ -1,37 +1,11 @@
-const NETLIFY_IMAGE_HOSTS = /(^|\.)(sanmartinsr\.com|netlify\.app)$/i;
-const OPTIMIZABLE_IMAGE_HOSTS = new Set([
-  'firebasestorage.googleapis.com',
-  'storage.googleapis.com',
-]);
+export const getStoreImageUrl = (source) => String(source || '').trim();
 
-const canUseNetlifyImageCdn = () => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return window.location.protocol === 'https:' && NETLIFY_IMAGE_HOSTS.test(window.location.hostname);
-};
-
-export const getStoreImageUrl = (source, { width = 520, quality = 75 } = {}) => {
+const resolveImageUrl = (source) => {
   const cleanSource = String(source || '').trim();
-  if (!cleanSource || !canUseNetlifyImageCdn()) {
-    return cleanSource;
-  }
+  if (!cleanSource) return '';
 
   try {
-    const sourceUrl = new URL(cleanSource);
-    if (!OPTIMIZABLE_IMAGE_HOSTS.has(sourceUrl.hostname)) {
-      return cleanSource;
-    }
-
-    const params = new URLSearchParams({
-      url: cleanSource,
-      w: String(Math.max(64, Math.round(Number(width) || 520))),
-      q: String(Math.min(100, Math.max(1, Math.round(Number(quality) || 75)))),
-      fm: 'webp',
-    });
-
-    return `/.netlify/images?${params.toString()}`;
+    return new URL(cleanSource, document.baseURI).href;
   } catch {
     return cleanSource;
   }
@@ -39,12 +13,17 @@ export const getStoreImageUrl = (source, { width = 520, quality = 75 } = {}) => 
 
 export const applyStoreImageFallback = (event, originalSource, fallbackSource) => {
   const image = event?.currentTarget;
-  if (!image) {
-    return;
-  }
+  if (!image) return;
 
   const cleanOriginal = String(originalSource || '').trim();
-  if (cleanOriginal && image.dataset.originalFallbackApplied !== 'true') {
+  const resolvedOriginal = resolveImageUrl(cleanOriginal);
+  const currentSource = String(image.currentSrc || image.src || '').trim();
+
+  if (
+    cleanOriginal
+    && resolvedOriginal !== currentSource
+    && image.dataset.originalFallbackApplied !== 'true'
+  ) {
     image.dataset.originalFallbackApplied = 'true';
     image.src = cleanOriginal;
     return;
