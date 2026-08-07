@@ -21,6 +21,7 @@ export default function StoreApp() {
         onCreateOrder={(payload, options = {}) => createOrder(payload, options)}
         publicStoreUrl={STORE_CANONICAL_ORIGIN}
         mode="public"
+        surface="native"
       />
     </div>
   );

@@ -150,6 +150,7 @@ import {
   subscribeStoreRewards,
 } from '../services/storeRewards';
 import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+import '../styles/storefrontPublic.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
@@ -1198,6 +1199,7 @@ export default function TiendaVirtualView({
   onCreateOrder,
   mode = 'public',
   publicStoreUrl = 'https://tienda.sanmartinsr.com',
+  surface = 'web',
 }) {
   const directBranchRouteId =
     typeof window !== 'undefined' ? getStoreBranchIdFromPathname(window.location.pathname) : '';
@@ -1357,6 +1359,7 @@ export default function TiendaVirtualView({
 
   const deferredQuery = useDeferredValue(query);
   const isDashboard = mode === 'dashboard';
+  const usePublicStorefrontDesign = !isDashboard && surface === 'web';
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const showMobileBottomNav = isPhoneLayout && !isDashboard;
   const selectedBranch = useMemo(
@@ -4137,6 +4140,12 @@ export default function TiendaVirtualView({
                   alt={product.name}
                   loading="lazy"
                   decoding="async"
+                  onError={(event) => {
+                    if (event.currentTarget.dataset.fallbackApplied === 'true') return;
+                    event.currentTarget.dataset.fallbackApplied = 'true';
+                    event.currentTarget.src = LOGO_PATH;
+                    event.currentTarget.classList.add('store-product-image-fallback');
+                  }}
                 />
               </span>
             </span>
@@ -4202,7 +4211,11 @@ export default function TiendaVirtualView({
   }, [Boolean(mobileOverlayOpen)]);
 
   return (
-    <div className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''}`}>
+    <div
+      className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''} ${
+        usePublicStorefrontDesign ? 'storefront-public-v2' : ''
+      }`}
+    >
       <style>{`
         .store-shell {
           ${SAN_MARTIN_STORE_CSS_VARS}
@@ -8011,16 +8024,17 @@ export default function TiendaVirtualView({
                 title="Inicia sesion"
                 onClick={() => openAuthSheet('login', 'guest')}
               >
-                Iniciar sesion
+                {isMobileLayout ? 'Ingresar' : 'Iniciar sesion'}
               </button>
             )}
               <button
                 type="button"
-                className="store-icon-button"
+                className="store-icon-button store-cart-button"
                 title="Carrito"
                 onClick={() => setCheckoutOpen(true)}
               >
-                {cartItems.length || '+'}
+                <StoreCheckoutIcon name="cart" />
+                {cartItems.length > 0 && <span className="store-cart-button-count">{cartItems.length}</span>}
               </button>
             </div>
           </div>
@@ -8095,7 +8109,7 @@ export default function TiendaVirtualView({
         )}
 
         {rewardSettings.enabled !== false && (
-          <section style={{ marginTop: isMobileLayout ? 10 : 18, marginBottom: isMobileLayout ? 4 : 8 }}>
+          <section className="store-rewards-entry">
             <StoreRewardsSummaryCard
               currentUser={currentUser}
               settings={rewardSettings}
@@ -8160,22 +8174,26 @@ export default function TiendaVirtualView({
             )}
           </section>
 
-          <div className="store-product-head">
-            <h2 className="store-count">
-              {showCatalogSkeleton ? 'Cargando productos...' : `${filteredProducts.length} productos`}
-            </h2>
-            <button
-              type="button"
-              className="store-button secondary"
-              onClick={() => {
-                setQuery('');
-                setActiveCategory('todos');
-                setActiveSubcategory('todas');
-              }}
-            >
-              Limpiar
-            </button>
-          </div>
+          {(showCatalogSkeleton || deferredQuery || activeCategory !== 'todos') && (
+            <div className="store-product-head" aria-live="polite">
+              <h2 className="store-count">
+                {showCatalogSkeleton ? 'Cargando productos...' : `${filteredProducts.length} productos`}
+              </h2>
+              {(deferredQuery || activeCategory !== 'todos') && (
+                <button
+                  type="button"
+                  className="store-button secondary"
+                  onClick={() => {
+                    setQuery('');
+                    setActiveCategory('todos');
+                    setActiveSubcategory('todas');
+                  }}
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
 
           {showCatalogSkeleton ? (
             <div className="store-grid store-grid-skeleton" aria-label="Cargando catalogo">
@@ -8189,7 +8207,21 @@ export default function TiendaVirtualView({
               ))}
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="store-empty">No encontramos productos con esa busqueda.</div>
+            <div className="store-empty" role="status">
+              <strong>No encontramos productos</strong>
+              <span>Prueba con otro nombre, codigo o categoria.</span>
+              <button
+                type="button"
+                className="store-button secondary"
+                onClick={() => {
+                  setQuery('');
+                  setActiveCategory('todos');
+                  setActiveSubcategory('todas');
+                }}
+              >
+                Ver todo el catalogo
+              </button>
+            </div>
           ) : activeCategory === 'todos' && !showSearchResultsAsFlatList ? (
             <div className="store-grouped-sections">
               {groupedAllProductsSections.map((section) => {
@@ -10146,6 +10178,11 @@ function FloatingCart({
                 className="store-floating-cart-thumb"
                 src={item.image || LOGO_PATH}
                 alt={item.nombre}
+                onError={(event) => {
+                  if (event.currentTarget.dataset.fallbackApplied === 'true') return;
+                  event.currentTarget.dataset.fallbackApplied = 'true';
+                  event.currentTarget.src = LOGO_PATH;
+                }}
               />
               <div>
                 <p className="store-floating-cart-name">{item.nombre}</p>
@@ -10288,7 +10325,16 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
 
         <div className="store-detail-grid">
           <div className="store-detail-image">
-            <img src={product.image || LOGO_PATH} alt={product.name} />
+            <img
+              src={product.image || LOGO_PATH}
+              alt={product.name}
+              onError={(event) => {
+                if (event.currentTarget.dataset.fallbackApplied === 'true') return;
+                event.currentTarget.dataset.fallbackApplied = 'true';
+                event.currentTarget.src = LOGO_PATH;
+                event.currentTarget.classList.add('store-product-image-fallback');
+              }}
+            />
           </div>
           <div className="store-product-sheet-copy">
             <div className="store-product-sheet-info">
@@ -10428,6 +10474,13 @@ function StoreCheckoutIcon({ name }) {
         <rect x="14" y="4" width="6" height="6" rx="1.5" />
         <rect x="4" y="14" width="6" height="6" rx="1.5" />
         <rect x="14" y="14" width="6" height="6" rx="1.5" />
+      </svg>
+    ),
+    cart: (
+      <svg {...commonProps}>
+        <path d="M3.5 5h2l1.7 9.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 1.9-1.4L21 8H7" />
+        <circle cx="9.5" cy="19" r="1.3" />
+        <circle cx="17.5" cy="19" r="1.3" />
       </svg>
     ),
     orders: (
