@@ -49,9 +49,165 @@
       name="twitter:image:alt"
       content="Logo de Delivery - Carnes San Martin Granada."
     />
+    <style>
+      .store-boot {
+        min-height: 100vh;
+        box-sizing: border-box;
+        padding: max(24px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+        color: #102846;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(48, 143, 226, 0.13), transparent 24rem),
+          linear-gradient(180deg, #f8fbff 0%, #edf5fd 100%);
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      }
+
+      .store-boot__inner {
+        width: min(1100px, 100%);
+        margin: 0 auto;
+      }
+
+      .store-boot__brand {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-height: 62px;
+      }
+
+      .store-boot__brand img {
+        width: 48px;
+        height: 48px;
+        display: block;
+      }
+
+      .store-boot__brand strong,
+      .store-boot__brand span {
+        display: block;
+      }
+
+      .store-boot__brand strong {
+        font-size: clamp(18px, 4.8vw, 25px);
+        line-height: 1.05;
+      }
+
+      .store-boot__brand span {
+        margin-top: 4px;
+        color: #467098;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .store-boot__search,
+      .store-boot__card,
+      .store-boot__product {
+        border: 1px solid rgba(16, 49, 86, 0.1);
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 14px 36px rgba(16, 49, 86, 0.08);
+      }
+
+      .store-boot__search {
+        height: 50px;
+        margin-top: 22px;
+        border-radius: 17px;
+      }
+
+      .store-boot__categories {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(122px, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+        overflow: hidden;
+      }
+
+      .store-boot__card {
+        height: 86px;
+        border-radius: 20px;
+      }
+
+      .store-boot__label {
+        margin: 30px 0 14px;
+        font-size: 19px;
+        font-weight: 900;
+      }
+
+      .store-boot__products {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(140px, 1fr));
+        gap: 15px;
+      }
+
+      .store-boot__product {
+        height: 230px;
+        border-radius: 24px;
+      }
+
+      .store-boot__search,
+      .store-boot__card,
+      .store-boot__product {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .store-boot__search::after,
+      .store-boot__card::after,
+      .store-boot__product::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        transform: translateX(-110%);
+        background: linear-gradient(100deg, transparent 20%, rgba(61, 149, 224, 0.14) 50%, transparent 80%);
+        animation: store-boot-shimmer 1.15s ease-in-out infinite;
+      }
+
+      @keyframes store-boot-shimmer {
+        to { transform: translateX(110%); }
+      }
+
+      @media (max-width: 700px) {
+        .store-boot { padding-inline: 15px; }
+        .store-boot__categories { grid-template-columns: repeat(3, minmax(104px, 1fr)); }
+        .store-boot__products { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+        .store-boot__product { height: 210px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .store-boot__search::after,
+        .store-boot__card::after,
+        .store-boot__product::after { animation: none; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="store-boot" aria-label="Cargando tienda">
+        <div class="store-boot__inner">
+          <header class="store-boot__brand">
+            <img src="/tienda/branding/logo-mark.svg" alt="" width="48" height="48" />
+            <div>
+              <strong>Delivery Carnes San Martin</strong>
+              <span>Preparando el catalogo</span>
+            </div>
+          </header>
+          <div class="store-boot__search" aria-hidden="true"></div>
+          <div class="store-boot__categories" aria-hidden="true">
+            <div class="store-boot__card"></div>
+            <div class="store-boot__card"></div>
+            <div class="store-boot__card"></div>
+            <div class="store-boot__card"></div>
+            <div class="store-boot__card"></div>
+          </div>
+          <p class="store-boot__label">Cargando productos...</p>
+          <div class="store-boot__products" aria-hidden="true">
+            <div class="store-boot__product"></div>
+            <div class="store-boot__product"></div>
+            <div class="store-boot__product"></div>
+            <div class="store-boot__product"></div>
+            <div class="store-boot__product"></div>
+          </div>
+        </div>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

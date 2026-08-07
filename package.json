@@ -23,7 +23,8 @@
     "firebase:use": "npx firebase-tools use comanda-digital-ac1ec",
     "firebase:deploy:rules": "npx firebase-tools deploy --only database,storage",
     "firebase:deploy:database": "npx firebase-tools deploy --only database",
-    "firebase:deploy:storage": "npx firebase-tools deploy --only storage"
+    "firebase:deploy:storage": "npx firebase-tools deploy --only storage",
+    "store:hosting:deploy": "npm run build && npx firebase-tools deploy --only hosting --project tiendavirtual-2ced1"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.0.0",

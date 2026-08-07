@@ -155,17 +155,17 @@ import '../styles/storefrontPublic.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
-const STORE_FAST_STATIC_ORIGIN = 'https://verdant-youtiao-5cd9d3.netlify.app';
+const STORE_PUBLIC_ASSET_ORIGIN = 'https://tiendavirtual-2ced1.web.app';
 const STORE_CATEGORY_IMAGE_BY_KEY = Object.freeze({
-  todos: '/tienda/categorias/todos-v1.webp',
-  promociones: '/tienda/categorias/combos-v1.webp',
-  combos: '/tienda/categorias/combos-v1.webp',
-  res: '/tienda/categorias/res-v1.webp',
-  pollo: '/tienda/categorias/pollo-v1.webp',
-  cerdo: '/tienda/categorias/cerdo-v1.webp',
-  abarroteria: '/tienda/categorias/abarroteria-v1.webp',
-  congelados: '/tienda/categorias/congelados-v1.webp',
-  refrigerados: '/tienda/categorias/refrigerados-v1.webp',
+  todos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/todos-stock-v2.webp`,
+  promociones: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v2.webp`,
+  combos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v2.webp`,
+  res: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/res-stock-v2.webp`,
+  pollo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/pollo-stock-v2.webp`,
+  cerdo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/cerdo-stock-v2.webp`,
+  abarroteria: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/abarroteria-stock-v2.webp`,
+  congelados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/congelados-stock-v2.webp`,
+  refrigerados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/refrigerados-stock-v2.webp`,
 });
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
@@ -306,13 +306,6 @@ const getStoreCategoryImagePath = (category = {}) => {
       categoryDescriptor.includes(key)
     );
     imagePath = STORE_CATEGORY_IMAGE_BY_KEY[matchingKey] || STORE_CATEGORY_IMAGE_BY_KEY.todos;
-  }
-
-  if (
-    typeof window !== 'undefined' &&
-    String(window.location.hostname || '').toLowerCase() === 'tienda.sanmartinsr.com'
-  ) {
-    return `${STORE_FAST_STATIC_ORIGIN}${imagePath}`;
   }
 
   return imagePath;
