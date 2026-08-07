@@ -986,7 +986,19 @@
 .store-shell.storefront-public-v2 .store-choice-card.active {
   border-color: var(--sf-blue-700);
   background: var(--sf-blue-100);
+  color: var(--sf-navy-900);
   box-shadow: 0 0 0 2px rgba(12, 75, 133, 0.08);
+}
+
+.store-shell.storefront-public-v2 .store-checkout-sheet .store-choice-card.active strong {
+  color: var(--sf-navy-900);
+}
+
+.store-shell.storefront-public-v2
+  .store-checkout-sheet
+  .store-choice-card.active
+  span:not(.store-checkout-icon) {
+  color: var(--sf-blue-700);
 }
 
 .store-shell.storefront-public-v2 .store-total-note,
