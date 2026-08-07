@@ -155,6 +155,17 @@ import '../styles/storefrontPublic.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
+const STORE_CATEGORY_IMAGE_BY_KEY = Object.freeze({
+  todos: '/tienda/categorias/todos-v1.webp',
+  promociones: '/tienda/categorias/combos-v1.webp',
+  combos: '/tienda/categorias/combos-v1.webp',
+  res: '/tienda/categorias/res-v1.webp',
+  pollo: '/tienda/categorias/pollo-v1.webp',
+  cerdo: '/tienda/categorias/cerdo-v1.webp',
+  abarroteria: '/tienda/categorias/abarroteria-v1.webp',
+  congelados: '/tienda/categorias/congelados-v1.webp',
+  refrigerados: '/tienda/categorias/refrigerados-v1.webp',
+});
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
 const STORE_ORDER_UPDATE_ACK_KEY = 'sanmartin_store_order_update_ack';
@@ -282,6 +293,21 @@ const normalizeStorePriorityText = (value) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+
+const getStoreCategoryImagePath = (category = {}) => {
+  const categoryKey = normalizeStorePriorityText(category.id || category.label).replace(/\s+/g, '-');
+  const categoryDescriptor = normalizeStorePriorityText(`${category.id || ''} ${category.label || ''}`);
+
+  if (STORE_CATEGORY_IMAGE_BY_KEY[categoryKey]) {
+    return STORE_CATEGORY_IMAGE_BY_KEY[categoryKey];
+  }
+
+  const matchingKey = Object.keys(STORE_CATEGORY_IMAGE_BY_KEY).find((key) =>
+    categoryDescriptor.includes(key)
+  );
+
+  return STORE_CATEGORY_IMAGE_BY_KEY[matchingKey] || STORE_CATEGORY_IMAGE_BY_KEY.todos;
+};
 
 const STORE_ALL_PRODUCTS_PRIORITY_GROUPS = [
   { category: 'res', subcategory: 'linea diaria', title: 'Res · Linea Diaria' },
@@ -8135,23 +8161,47 @@ export default function TiendaVirtualView({
               <span className="store-filter-kicker">Categorias</span>
             </div>
 
-            <nav className="store-tabs">
-              {categoryOptions.map((category) => (
-                <button
-                  key={category.id}
-                  type="button"
-                  className={`store-chip store-filter-chip ${activeCategory === category.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveCategory(category.id);
-                    setActiveSubcategory('todas');
-                  }}
-                >
-                  <span className="store-filter-label">{category.label}</span>
-                  <span className="store-filter-meta">
-                    {Number(categoryProductCounts[category.id] || 0)} productos
-                  </span>
-                </button>
-              ))}
+            <nav className="store-tabs store-category-gallery" aria-label="Categorias del catalogo">
+              {categoryOptions.map((category, categoryIndex) => {
+                const categoryIsActive = activeCategory === category.id;
+                const categoryProductCount = Number(categoryProductCounts[category.id] || 0);
+
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={`store-chip store-filter-chip store-category-card ${categoryIsActive ? 'active' : ''}`}
+                    aria-label={`${category.label}, ${categoryProductCount} productos`}
+                    aria-pressed={categoryIsActive}
+                    onClick={() => {
+                      setActiveCategory(category.id);
+                      setActiveSubcategory('todas');
+                    }}
+                  >
+                    <span className="store-category-photo" aria-hidden="true">
+                      <img
+                        src={getStoreCategoryImagePath(category)}
+                        alt=""
+                        loading={categoryIndex < 3 ? 'eager' : 'lazy'}
+                        decoding="async"
+                        fetchPriority={categoryIndex === 0 ? 'high' : 'auto'}
+                      />
+                    </span>
+                    <span className="store-category-shade" aria-hidden="true" />
+                    <span className="store-category-copy">
+                      <span className="store-filter-label">{category.label}</span>
+                      <span className="store-filter-meta">
+                        {categoryProductCount} productos
+                      </span>
+                    </span>
+                    <span className="store-category-selected" aria-hidden="true">
+                      <svg viewBox="0 0 20 20" fill="none">
+                        <path d="m5 10 3 3 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  </button>
+                );
+              })}
             </nav>
 
             {orderedSubcategoryOptions.length > 0 && (
