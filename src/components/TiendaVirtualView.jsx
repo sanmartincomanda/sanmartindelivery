@@ -158,15 +158,15 @@ const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_PUBLIC_ASSET_ORIGIN = 'https://tiendavirtual-2ced1.web.app';
 const STORE_CATEGORY_IMAGE_BY_KEY = Object.freeze({
-  todos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/todos-stock-v2.webp`,
-  promociones: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v2.webp`,
-  combos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v2.webp`,
-  res: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/res-stock-v2.webp`,
-  pollo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/pollo-stock-v2.webp`,
-  cerdo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/cerdo-stock-v2.webp`,
-  abarroteria: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/abarroteria-stock-v2.webp`,
-  congelados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/congelados-stock-v2.webp`,
-  refrigerados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/refrigerados-stock-v2.webp`,
+  todos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/todos-stock-v3.webp`,
+  promociones: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v3.webp`,
+  combos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v3.webp`,
+  res: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/res-stock-v3.webp`,
+  pollo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/pollo-stock-v3.webp`,
+  cerdo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/cerdo-stock-v3.webp`,
+  abarroteria: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/abarroteria-stock-v3.webp`,
+  congelados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/congelados-stock-v3.webp`,
+  refrigerados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/refrigerados-stock-v3.webp`,
 });
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
