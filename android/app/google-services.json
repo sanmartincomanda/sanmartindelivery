@@ -8,6 +8,43 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:41323183250:android:1e66b9fec03c01d2917a4b",
+        "android_client_info": {
+          "package_name": "com.sanmartinsr.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "41323183250-qfujhm8jgs6dpv813lf5kjjn0ntefq6l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanmartinsr.app",
+            "certificate_hash": "da45011c4e8a55d18f7f22667069db2bfbce4e93"
+          }
+        },
+        {
+          "client_id": "41323183250-c73nickbciujfcrfuttn8bmn1l6oie4f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8psbVmKB6bJWh_yFMTnkcVUiOpQC3-k8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "41323183250-7nhjmln2m2m7v1gumpt58a640s4gg9aq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:41323183250:android:64070ec5f0720c40917a4b",
         "android_client_info": {
           "package_name": "com.sanmartinsr.tienda"

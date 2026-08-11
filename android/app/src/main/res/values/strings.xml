@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Carnes San Martin</string>
     <string name="title_activity_main">Carnes San Martin</string>
-    <string name="package_name">com.sanmartinsr.tienda</string>
-    <string name="custom_url_scheme">com.sanmartinsr.tienda</string>
+    <string name="package_name">com.sanmartinsr.app</string>
+    <string name="custom_url_scheme">com.sanmartinsr.app</string>
 </resources>

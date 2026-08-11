@@ -1,4 +1,4 @@
-package com.sanmartinsr.tienda;
+package com.sanmartinsr.app;
 
 import com.getcapacitor.BridgeActivity;
 
