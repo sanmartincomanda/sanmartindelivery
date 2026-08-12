@@ -8,9 +8,10 @@ const formatNio = (value) =>
     minimumFractionDigits: 2,
   }).format(Number(value || 0));
 
-export function PoketLogo({ size = 44, inverted = true }) {
+export function PoketLogo({ size = 44, inverted = true, className = '' }) {
   return (
     <span
+      className={`poket-logo ${className}`.trim()}
       aria-hidden="true"
       style={{
         width: size,

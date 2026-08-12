@@ -7282,6 +7282,36 @@ export default function TiendaVirtualView({
           box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
           text-align: center;
         }
+        .store-choice-card.payment.store-poket-choice {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 12px 14px;
+        }
+        .store-poket-choice-copy {
+          display: grid;
+          gap: 1px;
+          text-align: left;
+        }
+        .store-poket-choice-copy small {
+          color: var(--sm-text-soft);
+          font-size: 11px;
+          font-weight: 850;
+          line-height: 1;
+        }
+        .store-poket-choice-copy strong {
+          grid-area: auto;
+          color: var(--sm-blue-deep);
+          font-size: 18px;
+          font-weight: 950;
+          line-height: 1.05;
+        }
+        .store-poket-choice.active .store-poket-choice-copy small,
+        .store-poket-choice.active .store-poket-choice-copy strong {
+          color: #ffffff;
+        }
         .store-success-check {
           width: 76px;
           height: 76px;
@@ -11491,17 +11521,25 @@ function CheckoutSheet({
                   <button
                     key={payment.value}
                     type="button"
-                    className={`store-choice-card payment ${paymentValue === payment.value ? 'active' : ''}`}
+                    className={`store-choice-card payment ${payment.value === 'LINK DE PAGO' ? 'store-poket-choice' : ''} ${paymentValue === payment.value ? 'active' : ''}`}
                     aria-pressed={paymentValue === payment.value}
                     onClick={() => onCustomerChange('metodoPago', payment.value)}
                   >
                     {payment.value === 'LINK DE PAGO' ? (
-                      <PoketLogo size={42} inverted={false} />
+                      <>
+                        <PoketLogo size={46} inverted={false} />
+                        <div className="store-poket-choice-copy">
+                          <small>Paga con</small>
+                          <strong>Poket</strong>
+                        </div>
+                      </>
                     ) : (
-                      <StoreCheckoutIcon name={payment.icon} />
+                      <>
+                        <StoreCheckoutIcon name={payment.icon} />
+                        <strong>{payment.title}</strong>
+                        <span>{payment.detail}</span>
+                      </>
                     )}
-                    <strong>{payment.title}</strong>
-                    <span>{payment.detail}</span>
                   </button>
                 ))}
               </div>
@@ -11509,10 +11547,9 @@ function CheckoutSheet({
 
             {paymentValue === 'LINK DE PAGO' && (
               <div className="store-payment-note">
-                <StoreCheckoutIcon name="link" />
+                <PoketLogo size={38} inverted={false} />
                 <span>
-                  <strong>Nota:</strong> Cuando se actualice tu pedido con los pesos reales,
-                  podras tocar el link de pago.
+                  Se generará un link de pago automático cuando el pedido esté listo.
                 </span>
               </div>
             )}
