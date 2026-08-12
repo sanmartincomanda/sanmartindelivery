@@ -9,13 +9,13 @@ import {
 import { STORE_SUBCATEGORY_CANONICALS } from '../data/storeSubcategoryRules';
 import {
   compareCatalogProducts,
+  fetchActiveStoreCatalogHttp,
+  fetchStoreCatalogMetaHttp,
   getProductMinQuantity,
   getProductQuantityStep,
   isUnitMeasure,
   mergeCatalogProducts,
   resolveCatalogProductForBranch,
-  STORE_CATALOG_PATH,
-  STORE_CATALOG_META_PATH,
 } from '../services/storeCatalog';
 import {
   mergeStoreCategories,
@@ -1468,8 +1468,8 @@ export default function TiendaVirtualView({
         let canReuseCache = false;
 
         if (cachedCatalog.data) {
-          const metaSnapshot = await get(ref(database, STORE_CATALOG_META_PATH));
-          remoteUpdatedAt = Number(metaSnapshot.val()?.updatedAt || 0);
+          const remoteMeta = await fetchStoreCatalogMetaHttp();
+          remoteUpdatedAt = Number(remoteMeta?.updatedAt || 0);
           canReuseCache =
             cachedCatalog.updatedAt > 0 &&
             remoteUpdatedAt > 0 &&
@@ -1486,10 +1486,7 @@ export default function TiendaVirtualView({
           return;
         }
 
-        const catalogSnapshot = await get(
-          databaseQuery(ref(database, STORE_CATALOG_PATH), orderByChild('active'), equalTo(true))
-        );
-        const remoteCatalog = catalogSnapshot.val() || {};
+        const remoteCatalog = (await fetchActiveStoreCatalogHttp()) || {};
 
         writeStoreVersionedCache(
           STORE_CATALOG_CACHE_KEY,

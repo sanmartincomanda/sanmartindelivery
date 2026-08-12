@@ -8,6 +8,34 @@ export const STORE_CATALOG_PATH = 'storeCatalog';
 export const STORE_CATALOG_META_PATH = 'storeCatalogMeta';
 export const SICAR_SYNC_SOURCE = 'sicar';
 export const SICAR_CATALOG_SYNC_BATCH_SIZE = 25;
+const STORE_CATALOG_HTTP_TIMEOUT_MS = 8000;
+
+const fetchCatalogJson = async (path, searchParams = '') => {
+  const databaseUrl = String(database?.app?.options?.databaseURL || '').replace(/\/$/, '');
+  if (!databaseUrl) {
+    throw new Error('Firebase Realtime Database no tiene URL configurada');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), STORE_CATALOG_HTTP_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${databaseUrl}/${path}.json${searchParams}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`Firebase respondio HTTP ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+export const fetchStoreCatalogMetaHttp = () => fetchCatalogJson(STORE_CATALOG_META_PATH);
+
+export const fetchActiveStoreCatalogHttp = () =>
+  fetchCatalogJson(STORE_CATALOG_PATH, '?orderBy=%22active%22&equalTo=true');
 
 const roundPrice = (value) => Number(Number(value || 0).toFixed(2));
 const roundQuantityRule = (value) => Number(Number(value || 0).toFixed(3));
