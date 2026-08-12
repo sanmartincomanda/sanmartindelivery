@@ -108,6 +108,7 @@ import {
   mergeStorePopupAds,
   STORE_POPUP_ADS_PATH,
 } from '../services/storePopupAds';
+import PoketPaymentBadge, { PoketLogo } from './PoketPaymentBadge';
 import {
   cleanStorePhone,
   completeExistingStoreUserProfile,
@@ -260,8 +261,8 @@ const getPaymentMeta = (payment) => {
     },
     'LINK DE PAGO': {
       icon: 'link',
-      title: 'Link de pago',
-      detail: 'Paga al confirmar pesos',
+      title: 'Poket',
+      detail: 'Link de pago seguro',
     },
     EFECTIVO: {
       icon: 'cash',
@@ -7326,35 +7327,47 @@ export default function TiendaVirtualView({
         .store-friendly-status {
           position: relative;
           overflow: hidden;
-          border-radius: 18px;
-          padding: 16px;
-          box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+          border: 1px solid #e2e8f0;
+          border-radius: 28px;
+          padding: 22px;
+          background: #ffffff;
+          box-shadow: 0 24px 60px rgba(15, 49, 89, 0.1);
         }
         .store-friendly-status::after {
-          content: '';
-          position: absolute;
-          inset: auto -38px -54px auto;
-          width: 132px;
-          height: 132px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.68);
+          display: none;
+        }
+        .store-order-card-topline {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding-bottom: 16px;
+          margin-bottom: 20px;
+          border-bottom: 1px solid #e8eef5;
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        }
+        .store-order-card-topline span {
+          color: #123354;
         }
         .store-friendly-head {
           position: relative;
           z-index: 1;
           display: flex;
-          align-items: flex-start;
-          gap: 12px;
+          align-items: center;
+          gap: 16px;
         }
         .store-status-visual {
-          width: 72px;
-          height: 72px;
+          width: 68px;
+          height: 68px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: 24px;
-          background: #ffffff;
-          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+          border-radius: 22px;
+          background: var(--order-soft, #f1f5f9);
+          box-shadow: none;
           flex: 0 0 auto;
         }
         .store-status-visual svg {
@@ -7375,47 +7388,105 @@ export default function TiendaVirtualView({
         .store-status-message {
           position: relative;
           z-index: 1;
-          margin: 12px 0 0;
+          margin: 7px 0 0;
           color: #475569;
-          line-height: 1.45;
+          font-size: 14px;
+          line-height: 1.5;
+        }
+        .store-order-eyebrow {
+          color: #64748b;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+        }
+        .store-friendly-head h3 {
+          margin: 4px 0 0;
+          color: #102a46;
+          font-size: 25px;
+          line-height: 1.05;
+          letter-spacing: -0.035em;
         }
         .store-progress {
           position: relative;
           z-index: 1;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 8px;
-          margin-top: 16px;
+          gap: 0;
+          margin: 24px 2px 22px;
         }
         .store-progress-step {
-          min-height: 58px;
+          position: relative;
+          min-height: 66px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           flex-direction: column;
-          gap: 5px;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.72);
+          gap: 7px;
+          background: transparent;
           color: #94a3b8;
           font-size: 10.5px;
           font-weight: 900;
           text-align: center;
           line-height: 1.1;
-          padding: 7px 6px;
+          padding: 0 6px;
+        }
+        .store-progress-step::before {
+          content: '';
+          position: absolute;
+          z-index: 0;
+          top: 14px;
+          left: 0;
+          width: 100%;
+          height: 4px;
+          background: #e2e8f0;
+        }
+        .store-progress-step:first-child::before {
+          left: 50%;
+          width: 50%;
+        }
+        .store-progress-step:last-child::before {
+          width: 50%;
         }
         .store-progress-step.done {
-          color: #ffffff;
+          color: #123354;
+        }
+        .store-progress-step.done::before {
+          background: var(--order-accent, #145ca8);
+        }
+        .store-progress-step.current small {
+          color: var(--order-accent, #145ca8);
+          font-weight: 950;
         }
         .store-progress-step.done .store-status-visual.compact {
-          background: #ffffff;
+          position: relative;
+          z-index: 1;
+          color: #fff;
+          background: var(--order-accent, #145ca8);
+          box-shadow: 0 0 0 5px #fff;
+        }
+        .store-progress-step.done .store-status-visual.compact svg {
+          filter: brightness(0) invert(1);
+        }
+        .store-progress-step small {
+          color: #94a3b8;
+          font-size: 10px;
+          font-weight: 850;
         }
         .store-order-meta {
           position: relative;
           z-index: 1;
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 8px;
-          margin-top: 14px;
+          gap: 10px;
+          margin-top: 18px;
+        }
+        .store-order-meta > div {
+          min-height: 58px;
+          padding: 12px 14px;
+          border-radius: 16px;
+          background: #f5f8fc;
+          border: 1px solid #e5edf5;
         }
         .store-order-meta span {
           display: block;
@@ -7516,27 +7587,73 @@ export default function TiendaVirtualView({
         }
         .store-orders-hero {
           margin-top: 2px;
-          padding: 18px 18px 16px;
-          border-radius: 24px;
-          background:
-            radial-gradient(circle at top right, rgba(255, 225, 214, 0.65), transparent 32%),
-            linear-gradient(180deg, #ffffff 0%, #fff8f6 100%);
-          border: 1px solid rgba(123, 16, 34, 0.1);
-          box-shadow: 0 20px 44px rgba(123, 16, 34, 0.08);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 18px 20px;
+          border-radius: 22px;
+          background: #f4f8fc;
+          border: 1px solid #dce7f1;
+          box-shadow: none;
         }
         .store-orders-hero h2 {
-          margin: 12px 0 4px;
-          color: #111827;
+          margin: 2px 0 0;
+          color: #102a46;
           font-size: 24px;
           line-height: 1.04;
           letter-spacing: -0.03em;
         }
-        .store-orders-hero p {
-          margin: 0;
-          color: #64748b;
-          font-size: 14px;
-          line-height: 1.5;
-          font-weight: 700;
+        .store-orders-hero span {
+          color: #145ca8;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+        }
+        .store-orders-hero > strong {
+          max-width: 46%;
+          color: #475569;
+          font-size: 12px;
+          text-align: right;
+        }
+        .store-poket-action {
+          display: grid;
+          gap: 14px;
+          margin-top: 18px;
+          padding: 18px;
+          border-radius: 24px;
+          background: linear-gradient(145deg, #102e80 0%, #184fc4 55%, #159cae 100%);
+          color: #fff;
+          box-shadow: 0 20px 42px rgba(19, 67, 170, .28);
+        }
+        .store-poket-action-copy {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+        }
+        .store-poket-action-copy span,
+        .store-poket-action-copy small {
+          display: block;
+          color: rgba(255,255,255,.78);
+          font-size: 11px;
+          font-weight: 750;
+        }
+        .store-poket-action-copy strong {
+          display: block;
+          margin: 2px 0;
+          font-size: 22px;
+          line-height: 1.05;
+          letter-spacing: -.025em;
+        }
+        .store-poket-pay-button {
+          min-height: 58px;
+          border: 0;
+          background: #fff;
+          color: #173bc5;
+          font-size: 17px;
+          font-weight: 950;
+          box-shadow: 0 12px 26px rgba(3, 21, 75, .24);
         }
         .store-status-items {
           position: relative;
@@ -7992,17 +8109,41 @@ export default function TiendaVirtualView({
             font-size: 22px;
           }
           .store-orders-hero {
-            padding: 16px 16px 14px;
-            border-radius: 22px;
+            padding: 14px 16px;
+            border-radius: 18px;
           }
           .store-orders-hero h2 {
-            font-size: 20px;
+            font-size: 21px;
+          }
+          .store-friendly-status {
+            padding: 17px;
+            border-radius: 22px;
+          }
+          .store-order-card-topline {
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+          }
+          .store-status-visual {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+          }
+          .store-status-visual svg {
+            width: 50px;
+            height: 50px;
+          }
+          .store-friendly-head h3 {
+            font-size: 22px;
+          }
+          .store-status-message {
+            font-size: 13px;
           }
           .store-order-meta {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
           .store-progress {
             grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-top: 20px;
           }
           .store-location-actions,
           .store-map-fields,
@@ -8029,8 +8170,18 @@ export default function TiendaVirtualView({
             min-height: 82px;
           }
           .store-progress-step {
-            min-height: 54px;
+            min-height: 62px;
             font-size: 9.5px;
+          }
+          .store-poket-action {
+            padding: 16px;
+            border-radius: 20px;
+          }
+          .store-poket-action-copy strong {
+            font-size: 19px;
+          }
+          .store-poket-pay-button {
+            min-height: 56px;
           }
         }
       `}</style>
@@ -11343,7 +11494,11 @@ function CheckoutSheet({
                     aria-pressed={paymentValue === payment.value}
                     onClick={() => onCustomerChange('metodoPago', payment.value)}
                   >
-                    <StoreCheckoutIcon name={payment.icon} />
+                    {payment.value === 'LINK DE PAGO' ? (
+                      <PoketLogo size={42} inverted={false} />
+                    ) : (
+                      <StoreCheckoutIcon name={payment.icon} />
+                    )}
                     <strong>{payment.title}</strong>
                     <span>{payment.detail}</span>
                   </button>
@@ -11697,22 +11852,7 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
 
   const paymentConfirmed = confirmedLocally || paymentConfirmedFromOrder;
   if (paymentConfirmed) {
-    return (
-      <div
-        role="status"
-        style={{
-          borderRadius: 16,
-          padding: '13px 16px',
-          background: '#ecfdf3',
-          border: '1px solid #86efac',
-          color: '#166534',
-          fontWeight: 900,
-          textAlign: 'center',
-        }}
-      >
-        Pago confirmado con Poket
-      </div>
-    );
+    return <PoketPaymentBadge order={order} />;
   }
 
   if (order?.totalAproximado !== false) {
@@ -11756,22 +11896,26 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
   };
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div className="store-poket-action">
+      <div className="store-poket-action-copy">
+        <PoketLogo size={58} />
+        <div>
+          <span>Pago seguro con tarjeta</span>
+          <strong>Paga ahora con Poket</strong>
+          <small>Confirmacion inmediata en tu pedido</small>
+        </div>
+      </div>
       <button
         type="button"
-        className="store-button"
+        className="store-button store-poket-pay-button"
         onClick={handlePayment}
         disabled={busy || checkingPayment}
-        style={{
-          background: 'linear-gradient(135deg, #0f3b82 0%, #1682dd 100%)',
-          boxShadow: '0 14px 28px rgba(15, 59, 130, 0.2)',
-        }}
       >
         {busy
           ? 'Preparando pago...'
           : checkingPayment
             ? 'Confirmando pago...'
-            : 'Paga con Poket'}
+            : `Pagar ${formatCurrency(order.total)}`}
       </button>
       {errorMessage && (
         <div role="alert" style={{ color: '#b42318', fontSize: 13, fontWeight: 800 }}>
@@ -11982,16 +12126,15 @@ function OrdersSheet({ currentUser, orders, createdOrder, onCancelOrder, onClose
         </div>
 
         <div className="store-orders-hero">
-          <div className="store-status-pill">Seguimiento en vivo</div>
-          <h2>{currentUser.nombre}</h2>
-          <p>
-            Aqui veras tu pedido en tres pasos simples: preparacion, camino y entrega.
-          </p>
+          <div>
+            <span>Seguimiento en vivo</span>
+            <h2>Tu pedido</h2>
+          </div>
+          <strong>{currentUser.nombre}</strong>
         </div>
 
         {activeOrder ? (
           <>
-            <div className="store-section-label">Pedido actual</div>
             <OrderStatusCard
               order={activeOrder}
               currentUser={currentUser}
@@ -12113,66 +12256,40 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
     <div
       className="store-status-card store-friendly-status"
       style={{
-        borderColor: meta.accent,
-        background: `linear-gradient(135deg, ${meta.soft} 0%, #ffffff 72%)`,
+        '--order-accent': meta.accent,
+        '--order-soft': meta.soft,
       }}
     >
+      <div className="store-order-card-topline">
+        <span>Pedido #{orderNumber}</span>
+        <strong style={{ color: meta.accent }}>{order.estado || 'Pendiente'}</strong>
+      </div>
       <div className="store-friendly-head">
         <StoreOrderStatusVisual type={meta.visual} />
         <div style={{ flex: 1 }}>
-          <div
-            className="store-status-pill"
-            style={{
-              background: highlight ? '#111827' : '#ffffff',
-              color: highlight ? '#ffffff' : '#111827',
-            }}
-          >
-            Pedido #{orderNumber}
-          </div>
-          <h3 style={{ margin: '10px 0 2px', color: '#111827' }}>{meta.label}</h3>
-          <div style={{ color: meta.accent, fontSize: 13, fontWeight: 900 }}>
-            {order.estado || 'Pendiente'}
-          </div>
-          {poketPaymentConfirmed && (
-            <div
-              role="status"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                marginTop: 8,
-                borderRadius: 999,
-                padding: '6px 10px',
-                background: '#dcfce7',
-                border: '1px solid #86efac',
-                color: '#166534',
-                fontSize: 12,
-                fontWeight: 950,
-              }}
-            >
-              &#10003; PAGADO CON POKET
-            </div>
-          )}
+          <span className="store-order-eyebrow">Estado actual</span>
+          <h3>{meta.label}</h3>
+          <p className="store-status-message">{meta.message}</p>
         </div>
       </div>
-
-      <p className="store-status-message">{meta.message}</p>
 
       <div className="store-progress" aria-label="Progreso del pedido">
         {getOrderProgressSteps(order).map((step, index) => {
           const isDone = meta.progress >= index + 1;
+          const isCurrent = meta.progress === index + 1;
           return (
             <span
               key={step.key}
-              className={`store-progress-step ${isDone ? 'done' : ''}`}
-              style={isDone ? { background: meta.accent } : undefined}
+              className={`store-progress-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`}
             >
               <StoreOrderStatusVisual type={step.icon} compact />
-              {step.label}
+              <small>{step.label}</small>
             </span>
           );
         })}
       </div>
+
+      {poketPaymentConfirmed && <PoketPaymentBadge order={order} />}
 
       <div className="store-order-meta">
         <div>

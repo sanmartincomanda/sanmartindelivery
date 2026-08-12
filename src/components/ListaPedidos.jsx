@@ -6,6 +6,8 @@ import { DRIVERS_PATH, getDriverPublicName, mergeDrivers } from '../services/dri
 import { buildStoreKitchenOrderText, formatOrderNumber, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+import PoketPaymentBadge from './PoketPaymentBadge';
+import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -1032,6 +1034,12 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     )}
                   </div>
+
+                  {isPoketPaymentConfirmed(pedido) && (
+                    <div style={{ padding: '18px 28px 0' }}>
+                      <PoketPaymentBadge order={pedido} />
+                    </div>
+                  )}
 
                   {/* Contenido */}
                   <div style={{ padding: '28px' }}>

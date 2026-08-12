@@ -6,6 +6,8 @@ import { hoyISO } from './Utils';
 import { buildStoreKitchenOrderText, formatOrderNumber, formatWeight, isPickupOrder } from '../services/orders';
 import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+import PoketPaymentBadge from './PoketPaymentBadge';
+import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 
 const KITCHEN_THEME = SAN_MARTIN_THEME;
 
@@ -1122,6 +1124,12 @@ export default function KitchenView({ orders, allowRuta = true }) {
                       </div>
                     )}
                   </div>
+
+                  {isPoketPaymentConfirmed(pedido) && (
+                    <div style={{ padding: '18px 28px 0' }}>
+                      <PoketPaymentBadge order={pedido} />
+                    </div>
+                  )}
 
                   {/* Contenido del Pedido */}
                   <div style={{ padding: '28px' }}>
