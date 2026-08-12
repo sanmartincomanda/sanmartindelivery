@@ -33,6 +33,10 @@ const normalizeStatus = (value) =>
 const isCanceledOrder = (order) =>
   CANCELED_ORDER_STATUSES.some((status) => normalizeStatus(order?.estado).includes(status));
 
+const isOrderReadyForPayment = (order) =>
+  order?.totalAproximado === false &&
+  ['preparado', 'enviado'].includes(normalizeStatus(order?.estado));
+
 const buildOrderCallbackUrl = (configuredUrl, order = {}) => {
   const callbackUrl = new URL(configuredUrl);
   const branchId = String(order.storeBranchId || '').trim().toLowerCase();
@@ -143,6 +147,12 @@ export const handler = async (event) => {
         code: 'ORDER_TOTAL_PENDING',
       }, headers);
     }
+    if (!isOrderReadyForPayment(order)) {
+      return jsonResponse(409, {
+        error: 'El enlace se activara cuando tu pedido este listo.',
+        code: 'ORDER_NOT_READY',
+      }, headers);
+    }
 
     const amount = roundCurrency(order.total);
     if (!(amount > 0)) {
@@ -152,6 +162,12 @@ export const handler = async (event) => {
     releaseLock = await acquireOrderLock(database, orderKey);
     const freshSnapshot = await orderRef.get();
     const freshOrder = freshSnapshot.val() || order;
+    if (!isOrderReadyForPayment(freshOrder)) {
+      return jsonResponse(409, {
+        error: 'El enlace se activara cuando tu pedido este listo.',
+        code: 'ORDER_NOT_READY',
+      }, headers);
+    }
     const config = getPoketConfig();
     const existingPayment = await reconcileExistingLink(database, orderKey, freshOrder, config);
 

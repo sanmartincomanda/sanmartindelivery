@@ -17,9 +17,17 @@ export const isPoketPaymentOrder = (order = {}) =>
 export const isPoketPaymentConfirmed = (order = {}) =>
   order?.poketPayment?.paid === true || normalizeText(order?.poketPayment?.status) === 'authorized';
 
+export const isPoketPaymentReady = (order = {}) => {
+  const status = normalizeText(order.estado);
+  return (
+    order.totalAproximado === false &&
+    ['preparado', 'enviado'].includes(status)
+  );
+};
+
 export const canCreatePoketPaylink = (order = {}) =>
   isPoketPaymentOrder(order) &&
-  order.totalAproximado === false &&
+  isPoketPaymentReady(order) &&
   Number(order.total || 0) > 0 &&
   !['cancelado', 'anulado', 'entregado'].some((status) => normalizeText(order.estado).includes(status));
 

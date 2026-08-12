@@ -77,6 +77,7 @@ import {
 } from '../services/storeDeliverySettings';
 import {
   canCreatePoketPaylink,
+  isPoketPaymentReady,
   isPoketPaymentConfirmed,
   isPoketPaymentOrder,
   openPoketPaylink,
@@ -11869,6 +11870,24 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
         }}
       >
         Cuando se actualice tu pedido con los pesos reales, podras tocar el link de pago.
+      </div>
+    ) : null;
+  }
+
+  if (!isPoketPaymentReady(order)) {
+    return showPending ? (
+      <div
+        style={{
+          borderRadius: 16,
+          padding: '13px 16px',
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          color: '#164e85',
+          fontWeight: 800,
+          lineHeight: 1.45,
+        }}
+      >
+        El pago con Poket se habilitara cuando tu pedido este listo.
       </div>
     ) : null;
   }
