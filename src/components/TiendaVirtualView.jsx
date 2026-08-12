@@ -76,6 +76,13 @@ import {
   subscribeStoreDeliverySettings,
 } from '../services/storeDeliverySettings';
 import {
+  canCreatePoketPaylink,
+  isPoketPaymentConfirmed,
+  isPoketPaymentOrder,
+  openPoketPaylink,
+  preparePoketPaylink,
+} from '../services/poketPaylinks';
+import {
   buildStoreBranchPath,
   DEFAULT_STORE_BRANCH_ID,
   getNearestStoreBranch,
@@ -253,7 +260,7 @@ const getPaymentMeta = (payment) => {
     'LINK DE PAGO': {
       icon: 'link',
       title: 'Link de pago',
-      detail: 'Te enviamos link',
+      detail: 'Paga al confirmar pesos',
     },
     EFECTIVO: {
       icon: 'cash',
@@ -1411,6 +1418,21 @@ export default function TiendaVirtualView({
 
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !currentUser) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('poket') !== 'return') {
+      return;
+    }
+
+    setOrdersOpen(true);
+    url.searchParams.delete('poket');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [currentUser]);
 
   useEffect(() => {
     if (catalogLoading) return undefined;
@@ -11334,7 +11356,10 @@ function CheckoutSheet({
             {paymentValue === 'LINK DE PAGO' && (
               <div className="store-payment-note">
                 <StoreCheckoutIcon name="link" />
-                <span>Se enviara el link por WhatsApp a tu numero registrado.</span>
+                <span>
+                  <strong>Nota:</strong> Cuando se actualice tu pedido con los pesos reales,
+                  podras tocar el link de pago.
+                </span>
               </div>
             )}
 
@@ -11611,6 +11636,98 @@ function RegisterOutOfCoverageModal({ branch, suggestedBranch, onSwitch, onClose
   );
 }
 
+function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
+  const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [confirmedLocally, setConfirmedLocally] = useState(false);
+
+  if (!isPoketPaymentOrder(order)) {
+    return null;
+  }
+
+  const paymentConfirmed = confirmedLocally || isPoketPaymentConfirmed(order);
+  if (paymentConfirmed) {
+    return (
+      <div
+        role="status"
+        style={{
+          borderRadius: 16,
+          padding: '13px 16px',
+          background: '#ecfdf3',
+          border: '1px solid #86efac',
+          color: '#166534',
+          fontWeight: 900,
+          textAlign: 'center',
+        }}
+      >
+        Pago confirmado con Poket
+      </div>
+    );
+  }
+
+  if (order?.totalAproximado !== false) {
+    return showPending ? (
+      <div
+        style={{
+          borderRadius: 16,
+          padding: '13px 16px',
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          color: '#164e85',
+          fontWeight: 800,
+          lineHeight: 1.45,
+        }}
+      >
+        Cuando se actualice tu pedido con los pesos reales, podras tocar el link de pago.
+      </div>
+    ) : null;
+  }
+
+  if (!canCreatePoketPaylink(order)) {
+    return null;
+  }
+
+  const handlePayment = async () => {
+    setBusy(true);
+    setErrorMessage('');
+    try {
+      const result = await preparePoketPaylink(order);
+      if (result.paid === true) {
+        setConfirmedLocally(true);
+        return;
+      }
+      onBeforeRedirect?.();
+      openPoketPaylink(result.permanentLink);
+    } catch (error) {
+      setErrorMessage(error?.message || 'No pudimos abrir Poket. Intenta nuevamente.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <button
+        type="button"
+        className="store-button"
+        onClick={handlePayment}
+        disabled={busy}
+        style={{
+          background: 'linear-gradient(135deg, #0f3b82 0%, #1682dd 100%)',
+          boxShadow: '0 14px 28px rgba(15, 59, 130, 0.2)',
+        }}
+      >
+        {busy ? 'Preparando pago...' : 'Paga con Poket'}
+      </button>
+      {errorMessage && (
+        <div role="alert" style={{ color: '#b42318', fontSize: 13, fontWeight: 800 }}>
+          {errorMessage}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const whatsappLink = buildOrderUpdateReviewWhatsAppLink(order, currentUser);
@@ -11765,6 +11882,7 @@ function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
         </div>
 
         <div style={{ display: 'grid', gap: 10 }}>
+          <PoketPaymentAction order={order} onBeforeRedirect={onAccept} />
           <button type="button" className="store-button" onClick={onAccept}>
             ACEPTAR CAMBIO
           </button>
@@ -12051,6 +12169,8 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           ))}
         </div>
       )}
+
+      <PoketPaymentAction order={order} />
 
       <a className="store-whatsapp-button" href={whatsappLink} target="_blank" rel="noreferrer">
         💬 Escribir a WhatsApp de la tienda
