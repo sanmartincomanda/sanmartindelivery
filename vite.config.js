@@ -2,15 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
-const FIREBASE_PUBLIC_ASSET_ORIGIN = 'https://tiendavirtual-2ced1.web.app/';
-
 export default defineConfig(({ mode }) => ({
-  // Keep the lightweight HTML on the current domain while production assets
-  // load from Firebase's CDN. Local development and the native app stay local.
-  base:
-    mode === 'production'
-      ? FIREBASE_PUBLIC_ASSET_ORIGIN
-      : './',
+  // Web deployments must load their hashed chunks from the same release and
+  // host as index.html. The native build keeps relative paths inside the APK.
+  base: mode === 'android' ? './' : '/',
   plugins: [react()],
   resolve: {
     alias: {
