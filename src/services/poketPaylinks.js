@@ -67,7 +67,29 @@ export async function preparePoketPaylink(order) {
   };
 }
 
+export async function refreshPoketPaymentStatus(order) {
+  const orderKey = String(order?.firebaseKey || '').trim();
+  const user = auth.currentUser;
+  if (!user || !orderKey || !order?.poketPayment?.paylinkId) {
+    return { paid: isPoketPaymentConfirmed(order), status: order?.poketPayment?.status || '' };
+  }
+
+  const idToken = await user.getIdToken();
+  const response = await fetch(`${POKET_FUNCTION_ORIGIN}/.netlify/functions/poket-paylink`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ orderKey, action: 'status' }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data?.error || 'No pudimos confirmar el estado del pago.');
+  }
+  return data;
+}
+
 export const openPoketPaylink = (permanentLink) => {
   window.location.assign(validatePoketUrl(permanentLink));
 };
-

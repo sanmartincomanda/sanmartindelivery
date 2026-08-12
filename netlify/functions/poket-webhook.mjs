@@ -33,6 +33,17 @@ const isAuthorizedWebhook = (event) => {
 
 const normalizeEventType = (value) => String(value || '').trim().toLowerCase();
 
+const normalizeProviderStatus = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '');
+
+const isSuccessfulProviderStatus = (value) =>
+  ['authorized', 'resolved', 'paid', 'success', 'successful'].includes(
+    normalizeProviderStatus(value)
+  );
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Metodo no permitido' });
@@ -91,17 +102,20 @@ export const handler = async (event) => {
 
     const amountMatches = receivedAmount > 0 && receivedAmount === expectedAmount;
     const currencyMatches = receivedCurrency === 'NIO';
-    const authorized =
-      providerStatus.toLowerCase() === 'authorized' && amountMatches && currencyMatches;
+    const alreadyConfirmed =
+      order?.poketPayment?.paid === true ||
+      normalizeProviderStatus(order?.poketPayment?.status) === 'authorized';
+    const providerResolvedPayment = isSuccessfulProviderStatus(providerStatus);
+    const authorized = alreadyConfirmed || (providerResolvedPayment && amountMatches && currencyMatches);
     const paymentPatch = {
       ...basePatch,
       status: authorized
         ? 'Authorized'
-        : providerStatus.toLowerCase() === 'authorized'
+        : providerResolvedPayment
           ? 'AmountMismatch'
           : 'Failed',
       paid: authorized,
-      paidAt: authorized ? nowIso : null,
+      paidAt: authorized ? (order?.poketPayment?.paidAt || nowIso) : null,
       receivedAmount,
       expectedAmount,
       receivedCurrency,

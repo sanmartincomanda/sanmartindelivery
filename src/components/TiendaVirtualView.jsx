@@ -81,6 +81,7 @@ import {
   isPoketPaymentOrder,
   openPoketPaylink,
   preparePoketPaylink,
+  refreshPoketPaymentStatus,
 } from '../services/poketPaylinks';
 import {
   buildStoreBranchPath,
@@ -11635,14 +11636,66 @@ function RegisterOutOfCoverageModal({ branch, suggestedBranch, onSwitch, onClose
 
 function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
   const [busy, setBusy] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmedLocally, setConfirmedLocally] = useState(false);
+
+  const orderKey = String(order?.firebaseKey || '').trim();
+  const paylinkId = String(order?.poketPayment?.paylinkId || '').trim();
+  const paymentConfirmedFromOrder = isPoketPaymentConfirmed(order);
+
+  useEffect(() => {
+    if (!isPoketPaymentOrder(order) || !orderKey || !paylinkId || paymentConfirmedFromOrder) {
+      return undefined;
+    }
+
+    let active = true;
+    let attempts = 0;
+    let timeoutId = null;
+    const shouldPoll =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('poket') === 'return';
+
+    const checkPayment = async () => {
+      if (!active) return;
+      attempts += 1;
+      setCheckingPayment(true);
+      try {
+        const result = await refreshPoketPaymentStatus(order);
+        if (!active) return;
+        if (result?.paid === true) {
+          setConfirmedLocally(true);
+          setErrorMessage('');
+          return;
+        }
+      } catch (error) {
+        if (active && attempts === 1) {
+          console.warn('No se pudo reconciliar el pago Poket:', error);
+        }
+      } finally {
+        if (active) setCheckingPayment(false);
+      }
+
+      if (active && shouldPoll && attempts < 8) {
+        timeoutId = window.setTimeout(checkPayment, 5000);
+      }
+    };
+
+    checkPayment();
+    const handleFocus = () => checkPayment();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      active = false;
+      if (timeoutId) window.clearTimeout(timeoutId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [orderKey, paylinkId, paymentConfirmedFromOrder]);
 
   if (!isPoketPaymentOrder(order)) {
     return null;
   }
 
-  const paymentConfirmed = confirmedLocally || isPoketPaymentConfirmed(order);
+  const paymentConfirmed = confirmedLocally || paymentConfirmedFromOrder;
   if (paymentConfirmed) {
     return (
       <div
@@ -11708,13 +11761,17 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
         type="button"
         className="store-button"
         onClick={handlePayment}
-        disabled={busy}
+        disabled={busy || checkingPayment}
         style={{
           background: 'linear-gradient(135deg, #0f3b82 0%, #1682dd 100%)',
           boxShadow: '0 14px 28px rgba(15, 59, 130, 0.2)',
         }}
       >
-        {busy ? 'Preparando pago...' : 'Paga con Poket'}
+        {busy
+          ? 'Preparando pago...'
+          : checkingPayment
+            ? 'Confirmando pago...'
+            : 'Paga con Poket'}
       </button>
       {errorMessage && (
         <div role="alert" style={{ color: '#b42318', fontSize: 13, fontWeight: 800 }}>
@@ -12050,6 +12107,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
   const statusKey = normalizeCustomerOrderStatus(order.estado);
   const canCancelOrder =
     typeof onCancelOrder === 'function' && !['cancelado', 'enviado', 'entregado'].includes(statusKey);
+  const poketPaymentConfirmed = isPoketPaymentConfirmed(order);
 
   return (
     <div
@@ -12075,6 +12133,26 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           <div style={{ color: meta.accent, fontSize: 13, fontWeight: 900 }}>
             {order.estado || 'Pendiente'}
           </div>
+          {poketPaymentConfirmed && (
+            <div
+              role="status"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                marginTop: 8,
+                borderRadius: 999,
+                padding: '6px 10px',
+                background: '#dcfce7',
+                border: '1px solid #86efac',
+                color: '#166534',
+                fontSize: 12,
+                fontWeight: 950,
+              }}
+            >
+              &#10003; PAGADO CON POKET
+            </div>
+          )}
         </div>
       </div>
 

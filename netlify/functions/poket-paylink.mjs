@@ -124,6 +124,16 @@ export const handler = async (event) => {
     if (String(order.canal || '') !== 'tienda_virtual' || !isPoketPaymentMethod(order.metodoPago)) {
       return jsonResponse(400, { error: 'El pedido no usa Link de pago' }, headers);
     }
+
+    if (String(payload.action || '').trim().toLowerCase() === 'status') {
+      const config = getPoketConfig();
+      const payment = await reconcileExistingLink(database, orderKey, order, config);
+      return jsonResponse(200, {
+        status: payment.status || 'Pending',
+        paid: payment.paid === true || normalizeStatus(payment.status) === 'authorized',
+      }, headers);
+    }
+
     if (isCanceledOrder(order)) {
       return jsonResponse(409, { error: 'El pedido esta cancelado' }, headers);
     }
