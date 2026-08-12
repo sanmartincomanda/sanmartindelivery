@@ -1028,8 +1028,10 @@ const getCustomerStatusMetaV2 = (order = {}) => {
     accent: '#9f1239',
     soft: '#fff1f2',
     visual: 'prep',
-    label: 'Carnes San Martin',
-    message: 'Carnes San Martin esta preparando tu pedido.',
+    label: statusKey === 'pendiente' ? 'Pedido recibido' : 'Preparando tu pedido',
+    message: statusKey === 'pendiente'
+      ? 'Ya enviamos tu pedido a la tienda.'
+      : 'Nuestro equipo está preparando tu pedido.',
     progress: 1,
   };
 
@@ -1070,14 +1072,16 @@ const getCustomerStatusMetaV2 = (order = {}) => {
     };
   }
 
-  if (statusKey === 'preparado' && pickupOrder) {
+  if (statusKey === 'preparado') {
     return {
-      accent: '#2563eb',
-      soft: '#eff6ff',
-      visual: 'pickup',
-      label: 'Pickup listo',
-      message: 'Tu pedido esta listo para recoger en tienda.',
-      progress: 2,
+      accent: '#16a34a',
+      soft: '#f0fdf4',
+      visual: pickupOrder ? 'pickup' : 'done',
+      label: pickupOrder ? 'Pickup listo' : 'Pedido listo',
+      message: pickupOrder
+        ? 'Tu pedido esta listo para recoger en tienda.'
+        : 'Tu pedido esta listo. Estamos coordinando la entrega.',
+      progress: pickupOrder ? 2 : 1,
     };
   }
 
@@ -7367,6 +7371,262 @@ export default function TiendaVirtualView({
         .store-friendly-status::after {
           display: none;
         }
+        .store-live-status-pill {
+          display: inline-flex;
+          align-items: center;
+          min-height: 30px;
+          padding: 0 12px;
+          border-radius: 999px;
+          color: var(--status-color, #145ca8);
+          background: var(--status-soft, #eff6ff);
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: 0;
+          text-transform: none;
+        }
+        .store-preparation-card {
+          display: grid;
+          grid-template-columns: 116px minmax(0, 1fr);
+          align-items: center;
+          gap: 20px;
+          padding: 18px;
+          border-radius: 22px;
+          background: #f8fafc;
+          border: 1px solid #e5eaf0;
+        }
+        .store-preparation-brand {
+          min-height: 96px;
+          display: grid;
+          place-items: center;
+          padding: 14px;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid #edf0f4;
+          box-shadow: 0 10px 24px rgba(15, 23, 42, .06);
+        }
+        .store-preparation-brand img {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+        .store-preparation-copy h3,
+        .store-route-copy h3 {
+          margin: 5px 0 0;
+          color: #111827;
+          font-size: clamp(22px, 3vw, 30px);
+          line-height: 1.05;
+          letter-spacing: -.035em;
+        }
+        .store-preparation-copy .store-status-message {
+          margin-top: 8px;
+        }
+        .store-live-progress {
+          display: grid;
+          gap: 10px;
+          margin: 18px 0;
+          padding: 16px 18px;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid #e7ebf0;
+        }
+        .store-live-progress > div {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 6px;
+        }
+        .store-live-progress > div span {
+          height: 6px;
+          border-radius: 999px;
+          background: #e5e7eb;
+          transition: background .18s ease, transform .18s ease;
+        }
+        .store-live-progress > div span.done {
+          background: var(--progress-color, #145ca8);
+        }
+        .store-live-progress > strong {
+          color: #1f2937;
+          font-size: 14px;
+          line-height: 1.35;
+        }
+        .store-delivery-route-card {
+          overflow: hidden;
+          border-radius: 24px;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+        }
+        .store-route-map {
+          position: relative;
+          min-height: 178px;
+          overflow: hidden;
+          background-color: #edf3f7;
+          background-image:
+            linear-gradient(28deg, transparent 46%, rgba(255,255,255,.92) 47%, rgba(255,255,255,.92) 52%, transparent 53%),
+            linear-gradient(104deg, transparent 43%, rgba(255,255,255,.72) 44%, rgba(255,255,255,.72) 49%, transparent 50%),
+            linear-gradient(rgba(31, 89, 129, .06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(31, 89, 129, .06) 1px, transparent 1px);
+          background-size: 180px 120px, 210px 150px, 28px 28px, 28px 28px;
+        }
+        .store-route-line {
+          position: absolute;
+          top: 88px;
+          left: 20%;
+          width: 60%;
+          height: 5px;
+          border-radius: 999px;
+          background: repeating-linear-gradient(90deg, #ef233c 0 12px, transparent 12px 19px);
+          transform: rotate(-8deg);
+        }
+        .store-route-pin {
+          position: absolute;
+          z-index: 2;
+          width: 48px;
+          height: 48px;
+          display: grid;
+          place-items: center;
+          border-radius: 50% 50% 50% 12px;
+          background: #ffffff;
+          border: 3px solid #ffffff;
+          box-shadow: 0 12px 24px rgba(15, 23, 42, .18);
+          transform: rotate(-45deg);
+        }
+        .store-route-pin > * {
+          transform: rotate(45deg);
+        }
+        .store-route-pin-origin {
+          left: 14%;
+          top: 80px;
+        }
+        .store-route-pin-origin img {
+          width: 30px;
+          height: 30px;
+        }
+        .store-route-pin-driver {
+          left: calc(50% - 24px);
+          top: 44px;
+          background: #ef233c;
+        }
+        .store-route-pin-home {
+          right: 14%;
+          top: 65px;
+          color: #ffffff;
+          background: #154f86;
+          font-size: 25px;
+          font-weight: 950;
+        }
+        .store-route-copy {
+          padding: 20px 20px 12px;
+        }
+        .store-route-copy p {
+          margin: 8px 0 0;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        .store-route-stops {
+          display: grid;
+          gap: 12px;
+          padding: 8px 20px 18px;
+        }
+        .store-route-stops > div,
+        .store-rider-card {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .store-route-stops p,
+        .store-rider-card p {
+          min-width: 0;
+          display: grid;
+          gap: 2px;
+          margin: 0;
+        }
+        .store-route-stops small,
+        .store-rider-card small {
+          color: #64748b;
+          font-size: 11px;
+          font-weight: 800;
+        }
+        .store-route-stops strong,
+        .store-rider-card strong {
+          overflow-wrap: anywhere;
+          color: #111827;
+          font-size: 13px;
+        }
+        .store-route-dot {
+          width: 13px;
+          height: 13px;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          background: #154f86;
+          box-shadow: 0 0 0 5px #e8f1f8;
+        }
+        .store-route-dot.destination {
+          background: #ef233c;
+          box-shadow: 0 0 0 5px #fee2e2;
+        }
+        .store-rider-card {
+          margin: 0 16px 16px;
+          padding: 14px;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+        }
+        .store-rider-avatar {
+          width: 42px;
+          height: 42px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          color: #ffffff;
+          background: linear-gradient(145deg, #154f86, #2a8ac8);
+          font-size: 17px;
+          font-weight: 950;
+        }
+        .store-rider-state {
+          margin-left: auto;
+          padding: 6px 10px;
+          border-radius: 999px;
+          color: #0f766e;
+          background: #ccfbf1;
+          font-size: 10px;
+          font-weight: 950;
+        }
+        .store-order-details {
+          margin-top: 14px;
+          overflow: hidden;
+          border: 1px solid #e5e7eb;
+          border-radius: 18px;
+          background: #ffffff;
+        }
+        .store-order-details summary {
+          min-height: 54px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 0 16px;
+          color: #111827;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 950;
+          list-style: none;
+        }
+        .store-order-details summary::-webkit-details-marker {
+          display: none;
+        }
+        .store-order-details summary small {
+          color: #64748b;
+          font-size: 11px;
+        }
+        .store-order-details[open] summary {
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .store-order-details .store-status-items {
+          margin: 0;
+          border: 0;
+          border-radius: 0;
+        }
         .store-order-card-topline {
           display: flex;
           align-items: center;
@@ -8147,12 +8407,58 @@ export default function TiendaVirtualView({
             font-size: 21px;
           }
           .store-friendly-status {
-            padding: 17px;
-            border-radius: 22px;
+            padding: 14px;
+            border-radius: 24px;
           }
           .store-order-card-topline {
             padding-bottom: 12px;
             margin-bottom: 15px;
+          }
+          .store-preparation-card {
+            grid-template-columns: 88px minmax(0, 1fr);
+            gap: 14px;
+            padding: 14px;
+            border-radius: 19px;
+          }
+          .store-preparation-brand {
+            min-height: 76px;
+            padding: 10px;
+            border-radius: 15px;
+          }
+          .store-preparation-copy h3,
+          .store-route-copy h3 {
+            font-size: 21px;
+          }
+          .store-live-progress {
+            margin: 14px 0;
+            padding: 14px;
+          }
+          .store-live-progress > strong {
+            font-size: 12px;
+          }
+          .store-route-map {
+            min-height: 150px;
+          }
+          .store-route-pin-origin {
+            top: 66px;
+          }
+          .store-route-pin-driver {
+            top: 34px;
+          }
+          .store-route-pin-home {
+            top: 54px;
+          }
+          .store-route-line {
+            top: 75px;
+          }
+          .store-route-copy {
+            padding: 17px 16px 10px;
+          }
+          .store-route-stops {
+            padding: 8px 16px 15px;
+          }
+          .store-rider-card {
+            margin: 0 12px 12px;
           }
           .store-status-visual {
             width: 56px;
@@ -12307,6 +12613,12 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
   const canCancelOrder =
     typeof onCancelOrder === 'function' && !['cancelado', 'enviado', 'entregado'].includes(statusKey);
   const poketPaymentConfirmed = isPoketPaymentConfirmed(order);
+  const enRoute = statusKey === 'enviado' && !pickupOrder;
+  const visibleItems = Array.isArray(order.items)
+    ? order.items.filter((item) => !isDeliveryServiceItem(item))
+    : [];
+  const branchName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
+  const deliveryAddress = String(order.direccion || currentUser?.direccion || 'Direccion registrada').trim();
 
   return (
     <div
@@ -12318,36 +12630,74 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
     >
       <div className="store-order-card-topline">
         <span>Pedido #{orderNumber}</span>
-        <strong style={{ color: meta.accent }}>{order.estado || 'Pendiente'}</strong>
-      </div>
-      <div className="store-friendly-head">
-        <StoreOrderStatusVisual type={meta.visual} />
-        <div style={{ flex: 1 }}>
-          <span className="store-order-eyebrow">Estado actual</span>
-          <h3>{meta.label}</h3>
-          <p className="store-status-message">{meta.message}</p>
-        </div>
+        <strong className="store-live-status-pill" style={{ '--status-color': meta.accent, '--status-soft': meta.soft }}>
+          {meta.label}
+        </strong>
       </div>
 
-      <div className="store-progress" aria-label="Progreso del pedido">
-        {getOrderProgressSteps(order).map((step, index) => {
-          const isDone = meta.progress >= index + 1;
-          const isCurrent = meta.progress === index + 1;
-          return (
+      {enRoute ? (
+        <div className="store-delivery-route-card">
+          <div className="store-route-map" aria-hidden="true">
+            <span className="store-route-line" />
+            <span className="store-route-pin store-route-pin-origin">
+              <img src="/tienda/branding/logo-mark.svg" alt="" />
+            </span>
+            <span className="store-route-pin store-route-pin-driver">
+              <StoreOrderStatusVisual type="driver" compact />
+            </span>
+            <span className="store-route-pin store-route-pin-home">⌂</span>
+          </div>
+          <div className="store-route-copy">
+            <span className="store-order-eyebrow">Tu pedido va en camino</span>
+            <h3>{riderName} lleva tu pedido</h3>
+            <p>Te avisaremos cuando llegue a tu dirección.</p>
+          </div>
+          <div className="store-route-stops">
+            <div>
+              <span className="store-route-dot origin" />
+              <p><small>Sale de</small><strong>{branchName}</strong></p>
+            </div>
+            <div>
+              <span className="store-route-dot destination" />
+              <p><small>Lo recibes en</small><strong>{deliveryAddress}</strong></p>
+            </div>
+          </div>
+          <div className="store-rider-card">
+            <span className="store-rider-avatar">{riderName.charAt(0).toUpperCase()}</span>
+            <p><small>Entrega a cargo de</small><strong>{riderName}</strong></p>
+            <span className="store-rider-state">En camino</span>
+          </div>
+        </div>
+      ) : (
+        <div className="store-preparation-card">
+          <div className="store-preparation-brand">
+            <img src="/tienda/branding/logo-full.svg" alt="Carnes San Martin" />
+          </div>
+          <div className="store-preparation-copy">
+            <span className="store-order-eyebrow">
+              {statusKey === 'preparado' ? 'Todo preparado' : branchName}
+            </span>
+            <h3>{meta.label}</h3>
+          </div>
+        </div>
+      )}
+
+      <div className="store-live-progress" aria-label="Progreso del pedido">
+        <div>
+          {getOrderProgressSteps(order).map((step, index) => (
             <span
               key={step.key}
-              className={`store-progress-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`}
-            >
-              <StoreOrderStatusVisual type={step.icon} compact />
-              <small>{step.label}</small>
-            </span>
-          );
-        })}
+              className={meta.progress >= index + 1 ? 'done' : ''}
+              style={{ '--progress-color': meta.accent }}
+            />
+          ))}
+        </div>
+        <strong>{meta.message}</strong>
       </div>
 
       {poketPaymentConfirmed && <PoketPaymentBadge order={order} />}
 
-      <div className="store-order-meta">
+      <div className="store-order-meta store-order-summary-grid">
         <div>
           <span>Ingreso</span>
           <strong>
@@ -12378,44 +12728,33 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
         </div>
       </div>
 
-      {Array.isArray(order.items) && order.items.some((item) => !isDeliveryServiceItem(item)) && (
-        <div className="store-status-items">
-          <strong className="store-status-items-title">Detalle del pedido</strong>
-          {order.items.filter((item) => !isDeliveryServiceItem(item)).map((item) => (
-            <div key={`${order.firebaseKey || order.id}-${item.codigo || item.nombre}`}>
-              <div>
-                {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
-                {item.codigo ? ` [${item.codigo}]` : ''}
-              </div>
-              {item.descripcion && <small>{item.descripcion}</small>}
-              {Number(item.subtotal || 0) > 0 && <small>{formatCurrency(item.subtotal)}</small>}
+      {(visibleItems.length > 0 || order.rewardRedemption?.rewardName) && (
+        <details className="store-order-details">
+          <summary>
+            <span>Ver detalle del pedido</span>
+            <small>{visibleItems.length} {visibleItems.length === 1 ? 'producto' : 'productos'}</small>
+          </summary>
+          {visibleItems.length > 0 && (
+            <div className="store-status-items">
+              {visibleItems.map((item) => (
+                <div key={`${order.firebaseKey || order.id}-${item.codigo || item.nombre}`}>
+                  <div>
+                    {formatStoreQuantity(item.cantidad, item.unidad)} {item.unidad} {item.nombre}
+                    {item.codigo ? ` [${item.codigo}]` : ''}
+                  </div>
+                  {item.descripcion && <small>{item.descripcion}</small>}
+                  {Number(item.subtotal || 0) > 0 && <small>{formatCurrency(item.subtotal)}</small>}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      {order.rewardRedemption?.rewardName && (
-        <div className="store-status-items">
-          <strong className="store-status-items-title">{STORE_REWARD_REDEMPTION_CART_LABEL}</strong>
-          <div>
-            <div>{order.rewardRedemption.rewardName}</div>
-            <small>
-              {Number(order.rewardRedemption.pointsRedeemed || 0)} puntos canjeados
-              {order.rewardRedemption.status === 'redeemed'
-                ? ' - aplicado'
-                : order.rewardRedemption.status === 'refunded'
-                  ? ' - puntos devueltos'
-                  : ' - pendiente de confirmar'}
-            </small>
-          </div>
-          {(Array.isArray(order.rewardRedemption.items) ? order.rewardRedemption.items : []).map((item) => (
-            <div key={`${order.firebaseKey || order.id}-reward-${item.productCode || item.productName}`}>
-              <div>
-                {Number(item.quantity || 1)} x {item.productName || item.productCode}
-              </div>
+          )}
+          {order.rewardRedemption?.rewardName && (
+            <div className="store-status-items store-reward-order-item">
+              <strong className="store-status-items-title">{STORE_REWARD_REDEMPTION_CART_LABEL}</strong>
+              <div>{order.rewardRedemption.rewardName}</div>
             </div>
-          ))}
-        </div>
+          )}
+        </details>
       )}
 
       <PoketPaymentAction order={order} />
