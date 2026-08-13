@@ -6,6 +6,7 @@ import {
 } from '../services/storeRewards';
 import { useRef } from 'react';
 import SanMartinCrownIcon from './SanMartinCrownIcon';
+import '../App.css';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const CLUB_DISPLAY_NAME = 'Miembro Gold San Martin Granada';
