@@ -2382,6 +2382,12 @@ export default function TiendaVirtualView({
       return null;
     }
 
+    if (isPoketPaymentOrder(activeCustomerOrder)) {
+      if (!isPoketPaymentReady(activeCustomerOrder) || isPoketPaymentConfirmed(activeCustomerOrder)) {
+        return null;
+      }
+    }
+
     return activeCustomerOrder;
   }, [
     acceptedOrderUpdateRevisions,
@@ -7946,6 +7952,155 @@ export default function TiendaVirtualView({
           font-weight: 950;
           box-shadow: 0 12px 26px rgba(3, 21, 75, .24);
         }
+        .store-poket-ready-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 560;
+          display: grid;
+          place-items: center;
+          padding: 18px;
+          background: rgba(8, 21, 37, .66);
+          backdrop-filter: blur(10px);
+        }
+        .store-poket-ready-card {
+          width: min(460px, 100%);
+          max-height: calc(100dvh - 36px);
+          overflow-y: auto;
+          display: grid;
+          justify-items: center;
+          gap: 12px;
+          padding: 28px 24px 22px;
+          border-radius: 30px;
+          background: #ffffff;
+          border: 1px solid rgba(255,255,255,.72);
+          box-shadow: 0 36px 100px rgba(2, 12, 27, .42);
+          text-align: center;
+          animation: storePoketReadyIn .22s ease-out both;
+        }
+        @keyframes storePoketReadyIn {
+          from { opacity: 0; transform: translateY(16px) scale(.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .store-poket-ready-check {
+          width: 92px;
+          height: 92px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          color: #ffffff;
+          background: linear-gradient(145deg, #22c55e, #079447);
+          box-shadow: 0 0 0 12px #dcfce7, 0 20px 38px rgba(16,185,129,.3);
+          margin: 8px 0 10px;
+        }
+        .store-poket-ready-order {
+          color: #64748b;
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+        }
+        .store-poket-ready-card h2 {
+          margin: 0;
+          color: #0f172a;
+          font-size: clamp(28px, 7vw, 36px);
+          line-height: 1;
+          letter-spacing: -.045em;
+        }
+        .store-poket-ready-card > p {
+          max-width: 340px;
+          margin: 0;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1.5;
+        }
+        .store-poket-ready-total {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 5px;
+          padding: 16px 18px;
+          border-radius: 18px;
+          color: #0f172a;
+          background: #f4f8fc;
+          border: 1px solid #e0e9f2;
+        }
+        .store-poket-ready-total span {
+          color: #475569;
+          font-size: 13px;
+          font-weight: 850;
+        }
+        .store-poket-ready-total strong {
+          color: #0c4d88;
+          font-size: 24px;
+          font-weight: 950;
+        }
+        .store-poket-action-modal {
+          width: 100%;
+          margin-top: 2px;
+          padding: 0;
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
+        }
+        .store-poket-action-modal .store-poket-pay-button {
+          min-height: 66px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          border: 0;
+          border-radius: 18px;
+          color: #ffffff;
+          background: linear-gradient(135deg, #123fc4 0%, #147acb 64%, #10a9b1 100%);
+          box-shadow: 0 18px 34px rgba(18,63,196,.28);
+          font-size: 16px;
+          font-weight: 950;
+          letter-spacing: .01em;
+        }
+        .store-poket-action-modal .store-poket-pay-button .poket-logo {
+          border-radius: 11px !important;
+          background: #ffffff !important;
+        }
+        .store-poket-card-note {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          padding: 0 6px;
+          color: #475569;
+          text-align: left;
+        }
+        .store-poket-card-note > span {
+          width: 20px;
+          height: 20px;
+          display: grid;
+          place-items: center;
+          flex: 0 0 auto;
+          border-radius: 50%;
+          color: #ffffff;
+          background: #16a34a;
+          font-size: 12px;
+          font-weight: 950;
+        }
+        .store-poket-card-note p {
+          margin: 0;
+          font-size: 12px;
+          font-weight: 750;
+          line-height: 1.45;
+        }
+        .store-poket-later-button {
+          min-height: 42px;
+          padding: 0 18px;
+          border: 0;
+          background: transparent;
+          color: #64748b;
+          cursor: pointer;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 900;
+        }
         .store-status-items {
           position: relative;
           z-index: 1;
@@ -9008,12 +9163,20 @@ export default function TiendaVirtualView({
       )}
 
       {pendingOrderUpdateReview && (
-        <OrderUpdateReviewModal
-          order={pendingOrderUpdateReview}
-          currentUser={currentUser}
-          onAccept={acceptPendingOrderUpdate}
-          onReject={handleRejectPendingOrderUpdate}
-        />
+        isPoketPaymentOrder(pendingOrderUpdateReview) ? (
+          <PoketReadyPaymentModal
+            order={pendingOrderUpdateReview}
+            onPay={acceptPendingOrderUpdate}
+            onLater={handleRejectPendingOrderUpdate}
+          />
+        ) : (
+          <OrderUpdateReviewModal
+            order={pendingOrderUpdateReview}
+            currentUser={currentUser}
+            onAccept={acceptPendingOrderUpdate}
+            onReject={handleRejectPendingOrderUpdate}
+          />
+        )
       )}
 
       {storeClosedNoticeOpen && (
@@ -12133,7 +12296,7 @@ function RegisterOutOfCoverageModal({ branch, suggestedBranch, onSwitch, onClose
   );
 }
 
-function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
+function PoketPaymentAction({ order, onBeforeRedirect, showPending = true, variant = 'card' }) {
   const [busy, setBusy] = useState(false);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -12246,6 +12409,7 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
       const result = await preparePoketPaylink(order);
       if (result.paid === true) {
         setConfirmedLocally(true);
+        onBeforeRedirect?.();
         return;
       }
       onBeforeRedirect?.();
@@ -12257,27 +12421,38 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
     }
   };
 
+  const readyModal = variant === 'ready-modal';
+
   return (
-    <div className="store-poket-action">
-      <div className="store-poket-action-copy">
-        <PoketLogo size={58} />
-        <div>
-          <span>Pago seguro con tarjeta</span>
-          <strong>Paga ahora con Poket</strong>
-          <small>Confirmacion inmediata en tu pedido</small>
+    <div className={`store-poket-action ${readyModal ? 'store-poket-action-modal' : ''}`}>
+      {!readyModal && (
+        <div className="store-poket-action-copy">
+          <PoketLogo size={58} />
+          <div>
+            <span>Pago seguro con tarjeta</span>
+            <strong>Paga ahora con Poket</strong>
+            <small>Confirmacion inmediata en tu pedido</small>
+          </div>
         </div>
-      </div>
+      )}
       <button
         type="button"
         className="store-button store-poket-pay-button"
         onClick={handlePayment}
         disabled={busy || checkingPayment}
       >
-        {busy
-          ? 'Preparando pago...'
-          : checkingPayment
-            ? 'Confirmando pago...'
-            : `Pagar ${formatCurrency(order.total)}`}
+        {busy ? (
+          'Preparando pago...'
+        ) : checkingPayment ? (
+          'Confirmando pago...'
+        ) : readyModal ? (
+          <>
+            <PoketLogo size={36} inverted={false} />
+            <span>PAGAR CON POKET</span>
+          </>
+        ) : (
+          `Pagar ${formatCurrency(order.total)}`
+        )}
       </button>
       {errorMessage && (
         <div role="alert" style={{ color: '#b42318', fontSize: 13, fontWeight: 800 }}>
@@ -12286,6 +12461,38 @@ function PoketPaymentAction({ order, onBeforeRedirect, showPending = true }) {
       )}
     </div>
   );
+}
+
+function PoketReadyPaymentModal({ order, onPay, onLater }) {
+  const modalContent = (
+    <div className="store-poket-ready-overlay" role="dialog" aria-modal="true" aria-labelledby="poket-ready-title">
+      <div className="store-poket-ready-card">
+        <div className="store-poket-ready-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" strokeWidth="2.7">
+            <path d="M5 12.5 9.2 17 19 7" />
+          </svg>
+        </div>
+        <span className="store-poket-ready-order">Pedido #{formatOrderNumber(order)}</span>
+        <h2 id="poket-ready-title">Tu pedido está listo</h2>
+        <p>Ya confirmamos los productos y el total final de tu pedido.</p>
+        <div className="store-poket-ready-total">
+          <span>Total a pagar</span>
+          <strong>{formatCurrency(order.total)}</strong>
+        </div>
+        <PoketPaymentAction order={order} onBeforeRedirect={onPay} showPending={false} variant="ready-modal" />
+        <div className="store-poket-card-note">
+          <span aria-hidden="true">✓</span>
+          <p>Aceptamos cualquier tarjeta de débito o crédito Visa o Mastercard.</p>
+        </div>
+        <button type="button" className="store-poket-later-button" onClick={onLater}>
+          Pagar después
+        </button>
+      </div>
+    </div>
+  );
+
+  if (typeof document === 'undefined' || !document.body) return modalContent;
+  return createPortal(modalContent, document.body);
 }
 
 function OrderUpdateReviewModal({ order, currentUser, onAccept, onReject }) {
