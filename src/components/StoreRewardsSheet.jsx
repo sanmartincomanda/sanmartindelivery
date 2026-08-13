@@ -3,13 +3,11 @@ import {
   buildCustomerRewardSummary,
   getRewardDisplayStatus,
   getStoreRewardChoiceGroups,
-  getStoreRewardFixedItems,
 } from '../services/storeRewards';
 import { useRef } from 'react';
 import SanMartinCrownIcon from './SanMartinCrownIcon';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
-const formatCurrency = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 const CLUB_DISPLAY_NAME = 'Miembro Gold San Martin Granada';
 const CLUB_THEME = {
   ...SAN_MARTIN_THEME,
@@ -324,7 +322,6 @@ function RewardCard({
   busy,
 }) {
   const choiceGroups = useMemo(() => getStoreRewardChoiceGroups(reward), [reward]);
-  const fixedItems = useMemo(() => getStoreRewardFixedItems(reward), [reward]);
   const [choices, setChoices] = useState(() =>
     Object.fromEntries(
       choiceGroups.map((group) => [group.choiceGroup, String(group.items?.[0]?.productCode || '').trim()])
@@ -335,128 +332,45 @@ function RewardCard({
   const isSelected = selectedReward?.rewardId === reward.id;
   const canRedeem = status.status === 'available';
 
-  const statusMeta = (() => {
-    if (isSelected) {
-      return { label: 'Seleccionado', tone: CLUB_THEME.blueDeep, bg: 'rgba(29, 116, 199, 0.12)', border: CLUB_THEME.borderStrong };
-    }
-    if (status.status === 'available') {
-      return { label: 'Disponible', tone: CLUB_THEME.blueDeep, bg: 'rgba(29, 116, 199, 0.12)', border: CLUB_THEME.borderStrong };
-    }
-    if (status.status === 'unavailable') {
-      return { label: 'Sin disponibilidad', tone: CLUB_THEME.textMuted, bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.08)' };
-    }
-    if (status.status === 'min_purchase') {
-      return { label: `Compra minima ${formatCurrency(reward.minPurchaseAmount)}`, tone: CLUB_THEME.goldSoft, bg: 'rgba(212, 175, 55, 0.1)', border: CLUB_THEME.border };
-    }
-    return { label: `${missingPoints} pts faltantes`, tone: CLUB_THEME.goldMuted, bg: 'rgba(212, 175, 55, 0.08)', border: CLUB_THEME.border };
-  })();
-
-  const actionLabel = canRedeem
-    ? 'Canjear premio'
-    : status.status === 'min_purchase'
-      ? 'Aun no aplica'
+  const statusLabel = isSelected
+    ? 'Elegido'
+    : canRedeem
+      ? 'Disponible'
       : status.status === 'unavailable'
-        ? 'Sin disponibilidad'
-        : `${missingPoints} pts faltantes`;
+        ? 'Agotado'
+        : status.status === 'min_purchase'
+          ? 'En tu pedido'
+          : `${missingPoints} pts`;
 
   return (
     <article
-      className={`sm-reward-detail-card${canRedeem ? ' sm-reward-detail-card--available' : ''}${isSelected ? ' sm-reward-detail-card--selected' : ''}`}
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'grid',
-        gridTemplateColumns: reward.image ? '112px minmax(0, 1fr)' : '1fr',
-        gap: 16,
-        padding: 18,
-        borderRadius: 24,
-        background: canRedeem
-          ? 'linear-gradient(135deg, #fffdf4 0%, #ffffff 46%, #eef7ff 100%)'
-          : CLUB_THEME.panelElevated,
-        border: canRedeem
-          ? '2px solid rgba(209, 172, 63, 0.72)'
-          : isSelected
-            ? `2px solid ${CLUB_THEME.borderStrong}`
-            : `1px solid ${CLUB_THEME.border}`,
-        boxShadow: canRedeem
-          ? '0 22px 46px rgba(154, 116, 18, 0.18), 0 0 0 4px rgba(232, 199, 108, 0.1)'
-          : isSelected
-            ? '0 22px 44px rgba(29, 116, 199, 0.16)'
-            : '0 18px 36px rgba(24, 93, 160, 0.12)',
-      }}
+      className={`sm-gold-reward-card${canRedeem ? ' is-unlocked' : ' is-locked'}${isSelected ? ' is-selected' : ''}`}
     >
-      {reward.image && (
-        <div
-          className={canRedeem ? 'sm-reward-detail-image sm-reward-detail-image--available' : 'sm-reward-detail-image'}
-          style={{
-            height: 112,
-            width: 112,
-            borderRadius: 24,
-            overflow: 'hidden',
-            background: CLUB_THEME.panelSoft,
-          }}
-        >
+      <div className="sm-gold-reward-image">
+        {reward.image ? (
           <img
             src={reward.image}
             alt={reward.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             loading="lazy"
             decoding="async"
           />
-        </div>
-      )}
-
-      <div style={{ display: 'grid', gap: 10 }}>
-        {canRedeem && (
-          <div className="sm-reward-card-unlocked-label">
-            <ClubTrophyIcon size={17} />
-            <span>¡Premio desbloqueado!</span>
-            <ClubSparkleIcon size={14} />
-          </div>
+        ) : (
+          <ClubSanMartinIcon size={58} />
         )}
+        <span className="sm-gold-reward-state">
+          {canRedeem ? <ClubTrophyIcon size={15} /> : null}
+          {statusLabel}
+        </span>
+      </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <strong style={{ display: 'block', fontSize: 21, color: CLUB_THEME.text }}>{reward.name}</strong>
-            <span style={{ color: CLUB_THEME.textSoft, fontWeight: 700 }}>{Number(reward.pointsRequired || 0)} puntos</span>
-          </div>
-          <span
-            style={{
-              alignSelf: 'start',
-              padding: '9px 12px',
-              borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 900,
-              background: statusMeta.bg,
-              color: statusMeta.tone,
-              border: `1px solid ${statusMeta.border}`,
-            }}
-          >
-            {statusMeta.label}
-          </span>
-        </div>
+      <div className="sm-gold-reward-copy">
+        <strong>{reward.name}</strong>
+        <span>{Number(reward.pointsRequired || 0)} pts</span>
 
-        {reward.description && <p style={{ margin: 0, color: CLUB_THEME.textMuted, lineHeight: 1.55 }}>{reward.description}</p>}
-
-        {fixedItems.length > 0 && (
-          <div style={{ display: 'grid', gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 900, color: CLUB_THEME.goldMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Incluye
-            </span>
-            {fixedItems.map((item) => (
-              <div key={item.id} style={{ color: CLUB_THEME.text, fontWeight: 700 }}>
-                {Number(item.quantity || 1)} x {item.productName || item.productCode}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {choiceGroups.map((group) => (
-          <div key={group.choiceGroup} style={{ display: 'grid', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 900, color: CLUB_THEME.goldMuted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Elige una opcion
-            </span>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {canRedeem && choiceGroups.map((group) => (
+          <div key={group.choiceGroup} className="sm-gold-reward-choices">
+            <small>Elige uno</small>
+            <div>
               {group.items.map((item) => {
                 const active = choices[group.choiceGroup] === item.productCode;
                 return (
@@ -469,15 +383,7 @@ function RewardCard({
                         [group.choiceGroup]: item.productCode,
                       }))
                     }
-                    style={{
-                      borderRadius: 999,
-                      border: active ? `2px solid ${CLUB_THEME.borderStrong}` : `1px solid ${CLUB_THEME.border}`,
-                      background: active ? 'rgba(29, 116, 199, 0.12)' : CLUB_THEME.panelElevated,
-                      color: active ? CLUB_THEME.blueDeep : CLUB_THEME.textSoft,
-                      fontWeight: 800,
-                      padding: '10px 14px',
-                      cursor: 'pointer',
-                    }}
+                    className={active ? 'is-active' : ''}
                   >
                     {item.choiceLabel || item.productName || item.productCode}
                   </button>
@@ -487,45 +393,28 @@ function RewardCard({
           </div>
         ))}
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {(canRedeem || isSelected) && (
+          <div className="sm-gold-reward-actions">
           {isSelected ? (
             <button
               type="button"
               onClick={onClearSelectedReward}
-              style={{
-                border: `1px solid ${CLUB_THEME.border}`,
-                background: CLUB_THEME.panelElevated,
-                color: CLUB_THEME.text,
-                borderRadius: 999,
-                padding: '12px 18px',
-                fontWeight: 900,
-                cursor: 'pointer',
-              }}
+              className="sm-gold-reward-button is-secondary"
             >
-              Seguir acumulando
+              Quitar premio
             </button>
           ) : (
             <button
               type="button"
-              className={canRedeem ? 'sm-reward-redeem-button' : ''}
-              disabled={!canRedeem || busy}
+              className="sm-gold-reward-button"
+              disabled={busy}
               onClick={() => onSelectReward(reward, { choices })}
-              style={{
-                border: 0,
-                background: canRedeem ? 'linear-gradient(135deg, #0e4d88 0%, #1d74c7 58%, #5caaf4 100%)' : 'rgba(29, 116, 199, 0.08)',
-                color: canRedeem ? '#ffffff' : CLUB_THEME.textMuted,
-                borderRadius: 999,
-                padding: '12px 18px',
-                fontWeight: 900,
-                cursor: canRedeem && !busy ? 'pointer' : 'not-allowed',
-                boxShadow: canRedeem ? '0 16px 30px rgba(24, 93, 160, 0.22)' : 'none',
-              }}
             >
-              {canRedeem && <ClubTrophyIcon size={18} />}
-              <span>{actionLabel}</span>
+              <span>Canjear</span>
             </button>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </article>
   );
@@ -1069,19 +958,20 @@ export default function StoreRewardsSheet({
   onClose,
   onOpenAuth,
 }) {
-  const [activeView, setActiveView] = useState('home');
-  const [isCompactLayout, setIsCompactLayout] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 860 : false
-  );
-  const homeScrollRef = useRef(null);
-  const rewardsScrollRef = useRef(null);
-  const transactionsScrollRef = useRef(null);
+  const [activeView, setActiveView] = useState('rewards');
+  const screenScrollRef = useRef(null);
   const pointsBalance = Number(account?.pointsBalance || 0);
   const rewardSummary = useMemo(
     () => buildCustomerRewardSummary(rewards, pointsBalance, cartAmount, settings),
     [rewards, pointsBalance, cartAmount, settings]
   );
-  const rewardList = Array.isArray(rewards) ? rewards : [];
+  const rewardList = useMemo(
+    () =>
+      [...(Array.isArray(rewards) ? rewards : [])].sort(
+        (left, right) => Number(left?.pointsRequired || 0) - Number(right?.pointsRequired || 0)
+      ),
+    [rewards]
+  );
   const transactionList = useMemo(
     () =>
       [...(Array.isArray(transactions) ? transactions : [])].sort(
@@ -1089,66 +979,33 @@ export default function StoreRewardsSheet({
       ),
     [transactions]
   );
-  const rewardPreviewList = useMemo(() => {
-    const previewItems = [...rewardSummary.availableRewards, ...rewardSummary.upcomingRewards];
-    const uniqueItems = [];
-    const seen = new Set();
-
-    previewItems.forEach((reward) => {
-      const rewardId = String(reward?.id || '').trim();
-      if (!rewardId || seen.has(rewardId)) {
-        return;
-      }
-      seen.add(rewardId);
-      uniqueItems.push(reward);
-    });
-
-    return uniqueItems.slice(0, 3);
-  }, [rewardSummary.availableRewards, rewardSummary.upcomingRewards]);
-  const transactionPreviewList = transactionList.slice(0, 3);
-  const viewOrder = ['home', 'rewards', 'transactions'];
-  const activeViewIndex = Math.max(0, viewOrder.indexOf(activeView));
+  const nextReward = rewardSummary.closestReward;
+  const nextRewardPoints = Math.max(1, Number(nextReward?.pointsRequired || 1));
+  const progressPct = Math.max(0, Math.min(100, (pointsBalance / nextRewardPoints) * 100));
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    setActiveView('home');
+    setActiveView('rewards');
   }, [open]);
 
   useEffect(() => {
-    if (!open || typeof window === 'undefined') {
+    if (!open || typeof document === 'undefined') {
       return undefined;
     }
 
-    const scrollContainers = {
-      home: homeScrollRef,
-      rewards: rewardsScrollRef,
-      transactions: transactionsScrollRef,
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
     };
-    const frameId = window.requestAnimationFrame(() => {
-      const scrollContainer = scrollContainers[activeView]?.current;
-      if (scrollContainer) {
-        scrollContainer.scrollTop = 0;
-      }
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [activeView, open]);
+  }, [open]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-
-    const handleResize = () => {
-      setIsCompactLayout(window.innerWidth <= 860);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    screenScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+  }, [activeView]);
 
   const renderRewardCards = (items = []) =>
     items.map((reward) => {
@@ -1168,328 +1025,91 @@ export default function StoreRewardsSheet({
       );
     });
 
-  const openView = (view) => setActiveView(view);
-  const goHome = () => setActiveView('home');
-
-  const getPaneStyle = (view) => {
-    const paneIndex = viewOrder.indexOf(view);
-    const isActive = paneIndex === activeViewIndex;
-    const offset = paneIndex < activeViewIndex ? -24 : 24;
-
-    return {
-      position: isActive ? 'relative' : 'absolute',
-      inset: 0,
-      opacity: isActive ? 1 : 0,
-      transform: isActive ? 'translateX(0)' : `translateX(${offset}px)`,
-      pointerEvents: isActive ? 'auto' : 'none',
-      transition: 'opacity 160ms ease, transform 160ms ease',
-      visibility: isActive ? 'visible' : 'hidden',
-      height: '100%',
-    };
-  };
-
-  const panelSurfaceStyle = {
-    borderRadius: isCompactLayout ? 24 : 28,
-    background: CLUB_THEME.panelElevated,
-    padding: isCompactLayout ? 16 : 22,
-    border: `1px solid ${CLUB_THEME.border}`,
-    boxShadow: '0 20px 38px rgba(24, 93, 160, 0.12)',
-  };
-
   if (!open) {
     return null;
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 130,
-        background: CLUB_THEME.overlay,
-        backdropFilter: 'blur(18px)',
-        padding: isCompactLayout ? 0 : 'clamp(14px, 3vw, 28px)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: isCompactLayout ? 'stretch' : 'center',
-      }}
-    >
-      <div
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          width: isCompactLayout ? '100%' : 'min(1080px, 100%)',
-          height: isCompactLayout ? '100dvh' : 'min(90vh, 920px)',
-          maxHeight: isCompactLayout ? '100dvh' : 'min(90vh, 920px)',
-          overflow: 'hidden',
-          borderRadius: isCompactLayout ? 0 : 34,
-          background: 'linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%)',
-          padding: isCompactLayout ? '14px 14px 18px' : 'clamp(16px, 3vw, 28px)',
-          boxShadow: '0 34px 80px rgba(24, 93, 160, 0.16)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: activeView === 'home' ? 'flex-end' : 'space-between',
-            gap: 12,
-            alignItems: 'center',
-            marginBottom: 14,
-          }}
+    <div className="sm-gold-screen">
+      <header className="sm-gold-screen-nav">
+        <button
+          type="button"
+          className="sm-gold-back-button"
+          onClick={activeView === 'transactions' ? () => setActiveView('rewards') : onClose}
         >
-          {activeView !== 'home' && (
-            <button
-              type="button"
-              onClick={goHome}
-              style={{
-                border: `1px solid ${CLUB_THEME.border}`,
-                background: CLUB_THEME.panelElevated,
-                color: CLUB_THEME.text,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 14px 10px 12px',
-                borderRadius: 999,
-                fontWeight: 900,
-                fontSize: 17,
-                cursor: 'pointer',
-                boxShadow: '0 12px 28px rgba(24, 93, 160, 0.12)',
-              }}
-            >
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 999,
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: 'rgba(29, 116, 199, 0.1)',
-                }}
-              >
-                <ClubBackIcon />
-              </span>
-              <span>{activeView === 'rewards' ? 'Premios' : 'Movimientos'}</span>
-            </button>
-          )}
+          <ClubBackIcon size={20} />
+          <span>{activeView === 'transactions' ? 'Premios' : 'Tienda'}</span>
+        </button>
+        <strong>{activeView === 'transactions' ? 'Movimientos' : 'Miembro Gold'}</strong>
+        <button type="button" className="sm-gold-close-button" onClick={onClose} aria-label="Cerrar Miembro Gold">
+          <ClubCloseIcon />
+        </button>
+      </header>
 
-          <SheetRoundButton onClick={onClose} ariaLabel="Cerrar Miembro Gold San Martin">
-            <ClubCloseIcon />
-          </SheetRoundButton>
-        </div>
-
-        {!currentUser ? (
-          <GuestRewardsPrompt displayName={displayName} onOpenAuth={onOpenAuth} />
-        ) : (
-          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-            <div style={getPaneStyle('home')}>
-              <div
-                ref={homeScrollRef}
-                style={{
-                  height: '100%',
-                  overflowY: 'auto',
-                  display: 'grid',
-                  gridAutoRows: 'max-content',
-                  alignContent: 'start',
-                  gap: 14,
-                  paddingBottom: 4,
-                  scrollBehavior: 'auto',
-                }}
-              >
-                <RewardsProgressCard
-                  settings={settings}
-                  pointsBalance={pointsBalance}
-                  closestReward={rewardSummary.closestReward}
-                  availableReward={rewardSummary.bestReward}
-                  displayName={displayName}
-                  onOpenRewards={() => openView('rewards')}
-                />
-
-                <SheetSectionShortcut
-                  title="Premios"
-                  icon={<ClubSanMartinIcon size={28} />}
-                  subtitle={
-                    rewardSummary.availableRewards.length > 0
-                      ? '¡Tenés un premio esperando por vos!'
-                      : 'Mira una vista previa y entra para verlos todos.'
-                  }
-                  badge={
-                    rewardSummary.availableRewards.length > 0
-                      ? `${rewardSummary.availableRewards.length} ${rewardSummary.availableRewards.length === 1 ? 'listo' : 'listos'}`
-                      : `${rewardList.length} ${rewardList.length === 1 ? 'premio' : 'premios'}`
-                  }
-                  preview={
-                    rewardPreviewList.length > 0 ? (
-                      rewardPreviewList.map((reward) => (
-                        <RewardPreviewCard
-                          key={reward.id}
-                          reward={reward}
-                          status={getRewardDisplayStatus(reward, pointsBalance, cartAmount, settings)}
-                        />
-                      ))
-                    ) : (
-                      <div
-                        style={{
-                          padding: 14,
-                          borderRadius: 18,
-                          background: CLUB_THEME.panelSoft,
-                          color: CLUB_THEME.textSoft,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Todavia no hay premios configurados.
-                      </div>
-                    )
-                  }
-                  onClick={() => openView('rewards')}
-                />
-
-                <SheetSectionShortcut
-                  title="Movimientos recientes"
-                  icon={<ClubTransactionsIcon />}
-                  accent={CLUB_THEME.blueDeep}
-                  subtitle="Tus ultimos movimientos antes de abrir el historial completo."
-                  badge={transactionList.length > 0 ? `${transactionList.length} mov.` : ''}
-                  preview={
-                    transactionPreviewList.length > 0 ? (
-                      transactionPreviewList.map((transaction) => (
-                        <TransactionPreviewItem key={transaction.id} transaction={transaction} />
-                      ))
-                    ) : (
-                      <div
-                        style={{
-                          padding: 14,
-                          borderRadius: 18,
-                          background: CLUB_THEME.panelSoft,
-                          color: CLUB_THEME.textSoft,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Todavia no tienes movimientos de puntos.
-                      </div>
-                    )
-                  }
-                  onClick={() => openView('transactions')}
-                />
-              </div>
-            </div>
-
-            <div style={getPaneStyle('rewards')}>
-              <div ref={rewardsScrollRef} style={{ height: '100%', overflowY: 'auto', scrollBehavior: 'auto' }}>
-                <section style={panelSurfaceStyle}>
-                  <div style={{ marginBottom: 16 }}>
-                    <RewardsProgressCard
-                      settings={settings}
-                      pointsBalance={pointsBalance}
-                      closestReward={rewardSummary.closestReward}
-                      availableReward={rewardSummary.bestReward}
-                      onOpenRewards={() => openView('rewards')}
-                    />
-                  </div>
-
-                  <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: CLUB_THEME.blueDeep }}>
-                    Premios
-                  </strong>
-
-                  <div style={{ display: 'grid', gap: 14, marginTop: 16 }}>
-                    {rewardList.length > 0 ? (
-                      renderRewardCards(rewardList)
-                    ) : (
-                      <div
-                        style={{
-                          padding: 18,
-                          borderRadius: 18,
-                          background: CLUB_THEME.panelSoft,
-                          color: CLUB_THEME.textSoft,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Todavia no hay premios configurados.
-                      </div>
-                    )}
-                  </div>
-                </section>
-              </div>
-            </div>
-
-            <div style={getPaneStyle('transactions')}>
-              <div ref={transactionsScrollRef} style={{ height: '100%', overflowY: 'auto', scrollBehavior: 'auto' }}>
-                <section style={panelSurfaceStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <strong style={{ display: 'block', fontSize: isCompactLayout ? 24 : 28, color: CLUB_THEME.blueDeep }}>
-                      Movimientos de puntos
-                    </strong>
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: 999,
-                        background: CLUB_THEME.panelSoft,
-                        color: CLUB_THEME.blueDeep,
-                        fontWeight: 900,
-                      }}
-                    >
-                      {pointsBalance} pts
+      <div ref={screenScrollRef} className="sm-gold-screen-scroll">
+        <main className={`sm-gold-screen-content view-${activeView}`}>
+          {!currentUser ? (
+            <GuestRewardsPrompt displayName={displayName} onOpenAuth={onOpenAuth} />
+          ) : (
+            <>
+              <section className="sm-gold-hero">
+                <div className="sm-gold-hero-topline">
+                  <div className="sm-gold-identity">
+                    <ClubSanMartinIcon size={44} />
+                    <div>
+                      <span>Miembro Gold</span>
+                      <strong>{pointsBalance} pts</strong>
                     </div>
                   </div>
+                  <button type="button" className="sm-gold-history-button" onClick={() => setActiveView('transactions')}>
+                    <ClubTransactionsIcon size={18} color="#ffffff" />
+                    <span>Movimientos</span>
+                  </button>
+                </div>
 
-                  <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-                    {transactionList.length === 0 ? (
-                      <div
-                        style={{
-                          padding: 18,
-                          borderRadius: 18,
-                          background: CLUB_THEME.panelSoft,
-                          color: CLUB_THEME.textSoft,
-                          fontWeight: 700,
-                        }}
-                      >
-                        Todavia no tienes movimientos de puntos.
-                      </div>
-                    ) : (
-                      transactionList.map((transaction) => (
-                        <div
-                          key={transaction.id}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(0, 1fr) auto',
-                            gap: 10,
-                            alignItems: 'center',
-                            padding: '14px 16px',
-                            borderRadius: 18,
-                            background: CLUB_THEME.panelSoft,
-                          }}
-                        >
-                          <div>
-                            <strong style={{ color: CLUB_THEME.text }}>
-                              {transaction.rewardName || transaction.orderKey || formatTransactionType(transaction)}
-                            </strong>
-                            <div style={{ marginTop: 4, color: CLUB_THEME.textMuted }}>{formatTransactionDate(transaction.createdAt)}</div>
-                            <div style={{ marginTop: 4, color: CLUB_THEME.textSoft, fontWeight: 700 }}>
-                              {transaction.note || formatTransactionType(transaction)}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <strong
-                              style={{
-                                display: 'block',
-                                fontSize: 22,
-                                color: Number(transaction.signedPoints || 0) >= 0 ? CLUB_THEME.blueDeep : '#d08b8b',
-                              }}
-                            >
-                              {formatSignedPoints(transaction)}
-                            </strong>
-                            <span style={{ color: CLUB_THEME.textMuted, fontWeight: 700 }}>{formatTransactionType(transaction)}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                <div className="sm-gold-progress-track" aria-label={`Progreso ${Math.round(progressPct)}%`}>
+                  <span style={{ width: `${progressPct}%` }} />
+                </div>
+                <div className="sm-gold-progress-labels">
+                  <span>{nextReward?.name || 'Todos los premios desbloqueados'}</span>
+                  <strong>{nextReward ? `${nextRewardPoints} pts` : `${pointsBalance} pts`}</strong>
+                </div>
+              </section>
+
+              {activeView === 'rewards' ? (
+                <section className="sm-gold-rewards-section">
+                  <div className="sm-gold-section-heading">
+                    <h1>Premios</h1>
+                    {rewardSummary.availableRewards.length > 0 ? (
+                      <span>{rewardSummary.availableRewards.length} disponible{rewardSummary.availableRewards.length === 1 ? '' : 's'}</span>
+                    ) : null}
                   </div>
+                  {rewardList.length > 0 ? (
+                    <div className="sm-gold-rewards-grid">{renderRewardCards(rewardList)}</div>
+                  ) : (
+                    <div className="sm-gold-empty-state">Todavia no hay premios.</div>
+                  )}
                 </section>
-              </div>
-            </div>
-          </div>
-        )}
+              ) : (
+                <section className="sm-gold-transactions-section">
+                  <div className="sm-gold-section-heading">
+                    <h1>Movimientos</h1>
+                    <span>{pointsBalance} pts</span>
+                  </div>
+                  {transactionList.length > 0 ? (
+                    <div className="sm-gold-transactions-list">
+                      {transactionList.map((transaction) => (
+                        <TransactionPreviewItem key={transaction.id} transaction={transaction} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="sm-gold-empty-state">Todavia no tienes movimientos.</div>
+                  )}
+                </section>
+              )}
+            </>
+          )}
+        </main>
       </div>
     </div>
   );

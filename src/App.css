@@ -312,3 +312,528 @@
     animation: none !important;
   }
 }
+
+/* Miembro Gold lives as a storefront destination, not as a modal dialog. */
+.sm-gold-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  color: #102846;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(92, 170, 244, 0.16), transparent 28rem),
+    linear-gradient(180deg, #f8fbff 0%, #edf5fd 100%);
+  animation: smGoldScreenIn 160ms ease-out both;
+}
+
+@keyframes smGoldScreenIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sm-gold-screen-nav {
+  position: relative;
+  z-index: 2;
+  min-height: 68px;
+  padding: max(10px, env(safe-area-inset-top)) clamp(14px, 3vw, 34px) 10px;
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) auto minmax(92px, 1fr);
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid rgba(29, 116, 199, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.sm-gold-screen-nav > strong {
+  color: #102846;
+  font-size: 17px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.sm-gold-back-button,
+.sm-gold-close-button,
+.sm-gold-history-button,
+.sm-gold-reward-button {
+  font: inherit;
+}
+
+.sm-gold-back-button,
+.sm-gold-close-button {
+  min-height: 42px;
+  border: 1px solid rgba(29, 116, 199, 0.16);
+  color: #102846;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.sm-gold-back-button {
+  width: fit-content;
+  padding: 0 14px 0 11px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.sm-gold-close-button {
+  width: 42px;
+  padding: 0;
+  justify-self: end;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.sm-gold-screen-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.sm-gold-screen-content {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 34px) 0 calc(36px + env(safe-area-inset-bottom));
+  animation: smGoldContentIn 160ms ease-out both;
+}
+
+@keyframes smGoldContentIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.sm-gold-hero {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(18px, 3vw, 28px);
+  border-radius: 26px;
+  color: #ffffff;
+  background: linear-gradient(132deg, #092746 0%, #0c4b85 52%, #1d74c7 100%);
+  box-shadow: 0 22px 48px rgba(8, 42, 79, 0.2);
+}
+
+.sm-gold-hero::after {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  right: -110px;
+  bottom: -190px;
+  border-radius: 50%;
+  border: 44px solid rgba(255, 255, 255, 0.07);
+  pointer-events: none;
+}
+
+.sm-gold-hero-topline {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sm-gold-identity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.sm-gold-identity > svg {
+  flex: 0 0 auto;
+  padding: 7px;
+  border-radius: 15px;
+  background: #ffffff;
+}
+
+.sm-gold-identity > div {
+  display: grid;
+  gap: 2px;
+}
+
+.sm-gold-identity span {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sm-gold-identity strong {
+  color: #ffffff;
+  font-size: clamp(27px, 4vw, 38px);
+  line-height: 1;
+  font-weight: 950;
+}
+
+.sm-gold-history-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.sm-gold-progress-track {
+  position: relative;
+  z-index: 1;
+  height: 10px;
+  margin-top: 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.sm-gold-progress-track > span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d1ac3f, #ffe58d);
+  box-shadow: 0 0 18px rgba(255, 229, 141, 0.55);
+  transition: width 220ms ease;
+}
+
+.sm-gold-progress-labels {
+  position: relative;
+  z-index: 1;
+  margin-top: 9px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sm-gold-progress-labels span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sm-gold-progress-labels strong {
+  flex: 0 0 auto;
+  color: #ffffff;
+}
+
+.sm-gold-rewards-section,
+.sm-gold-transactions-section {
+  margin-top: 26px;
+}
+
+.sm-gold-section-heading {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sm-gold-section-heading h1 {
+  margin: 0;
+  color: #102846;
+  font-size: clamp(24px, 3vw, 31px);
+  font-weight: 950;
+  letter-spacing: -0.025em;
+}
+
+.sm-gold-section-heading > span {
+  padding: 7px 11px;
+  border-radius: 999px;
+  color: #0c4b85;
+  background: rgba(29, 116, 199, 0.09);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sm-gold-rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 20px);
+}
+
+.sm-gold-reward-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(29, 116, 199, 0.13);
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 15px 32px rgba(10, 42, 78, 0.1);
+  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+
+.sm-gold-reward-card.is-locked {
+  opacity: 0.48;
+  filter: saturate(0.38);
+}
+
+.sm-gold-reward-card.is-unlocked {
+  border-color: rgba(209, 172, 63, 0.75);
+  box-shadow: 0 18px 40px rgba(12, 77, 136, 0.16), 0 0 0 3px rgba(209, 172, 63, 0.13);
+}
+
+.sm-gold-reward-card.is-unlocked:hover {
+  transform: translateY(-3px);
+}
+
+.sm-gold-reward-card.is-selected {
+  border-color: #1d74c7;
+  box-shadow: 0 18px 40px rgba(12, 77, 136, 0.19), 0 0 0 3px rgba(29, 116, 199, 0.14);
+}
+
+.sm-gold-reward-image {
+  position: relative;
+  aspect-ratio: 1 / 0.83;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(145deg, #f8fbff, #edf5fd);
+}
+
+.sm-gold-reward-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sm-gold-reward-state {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ffffff;
+  background: rgba(9, 39, 70, 0.82);
+  box-shadow: 0 8px 18px rgba(8, 42, 79, 0.16);
+  font-size: 10px;
+  font-weight: 950;
+  backdrop-filter: blur(10px);
+}
+
+.is-unlocked .sm-gold-reward-state {
+  color: #102846;
+  background: linear-gradient(135deg, #f8dd75, #d1ac3f);
+}
+
+.sm-gold-reward-copy {
+  padding: 14px;
+  display: grid;
+  gap: 7px;
+}
+
+.sm-gold-reward-copy > strong {
+  min-height: 2.4em;
+  color: #102846;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 900;
+}
+
+.sm-gold-reward-copy > span {
+  color: #0c4b85;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.sm-gold-reward-choices {
+  display: grid;
+  gap: 6px;
+}
+
+.sm-gold-reward-choices small {
+  color: #6986a6;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sm-gold-reward-choices > div {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sm-gold-reward-choices button {
+  padding: 7px 9px;
+  border: 1px solid rgba(29, 116, 199, 0.18);
+  border-radius: 999px;
+  color: #466e98;
+  background: #f4f9ff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.sm-gold-reward-choices button.is-active {
+  color: #ffffff;
+  border-color: #0c4b85;
+  background: #0c4b85;
+}
+
+.sm-gold-reward-actions {
+  margin-top: 3px;
+}
+
+.sm-gold-reward-button {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 13px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0c4b85, #1d74c7);
+  font-size: 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.sm-gold-reward-button.is-secondary {
+  color: #0c4b85;
+  border: 1px solid rgba(29, 116, 199, 0.2);
+  background: #edf6ff;
+}
+
+.sm-gold-transactions-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sm-gold-transactions-list > div {
+  padding: 16px !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(10, 42, 78, 0.08);
+}
+
+.sm-gold-empty-state {
+  padding: 36px 20px;
+  border: 1px dashed rgba(29, 116, 199, 0.24);
+  border-radius: 22px;
+  color: #6986a6;
+  background: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .sm-gold-rewards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .sm-gold-screen-nav {
+    min-height: 60px;
+    padding-inline: 12px;
+    grid-template-columns: minmax(78px, 1fr) auto minmax(78px, 1fr);
+  }
+
+  .sm-gold-screen-nav > strong {
+    font-size: 15px;
+  }
+
+  .sm-gold-back-button {
+    min-height: 38px;
+    padding-inline: 9px 11px;
+  }
+
+  .sm-gold-close-button {
+    width: 38px;
+    min-height: 38px;
+  }
+
+  .sm-gold-screen-content {
+    width: calc(100% - 24px);
+    padding-top: 14px;
+  }
+
+  .sm-gold-hero {
+    padding: 16px;
+    border-radius: 21px;
+  }
+
+  .sm-gold-identity > svg {
+    width: 39px;
+    height: 39px;
+  }
+
+  .sm-gold-history-button {
+    width: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .sm-gold-history-button span {
+    display: none;
+  }
+
+  .sm-gold-progress-labels span {
+    max-width: 70%;
+  }
+
+  .sm-gold-rewards-section,
+  .sm-gold-transactions-section {
+    margin-top: 20px;
+  }
+
+  .sm-gold-rewards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 11px;
+  }
+
+  .sm-gold-reward-card {
+    border-radius: 17px;
+  }
+
+  .sm-gold-reward-copy {
+    padding: 11px;
+  }
+
+  .sm-gold-reward-copy > strong {
+    font-size: 12.5px;
+  }
+
+  .sm-gold-reward-copy > span {
+    font-size: 16px;
+  }
+
+  .sm-gold-reward-state {
+    top: 7px;
+    right: 7px;
+    min-height: 25px;
+    padding-inline: 7px;
+    font-size: 8.5px;
+  }
+
+  .sm-gold-section-heading h1 {
+    font-size: 23px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sm-gold-screen,
+  .sm-gold-screen-content {
+    animation: none;
+  }
+}
