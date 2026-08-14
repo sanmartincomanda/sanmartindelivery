@@ -354,14 +354,12 @@
 }
 
 .sm-gold-back-button,
-.sm-gold-close-button,
 .sm-gold-history-button,
 .sm-gold-reward-button {
   font: inherit;
 }
 
-.sm-gold-back-button,
-.sm-gold-close-button {
+.sm-gold-back-button {
   min-height: 42px;
   border: 1px solid rgba(29, 116, 199, 0.16);
   color: #102846;
@@ -378,15 +376,6 @@
   gap: 7px;
   font-size: 13px;
   font-weight: 900;
-}
-
-.sm-gold-close-button {
-  width: 42px;
-  padding: 0;
-  justify-self: end;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
 }
 
 .sm-gold-screen-scroll {
@@ -755,11 +744,6 @@
   .sm-gold-back-button {
     min-height: 38px;
     padding-inline: 9px 11px;
-  }
-
-  .sm-gold-close-button {
-    width: 38px;
-    min-height: 38px;
   }
 
   .sm-gold-screen-content {

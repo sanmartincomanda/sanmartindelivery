@@ -81,14 +81,6 @@ function ClubBackIcon({ size = 18, color = CLUB_THEME.text }) {
   );
 }
 
-function ClubCloseIcon({ size = 18, color = CLUB_THEME.text }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M7 7l10 10M17 7L7 17" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function ClubRewardsIcon({ size = 22, color = CLUB_THEME.blueDeep }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1042,9 +1034,6 @@ export default function StoreRewardsSheet({
           <span>{activeView === 'transactions' ? 'Premios' : 'Tienda'}</span>
         </button>
         <strong>{activeView === 'transactions' ? 'Movimientos' : 'Miembro Gold'}</strong>
-        <button type="button" className="sm-gold-close-button" onClick={onClose} aria-label="Cerrar Miembro Gold">
-          <ClubCloseIcon />
-        </button>
       </header>
 
       <div ref={screenScrollRef} className="sm-gold-screen-scroll">
