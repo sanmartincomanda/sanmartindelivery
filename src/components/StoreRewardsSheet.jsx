@@ -988,18 +988,6 @@ export default function StoreRewardsSheet({
   }, [open]);
 
   useEffect(() => {
-    if (!open || typeof document === 'undefined') {
-      return undefined;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
-  useEffect(() => {
     screenScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [activeView]);
 
