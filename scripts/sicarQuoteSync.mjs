@@ -17,6 +17,8 @@ const STORE_USERS_PATH = 'storeUsers';
 const QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
 const LINKED_QUOTES_PATH = 'sicarLinkedQuotes';
 const LINKED_QUOTES_REFRESH_MS = 5000;
+const AUTO_SYNC_RETRY_INITIAL_MS = 5000;
+const AUTO_SYNC_RETRY_MAX_MS = 300000;
 const DEFAULT_CLIENT_ID = 1;
 const DEFAULT_USER_ID = 1;
 const DEFAULT_VENDOR_ID = 7;
@@ -565,11 +567,17 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     lastError: '',
     lastProcessedOrderKey: '',
     lastQuoteId: 0,
+    retryAttempt: 0,
+    nextRetryAt: '',
   };
 
   const runningOrderPromises = new Map();
   let queueListenerStarted = false;
   let queueUnsubscribe = null;
+  let autoSyncEnabled = false;
+  let autoSyncStarting = false;
+  let autoSyncRetryTimer = null;
+  let autoSyncRetryDelayMs = AUTO_SYNC_RETRY_INITIAL_MS;
   let processRequested = false;
   let linkedQuotesRefreshTimer = null;
   let linkedQuotesRefreshing = false;
@@ -2329,11 +2337,52 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     }
   };
 
-  const initAutoSync = () => {
-    if (queueListenerStarted) {
+  const clearAutoSyncRetry = () => {
+    if (autoSyncRetryTimer) {
+      clearTimeout(autoSyncRetryTimer);
+      autoSyncRetryTimer = null;
+    }
+    state.nextRetryAt = '';
+  };
+
+  const scheduleAutoSyncRetry = () => {
+    if (!autoSyncEnabled || queueListenerStarted || autoSyncRetryTimer) {
       return;
     }
 
+    const delayMs = Math.max(AUTO_SYNC_RETRY_INITIAL_MS, autoSyncRetryDelayMs);
+    state.retryAttempt += 1;
+    state.nextRetryAt = new Date(Date.now() + delayMs).toISOString();
+
+    autoSyncRetryTimer = setTimeout(() => {
+      autoSyncRetryTimer = null;
+      state.nextRetryAt = '';
+      initAutoSync();
+    }, delayMs);
+
+    autoSyncRetryDelayMs = Math.min(delayMs * 2, AUTO_SYNC_RETRY_MAX_MS);
+  };
+
+  const resetListenerState = () => {
+    queueUnsubscribe = null;
+    queueListenerStarted = false;
+    state.listening = false;
+    if (linkedQuotesRefreshTimer) {
+      clearTimeout(linkedQuotesRefreshTimer);
+      linkedQuotesRefreshTimer = null;
+    }
+    linkedQuotesRefreshing = false;
+    state.refreshingLinkedQuotes = false;
+  };
+
+  const initAutoSync = () => {
+    autoSyncEnabled = true;
+    if (queueListenerStarted || autoSyncStarting) {
+      return;
+    }
+
+    clearAutoSyncRetry();
+    autoSyncStarting = true;
     ensureAuthenticatedFirebaseSession()
       .then(() => {
         queueListenerStarted = true;
@@ -2349,9 +2398,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
           },
           (error) => {
             state.lastError = String(error?.message || error || 'No se pudo escuchar la cola SICAR.');
+            resetListenerState();
+            refreshAuthenticatedFirebaseSession()
+              .catch(() => {})
+              .finally(() => scheduleAutoSyncRetry());
           }
         );
         state.listening = true;
+        state.retryAttempt = 0;
+        state.nextRetryAt = '';
+        autoSyncRetryDelayMs = AUTO_SYNC_RETRY_INITIAL_MS;
         seedLinkedQuoteWatchesFromOrders().catch((error) => {
           state.lastError = String(error?.message || error || 'No se pudieron preparar las cotizaciones enlazadas.');
         });
@@ -2361,22 +2417,21 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         state.lastError = String(
           error?.message || error || 'No se pudo autenticar el integrador SICAR contra Firebase.'
         );
+        scheduleAutoSyncRetry();
+      })
+      .finally(() => {
+        autoSyncStarting = false;
       });
   };
 
   const stopAutoSync = () => {
+    autoSyncEnabled = false;
+    autoSyncStarting = false;
+    clearAutoSyncRetry();
     if (typeof queueUnsubscribe === 'function') {
       queueUnsubscribe();
     }
-    queueUnsubscribe = null;
-    queueListenerStarted = false;
-    state.listening = false;
-    if (linkedQuotesRefreshTimer) {
-      clearTimeout(linkedQuotesRefreshTimer);
-      linkedQuotesRefreshTimer = null;
-    }
-    linkedQuotesRefreshing = false;
-    state.refreshingLinkedQuotes = false;
+    resetListenerState();
   };
 
   return {
