@@ -435,9 +435,9 @@
   gap: 13px;
 }
 
-.sm-gold-identity > svg {
+.sm-gold-identity > img {
   flex: 0 0 auto;
-  border-radius: 15px;
+  border-radius: 14px;
   box-shadow: 0 9px 22px rgba(4, 27, 52, 0.28);
 }
 
@@ -756,9 +756,9 @@
     border-radius: 21px;
   }
 
-  .sm-gold-identity > svg {
-    width: 39px;
-    height: 39px;
+  .sm-gold-identity > img {
+    width: 56px;
+    height: 56px;
   }
 
   .sm-gold-history-button {

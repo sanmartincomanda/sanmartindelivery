@@ -414,6 +414,7 @@ function RewardCard({
 }
 
 function GuestRewardsPrompt({ displayName = CLUB_DISPLAY_NAME, onOpenAuth }) {
+  void displayName;
   return (
     <div
       style={{
@@ -424,7 +425,8 @@ function GuestRewardsPrompt({ displayName = CLUB_DISPLAY_NAME, onOpenAuth }) {
         boxShadow: '0 20px 38px rgba(24, 93, 160, 0.12)',
       }}
     >
-      <h2 style={{ margin: 0, fontSize: 28, color: CLUB_THEME.blueDeep }}>{displayName}</h2>
+      <ClubSanMartinIcon size={96} />
+      <h2 style={{ margin: '14px 0 0', fontSize: 28, color: CLUB_THEME.blueDeep }}>Programa de lealtad</h2>
       <p style={{ margin: '10px 0 0', color: CLUB_THEME.textSoft, lineHeight: 1.6 }}>
         Inicia sesion para acumular puntos, ver tus premios y canjear uno en tu proximo pedido.
       </p>
@@ -464,8 +466,8 @@ export function StoreRewardsSummaryCard({
     [rewards, pointsBalance, cartAmount, settings]
   );
   const hasAvailableReward = Boolean(currentUser && summary.availableRewards.length > 0);
-  const compactTitle = compact ? 'Miembro Gold' : displayName;
-  const compactSubtitle = displayName.replace(/^Miembro Gold\s+/i, '') || 'San Martin';
+  const compactTitle = currentUser ? 'Tus puntos' : 'Programa de lealtad';
+  const compactSubtitle = 'Premios y beneficios';
 
   return (
     <button
@@ -1033,7 +1035,7 @@ export default function StoreRewardsSheet({
           <ClubBackIcon size={20} />
           <span>{activeView === 'transactions' ? 'Premios' : 'Tienda'}</span>
         </button>
-        <strong>{activeView === 'transactions' ? 'Movimientos' : 'Miembro Gold'}</strong>
+        <strong>{activeView === 'transactions' ? 'Movimientos' : 'Premios'}</strong>
       </header>
 
       <div ref={screenScrollRef} className="sm-gold-screen-scroll">
@@ -1045,9 +1047,9 @@ export default function StoreRewardsSheet({
               <section className="sm-gold-hero">
                 <div className="sm-gold-hero-topline">
                   <div className="sm-gold-identity">
-                    <ClubSanMartinIcon size={44} />
+                    <ClubSanMartinIcon size={64} />
                     <div>
-                      <span>Miembro Gold</span>
+                      <span>Tus puntos</span>
                       <strong>{pointsBalance} pts</strong>
                     </div>
                   </div>
