@@ -448,9 +448,8 @@
 
 .sm-gold-identity > svg {
   flex: 0 0 auto;
-  padding: 7px;
   border-radius: 15px;
-  background: #ffffff;
+  box-shadow: 0 9px 22px rgba(4, 27, 52, 0.28);
 }
 
 .sm-gold-identity > div {

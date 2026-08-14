@@ -5,7 +5,7 @@ import {
   getStoreRewardChoiceGroups,
 } from '../services/storeRewards';
 import { useRef } from 'react';
-import SanMartinCrownIcon from './SanMartinCrownIcon';
+import SanMartinGoldIcon from './SanMartinGoldIcon';
 import '../App.css';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
@@ -50,7 +50,7 @@ const formatTransactionDate = (value) => {
 };
 
 function ClubSanMartinIcon({ size = 54 }) {
-  return <SanMartinCrownIcon size={size} color={CLUB_THEME.red} />;
+  return <SanMartinGoldIcon size={size} />;
 }
 
 function ClubChevronIcon({ size = 16, color = CLUB_THEME.blueDeep }) {
