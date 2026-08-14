@@ -601,6 +601,11 @@
   object-fit: cover;
 }
 
+.sm-gold-reward-image img.san-martin-gold-logo {
+  object-fit: contain;
+  background: #0a3158;
+}
+
 .sm-gold-reward-state {
   position: absolute;
   top: 10px;

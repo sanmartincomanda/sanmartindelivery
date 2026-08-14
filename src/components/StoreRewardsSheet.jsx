@@ -517,12 +517,13 @@ export function StoreRewardsSummaryCard({
               borderRadius: compact ? 14 : 16,
               display: 'grid',
               placeItems: 'center',
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(237,246,255,0.92) 100%)',
-              border: `1px solid ${CLUB_THEME.border}`,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)',
+              overflow: 'hidden',
+              background: '#0a3158',
+              border: '1px solid rgba(10, 49, 88, 0.18)',
+              boxShadow: '0 7px 16px rgba(8, 42, 79, 0.18)',
             }}
           >
-            <ClubSanMartinIcon size={compact ? 32 : 44} />
+            <ClubSanMartinIcon size={compact ? 44 : 56} />
           </div>
 
           <div style={{ minWidth: 0 }}>
