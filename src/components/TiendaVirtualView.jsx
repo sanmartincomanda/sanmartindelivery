@@ -207,6 +207,7 @@ const STORE_GROUP_PAGE_SIZE = 5;
 const STORE_CASH_PAYMENT = 'EFECTIVO';
 const STORE_MOBILE_NAV_BREAKPOINT = 820;
 const STORE_MOBILE_SCROLL_OFFSET = 96;
+const STORE_ACTIVITY_HISTORY_MS = 92 * 24 * 60 * 60 * 1000;
 const STORE_COMBOS_CATEGORY_ID = 'promociones';
 const isDeliveryServiceItem = (item = {}) => {
   const code = String(item?.codigo || item?.code || '').trim();
@@ -320,6 +321,55 @@ const getStoreCategoryImagePath = (category = {}) => {
   }
 
   return imagePath;
+};
+
+const getStoreOrderTimestampMs = (order = {}) => {
+  const directTimestamp = Number(
+    order.timestamp ||
+      order.createdAt ||
+      order.createdAtMs ||
+      order.fechaMs ||
+      order.timestampMs ||
+      order.ingresoMs ||
+      0
+  );
+
+  if (Number.isFinite(directTimestamp) && directTimestamp > 0) {
+    return directTimestamp;
+  }
+
+  const dateCandidates = [
+    order.fechaIso,
+    order.fechaISO,
+    order.createdAtIso,
+    order.fecha,
+    [order.fecha, order.hora].filter(Boolean).join(' '),
+  ].filter(Boolean);
+
+  for (const candidate of dateCandidates) {
+    const parsed = Date.parse(String(candidate));
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return 0;
+};
+
+const formatStoreOrderActivityDate = (order = {}) => {
+  const timestamp = getStoreOrderTimestampMs(order);
+
+  if (!timestamp) {
+    return String(order.fecha || 'Fecha no disponible');
+  }
+
+  return new Intl.DateTimeFormat('es-NI', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestamp));
 };
 
 const STORE_ALL_PRODUCTS_PRIORITY_GROUPS = [
@@ -1811,7 +1861,13 @@ export default function TiendaVirtualView({
           ? 'categories'
           : 'home';
 
-      setMobileNavSection((current) => (current === nextSection ? current : nextSection));
+      setMobileNavSection((current) => {
+        if (!['home', 'categories'].includes(current)) {
+          return current;
+        }
+
+        return current === nextSection ? current : nextSection;
+      });
     };
 
     updateMobileNavSection();
@@ -1849,7 +1905,8 @@ export default function TiendaVirtualView({
       (error) => {
         console.error('No se pudieron cargar los pedidos del cliente:', error);
         setCustomerOrders([]);
-      }
+      },
+      0
     );
 
     return () => unsubscribe();
@@ -2397,14 +2454,29 @@ export default function TiendaVirtualView({
   ]);
 
   const hasTrackedOrder = Boolean(activeCustomerOrder);
+  const mobileStandalonePageActive =
+    showMobileBottomNav && ['categories', 'activity', 'profile'].includes(mobileNavSection);
+  const customerOrdersLastThreeMonths = useMemo(() => {
+    const cutoff = Number(currentTimeMs || Date.now()) - STORE_ACTIVITY_HISTORY_MS;
+
+    return (Array.isArray(customerOrders) ? customerOrders : []).filter((order) => {
+      const timestamp = getStoreOrderTimestampMs(order);
+      return !timestamp || timestamp >= cutoff;
+    });
+  }, [customerOrders, currentTimeMs]);
 
   useEffect(() => {
     if (!pendingOrderUpdateReview) {
       return;
     }
 
+    if (showMobileBottomNav) {
+      setMobileNavSection('activity');
+      return;
+    }
+
     setOrdersOpen(true);
-  }, [pendingOrderUpdateReview]);
+  }, [pendingOrderUpdateReview, showMobileBottomNav]);
 
   useEffect(() => {
     if (!activeCustomerOrderUpdateRevision) {
@@ -3257,6 +3329,7 @@ export default function TiendaVirtualView({
     setRewardsReturnTarget('');
     setCheckoutOpen(false);
     setProfileOpen(false);
+    setMobileNavSection('home');
     setAuthSheetOpen(false);
     setWelcomeCouponOpen(false);
     setAuthProviderDraft(null);
@@ -3296,6 +3369,7 @@ export default function TiendaVirtualView({
       setRewardsOpen(false);
       setRewardsReturnTarget('');
       setProfileOpen(false);
+      setMobileNavSection('home');
       setAuthPromptDismissed(allowsDirectGuestCatalog);
       setAuthSheetOpen(!allowsDirectGuestCatalog);
       if (typeof window !== 'undefined') {
@@ -3711,6 +3785,15 @@ export default function TiendaVirtualView({
       return;
     }
 
+    if (showMobileBottomNav) {
+      setOrdersOpen(false);
+      setProfileOpen(false);
+      setRewardsOpen(false);
+      setMobileNavSection('activity');
+      scrollToStoreRef(pageTopRef);
+      return;
+    }
+
     setOrdersOpen(true);
   };
 
@@ -3889,31 +3972,66 @@ export default function TiendaVirtualView({
   };
 
   const handleMobileBottomNav = (target) => {
+    const closeMobilePanels = () => {
+      setOrdersOpen(false);
+      setProfileOpen(false);
+      setRewardsOpen(false);
+    };
+
     if (target === 'home') {
+      closeMobilePanels();
       setMobileNavSection('home');
       scrollToStoreRef(pageTopRef);
       return;
     }
 
     if (target === 'categories') {
+      closeMobilePanels();
       setMobileNavSection('categories');
-      scrollToStoreRef(filtersPanelRef);
+      scrollToStoreRef(pageTopRef);
       return;
     }
 
-    if (target === 'orders') {
+    if (target === 'activity') {
       openCustomerOrders();
       return;
     }
 
-    if (target === 'rewards') {
-      openRewardsPanel();
-      return;
-    }
+    if (target === 'profile') {
+      if (!currentUser) {
+        openAuthSheet('login', 'guest');
+        return;
+      }
 
-    if (target === 'account') {
-      openProfilePanel();
+      closeMobilePanels();
+      setMobileNavSection('profile');
+      scrollToStoreRef(pageTopRef);
     }
+  };
+
+  const openMobileFilteredCatalog = () => {
+    setMobileNavSection('home');
+
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        scrollToStoreRef(filtersPanelRef);
+      }, 80);
+    }
+  };
+
+  const handleMobileCategorySelect = (category = {}) => {
+    const nextCategory = String(category.id || 'todos').trim() || 'todos';
+    setActiveCategory(nextCategory);
+    setActiveSubcategory('todas');
+
+    if (nextCategory === 'todos') {
+      openMobileFilteredCatalog();
+    }
+  };
+
+  const handleMobileSubcategorySelect = (subcategory) => {
+    setActiveSubcategory(subcategory);
+    openMobileFilteredCatalog();
   };
 
   const handleSelectReward = (reward, selection = {}) => {
@@ -7080,6 +7198,318 @@ export default function TiendaVirtualView({
           color: var(--sm-blue-deep);
           background: #ffffff;
         }
+        .store-mobile-app-page {
+          display: grid;
+          gap: 18px;
+          animation: storeMobilePageIn 0.22s ease both;
+        }
+        @keyframes storeMobilePageIn {
+          from {
+            opacity: 0;
+            transform: translateX(14px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .store-mobile-page-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 6px 2px 0;
+        }
+        .store-mobile-page-title {
+          flex: 1;
+          min-width: 0;
+          text-align: right;
+        }
+        .store-mobile-page-title span {
+          display: block;
+          color: var(--sm-blue-deep);
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.11em;
+          text-transform: uppercase;
+        }
+        .store-mobile-page-title h2 {
+          margin: 3px 0 0;
+          color: #0b2440;
+          font-size: clamp(25px, 7vw, 36px);
+          font-weight: 950;
+          letter-spacing: -0.04em;
+        }
+        .store-mobile-page-card {
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          border-radius: 28px;
+          background: rgba(255, 255, 255, 0.94);
+          box-shadow: 0 20px 44px rgba(12, 77, 136, 0.08);
+        }
+        .store-mobile-category-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .store-mobile-category-tile {
+          position: relative;
+          min-height: 142px;
+          overflow: hidden;
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          border-radius: 26px;
+          padding: 0;
+          background: #0b2440;
+          color: #ffffff;
+          box-shadow: 0 18px 36px rgba(10, 42, 78, 0.15);
+          text-align: left;
+        }
+        .store-mobile-category-tile img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.01);
+          transition: transform 0.28s ease;
+        }
+        .store-mobile-category-tile::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(5, 22, 41, 0.08) 0%, rgba(5, 22, 41, 0.82) 100%);
+        }
+        .store-mobile-category-tile:active img {
+          transform: scale(1.07);
+        }
+        .store-mobile-category-tile.active {
+          box-shadow:
+            0 22px 44px rgba(10, 42, 78, 0.2),
+            0 0 0 2px #ffffff,
+            0 0 0 5px #dc2626;
+        }
+        .store-mobile-category-tile-copy {
+          position: absolute;
+          left: 14px;
+          right: 14px;
+          bottom: 14px;
+          z-index: 1;
+          display: grid;
+          gap: 4px;
+        }
+        .store-mobile-category-tile-copy strong {
+          font-size: 18px;
+          font-weight: 950;
+          line-height: 1.05;
+          text-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+        }
+        .store-mobile-category-tile-copy span {
+          color: rgba(255, 255, 255, 0.82);
+          font-size: 12px;
+          font-weight: 850;
+        }
+        .store-mobile-subcategory-panel {
+          display: grid;
+          gap: 13px;
+          padding: 16px;
+        }
+        .store-mobile-subcategory-head {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .store-mobile-subcategory-head span {
+          display: block;
+          color: var(--sm-blue-deep);
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.09em;
+          text-transform: uppercase;
+        }
+        .store-mobile-subcategory-head h3 {
+          margin: 3px 0 0;
+          color: #0b2440;
+          font-size: 22px;
+          font-weight: 950;
+          letter-spacing: -0.03em;
+        }
+        .store-mobile-subcategory-list {
+          display: grid;
+          gap: 10px;
+        }
+        .store-mobile-subcategory-button {
+          width: 100%;
+          min-height: 58px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          border-radius: 20px;
+          padding: 12px 14px;
+          background: linear-gradient(180deg, #ffffff 0%, #f5faff 100%);
+          color: #0b2440;
+          font: inherit;
+          font-weight: 950;
+          text-align: left;
+        }
+        .store-mobile-subcategory-button.active {
+          background: linear-gradient(135deg, #0b2440, #0f5f9f);
+          color: #ffffff;
+          border-color: transparent;
+        }
+        .store-mobile-subcategory-button em {
+          min-width: 32px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 999px;
+          background: rgba(12, 77, 136, 0.08);
+          color: var(--sm-blue-deep);
+          font-size: 12px;
+          font-style: normal;
+        }
+        .store-mobile-subcategory-button.active em {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.14);
+        }
+        .store-mobile-activity-hero,
+        .store-mobile-profile-hero {
+          display: grid;
+          gap: 8px;
+          padding: 18px;
+          border-radius: 28px;
+          background:
+            radial-gradient(circle at top right, rgba(92, 170, 244, 0.32), transparent 40%),
+            linear-gradient(135deg, #0b2440, #0f5f9f);
+          color: #ffffff;
+          box-shadow: 0 22px 46px rgba(10, 42, 78, 0.22);
+        }
+        .store-mobile-activity-hero span,
+        .store-mobile-profile-hero span {
+          color: rgba(255, 255, 255, 0.72);
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .store-mobile-activity-hero h3,
+        .store-mobile-profile-hero h3 {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 950;
+          letter-spacing: -0.035em;
+        }
+        .store-mobile-activity-section {
+          display: grid;
+          gap: 12px;
+        }
+        .store-mobile-section-title {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin: 0;
+          color: #0b2440;
+          font-size: 18px;
+          font-weight: 950;
+          letter-spacing: -0.02em;
+        }
+        .store-mobile-section-title span {
+          color: var(--sm-text-soft);
+          font-size: 12px;
+          font-weight: 900;
+        }
+        .store-mobile-order-list {
+          display: grid;
+          gap: 10px;
+        }
+        .store-mobile-order-expander {
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          border-radius: 22px;
+          background: rgba(255, 255, 255, 0.96);
+          overflow: hidden;
+          box-shadow: 0 16px 32px rgba(12, 77, 136, 0.07);
+        }
+        .store-mobile-order-expander summary {
+          list-style: none;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px;
+          cursor: pointer;
+        }
+        .store-mobile-order-expander summary::-webkit-details-marker {
+          display: none;
+        }
+        .store-mobile-order-summary-copy {
+          display: grid;
+          gap: 3px;
+          min-width: 0;
+        }
+        .store-mobile-order-summary-copy strong {
+          color: #0b2440;
+          font-size: 15px;
+          font-weight: 950;
+        }
+        .store-mobile-order-summary-copy span {
+          color: var(--sm-text-soft);
+          font-size: 12px;
+          font-weight: 850;
+        }
+        .store-mobile-order-summary-total {
+          display: grid;
+          justify-items: end;
+          gap: 4px;
+          color: #0b2440;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+        .store-mobile-order-status-pill {
+          border-radius: 999px;
+          padding: 4px 8px;
+          background: rgba(12, 77, 136, 0.08);
+          color: var(--sm-blue-deep);
+          font-size: 10px;
+          font-weight: 950;
+          text-transform: uppercase;
+        }
+        .store-mobile-order-expanded-body {
+          padding: 0 12px 12px;
+        }
+        .store-mobile-profile-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .store-mobile-profile-stat {
+          display: grid;
+          gap: 5px;
+          min-height: 84px;
+          padding: 14px;
+          border-radius: 22px;
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          background: rgba(255, 255, 255, 0.96);
+          color: #0b2440;
+        }
+        .store-mobile-profile-stat span {
+          color: var(--sm-text-soft);
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .store-mobile-profile-stat strong {
+          font-size: 15px;
+          font-weight: 950;
+          line-height: 1.15;
+        }
+        .store-mobile-profile-actions {
+          display: grid;
+          gap: 10px;
+        }
         .store-mobile-cart {
           position: fixed;
           left: 14px;
@@ -7136,16 +7566,17 @@ export default function TiendaVirtualView({
           max-width: 520px;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 8px;
-          padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
-          border-radius: 28px;
-          border: 1px solid rgba(12, 77, 136, 0.12);
+          padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+          border-radius: 32px;
+          border: 1px solid rgba(255, 255, 255, 0.09);
           background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 249, 255, 0.98) 100%);
+            radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.1), transparent 30%),
+            linear-gradient(135deg, rgba(8, 18, 32, 0.98), rgba(12, 21, 32, 0.96));
           box-shadow:
-            0 22px 50px rgba(10, 42, 78, 0.18),
-            inset 0 1px 0 rgba(255, 255, 255, 0.72);
+            0 24px 54px rgba(5, 13, 24, 0.42),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
           backdrop-filter: blur(16px);
         }
         .store-mobile-nav-button {
@@ -7153,19 +7584,21 @@ export default function TiendaVirtualView({
           min-width: 0;
           border: 0;
           background: transparent;
-          color: #7b8ba2;
+          color: rgba(255, 255, 255, 0.62);
           display: grid;
           justify-items: center;
-          gap: 5px;
-          padding: 8px 4px 6px;
-          border-radius: 18px;
+          gap: 4px;
+          padding: 10px 6px 8px;
+          border-radius: 24px;
           font: inherit;
           transition: transform 0.18s ease, color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
         }
         .store-mobile-nav-button.active {
-          color: var(--sm-blue-deep);
-          background: linear-gradient(180deg, rgba(12, 77, 136, 0.12), rgba(59, 130, 246, 0.08));
-          box-shadow: inset 0 0 0 1px rgba(12, 77, 136, 0.08);
+          color: #ffffff;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
+          box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+            0 10px 24px rgba(0, 0, 0, 0.2);
         }
         .store-mobile-nav-button:active {
           transform: translateY(1px) scale(0.98);
@@ -7177,14 +7610,14 @@ export default function TiendaVirtualView({
           align-items: center;
           justify-content: center;
           border-radius: 14px;
-          background: rgba(12, 77, 136, 0.08);
+          background: transparent;
         }
         .store-mobile-nav-button.active .store-mobile-nav-icon {
-          background: linear-gradient(135deg, rgba(12, 77, 136, 0.16), rgba(220, 38, 38, 0.12));
+          background: rgba(255, 255, 255, 0.1);
         }
         .store-mobile-nav-label {
           display: block;
-          font-size: 10px;
+          font-size: 11px;
           line-height: 1.1;
           font-weight: 900;
           letter-spacing: 0.01em;
@@ -8536,11 +8969,11 @@ export default function TiendaVirtualView({
             padding: 7px 2px 5px;
           }
           .store-mobile-nav-icon {
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
           }
           .store-mobile-nav-label {
-            font-size: 9px;
+            font-size: 10px;
           }
           .store-auth-page {
             padding: 24px 14px;
@@ -8726,7 +9159,14 @@ export default function TiendaVirtualView({
                   type="button"
                   className="store-icon-button store-profile-button"
                   title="Mi perfil"
-                  onClick={openProfilePanel}
+                  onClick={() => {
+                    if (showMobileBottomNav) {
+                      handleMobileBottomNav('profile');
+                      return;
+                    }
+
+                    openProfilePanel();
+                  }}
                 >
                   <StoreProfileGlyph active={hasTrackedOrder} />
                 </button>
@@ -8798,6 +9238,53 @@ export default function TiendaVirtualView({
           </label>
         </header>
 
+        {showMobileBottomNav && mobileNavSection === 'categories' ? (
+          <StoreMobileCategoriesPage
+            categories={categoryOptions}
+            counts={categoryProductCounts}
+            activeCategory={activeCategory}
+            activeSubcategory={activeSubcategory}
+            subcategories={orderedSubcategoryOptions}
+            subcategoryCounts={subcategoryProductCounts}
+            categoryMediaReady={categoryMediaReady}
+            onBack={() => {
+              setMobileNavSection('home');
+              scrollToStoreRef(pageTopRef);
+            }}
+            onSelectCategory={handleMobileCategorySelect}
+            onSelectSubcategory={handleMobileSubcategorySelect}
+            onOpenProducts={openMobileFilteredCatalog}
+          />
+        ) : showMobileBottomNav && mobileNavSection === 'activity' ? (
+          <StoreMobileActivityPage
+            currentUser={currentUser}
+            orders={customerOrdersLastThreeMonths}
+            createdOrder={createdOrder}
+            onCancelOrder={cancelCustomerOrder}
+            onBack={() => {
+              setMobileNavSection('home');
+              scrollToStoreRef(pageTopRef);
+            }}
+          />
+        ) : showMobileBottomNav && mobileNavSection === 'profile' ? (
+          <StoreMobileProfilePage
+            currentUser={currentUser}
+            rewardPoints={Number(rewardAccount?.pointsBalance || 0)}
+            selectedBranch={selectedBranch}
+            onBack={() => {
+              setMobileNavSection('home');
+              scrollToStoreRef(pageTopRef);
+            }}
+            onEditProfile={openProfilePanel}
+            onOpenRewards={openRewardsPanel}
+            onOpenActivity={() => {
+              setMobileNavSection('activity');
+              scrollToStoreRef(pageTopRef);
+            }}
+            onSignOut={clearStoreSession}
+          />
+        ) : (
+          <>
         {!currentUser && !isDashboard && (
           <section className="store-guest-invite" aria-label="Beneficios de iniciar sesion">
             <div className="store-guest-invite-copy">
@@ -9029,6 +9516,8 @@ export default function TiendaVirtualView({
             </div>
           )}
         </main>
+          </>
+        )}
       </div>
 
       {showMobileBottomNav && !mobileOverlayOpen && (
@@ -9041,7 +9530,12 @@ export default function TiendaVirtualView({
         />
       )}
 
-      {cartItems.length > 0 && !selectedProduct && !checkoutOpen && !ordersOpen && !profileOpen && (
+      {cartItems.length > 0 &&
+        !mobileStandalonePageActive &&
+        !selectedProduct &&
+        !checkoutOpen &&
+        !ordersOpen &&
+        !profileOpen && (
         isMobileLayout ? (
           <MobileCartBar
             cartCount={cartCount}
@@ -9065,6 +9559,7 @@ export default function TiendaVirtualView({
 
       {isMobileLayout &&
         hasTrackedOrder &&
+        mobileNavSection === 'home' &&
         !ordersOpen &&
         !profileOpen &&
         !authSheetOpen &&
@@ -11015,17 +11510,11 @@ function StoreMobileBottomNav({
   hasTrackedOrder = false,
   onSelect,
 }) {
-  const rewardBadge =
-    currentUser && Number(rewardPoints || 0) > 0
-      ? `${Math.min(99, Number(rewardPoints || 0))}${Number(rewardPoints || 0) > 99 ? '+' : ''}`
-      : '';
-
   const items = [
     { key: 'home', label: 'Inicio', icon: 'home' },
-    { key: 'categories', label: 'Categorias', icon: 'categories' },
-    { key: 'orders', label: 'Mis pedidos', icon: 'orders', badge: hasTrackedOrder ? 'dot' : '' },
-    { key: 'rewards', label: 'Premios', icon: 'reward', badge: rewardBadge },
-    { key: 'account', label: currentUser ? 'Mi cuenta' : 'Ingresar', icon: 'account' },
+    { key: 'categories', label: 'Categoria', icon: 'categories' },
+    { key: 'activity', label: 'Actividad', icon: 'activity', badge: hasTrackedOrder ? 'dot' : '' },
+    { key: 'profile', label: 'Perfil', icon: 'profile', badge: currentUser && Number(rewardPoints || 0) > 0 ? 'dot' : '' },
   ];
 
   return (
@@ -11052,6 +11541,255 @@ function StoreMobileBottomNav({
         );
       })}
     </nav>
+  );
+}
+
+function StoreMobileCategoriesPage({
+  categories,
+  counts,
+  activeCategory,
+  activeSubcategory,
+  subcategories,
+  subcategoryCounts,
+  categoryMediaReady,
+  onBack,
+  onSelectCategory,
+  onSelectSubcategory,
+  onOpenProducts,
+}) {
+  const selectedCategory = categories.find((category) => category.id === activeCategory) || categories[0];
+  const selectedCategoryCount = Number(counts?.[selectedCategory?.id] || 0);
+
+  return (
+    <section className="store-mobile-app-page store-mobile-categories-page">
+      <div className="store-mobile-page-head">
+        <StoreBackButton onClick={onBack} label="Tienda" />
+        <div className="store-mobile-page-title">
+          <span>Navegar tienda</span>
+          <h2>Categorias</h2>
+        </div>
+      </div>
+
+      <div className="store-mobile-category-grid">
+        {categories.map((category) => {
+          const active = category.id === activeCategory;
+          const productCount = Number(counts?.[category.id] || 0);
+
+          return (
+            <button
+              key={category.id}
+              type="button"
+              className={`store-mobile-category-tile ${active ? 'active' : ''}`}
+              onClick={() => onSelectCategory?.(category)}
+            >
+              {categoryMediaReady ? (
+                <img
+                  src={getStoreCategoryImagePath(category)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : null}
+              <span className="store-mobile-category-tile-copy">
+                <strong>{category.label}</strong>
+                <span>{productCount} productos</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="store-mobile-page-card store-mobile-subcategory-panel">
+        <div className="store-mobile-subcategory-head">
+          <div>
+            <span>Seleccion actual</span>
+            <h3>{selectedCategory?.label || 'Todos'}</h3>
+          </div>
+          <button type="button" className="store-button secondary" onClick={onOpenProducts}>
+            Ver productos
+          </button>
+        </div>
+
+        {selectedCategory?.id === 'todos' || subcategories.length === 0 ? (
+          <button
+            type="button"
+            className="store-mobile-subcategory-button active"
+            onClick={onOpenProducts}
+          >
+            <span>Todo el catalogo</span>
+            <em>{selectedCategoryCount}</em>
+          </button>
+        ) : (
+          <div className="store-mobile-subcategory-list">
+            {subcategories.map((subcategory) => {
+              const active =
+                normalizeStorePriorityText(activeSubcategory) === normalizeStorePriorityText(subcategory);
+
+              return (
+                <button
+                  key={subcategory}
+                  type="button"
+                  className={`store-mobile-subcategory-button ${active ? 'active' : ''}`}
+                  onClick={() => onSelectSubcategory?.(subcategory)}
+                >
+                  <span>{subcategory}</span>
+                  <em>{Number(subcategoryCounts?.[subcategory] || 0)}</em>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function StoreMobileActivityPage({ currentUser, orders, createdOrder, onCancelOrder, onBack }) {
+  const listedOrders = Array.isArray(orders) ? orders : [];
+  const activeOrder = resolveActiveStoreCustomerOrder(listedOrders, createdOrder);
+  const previousOrders = (activeOrder
+    ? listedOrders.filter((order) => !isSameStoreCustomerOrder(order, activeOrder))
+    : listedOrders
+  ).sort((left, right) => getStoreOrderTimestampMs(right) - getStoreOrderTimestampMs(left));
+
+  return (
+    <section className="store-mobile-app-page store-mobile-activity-page">
+      <div className="store-mobile-page-head">
+        <StoreBackButton onClick={onBack} label="Tienda" />
+        <div className="store-mobile-page-title">
+          <span>Pedidos y seguimiento</span>
+          <h2>Actividad</h2>
+        </div>
+      </div>
+
+      <div className="store-mobile-activity-hero">
+        <span>{currentUser ? 'Cuenta activa' : 'Invitado'}</span>
+        <h3>{currentUser?.nombre || 'Inicia sesion'}</h3>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,.78)', fontWeight: 850 }}>
+          Pedido actual y pedidos de los ultimos 3 meses.
+        </p>
+      </div>
+
+      <div className="store-mobile-activity-section">
+        <h3 className="store-mobile-section-title">Pedido actual</h3>
+        {activeOrder ? (
+          <OrderStatusCard
+            order={activeOrder}
+            currentUser={currentUser}
+            highlight
+            onCancelOrder={onCancelOrder}
+          />
+        ) : (
+          <div className="store-empty">
+            <strong>No tienes un pedido activo</strong>
+            <span>Cuando realices un pedido, lo veras aqui.</span>
+          </div>
+        )}
+      </div>
+
+      <div className="store-mobile-activity-section">
+        <h3 className="store-mobile-section-title">
+          Pedidos anteriores <span>{previousOrders.length}</span>
+        </h3>
+        {previousOrders.length > 0 ? (
+          <div className="store-mobile-order-list">
+            {previousOrders.map((order) => {
+              const orderNumber = formatOrderNumber(order);
+              const statusLabel = String(order.estado || 'Pendiente');
+              const total = Number(order.total || order.totalFinal || order.totalActualizado || order.totalAproximado || 0);
+
+              return (
+                <details key={order.firebaseKey || order.id || orderNumber} className="store-mobile-order-expander">
+                  <summary>
+                    <span className="store-mobile-order-summary-copy">
+                      <strong>Pedido #{orderNumber}</strong>
+                      <span>{formatStoreOrderActivityDate(order)}</span>
+                    </span>
+                    <span className="store-mobile-order-summary-total">
+                      {formatCurrency(total)}
+                      <span className="store-mobile-order-status-pill">{statusLabel}</span>
+                    </span>
+                  </summary>
+                  <div className="store-mobile-order-expanded-body">
+                    <OrderStatusCard order={order} currentUser={currentUser} />
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="store-empty">
+            <strong>Sin pedidos anteriores</strong>
+            <span>Aqui se mostraran los pedidos de los ultimos 3 meses.</span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function StoreMobileProfilePage({
+  currentUser,
+  rewardPoints,
+  selectedBranch,
+  onBack,
+  onEditProfile,
+  onOpenRewards,
+  onOpenActivity,
+  onSignOut,
+}) {
+  return (
+    <section className="store-mobile-app-page store-mobile-profile-page">
+      <div className="store-mobile-page-head">
+        <StoreBackButton onClick={onBack} label="Tienda" />
+        <div className="store-mobile-page-title">
+          <span>Cuenta</span>
+          <h2>Perfil</h2>
+        </div>
+      </div>
+
+      <div className="store-mobile-profile-hero">
+        <span>Cliente</span>
+        <h3>{currentUser?.nombre || 'Mi cuenta'}</h3>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,.78)', fontWeight: 850 }}>
+          {currentUser?.telefono || 'Telefono no registrado'}
+        </p>
+      </div>
+
+      <div className="store-mobile-profile-grid">
+        <div className="store-mobile-profile-stat">
+          <span>Tienda</span>
+          <strong>{selectedBranch?.name || selectedBranch?.label || selectedBranch?.shortName || 'Granada'}</strong>
+        </div>
+        <div className="store-mobile-profile-stat">
+          <span>Miembro Gold</span>
+          <strong>{Number(rewardPoints || 0)} pts</strong>
+        </div>
+        <div className="store-mobile-profile-stat">
+          <span>Codigo cliente</span>
+          <strong>{currentUser?.codigoCliente || currentUser?.clientCode || 'Pendiente'}</strong>
+        </div>
+        <div className="store-mobile-profile-stat">
+          <span>Direccion</span>
+          <strong>{currentUser?.direccion || 'Sin direccion'}</strong>
+        </div>
+      </div>
+
+      <div className="store-mobile-profile-actions">
+        <button type="button" className="store-button" onClick={onEditProfile}>
+          Editar perfil
+        </button>
+        <button type="button" className="store-button secondary" onClick={onOpenRewards}>
+          Miembro Gold
+        </button>
+        <button type="button" className="store-button secondary" onClick={onOpenActivity}>
+          Ver actividad
+        </button>
+        <button type="button" className="store-button secondary" onClick={onSignOut}>
+          Cerrar sesion
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -11242,6 +11980,13 @@ function StoreCheckoutIcon({ name }) {
         <path d="M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
       </svg>
     ),
+    activity: (
+      <svg {...commonProps}>
+        <path d="M7 4h10v16l-5-2.8L7 20z" />
+        <path d="M9.5 8h5" />
+        <path d="M9.5 11.5h5" />
+      </svg>
+    ),
     reward: (
       <svg {...commonProps}>
         <path d="m12 4 2.2 4.4 4.8.7-3.5 3.4.8 4.8-4.3-2.3-4.3 2.3.8-4.8-3.5-3.4 4.8-.7Z" />
@@ -11251,6 +11996,14 @@ function StoreCheckoutIcon({ name }) {
       <svg {...commonProps}>
         <circle cx="12" cy="8" r="3.5" />
         <path d="M5 20a7 7 0 0 1 14 0" />
+      </svg>
+    ),
+    profile: (
+      <svg {...commonProps}>
+        <circle cx="12" cy="7.5" r="3.2" />
+        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+        <path d="M18.5 5.5h.01" />
+        <circle cx="18.5" cy="5.5" r="2" fill="currentColor" stroke="none" />
       </svg>
     ),
     pin: (
