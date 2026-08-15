@@ -648,6 +648,12 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode]);
 
   useEffect(() => {
+    if (isStoreMode && section === 'entrega') {
+      setSection('sucursales');
+    }
+  }, [isStoreMode, section]);
+
+  useEffect(() => {
     if (!isStoreMode || !['catalogo', 'categorias', 'recompensas', 'promos_tienda'].includes(section)) {
       return undefined;
     }
@@ -2380,13 +2386,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Admintv / Tienda Virtual / Programa de Recompensas',
           title: 'Club San Martin Granada',
         },
-        entrega: {
-          path: 'Admintv / Tienda Virtual / Entrega',
-          title: 'Entrega y cobertura',
-        },
         sucursales: {
           path: 'Admintv / Tienda Virtual / Sucursales',
-          title: 'Sucursales',
+          title: 'Sucursales, entrega y cobertura',
         },
         pedidos: {
           path: 'Admintv / Tienda Virtual / Pedidos',
@@ -2749,13 +2751,6 @@ export default function ConfiguracionView({ mode = 'users' }) {
               onClick={() => setSection('recompensas')}
             >
               Recompensas
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'entrega' ? 'active' : ''}`}
-              onClick={() => setSection('entrega')}
-            >
-              Entrega
             </button>
             <button
               type="button"
@@ -3230,12 +3225,6 @@ export default function ConfiguracionView({ mode = 'users' }) {
             catalog={products}
             storeUsers={storeUsers}
             storeOrders={storeOrders}
-          />
-        ) : isStoreMode && section === 'entrega' ? (
-          <DeliverySettingsManager
-            settings={deliverySettings}
-            saving={savingDeliverySettings}
-            onSave={saveDeliveryConfig}
           />
         ) : isStoreMode && section === 'sucursales' ? (
           <StoreBranchesAdminSection />

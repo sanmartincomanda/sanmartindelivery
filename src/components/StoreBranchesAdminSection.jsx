@@ -15,6 +15,9 @@ import {
 } from '../services/storeBranches';
 import {
   DEFAULT_STORE_DELIVERY_SETTINGS,
+  STORE_DELIVERY_FEE_BRACKETS,
+  getStoreDeliveryFeeRows,
+  normalizeStoreDeliverySettings,
   normalizeStoreOperationHours,
   subscribeStoreDeliverySettings,
   validateStoreOperationHours,
@@ -36,6 +39,8 @@ const branchToForm = (branch = {}, globalSettings = DEFAULT_STORE_DELIVERY_SETTI
     lng: branch.storeLocation?.lng ?? '',
     coverageRadiusKm: branch.coverageRadiusKm ?? 7.5,
     switchPromptRadiusKm: branch.switchPromptRadiusKm ?? 12,
+    taxRate: effectiveDeliverySettings.taxRate,
+    fees: effectiveDeliverySettings.fees,
     operationHours: effectiveDeliverySettings.operationHours,
     active: branch.active !== false,
     acceptingOrders: branch.acceptingOrders !== false,
@@ -92,6 +97,16 @@ export default function StoreBranchesAdminSection() {
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateFee = (feeKey, value) => {
+    setForm((current) => ({
+      ...current,
+      fees: {
+        ...(current.fees || {}),
+        [feeKey]: value,
+      },
+    }));
   };
 
   const chooseSearchResult = (result) => {
@@ -165,14 +180,36 @@ export default function StoreBranchesAdminSection() {
       form.operationHours,
       globalDeliverySettings.operationHours
     );
-    const scheduleError = validateStoreOperationHours({
-      ...globalDeliverySettings,
-      operationHours,
-    });
+    const deliverySettings = normalizeStoreDeliverySettings(
+      {
+        ...globalDeliverySettings,
+        storeLocation: location,
+        coverageRadiusKm: form.coverageRadiusKm,
+        taxRate: form.taxRate,
+        fees: form.fees,
+        operationHours,
+      },
+      globalDeliverySettings
+    );
+    const scheduleError = validateStoreOperationHours(deliverySettings);
     if (scheduleError) {
       setMessage(scheduleError);
       return;
     }
+
+    if (!Number.isFinite(Number(form.coverageRadiusKm)) || Number(form.coverageRadiusKm) <= 0) {
+      setMessage('Completa un radio de cobertura valido.');
+      return;
+    }
+
+    const branchDeliverySettings = {
+      taxRate: deliverySettings.taxRate,
+      coverageRadiusKm: deliverySettings.coverageRadiusKm,
+      storeLocation: deliverySettings.storeLocation,
+      fees: deliverySettings.fees,
+      operationHours,
+      updatedAt: Date.now(),
+    };
 
     setSaving(true);
     setMessage('Guardando sucursal...');
@@ -182,13 +219,10 @@ export default function StoreBranchesAdminSection() {
         ...form,
         id: form.id.trim().toLowerCase(),
         storeLocation: location,
-        coverageRadiusKm: Number(form.coverageRadiusKm),
+        coverageRadiusKm: deliverySettings.coverageRadiusKm,
         switchPromptRadiusKm: Number(form.switchPromptRadiusKm),
         displayOrder: Number(form.displayOrder),
-        deliverySettings: {
-          ...(selectedBranch?.deliverySettings || {}),
-          operationHours,
-        },
+        deliverySettings: branchDeliverySettings,
       });
       setSelectedBranchId(saved.id);
       setMessage(`${saved.name} guardada. La tienda ya puede detectarla por ubicación.`);
@@ -221,6 +255,22 @@ export default function StoreBranchesAdminSection() {
     label: form.name,
   });
   const mapUrl = buildGoogleMapsPlaceUrl(mapLocation);
+  const deliveryPreview = useMemo(
+    () =>
+      normalizeStoreDeliverySettings(
+        {
+          ...globalDeliverySettings,
+          storeLocation: mapLocation || globalDeliverySettings.storeLocation,
+          coverageRadiusKm: form.coverageRadiusKm,
+          taxRate: form.taxRate,
+          fees: form.fees,
+          operationHours: form.operationHours,
+        },
+        globalDeliverySettings
+      ),
+    [form.coverageRadiusKm, form.fees, form.operationHours, form.taxRate, globalDeliverySettings, mapLocation]
+  );
+  const feeRows = useMemo(() => getStoreDeliveryFeeRows(deliveryPreview), [deliveryPreview]);
 
   return (
     <section className="cfg-section-card">
@@ -416,6 +466,56 @@ export default function StoreBranchesAdminSection() {
             </label>
           </div>
 
+          <section className="branch-admin-delivery-panel">
+            <div>
+              <span className="branch-admin-kicker">Entrega de esta sucursal</span>
+              <h3>Tarifas y cobertura</h3>
+              <p>
+                Estos montos aplican solamente a {form.shortName || form.city || form.name || 'esta sucursal'}.
+                El cliente vera el total con IVA segun la distancia.
+              </p>
+            </div>
+
+            <label>
+              IVA de envio (%)
+              <input
+                className="cfg-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.taxRate}
+                onChange={(event) => updateField('taxRate', event.target.value)}
+              />
+            </label>
+
+            <div className="branch-admin-fee-grid">
+              {STORE_DELIVERY_FEE_BRACKETS.map((bracket, index) => {
+                const row = feeRows[index] || {};
+                return (
+                  <label className="branch-admin-fee-card" key={bracket.key}>
+                    <span>
+                      <strong>{bracket.label}</strong>
+                      <em>Total cliente: C$ {Number(row.totalFee || 0).toFixed(2)}</em>
+                    </span>
+                    <input
+                      className="cfg-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.fees?.[bracket.key] ?? ''}
+                      onChange={(event) => updateFee(bracket.key, event.target.value)}
+                      placeholder="Costo base"
+                    />
+                    <small>
+                      Base C$ {Number(row.baseFee || 0).toFixed(2)} + IVA C${' '}
+                      {Number(row.taxAmount || 0).toFixed(2)}
+                    </small>
+                  </label>
+                );
+              })}
+            </div>
+          </section>
+
           <div className="branch-admin-grid two">
             <label>
               Teléfono
@@ -594,6 +694,55 @@ export default function StoreBranchesAdminSection() {
         .branch-admin-grid.two {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+        .branch-admin-delivery-panel {
+          display: grid;
+          gap: 12px;
+          padding: 14px;
+          border: 1px solid #dce7f3;
+          border-radius: 16px;
+          background: #f8fbff;
+        }
+        .branch-admin-delivery-panel h3 {
+          margin: 4px 0;
+          color: #102a4a;
+          font-size: 20px;
+        }
+        .branch-admin-delivery-panel p {
+          margin: 0;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 750;
+          line-height: 1.45;
+        }
+        .branch-admin-fee-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .branch-admin-fee-card {
+          padding: 12px;
+          border: 1px solid #dbe7f4;
+          border-radius: 14px;
+          background: #ffffff;
+        }
+        .branch-admin-fee-card span {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: flex-start;
+        }
+        .branch-admin-fee-card em {
+          color: #0c4d88;
+          font-size: 12px;
+          font-style: normal;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+        .branch-admin-fee-card small {
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 750;
+        }
         .branch-admin-search {
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto auto;
@@ -639,6 +788,7 @@ export default function StoreBranchesAdminSection() {
         @media (max-width: 900px) {
           .branch-admin-layout,
           .branch-admin-grid.two,
+          .branch-admin-fee-grid,
           .branch-admin-search {
             grid-template-columns: 1fr;
           }
