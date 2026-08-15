@@ -111,6 +111,9 @@ export const normalizeDriver = (driver = {}, fallback = {}) => {
     branchId: String(source.branchId ?? source.storeBranchId ?? backup.branchId ?? backup.storeBranchId ?? 'granada')
       .trim()
       .toLowerCase() || 'granada',
+    storeBranchId: String(source.storeBranchId ?? source.branchId ?? backup.storeBranchId ?? backup.branchId ?? 'granada')
+      .trim()
+      .toLowerCase() || 'granada',
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
     loginUsername,
@@ -157,6 +160,7 @@ export async function saveDriver(driver) {
   }
 
   const record = { ...normalized };
+  record.storeBranchId = normalized.branchId;
   const password = String(source.password || '').trim();
   if (password) {
     record.passwordHash = await hashStorePassword(normalized.code, password);

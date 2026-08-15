@@ -178,6 +178,39 @@ export async function provisionDriverAuthAccount({
   return { uid, email };
 }
 
+export async function updateDriverRoleRecord({
+  uid,
+  username,
+  driverCode,
+  displayName,
+  branchId = 'granada',
+}) {
+  await assertRole(AUTH_ROLES.ADMIN);
+
+  const cleanUid = String(uid || '').trim();
+  const cleanUsername = String(username || '').trim().toLowerCase();
+  const cleanDriverCode = String(driverCode || '').trim().toUpperCase();
+  const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
+
+  if (!cleanUid || !cleanUsername || !cleanDriverCode) {
+    throw new Error('Rol Driver incompleto');
+  }
+
+  await update(ref(database, `${USER_ROLES_PATH}/${cleanUid}`), {
+    role: AUTH_ROLES.DRIVER,
+    driverCode: cleanDriverCode,
+    driverUsername: cleanUsername,
+    username: cleanUsername,
+    email: buildDriverEmail(cleanUsername),
+    displayName: String(displayName || cleanDriverCode).trim(),
+    branchId: cleanBranchId,
+    storeBranchId: cleanBranchId,
+    updatedAt: Date.now(),
+  });
+
+  return { uid: cleanUid, email: buildDriverEmail(cleanUsername) };
+}
+
 export const getCurrentAuthUser = () => auth.currentUser;
 
 export const onFirebaseAuthChange = (callback) => onAuthStateChanged(auth, callback);

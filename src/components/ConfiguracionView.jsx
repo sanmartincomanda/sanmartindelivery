@@ -90,7 +90,7 @@ import {
   seedDefaultDriversIfEmpty,
   updateDriver,
 } from '../services/drivers';
-import { provisionDriverAuthAccount } from '../services/authRoles';
+import { provisionDriverAuthAccount, updateDriverRoleRecord } from '../services/authRoles';
 import { DEFAULT_STORE_BRANCHES } from '../services/storeBranches';
 import {
   KITCHEN_USER_KEY,
@@ -1693,16 +1693,26 @@ export default function ConfiguracionView({ mode = 'users' }) {
           `El usuario ${loginUsername} ya pertenece a ${duplicatedUsername.name || duplicatedUsername.code}.`
         );
       }
-      const authAccount = await provisionDriverAuthAccount({
-        username: loginUsername,
-        password: loginPassword,
-        driverCode: driverPayload.code,
-        displayName: driverPayload.name,
-        branchId: driverPayload.branchId,
-      });
+      const authAccount = driverPayload.authUid
+        ? await updateDriverRoleRecord({
+            uid: driverPayload.authUid,
+            username: loginUsername,
+            driverCode: driverPayload.code,
+            displayName: driverPayload.name,
+            branchId: driverPayload.branchId,
+          })
+        : await provisionDriverAuthAccount({
+            username: loginUsername,
+            password: loginPassword,
+            driverCode: driverPayload.code,
+            displayName: driverPayload.name,
+            branchId: driverPayload.branchId,
+          });
       await saveDriver({
         ...driverPayload,
         loginUsername,
+        branchId: driverPayload.branchId,
+        storeBranchId: driverPayload.branchId,
         authUid: authAccount.uid,
       });
       setDriverForm(emptyDriver);
