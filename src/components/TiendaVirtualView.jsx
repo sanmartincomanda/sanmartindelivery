@@ -1852,21 +1852,8 @@ export default function TiendaVirtualView({
     }
 
     const updateMobileNavSection = () => {
-      const filtersTop = filtersPanelRef.current
-        ? filtersPanelRef.current.getBoundingClientRect().top
-        : Number.POSITIVE_INFINITY;
-
-      const nextSection =
-        activeCategory !== 'todos' || activeSubcategory !== 'todas' || filtersTop <= 128
-          ? 'categories'
-          : 'home';
-
       setMobileNavSection((current) => {
-        if (!['home', 'categories'].includes(current)) {
-          return current;
-        }
-
-        return current === nextSection ? current : nextSection;
+        return ['categories', 'activity', 'profile'].includes(current) ? current : 'home';
       });
     };
 
@@ -1874,7 +1861,7 @@ export default function TiendaVirtualView({
     window.addEventListener('scroll', updateMobileNavSection, { passive: true });
 
     return () => window.removeEventListener('scroll', updateMobileNavSection);
-  }, [activeCategory, activeSubcategory, showMobileBottomNav]);
+  }, [showMobileBottomNav]);
 
   useEffect(
     () => () => {
@@ -7307,6 +7294,32 @@ export default function TiendaVirtualView({
           font-size: 12px;
           font-weight: 850;
         }
+        .store-mobile-category-drilldown-hero {
+          position: relative;
+          min-height: 188px;
+          overflow: hidden;
+          border: 1px solid rgba(12, 77, 136, 0.12);
+          border-radius: 30px;
+          background: #0b2440;
+          color: #ffffff;
+          box-shadow: 0 22px 46px rgba(10, 42, 78, 0.16);
+        }
+        .store-mobile-category-drilldown-hero img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .store-mobile-category-drilldown-hero::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(5, 22, 41, 0.06) 0%, rgba(5, 22, 41, 0.82) 100%);
+        }
+        .store-mobile-category-drilldown-hero .store-mobile-category-tile-copy {
+          z-index: 1;
+        }
         .store-mobile-subcategory-panel {
           display: grid;
           gap: 13px;
@@ -11557,15 +11570,96 @@ function StoreMobileCategoriesPage({
   onSelectSubcategory,
   onOpenProducts,
 }) {
-  const selectedCategory = categories.find((category) => category.id === activeCategory) || categories[0];
+  const [drilldownCategoryId, setDrilldownCategoryId] = useState('');
+  const selectedCategory = drilldownCategoryId
+    ? categories.find((category) => category.id === drilldownCategoryId)
+    : null;
   const selectedCategoryCount = Number(counts?.[selectedCategory?.id] || 0);
+  const isDrilldownOpen = Boolean(selectedCategory);
+
+  const handleCategoryClick = (category) => {
+    onSelectCategory?.(category);
+
+    if (category.id === 'todos') {
+      onOpenProducts?.();
+      return;
+    }
+
+    setDrilldownCategoryId(category.id);
+  };
+
+  if (isDrilldownOpen) {
+    return (
+      <section className="store-mobile-app-page store-mobile-categories-page">
+        <div className="store-mobile-page-head">
+          <StoreBackButton onClick={() => setDrilldownCategoryId('')} label="Categorias" />
+          <div className="store-mobile-page-title">
+            <h2>{selectedCategory.label}</h2>
+          </div>
+        </div>
+
+        <div className="store-mobile-category-drilldown-hero">
+          {categoryMediaReady ? (
+            <img
+              src={getStoreCategoryImagePath(selectedCategory)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+          ) : null}
+          <span className="store-mobile-category-tile-copy">
+            <strong>{selectedCategory.label}</strong>
+            <span>{selectedCategoryCount} productos</span>
+          </span>
+        </div>
+
+        <div className="store-mobile-page-card store-mobile-subcategory-panel">
+          <div className="store-mobile-subcategory-head">
+            <div>
+              <span>Elige una subcategoria</span>
+              <h3>{selectedCategory.label}</h3>
+            </div>
+          </div>
+
+          {subcategories.length === 0 ? (
+            <button
+              type="button"
+              className="store-mobile-subcategory-button active"
+              onClick={onOpenProducts}
+            >
+              <span>Ver productos</span>
+              <em>{selectedCategoryCount}</em>
+            </button>
+          ) : (
+            <div className="store-mobile-subcategory-list">
+              {subcategories.map((subcategory) => {
+                const active =
+                  normalizeStorePriorityText(activeSubcategory) === normalizeStorePriorityText(subcategory);
+
+                return (
+                  <button
+                    key={subcategory}
+                    type="button"
+                    className={`store-mobile-subcategory-button ${active ? 'active' : ''}`}
+                    onClick={() => onSelectSubcategory?.(subcategory)}
+                  >
+                    <span>{subcategory}</span>
+                    <em>{Number(subcategoryCounts?.[subcategory] || 0)}</em>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="store-mobile-app-page store-mobile-categories-page">
       <div className="store-mobile-page-head">
         <StoreBackButton onClick={onBack} label="Tienda" />
         <div className="store-mobile-page-title">
-          <span>Navegar tienda</span>
           <h2>Categorias</h2>
         </div>
       </div>
@@ -11580,7 +11674,7 @@ function StoreMobileCategoriesPage({
               key={category.id}
               type="button"
               className={`store-mobile-category-tile ${active ? 'active' : ''}`}
-              onClick={() => onSelectCategory?.(category)}
+              onClick={() => handleCategoryClick(category)}
             >
               {categoryMediaReady ? (
                 <img
@@ -11597,48 +11691,6 @@ function StoreMobileCategoriesPage({
             </button>
           );
         })}
-      </div>
-
-      <div className="store-mobile-page-card store-mobile-subcategory-panel">
-        <div className="store-mobile-subcategory-head">
-          <div>
-            <span>Seleccion actual</span>
-            <h3>{selectedCategory?.label || 'Todos'}</h3>
-          </div>
-          <button type="button" className="store-button secondary" onClick={onOpenProducts}>
-            Ver productos
-          </button>
-        </div>
-
-        {selectedCategory?.id === 'todos' || subcategories.length === 0 ? (
-          <button
-            type="button"
-            className="store-mobile-subcategory-button active"
-            onClick={onOpenProducts}
-          >
-            <span>Todo el catalogo</span>
-            <em>{selectedCategoryCount}</em>
-          </button>
-        ) : (
-          <div className="store-mobile-subcategory-list">
-            {subcategories.map((subcategory) => {
-              const active =
-                normalizeStorePriorityText(activeSubcategory) === normalizeStorePriorityText(subcategory);
-
-              return (
-                <button
-                  key={subcategory}
-                  type="button"
-                  className={`store-mobile-subcategory-button ${active ? 'active' : ''}`}
-                  onClick={() => onSelectSubcategory?.(subcategory)}
-                >
-                  <span>{subcategory}</span>
-                  <em>{Number(subcategoryCounts?.[subcategory] || 0)}</em>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
     </section>
   );
