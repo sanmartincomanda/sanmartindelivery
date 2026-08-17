@@ -174,7 +174,7 @@ export default function StoreBranchSelector({
           display: grid;
           place-items: center;
           padding: 18px;
-          background: rgba(0, 0, 0, 0.78);
+          background: rgba(18, 31, 46, 0.48);
           backdrop-filter: none;
         }
         .store-branch-modal {
@@ -182,12 +182,12 @@ export default function StoreBranchSelector({
           width: min(540px, 100%);
           max-height: min(760px, 92dvh);
           overflow: auto;
-          border: 1px solid #2f3034;
+          border: 1px solid #e6dfd8;
           border-radius: 22px;
           padding: 34px;
-          background: #101113;
-          color: #f7f5f2;
-          box-shadow: 0 28px 72px rgba(0, 0, 0, 0.55);
+          background: #ffffff;
+          color: #122b46;
+          box-shadow: 0 28px 72px rgba(18, 43, 70, 0.2);
           font-family: inherit;
           animation: storeBranchEnter 180ms ease-out both;
         }
@@ -201,9 +201,9 @@ export default function StoreBranchSelector({
           width: 40px;
           height: 40px;
           border-radius: 50%;
-          border: 1px solid #34353a;
-          background: #1b1c1f;
-          color: #f7f5f2;
+          border: 1px solid #e6dfd8;
+          background: #f8f6f3;
+          color: #122b46;
           font-size: 24px;
           cursor: pointer;
         }
@@ -224,7 +224,7 @@ export default function StoreBranchSelector({
         .store-branch-eyebrow {
           display: block;
           margin-top: 20px;
-          color: #ff5368;
+          color: #f01936;
           font-size: 12px;
           font-weight: 950;
           letter-spacing: 0.1em;
@@ -238,7 +238,7 @@ export default function StoreBranchSelector({
         }
         .store-branch-modal > p {
           margin: 0 0 20px;
-          color: #aaa9a6;
+          color: #5f6c79;
           font-weight: 700;
           line-height: 1.5;
         }
@@ -249,21 +249,21 @@ export default function StoreBranchSelector({
           gap: 14px;
           margin: 20px 0;
           padding: 16px;
-          border: 1px solid #2f3034;
+          border: 1px solid #e6dfd8;
           border-radius: 14px;
-          background: #18191c;
+          background: #f8f6f3;
         }
         .store-branch-nearby-card div {
           display: grid;
           gap: 4px;
         }
         .store-branch-nearby-card div span {
-          color: #aaa9a6;
+          color: #5f6c79;
           font-size: 13px;
           font-weight: 700;
         }
         .store-branch-nearby-card > span {
-          color: #f7f5f2;
+          color: #122b46;
           font-weight: 950;
           white-space: nowrap;
         }
@@ -285,9 +285,9 @@ export default function StoreBranchSelector({
           box-shadow: none;
         }
         .store-branch-secondary {
-          color: #f7f5f2;
-          background: #202125;
-          border: 1px solid #34353a;
+          color: #122b46;
+          background: #f8f6f3;
+          border: 1px solid #e6dfd8;
         }
         .store-branch-list {
           display: grid;
@@ -301,16 +301,16 @@ export default function StoreBranchSelector({
           align-items: center;
           gap: 12px;
           padding: 14px;
-          border: 1px solid #2f3034;
+          border: 1px solid #e6dfd8;
           border-radius: 14px;
-          background: #18191c;
-          color: #f7f5f2;
+          background: #ffffff;
+          color: #122b46;
           text-align: left;
           cursor: pointer;
         }
         .store-branch-row.selected {
           border-color: #f01936;
-          background: #22171b;
+          background: #fff2f4;
           box-shadow: inset 0 0 0 1px #f01936;
         }
         .store-branch-row-pin {
@@ -319,8 +319,8 @@ export default function StoreBranchSelector({
           display: grid;
           place-items: center;
           border-radius: 12px;
-          color: #ff5368;
-          background: #2a2024;
+          color: #f01936;
+          background: #fff0f2;
         }
         .store-branch-row-pin svg {
           width: 22px;
@@ -332,11 +332,11 @@ export default function StoreBranchSelector({
           gap: 3px;
         }
         .store-branch-row-copy small {
-          color: #aaa9a6;
+          color: #5f6c79;
           font-weight: 700;
         }
         .store-branch-row-copy em {
-          color: #ff5368;
+          color: #f01936;
           font-size: 12px;
           font-style: normal;
           font-weight: 950;
@@ -345,10 +345,10 @@ export default function StoreBranchSelector({
           display: grid;
           justify-items: end;
           gap: 4px;
-          color: #f7f5f2;
+          color: #122b46;
         }
         .store-branch-row-meta small {
-          color: #aaa9a6;
+          color: #5f6c79;
           font-weight: 800;
         }
         @keyframes storeBranchEnter {
@@ -372,7 +372,7 @@ export default function StoreBranchSelector({
             height: 5px;
             margin: -16px auto 16px;
             border-radius: 999px;
-            background: #55565b;
+            background: #cbbfb5;
           }
           .store-branch-row {
             grid-template-columns: 40px minmax(0, 1fr) auto;

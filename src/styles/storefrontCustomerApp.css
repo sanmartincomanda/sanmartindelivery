@@ -1,29 +1,29 @@
 /* Customer-facing storefront only. Internal surfaces intentionally do not use this layer. */
 html body .store-shell.storefront-public-v2 {
-  --customer-bg: #101113;
-  --customer-surface: #18191c;
-  --customer-surface-raised: #202125;
-  --customer-surface-soft: #292a2f;
-  --customer-border: #32343a;
-  --customer-border-strong: #454850;
-  --customer-text: #f7f5f2;
-  --customer-text-soft: #aaa9a6;
-  --customer-text-faint: #7f8085;
+  --customer-bg: #ffffff;
+  --customer-surface: #ffffff;
+  --customer-surface-raised: #f8f6f3;
+  --customer-surface-soft: #f1ede8;
+  --customer-border: #e6dfd8;
+  --customer-border-strong: #cbbfb5;
+  --customer-text: #122b46;
+  --customer-text-soft: #5f6c79;
+  --customer-text-faint: #89939d;
   --customer-red: #f01936;
   --customer-red-pressed: #d80d29;
-  --customer-green: #41b977;
-  --customer-amber: #d9a441;
-  --customer-danger: #ff5268;
+  --customer-green: #17845b;
+  --customer-amber: #a86d13;
+  --customer-danger: #d92d47;
   --customer-radius-sm: 10px;
   --customer-radius-md: 16px;
   --customer-radius-lg: 22px;
-  --customer-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --customer-shadow: 0 18px 42px rgba(18, 43, 70, 0.14);
   --customer-nav-height: 72px;
   min-height: 100dvh;
   overflow-x: clip;
   background: var(--customer-bg);
   color: var(--customer-text);
-  color-scheme: dark;
+  color-scheme: light;
   font-family: "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -82,7 +82,7 @@ html body .store-shell.storefront-public-v2 .store-top {
   border: 0;
   border-bottom: 1px solid var(--customer-border);
   border-radius: 0;
-  background: rgba(16, 17, 19, 0.98);
+  background: rgba(255, 255, 255, 0.98);
   box-shadow: none;
   backdrop-filter: none;
 }
@@ -174,7 +174,7 @@ html body .store-shell.storefront-public-v2 .store-icon-button:hover,
 html body .store-shell.storefront-public-v2 .store-order-status-button:hover {
   border-color: var(--customer-border-strong);
   background: var(--customer-surface-raised);
-  color: #fff;
+  color: var(--customer-text);
 }
 
 html body .store-shell.storefront-public-v2 .store-icon-button:active,
@@ -236,16 +236,16 @@ html body .store-shell.storefront-public-v2 .store-branch-pill strong {
 html body .store-shell.storefront-public-v2 .store-coverage-alert {
   border: 1px solid rgba(217, 164, 65, 0.34);
   border-radius: var(--customer-radius-sm);
-  background: #211c14;
-  color: #f2d399;
+  background: #fff8e9;
+  color: #80520d;
   box-shadow: none;
 }
 
 html body .store-shell.storefront-public-v2 .store-coverage-alert-button {
   min-height: 38px;
-  border-color: #524327;
+  border-color: #ddc18d;
   background: transparent;
-  color: #f2d399;
+  color: #80520d;
 }
 
 html body .store-shell.storefront-public-v2 .store-coverage-alert-button.primary {
@@ -268,7 +268,7 @@ html body .store-shell.storefront-public-v2 .store-search-wrap {
 
 html body .store-shell.storefront-public-v2 .store-search-wrap:focus-within {
   border-color: var(--customer-red);
-  background: #242529;
+  background: #ffffff;
   box-shadow: 0 0 0 3px rgba(240, 25, 54, 0.12);
 }
 
@@ -384,7 +384,7 @@ html body .store-shell.storefront-public-v2 .store-button.secondary {
 html body .store-shell.storefront-public-v2 .store-button.secondary:hover {
   border-color: var(--customer-border-strong);
   background: var(--customer-surface-soft);
-  color: #fff;
+  color: var(--customer-text);
 }
 
 html body .store-shell.storefront-public-v2 .store-rewards-entry {
@@ -392,9 +392,9 @@ html body .store-shell.storefront-public-v2 .store-rewards-entry {
 }
 
 html body .store-shell.storefront-public-v2 .sm-reward-summary-card {
-  border: 1px solid #4b3b1f !important;
+  border: 1px solid #dfc987 !important;
   border-radius: var(--customer-radius-md) !important;
-  background: #18150f !important;
+  background: #fffaf0 !important;
   color: var(--customer-text) !important;
   box-shadow: none !important;
 }
@@ -404,14 +404,14 @@ html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:
 }
 
 html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(2) > div:not(:first-child) {
-  color: #bca979 !important;
+  color: #8a651b !important;
 }
 
 html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(3) > div,
 html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(4) {
-  border-color: #54452a !important;
-  background: #262016 !important;
-  color: #e7c66f !important;
+  border-color: #e4d39f !important;
+  background: #fff4d7 !important;
+  color: #7e5b12 !important;
   box-shadow: none !important;
 }
 
@@ -788,14 +788,14 @@ html body .store-shell.storefront-public-v2 .store-price-stack {
 }
 
 html body .store-shell.storefront-public-v2 .store-price {
-  color: var(--customer-text);
+  color: var(--customer-red);
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: -0.025em;
 }
 
 html body .store-shell.storefront-public-v2 .store-price-stack.promo .store-price {
-  color: #ff5369;
+  color: var(--customer-red);
 }
 
 html body .store-shell.storefront-public-v2 .store-price-old {
@@ -831,7 +831,7 @@ html body .store-shell.storefront-public-v2 .store-add {
   font-size: 1.45rem;
   font-weight: 600;
   line-height: 1;
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 5px 16px rgba(117, 19, 35, 0.22);
   transition: transform 140ms ease, background 160ms ease;
 }
 
@@ -885,7 +885,7 @@ html body .store-shell.storefront-public-v2 .store-skeleton-line {
   background-image: linear-gradient(
     90deg,
     var(--customer-surface-raised) 0%,
-    #2b2d31 45%,
+    #ede7e1 45%,
     var(--customer-surface-raised) 100%
   );
   background-size: 220% 100%;
@@ -912,8 +912,8 @@ html body .store-shell.storefront-public-v2 .store-mobile-cart span {
 
 html body .store-shell.storefront-public-v2 .store-mobile-bottom-nav {
   border: 1px solid var(--customer-border);
-  background: #18191c;
-  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.36);
+  background: #ffffff;
+  box-shadow: 0 -10px 34px rgba(18, 43, 70, 0.14);
 }
 
 html body .store-shell.storefront-public-v2 .store-mobile-nav-button {
@@ -957,7 +957,7 @@ html body .store-shell.storefront-public-v2 .store-sheet-overlay {
   place-items: center;
   padding: 24px;
   overflow: auto;
-  background: rgba(0, 0, 0, 0.78);
+  background: rgba(18, 31, 46, 0.48);
   backdrop-filter: none;
 }
 
@@ -987,13 +987,13 @@ html body .store-shell.storefront-public-v2 .store-sheet-head {
   min-height: 68px;
   padding: 12px 18px;
   border-bottom: 1px solid var(--customer-border);
-  background: rgba(16, 17, 19, 0.98);
+  background: rgba(255, 255, 255, 0.98);
   color: var(--customer-text);
 }
 
 html body .store-shell.storefront-public-v2 .store-sheet-head.product {
   margin: 0;
-  background: rgba(16, 17, 19, 0.98) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: none;
 }
 
@@ -1016,7 +1016,7 @@ html body .store-shell.storefront-public-v2 .store-back {
 html body .store-shell.storefront-public-v2 .store-back:hover {
   border-color: var(--customer-border-strong);
   background: var(--customer-surface-raised);
-  color: #fff;
+  color: var(--customer-text);
 }
 
 html body .store-shell.storefront-public-v2 .store-product-sheet-heading span {
@@ -1415,7 +1415,7 @@ html body .store-shell.storefront-public-v2 .store-mobile-page-head {
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--customer-border);
-  background: rgba(16, 17, 19, 0.98);
+  background: rgba(255, 255, 255, 0.98);
 }
 
 html body .store-shell.storefront-public-v2 .store-mobile-page-title span {
@@ -1565,7 +1565,7 @@ html body .store-shell.storefront-public-v2 .store-progress-step.active .store-p
   50% { box-shadow: 0 0 0 8px rgba(240, 25, 54, 0.12); }
 }
 
-/* Loyalty area keeps its black and gold identity inside the customer app. */
+/* Loyalty uses warm gold accents without breaking the storefront's light theme. */
 html body .store-shell.storefront-public-v2 .sm-gold-screen {
   position: fixed;
   inset: 0;
@@ -1576,7 +1576,7 @@ html body .store-shell.storefront-public-v2 .sm-gold-screen {
 
 html body .store-shell.storefront-public-v2 .sm-gold-screen-nav {
   border-bottom: 1px solid var(--customer-border);
-  background: rgba(16, 17, 19, 0.98);
+  background: rgba(255, 255, 255, 0.98);
   color: var(--customer-text);
 }
 
@@ -1596,24 +1596,24 @@ html body .store-shell.storefront-public-v2 .sm-gold-screen-content {
 }
 
 html body .store-shell.storefront-public-v2 .sm-gold-hero {
-  border: 1px solid #4b3b1f;
-  background: #18150f;
+  border: 1px solid #dfc987;
+  background: #fffaf0;
   color: var(--customer-text);
   box-shadow: none;
 }
 
 html body .store-shell.storefront-public-v2 .sm-gold-history-button {
-  border-color: #54452a;
-  background: #262016;
-  color: #e7c66f;
+  border-color: #e4d39f;
+  background: #fff4d7;
+  color: #7e5b12;
 }
 
 html body .store-shell.storefront-public-v2 .sm-gold-progress-track {
-  background: #332b1c;
+  background: #eee4ca;
 }
 
 html body .store-shell.storefront-public-v2 .sm-gold-progress-track > span {
-  background: #d9a441;
+  background: #c69220;
 }
 
 html body .store-shell.storefront-public-v2 .sm-gold-rewards-section,
@@ -1720,7 +1720,7 @@ html body .store-shell.storefront-public-v2 .store-success-check {
     gap: 9px;
     margin: 0 -16px;
     padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 10px;
-    border-bottom-color: #292a2e;
+    border-bottom-color: var(--customer-border);
   }
 
   html body .store-shell.storefront-public-v2 .store-brand-row {
@@ -1992,7 +1992,7 @@ html body .store-shell.storefront-public-v2 .store-success-check {
     min-height: calc(62px + env(safe-area-inset-top, 0px));
     margin: 0;
     padding: calc(9px + env(safe-area-inset-top, 0px)) 16px 9px;
-    background: rgba(16, 17, 19, 0.98) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
   }
 
   html body .store-shell.storefront-public-v2 .store-product-sheet-heading strong {
@@ -2057,7 +2057,7 @@ html body .store-shell.storefront-public-v2 .store-success-check {
     margin: auto -16px 0;
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--customer-border);
-    background: rgba(16, 17, 19, 0.98);
+    background: rgba(255, 255, 255, 0.98);
   }
 
   html body .store-shell.storefront-public-v2 .store-product-sheet-selection {
@@ -2089,9 +2089,9 @@ html body .store-shell.storefront-public-v2 .store-success-check {
   }
 
   html body .store-shell.storefront-public-v2 .store-checkout-primary-action:disabled {
-    border-color: #5f252f;
-    background: #5f252f;
-    color: #d7c6c9;
+    border-color: #e8c3c8;
+    background: #f5dfe2;
+    color: #86636a;
   }
 
   html body .store-shell.storefront-public-v2 .store-order-line {
