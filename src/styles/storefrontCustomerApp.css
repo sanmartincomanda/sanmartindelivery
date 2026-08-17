@@ -1,5 +1,6 @@
 /* Customer-facing storefront only. Internal surfaces intentionally do not use this layer. */
 html body .store-shell.storefront-public-v2 {
+  --customer-canvas: #edf6ff;
   --customer-bg: #ffffff;
   --customer-surface: #ffffff;
   --customer-surface-raised: #f8f6f3;
@@ -21,7 +22,11 @@ html body .store-shell.storefront-public-v2 {
   --customer-nav-height: 72px;
   min-height: 100dvh;
   overflow-x: clip;
-  background: var(--customer-bg);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(70, 157, 224, 0.16), transparent 25%),
+    radial-gradient(circle at 90% 24%, rgba(240, 25, 54, 0.07), transparent 24%),
+    linear-gradient(180deg, #edf7ff 0%, #f8fbff 48%, #eaf4ff 100%);
+  background-attachment: fixed;
   color: var(--customer-text);
   color-scheme: light;
   font-family: "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
@@ -30,7 +35,9 @@ html body .store-shell.storefront-public-v2 {
 }
 
 html body .store-shell.storefront-public-v2::before {
-  display: none;
+  display: block;
+  z-index: 0;
+  opacity: 0.17;
 }
 
 html body .store-shell.storefront-public-v2 button,
@@ -54,12 +61,14 @@ html body .store-shell.storefront-public-v2 a:focus-visible {
 }
 
 html body .store-shell.storefront-public-v2 .store-page {
+  position: relative;
+  z-index: 1;
   width: min(100%, 1440px);
   max-width: 1440px;
   min-height: 100dvh;
   margin: 0 auto;
   padding: 0 28px 96px;
-  background: var(--customer-bg);
+  background: transparent;
 }
 
 html body .store-shell.storefront-public-v2 .store-page.with-floating-cart {
@@ -1729,15 +1738,36 @@ html body .store-shell.storefront-public-v2 .store-success-check {
   }
 
   html body .store-shell.storefront-public-v2 .store-top {
+    position: relative;
+    top: auto;
+    z-index: 30;
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
     gap: 9px;
     margin: 0 -16px;
     padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 10px;
     border-bottom-color: var(--customer-border);
+    background: rgba(247, 251, 255, 0.96);
   }
 
   html body .store-shell.storefront-public-v2 .store-brand-row {
+    grid-column: 1 / -1;
+    width: 100%;
+    align-items: flex-start;
     gap: 7px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-brand-main {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-brand-copy {
+    min-width: 0;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-brand-actions {
+    flex: 0 0 auto;
   }
 
   html body .store-shell.storefront-public-v2 .store-logo {
@@ -1751,8 +1781,15 @@ html body .store-shell.storefront-public-v2 .store-success-check {
   }
 
   html body .store-shell.storefront-public-v2 .store-title {
-    max-width: 165px;
-    font-size: 0.95rem;
+    display: -webkit-box;
+    max-width: none;
+    overflow: hidden;
+    font-size: 0.86rem;
+    line-height: 1.08;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   html body .store-shell.storefront-public-v2 .store-order-status-button {
