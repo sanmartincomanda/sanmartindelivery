@@ -263,6 +263,34 @@ html body .store-shell.storefront-public-v2 .store-coverage-alert-button.primary
   color: #fff;
 }
 
+@media (min-width: 1181px) {
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) {
+    grid-template-columns: minmax(420px, 1fr) minmax(300px, 430px);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) .store-brand-row {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) .store-search-wrap {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) .store-branch-coverage-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) .store-coverage-alert {
+    justify-content: space-between;
+  }
+}
+
 html body .store-shell.storefront-public-v2 .store-search-wrap {
   display: flex;
   align-items: center;
@@ -1703,6 +1731,15 @@ html body .store-shell.storefront-public-v2 .store-success-check {
 @media (max-width: 1180px) {
   html body .store-shell.storefront-public-v2 .store-top {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) .store-brand-row,
+  html body .store-shell.storefront-public-v2 .store-top:has(.store-coverage-alert) .store-branch-coverage-row {
+    grid-column: 1 / -1;
   }
 
   html body .store-shell.storefront-public-v2 .store-search-wrap {
