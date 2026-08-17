@@ -162,6 +162,7 @@ import {
 } from '../services/storeRewards';
 import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import '../styles/storefrontPublic.css';
+import '../styles/storefrontCustomerApp.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';

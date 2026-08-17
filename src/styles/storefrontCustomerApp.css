@@ -1,0 +1,2210 @@
+/* Customer-facing storefront only. Internal surfaces intentionally do not use this layer. */
+html body .store-shell.storefront-public-v2 {
+  --customer-bg: #101113;
+  --customer-surface: #18191c;
+  --customer-surface-raised: #202125;
+  --customer-surface-soft: #292a2f;
+  --customer-border: #32343a;
+  --customer-border-strong: #454850;
+  --customer-text: #f7f5f2;
+  --customer-text-soft: #aaa9a6;
+  --customer-text-faint: #7f8085;
+  --customer-red: #f01936;
+  --customer-red-pressed: #d80d29;
+  --customer-green: #41b977;
+  --customer-amber: #d9a441;
+  --customer-danger: #ff5268;
+  --customer-radius-sm: 10px;
+  --customer-radius-md: 16px;
+  --customer-radius-lg: 22px;
+  --customer-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --customer-nav-height: 72px;
+  min-height: 100dvh;
+  overflow-x: clip;
+  background: var(--customer-bg);
+  color: var(--customer-text);
+  color-scheme: dark;
+  font-family: "Avenir Next", "Segoe UI Variable", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html body .store-shell.storefront-public-v2::before {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2 button,
+html body .store-shell.storefront-public-v2 input,
+html body .store-shell.storefront-public-v2 textarea,
+html body .store-shell.storefront-public-v2 select {
+  font: inherit;
+}
+
+html body .store-shell.storefront-public-v2 button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html body .store-shell.storefront-public-v2 button:focus-visible,
+html body .store-shell.storefront-public-v2 input:focus-visible,
+html body .store-shell.storefront-public-v2 textarea:focus-visible,
+html body .store-shell.storefront-public-v2 select:focus-visible,
+html body .store-shell.storefront-public-v2 a:focus-visible {
+  outline: 3px solid rgba(240, 25, 54, 0.45);
+  outline-offset: 3px;
+}
+
+html body .store-shell.storefront-public-v2 .store-page {
+  width: min(100%, 1440px);
+  max-width: 1440px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 0 28px 96px;
+  background: var(--customer-bg);
+}
+
+html body .store-shell.storefront-public-v2 .store-page.with-floating-cart {
+  max-width: 1440px;
+  padding-right: 344px;
+}
+
+/* App header */
+html body .store-shell.storefront-public-v2 .store-top {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(280px, 430px);
+  align-items: center;
+  gap: 14px;
+  margin: 0 -28px;
+  padding: 12px 28px;
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--customer-border);
+  border-radius: 0;
+  background: rgba(16, 17, 19, 0.98);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+html body .store-shell.storefront-public-v2 .store-brand-main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+html body .store-shell.storefront-public-v2 .store-logo {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  object-fit: contain;
+}
+
+html body .store-shell.storefront-public-v2 .store-brand-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+html body .store-shell.storefront-public-v2 .store-brand-kicker {
+  overflow: hidden;
+  color: var(--customer-text-soft);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+html body .store-shell.storefront-public-v2 .store-title {
+  overflow: hidden;
+  color: var(--customer-text);
+  font-size: clamp(1rem, 1.6vw, 1.28rem);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body .store-shell.storefront-public-v2 .store-brand-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-status-button,
+html body .store-shell.storefront-public-v2 .store-icon-button {
+  min-height: 44px;
+  border: 1px solid var(--customer-border);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-status-button {
+  padding: 0 16px;
+  border-radius: var(--customer-radius-sm);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+html body .store-shell.storefront-public-v2 .store-icon-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+
+html body .store-shell.storefront-public-v2 .store-icon-button:hover,
+html body .store-shell.storefront-public-v2 .store-order-status-button:hover {
+  border-color: var(--customer-border-strong);
+  background: var(--customer-surface-raised);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-icon-button:active,
+html body .store-shell.storefront-public-v2 .store-order-status-button:active {
+  transform: scale(0.96);
+}
+
+html body .store-shell.storefront-public-v2 .store-icon-button svg,
+html body .store-shell.storefront-public-v2 .store-checkout-icon {
+  width: 21px;
+  height: 21px;
+}
+
+html body .store-shell.storefront-public-v2 .store-cart-button-count {
+  top: -3px;
+  right: -3px;
+  min-width: 20px;
+  height: 20px;
+  border: 2px solid var(--customer-bg);
+  background: var(--customer-red);
+  color: #fff;
+  font-size: 0.65rem;
+}
+
+html body .store-shell.storefront-public-v2 .store-branch-coverage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+html body .store-shell.storefront-public-v2 .store-branch-pill {
+  min-height: 44px;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-sm);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-branch-pill:hover {
+  border-color: var(--customer-border-strong);
+  background: var(--customer-surface-raised);
+}
+
+html body .store-shell.storefront-public-v2 .store-branch-pill-icon {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-branch-pill small,
+html body .store-shell.storefront-public-v2 .store-branch-pill-chevron {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-branch-pill strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-coverage-alert {
+  border: 1px solid rgba(217, 164, 65, 0.34);
+  border-radius: var(--customer-radius-sm);
+  background: #211c14;
+  color: #f2d399;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-coverage-alert-button {
+  min-height: 38px;
+  border-color: #524327;
+  background: transparent;
+  color: #f2d399;
+}
+
+html body .store-shell.storefront-public-v2 .store-coverage-alert-button.primary {
+  border-color: var(--customer-red);
+  background: var(--customer-red);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-search-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  overflow: hidden;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface-raised);
+  box-shadow: none;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-search-wrap:focus-within {
+  border-color: var(--customer-red);
+  background: #242529;
+  box-shadow: 0 0 0 3px rgba(240, 25, 54, 0.12);
+}
+
+html body .store-shell.storefront-public-v2 .store-search-tag {
+  position: relative;
+  width: 48px;
+  min-width: 48px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+}
+
+html body .store-shell.storefront-public-v2 .store-search-tag::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 16px;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--customer-text-soft);
+  border-radius: 50%;
+  margin: 0;
+}
+
+html body .store-shell.storefront-public-v2 .store-search-tag::after {
+  content: "";
+  position: absolute;
+  left: 31px;
+  top: 30px;
+  width: 7px;
+  height: 2px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--customer-text-soft);
+  margin: 0;
+  transform: rotate(45deg);
+}
+
+html body .store-shell.storefront-public-v2 .store-search {
+  min-width: 0;
+  height: 52px;
+  padding: 0 16px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--customer-text);
+  font-size: 0.96rem;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-search::placeholder {
+  color: var(--customer-text-soft);
+  opacity: 1;
+}
+
+/* Entry modules */
+html body .store-shell.storefront-public-v2 .store-guest-invite {
+  margin: 22px 0 0;
+  padding: 18px 20px;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-guest-invite-icon {
+  background: rgba(240, 25, 54, 0.12);
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-guest-invite-message strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-guest-invite-message span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-guest-invite-button,
+html body .store-shell.storefront-public-v2 .store-button {
+  min-height: 48px;
+  border: 1px solid var(--customer-red);
+  border-radius: var(--customer-radius-sm);
+  background: var(--customer-red);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: none;
+  transition: transform 140ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-button:hover,
+html body .store-shell.storefront-public-v2 .store-guest-invite-button:hover {
+  border-color: var(--customer-red-pressed);
+  background: var(--customer-red-pressed);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-button:active:not(:disabled),
+html body .store-shell.storefront-public-v2 .store-guest-invite-button:active {
+  transform: scale(0.98);
+}
+
+html body .store-shell.storefront-public-v2 .store-button.secondary {
+  border-color: var(--customer-border);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-button.secondary:hover {
+  border-color: var(--customer-border-strong);
+  background: var(--customer-surface-soft);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-rewards-entry {
+  margin: 18px 0 0;
+}
+
+html body .store-shell.storefront-public-v2 .sm-reward-summary-card {
+  border: 1px solid #4b3b1f !important;
+  border-radius: var(--customer-radius-md) !important;
+  background: #18150f !important;
+  color: var(--customer-text) !important;
+  box-shadow: none !important;
+}
+
+html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(2) > div {
+  color: var(--customer-text) !important;
+}
+
+html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(2) > div:not(:first-child) {
+  color: #bca979 !important;
+}
+
+html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(3) > div,
+html body .store-shell.storefront-public-v2 .sm-reward-summary-card > div > div:nth-child(4) {
+  border-color: #54452a !important;
+  background: #262016 !important;
+  color: #e7c66f !important;
+  box-shadow: none !important;
+}
+
+/* Categories */
+html body .store-shell.storefront-public-v2 main {
+  padding-top: 24px;
+}
+
+html body .store-shell.storefront-public-v2 .store-filters-panel {
+  margin: 0;
+  padding: 0 0 22px;
+  border: 0;
+  border-bottom: 1px solid var(--customer-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-filter-strip {
+  margin-bottom: 14px;
+}
+
+html body .store-shell.storefront-public-v2 .store-filter-strip strong {
+  color: var(--customer-text);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+html body .store-shell.storefront-public-v2 .store-filter-strip div > span,
+html body .store-shell.storefront-public-v2 .store-filter-strip > span,
+html body .store-shell.storefront-public-v2 .store-filter-kicker {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-filter-kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+html body .store-shell.storefront-public-v2 .store-tabs,
+html body .store-shell.storefront-public-v2 .store-category-gallery,
+html body .store-shell.storefront-public-v2 .store-subtabs {
+  scrollbar-width: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-tabs::-webkit-scrollbar,
+html body .store-shell.storefront-public-v2 .store-category-gallery::-webkit-scrollbar,
+html body .store-shell.storefront-public-v2 .store-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-gallery {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(136px, 1fr));
+  gap: 10px;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card {
+  position: relative;
+  min-width: 0;
+  height: 112px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+  transform: none;
+  transition: border-color 160ms ease, transform 140ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card:hover {
+  border-color: var(--customer-border-strong);
+  transform: translateY(-2px);
+}
+
+html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card:active {
+  transform: scale(0.98);
+}
+
+html body .store-shell.storefront-public-v2 .store-category-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--customer-surface-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-category-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  transform: none;
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-card:hover .store-category-photo img {
+  opacity: 0.92;
+  transform: scale(1.03);
+}
+
+html body .store-shell.storefront-public-v2 .store-category-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 10, 11, 0.08) 20%, rgba(10, 10, 11, 0.92) 100%);
+}
+
+html body .store-shell.storefront-public-v2 .store-category-copy {
+  position: absolute;
+  inset: auto 12px 11px;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-card .store-filter-label {
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-card .store-filter-meta {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card.active,
+html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card[aria-pressed="true"] {
+  border-color: var(--customer-red);
+  box-shadow: inset 0 0 0 2px var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-category-selected {
+  top: 9px;
+  right: 9px;
+  z-index: 3;
+  width: 23px;
+  height: 23px;
+  border: 0;
+  background: var(--customer-red);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-subtabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 0;
+  overflow-x: auto;
+}
+
+html body .store-shell.storefront-public-v2 .store-subtabs .store-chip,
+html body .store-shell.storefront-public-v2 .store-chip {
+  min-height: 42px;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-sm);
+  background: var(--customer-surface);
+  color: var(--customer-text-soft);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-subtabs .store-chip:hover,
+html body .store-shell.storefront-public-v2 .store-chip:hover {
+  border-color: var(--customer-border-strong);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-subtabs .store-chip.active,
+html body .store-shell.storefront-public-v2 .store-chip.active {
+  border-color: var(--customer-red);
+  background: var(--customer-red);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-filter-badge {
+  background: var(--customer-surface-soft);
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-chip.active .store-filter-badge {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* Product catalogue */
+html body .store-shell.storefront-public-v2 .store-product-head {
+  margin: 26px 0 16px;
+}
+
+html body .store-shell.storefront-public-v2 .store-count {
+  color: var(--customer-text);
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+html body .store-shell.storefront-public-v2 .store-grouped-sections {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 28px;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group {
+  width: 100%;
+  min-width: 0;
+  padding: 0 0 36px;
+  border: 0;
+  border-bottom: 1px solid var(--customer-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group:first-child {
+  border: 0;
+  border-bottom: 1px solid var(--customer-border);
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group-head {
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group-kicker {
+  color: var(--customer-red);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group-title {
+  margin-top: 4px;
+  color: var(--customer-text);
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group-meta {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-product-group-link,
+html body .store-shell.storefront-public-v2 .store-product-group-more {
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+html body .store-shell.storefront-public-v2 .store-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 24px 16px;
+  align-items: start;
+}
+
+html body .store-shell.storefront-public-v2 .store-product {
+  position: relative;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-card {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--customer-text);
+  text-align: left;
+  box-shadow: none;
+  transition: transform 140ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-card:active {
+  transform: scale(0.985);
+}
+
+html body .store-shell.storefront-public-v2 .store-product-media,
+html body .store-shell.storefront-public-v2 .store-product-image-shell,
+html body .store-shell.storefront-public-v2 .store-product-image {
+  width: 100%;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-media {
+  aspect-ratio: 1 / 1;
+  margin: 0 0 11px;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-image-shell {
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: #f4f2ef;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-image {
+  height: 100%;
+  display: block;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: none;
+  transition: transform 220ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-product:hover .store-product-image img {
+  transform: scale(1.025);
+}
+
+html body .store-shell.storefront-public-v2 .store-product-code {
+  margin: 0 0 4px;
+  color: var(--customer-text-faint);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-name {
+  display: -webkit-box;
+  min-height: 2.55em;
+  overflow: hidden;
+  color: var(--customer-text);
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1.28;
+  letter-spacing: -0.012em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-promo-badge {
+  justify-self: start;
+  margin-top: 7px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--customer-red);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+html body .store-shell.storefront-public-v2 .store-price-stack {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-height: 25px;
+  margin-top: 8px;
+}
+
+html body .store-shell.storefront-public-v2 .store-price {
+  color: var(--customer-text);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+html body .store-shell.storefront-public-v2 .store-price-stack.promo .store-price {
+  color: #ff5369;
+}
+
+html body .store-shell.storefront-public-v2 .store-price-old {
+  color: var(--customer-text-faint);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+html body .store-shell.storefront-public-v2 .store-unit {
+  margin-top: 2px;
+  color: var(--customer-text-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+html body .store-shell.storefront-public-v2 .store-add {
+  position: absolute;
+  top: auto;
+  right: 9px;
+  bottom: calc(100% - min(48px, 17%));
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 2px solid var(--customer-surface);
+  border-radius: 50%;
+  background: var(--customer-red);
+  color: #fff;
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.34);
+  transition: transform 140ms ease, background 160ms ease;
+}
+
+html body .store-shell.storefront-public-v2 .store-add:hover {
+  background: var(--customer-red-pressed);
+  transform: scale(1.04);
+}
+
+html body .store-shell.storefront-public-v2 .store-add:active {
+  transform: scale(0.94);
+}
+
+html body .store-shell.storefront-public-v2 .store-add.has-quantity {
+  width: auto;
+  min-width: 42px;
+  padding: 0 10px;
+  border-radius: 22px;
+  background: var(--customer-text);
+  color: var(--customer-bg);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+/* Loading and empty states */
+html body .store-shell.storefront-public-v2 .store-empty {
+  min-height: 240px;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-empty strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-empty span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-skeleton-media,
+html body .store-shell.storefront-public-v2 .store-skeleton-line,
+html body .store-shell.storefront-public-v2 .store-product-skeleton {
+  border-color: var(--customer-border);
+  background: var(--customer-surface-raised);
+}
+
+html body .store-shell.storefront-public-v2 .store-skeleton-media,
+html body .store-shell.storefront-public-v2 .store-skeleton-line {
+  background-image: linear-gradient(
+    90deg,
+    var(--customer-surface-raised) 0%,
+    #2b2d31 45%,
+    var(--customer-surface-raised) 100%
+  );
+  background-size: 220% 100%;
+  animation: customer-skeleton 1.35s ease-in-out infinite;
+}
+
+@keyframes customer-skeleton {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* Floating cart and mobile navigation */
+html body .store-shell.storefront-public-v2 .store-mobile-cart {
+  border: 0;
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-red);
+  color: #fff;
+  box-shadow: var(--customer-shadow);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-cart span {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-bottom-nav {
+  border: 1px solid var(--customer-border);
+  background: #18191c;
+  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.36);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-nav-button {
+  min-width: 0;
+  min-height: 56px;
+  border: 0;
+  border-radius: var(--customer-radius-sm);
+  background: transparent;
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-nav-button.active {
+  background: var(--customer-surface-soft);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-nav-button.active::before {
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-nav-icon {
+  color: currentColor;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-nav-label {
+  color: currentColor;
+  font-weight: 700;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-nav-badge {
+  border-color: var(--customer-surface);
+  background: var(--customer-red);
+}
+
+/* Product, cart and checkout surfaces */
+html body .store-shell.storefront-public-v2 .store-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-sheet {
+  width: min(100%, 780px);
+  max-height: min(92dvh, 920px);
+  overflow: auto;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-lg);
+  background: var(--customer-bg);
+  color: var(--customer-text);
+  box-shadow: var(--customer-shadow);
+  scrollbar-color: var(--customer-border-strong) transparent;
+}
+
+html body .store-shell.storefront-public-v2 .store-sheet.full,
+html body .store-shell.storefront-public-v2 .store-product-sheet {
+  width: min(100%, 980px);
+  max-width: 980px;
+  background: var(--customer-bg);
+}
+
+html body .store-shell.storefront-public-v2 .store-sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  min-height: 68px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--customer-border);
+  background: rgba(16, 17, 19, 0.98);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-sheet-head.product {
+  margin: 0;
+  background: rgba(16, 17, 19, 0.98) !important;
+  backdrop-filter: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-sheet-head strong {
+  color: var(--customer-text);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+html body .store-shell.storefront-public-v2 .store-back {
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--customer-border);
+  border-radius: 50%;
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-back:hover {
+  border-color: var(--customer-border-strong);
+  background: var(--customer-surface-raised);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-sheet-heading span {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-product-sheet-heading strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(340px, 1.08fr);
+  gap: 32px;
+  padding: 26px;
+}
+
+html body .store-shell.storefront-public-v2 .store-detail-image {
+  align-self: start;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: #f4f2ef;
+}
+
+html body .store-shell.storefront-public-v2 .store-detail-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-sheet-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-sheet-title {
+  margin: 0;
+  color: var(--customer-text);
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+html body .store-shell.storefront-public-v2 .store-price-sheet {
+  margin-top: 14px;
+}
+
+html body .store-shell.storefront-public-v2 .store-price-sheet .store-price {
+  font-size: 1.55rem;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-sheet-promo {
+  width: fit-content;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--customer-red);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-qty-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-qty-row::-webkit-scrollbar {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-qty-row .store-chip {
+  min-width: max-content;
+}
+
+html body .store-shell.storefront-public-v2 .store-stepper {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+html body .store-shell.storefront-public-v2 .store-stepper button,
+html body .store-shell.storefront-public-v2 .store-stepper .store-qty-input {
+  height: 48px;
+  min-height: 48px;
+  border: 1px solid var(--customer-border);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-stepper button {
+  border-radius: 50%;
+  font-size: 1.35rem;
+}
+
+html body .store-shell.storefront-public-v2 .store-stepper .store-qty-input {
+  border-radius: var(--customer-radius-sm);
+  text-align: center;
+}
+
+html body .store-shell.storefront-public-v2 .store-product-sheet-footer {
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-sheet {
+  width: min(100%, 760px);
+  padding-bottom: 18px;
+  background: var(--customer-bg);
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-progress {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--customer-border);
+  background: var(--customer-bg);
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-progress span {
+  min-height: 36px;
+  border-radius: 8px;
+  background: var(--customer-surface);
+  color: var(--customer-text-faint);
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-progress span.active {
+  background: var(--customer-surface-soft);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-progress span.active::after {
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-step {
+  padding: 18px;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) auto;
+  gap: 13px;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--customer-border);
+  background: transparent;
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line > img {
+  width: 66px;
+  height: 66px;
+  border-radius: var(--customer-radius-sm);
+  background: #f4f2ef;
+  object-fit: contain;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line > div > strong,
+html body .store-shell.storefront-public-v2 .store-order-line > strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line > div > div {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line-controls button,
+html body .store-shell.storefront-public-v2 .store-floating-qty-input {
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid var(--customer-border);
+  border-radius: 9px;
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-order-line-controls .store-order-line-remove {
+  width: auto;
+  padding: 0 9px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--customer-danger);
+}
+
+html body .store-shell.storefront-public-v2 .store-status-card,
+html body .store-shell.storefront-public-v2 .store-coupon-card,
+html body .store-shell.storefront-public-v2 .store-choice-section,
+html body .store-shell.storefront-public-v2 .store-location-card,
+html body .store-shell.storefront-public-v2 .store-location-selected,
+html body .store-shell.storefront-public-v2 .store-payment-note,
+html body .store-shell.storefront-public-v2 .store-cash-change {
+  border: 1px solid var(--customer-border) !important;
+  border-radius: var(--customer-radius-md) !important;
+  background: var(--customer-surface) !important;
+  color: var(--customer-text) !important;
+  box-shadow: none !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-status-card h3,
+html body .store-shell.storefront-public-v2 .store-status-card strong,
+html body .store-shell.storefront-public-v2 .store-choice-title,
+html body .store-shell.storefront-public-v2 .store-coupon-card strong {
+  color: var(--customer-text) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-status-card p,
+html body .store-shell.storefront-public-v2 .store-coupon-card span,
+html body .store-shell.storefront-public-v2 .store-coupon-card p,
+html body .store-shell.storefront-public-v2 .store-fulfillment-help,
+html body .store-shell.storefront-public-v2 .store-location-feedback {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-status-pill {
+  width: fit-content;
+  border: 0;
+  border-radius: 6px;
+  background: var(--customer-surface-soft);
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-status-pill.error {
+  background: rgba(255, 82, 104, 0.12);
+  color: var(--customer-danger);
+}
+
+html body .store-shell.storefront-public-v2 .store-choice-grid {
+  gap: 10px;
+}
+
+html body .store-shell.storefront-public-v2 .store-choice-card {
+  min-height: 112px;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text-soft);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-choice-card:hover {
+  border-color: var(--customer-border-strong);
+  background: var(--customer-surface-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-choice-card.active {
+  border-color: var(--customer-red);
+  background: rgba(240, 25, 54, 0.09);
+  color: var(--customer-text);
+  box-shadow: inset 0 0 0 1px var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-choice-card.active strong,
+html body .store-shell.storefront-public-v2 .store-choice-card.active span:not(.store-checkout-icon) {
+  color: var(--customer-text) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-choice-card strong,
+html body .store-shell.storefront-public-v2 .store-choice-card span {
+  color: inherit;
+}
+
+html body .store-shell.storefront-public-v2 .store-checkout-icon {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-input,
+html body .store-shell.storefront-public-v2 .store-field,
+html body .store-shell.storefront-public-v2 .store-textarea,
+html body .store-shell.storefront-public-v2 .store-select {
+  min-height: 50px;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-sm);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-input::placeholder,
+html body .store-shell.storefront-public-v2 .store-field::placeholder,
+html body .store-shell.storefront-public-v2 .store-textarea::placeholder {
+  color: var(--customer-text-faint);
+}
+
+html body .store-shell.storefront-public-v2 .store-input:focus,
+html body .store-shell.storefront-public-v2 .store-field:focus,
+html body .store-shell.storefront-public-v2 .store-textarea:focus,
+html body .store-shell.storefront-public-v2 .store-select:focus {
+  border-color: var(--customer-red);
+  box-shadow: 0 0 0 3px rgba(240, 25, 54, 0.11);
+}
+
+html body .store-shell.storefront-public-v2 .store-total-note {
+  border: 1px solid var(--customer-border) !important;
+  border-radius: var(--customer-radius-md) !important;
+  background: var(--customer-surface-raised) !important;
+  color: var(--customer-text) !important;
+  box-shadow: none !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-total-note span,
+html body .store-shell.storefront-public-v2 .store-total-note strong {
+  color: var(--customer-text) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-total-note p {
+  color: var(--customer-text-soft) !important;
+}
+
+/* Authentication and profile */
+html body .store-shell.storefront-public-v2 .store-auth-sheet {
+  border-color: var(--customer-border);
+  background: var(--customer-bg);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-sheet::before {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-card,
+html body .store-shell.storefront-public-v2 .store-auth-card.inline {
+  border-color: var(--customer-border);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-brand h1,
+html body .store-shell.storefront-public-v2 .store-auth-card h2,
+html body .store-shell.storefront-public-v2 .store-auth-card strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-card p,
+html body .store-shell.storefront-public-v2 .store-auth-card label,
+html body .store-shell.storefront-public-v2 .store-auth-card span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-toggle {
+  border-color: var(--customer-border);
+  background: var(--customer-surface-raised);
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-toggle button {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-toggle button.active {
+  background: var(--customer-surface-soft);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-auth-card .store-google-button {
+  border-color: var(--customer-border);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+}
+
+/* Native-feeling customer pages */
+html body .store-shell.storefront-public-v2 .store-mobile-app-page {
+  min-height: calc(100dvh - var(--customer-nav-height));
+  padding: 18px 0 32px;
+  background: var(--customer-bg);
+  color: var(--customer-text);
+  animation: customer-page-in 220ms ease both;
+}
+
+@keyframes customer-page-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-page-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--customer-border);
+  background: rgba(16, 17, 19, 0.98);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-page-title span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-page-title h2,
+html body .store-shell.storefront-public-v2 .store-mobile-section-title {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-category-grid {
+  gap: 12px;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-category-tile,
+html body .store-shell.storefront-public-v2 .store-mobile-category-drilldown-hero {
+  overflow: hidden;
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-category-tile::after,
+html body .store-shell.storefront-public-v2 .store-mobile-category-drilldown-hero::after {
+  background: linear-gradient(180deg, transparent 24%, rgba(0, 0, 0, 0.92) 100%);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-category-tile.active {
+  border-color: var(--customer-red);
+  box-shadow: inset 0 0 0 2px var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-category-tile-copy strong,
+html body .store-shell.storefront-public-v2 .store-mobile-category-tile-copy span {
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-page-card,
+html body .store-shell.storefront-public-v2 .store-mobile-profile-stat,
+html body .store-shell.storefront-public-v2 .store-mobile-order-expander {
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-subcategory-head span,
+html body .store-shell.storefront-public-v2 .store-mobile-profile-stat span,
+html body .store-shell.storefront-public-v2 .store-mobile-order-summary-copy span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-subcategory-head h3 {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-subcategory-button {
+  min-height: 54px;
+  border-color: var(--customer-border);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-subcategory-button.active {
+  border-color: var(--customer-red);
+  background: rgba(240, 25, 54, 0.09);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-activity-hero,
+html body .store-shell.storefront-public-v2 .store-mobile-profile-hero {
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-md);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-activity-hero p,
+html body .store-shell.storefront-public-v2 .store-mobile-profile-hero p {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-order-expander summary {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-mobile-order-status-pill {
+  background: var(--customer-surface-soft);
+  color: var(--customer-text-soft);
+}
+
+/* Order tracking */
+html body .store-shell.storefront-public-v2 .store-friendly-status {
+  border: 1px solid var(--customer-border);
+  border-radius: var(--customer-radius-lg);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-friendly-status::after {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2 .store-order-card-topline,
+html body .store-shell.storefront-public-v2 .store-status-visual,
+html body .store-shell.storefront-public-v2 .store-order-meta,
+html body .store-shell.storefront-public-v2 .store-status-items {
+  border-color: var(--customer-border);
+}
+
+html body .store-shell.storefront-public-v2 .store-order-eyebrow,
+html body .store-shell.storefront-public-v2 .store-status-message,
+html body .store-shell.storefront-public-v2 .store-order-meta span,
+html body .store-shell.storefront-public-v2 .store-status-items span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2 .store-friendly-status h3,
+html body .store-shell.storefront-public-v2 .store-friendly-status strong {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-progress {
+  background: var(--customer-surface-raised);
+}
+
+html body .store-shell.storefront-public-v2 .store-progress-step {
+  color: var(--customer-text-faint);
+}
+
+html body .store-shell.storefront-public-v2 .store-progress-step.active,
+html body .store-shell.storefront-public-v2 .store-progress-step.done {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2 .store-progress-step.active .store-progress-icon {
+  animation: customer-status-pulse 1.7s ease-in-out infinite;
+}
+
+@keyframes customer-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 25, 54, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(240, 25, 54, 0.12); }
+}
+
+/* Loyalty area keeps its black and gold identity inside the customer app. */
+html body .store-shell.storefront-public-v2 .sm-gold-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  background: var(--customer-bg);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-screen-nav {
+  border-bottom: 1px solid var(--customer-border);
+  background: rgba(16, 17, 19, 0.98);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-back-button {
+  border-color: var(--customer-border);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-screen-scroll {
+  background: var(--customer-bg);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-screen-content {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-hero {
+  border: 1px solid #4b3b1f;
+  background: #18150f;
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-history-button {
+  border-color: #54452a;
+  background: #262016;
+  color: #e7c66f;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-progress-track {
+  background: #332b1c;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-progress-track > span {
+  background: #d9a441;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-rewards-section,
+html body .store-shell.storefront-public-v2 .sm-gold-transactions-section {
+  background: transparent;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-section-heading h2,
+html body .store-shell.storefront-public-v2 .sm-gold-section-heading span {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-reward-card {
+  border-color: var(--customer-border);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-reward-card.is-locked {
+  opacity: 0.48;
+  filter: saturate(0.35);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-reward-card.is-unlocked {
+  border-color: #d9a441;
+  opacity: 1;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-reward-copy,
+html body .store-shell.storefront-public-v2 .sm-gold-reward-copy strong,
+html body .store-shell.storefront-public-v2 .sm-gold-reward-copy span {
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-reward-button {
+  border-color: var(--customer-red);
+  background: var(--customer-red);
+  color: #fff;
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-reward-button.is-secondary {
+  border-color: var(--customer-border);
+  background: var(--customer-surface-raised);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .sm-gold-transactions-list > * {
+  border-color: var(--customer-border) !important;
+  background: var(--customer-surface) !important;
+  color: var(--customer-text) !important;
+}
+
+html body .store-shell.storefront-public-v2 .store-success-card {
+  border-color: var(--customer-border);
+  background: var(--customer-surface);
+  color: var(--customer-text);
+}
+
+html body .store-shell.storefront-public-v2 .store-success-check {
+  background: rgba(65, 185, 119, 0.15);
+  color: var(--customer-green);
+}
+
+@media (max-width: 1180px) {
+  html body .store-shell.storefront-public-v2 .store-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-search-wrap {
+    grid-column: 1 / -1;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-gallery {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card {
+    flex: 0 0 148px;
+    scroll-snap-align: start;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  html body .store-shell.storefront-public-v2 {
+    --customer-nav-height: 68px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-page,
+  html body .store-shell.storefront-public-v2 .store-page.with-floating-cart,
+  html body .store-shell.storefront-public-v2 .store-page.with-mobile-nav {
+    width: 100%;
+    padding: 0 16px calc(var(--customer-nav-height) + env(safe-area-inset-bottom, 0px) + 34px);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 9px;
+    margin: 0 -16px;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 10px;
+    border-bottom-color: #292a2e;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-brand-row {
+    gap: 7px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-logo {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-brand-kicker {
+    display: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-title {
+    max-width: 165px;
+    font-size: 0.95rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-order-status-button {
+    min-height: 40px;
+    padding: 0 11px;
+    font-size: 0.7rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-icon-button {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-profile-button {
+    display: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-branch-coverage-row {
+    grid-column: 1 / -1;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-branch-pill {
+    width: 100%;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-search-wrap {
+    grid-column: 1 / -1;
+    min-height: 50px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-search,
+  html body .store-shell.storefront-public-v2 .store-search-tag {
+    height: 50px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-guest-invite {
+    gap: 12px;
+    margin-top: 16px;
+    padding: 14px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-guest-invite-message span {
+    display: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-guest-invite-button {
+    min-height: 42px;
+    padding: 0 13px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-rewards-entry {
+    margin-top: 12px;
+  }
+
+  html body .store-shell.storefront-public-v2 main {
+    padding-top: 18px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-filter-strip {
+    margin-bottom: 12px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-filter-strip strong {
+    font-size: 1.15rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-filter-kicker {
+    display: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-gallery {
+    gap: 9px;
+    margin: 0 -16px;
+    padding: 0 16px 3px;
+    overscroll-behavior-inline: contain;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-gallery .store-category-card {
+    flex-basis: 118px;
+    height: 94px;
+    border-radius: 14px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-copy {
+    inset: auto 10px 9px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-card .store-filter-label {
+    font-size: 0.82rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-category-card .store-filter-meta {
+    font-size: 0.62rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-subtabs {
+    margin: 11px -16px 0;
+    padding: 0 16px 2px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-head {
+    margin: 22px 0 14px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-head .store-button {
+    min-height: 40px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-grouped-sections {
+    gap: 32px;
+    margin-top: 22px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group {
+    margin: 0 -16px;
+    padding: 0 16px 28px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group-head {
+    align-items: start;
+    gap: 12px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group-title {
+    font-size: 1.35rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group-meta {
+    display: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group-link {
+    min-height: 38px;
+    padding: 0 11px;
+    font-size: 0.72rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group .store-grid {
+    display: flex;
+    gap: 12px;
+    margin: 0 -16px;
+    padding: 0 16px 6px;
+    overflow-x: auto;
+    scroll-padding-inline: 16px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group .store-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-group .store-product {
+    flex: 0 0 calc((100vw - 56px) / 2.2);
+    scroll-snap-align: start;
+  }
+
+  html body .store-shell.storefront-public-v2 main > .store-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 12px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-name {
+    font-size: 0.82rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-media {
+    margin-bottom: 9px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-add {
+    right: 7px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-bottom-nav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 110;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    min-height: var(--customer-nav-height);
+    padding: 6px;
+    border-radius: 22px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-nav-button {
+    gap: 2px;
+    padding: 5px 2px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-nav-button.active::before {
+    top: 0;
+    width: 24px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-nav-icon {
+    width: 23px;
+    height: 23px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-nav-label {
+    font-size: 0.66rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-cart {
+    left: 16px;
+    right: 16px;
+    bottom: calc(var(--customer-nav-height) + env(safe-area-inset-bottom, 0px) + 17px);
+    z-index: 105;
+    min-height: 56px;
+    padding: 0 18px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-sheet-overlay {
+    place-items: stretch;
+    padding: 0;
+    overflow: hidden;
+    background: var(--customer-bg);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-sheet,
+  html body .store-shell.storefront-public-v2 .store-sheet.full,
+  html body .store-shell.storefront-public-v2 .store-product-sheet,
+  html body .store-shell.storefront-public-v2 .store-checkout-sheet,
+  html body .store-shell.storefront-public-v2 .store-auth-sheet {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-sheet-head {
+    min-height: calc(62px + env(safe-area-inset-top, 0px));
+    padding: calc(9px + env(safe-area-inset-top, 0px)) 16px 9px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-sheet-head.product {
+    min-height: calc(62px + env(safe-area-inset-top, 0px));
+    margin: 0;
+    padding: calc(9px + env(safe-area-inset-top, 0px)) 16px 9px;
+    background: rgba(16, 17, 19, 0.98) !important;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-sheet-heading strong {
+    font-size: 0.95rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    min-height: calc(100dvh - 62px - env(safe-area-inset-top, 0px));
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html body .store-shell.storefront-public-v2 .store-detail-image {
+    width: 100%;
+    max-height: 31dvh;
+    margin-top: 12px;
+    border-radius: 14px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-sheet-copy {
+    min-height: 0;
+    padding: 18px 0 0;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-sheet-title {
+    font-size: clamp(1.35rem, 6vw, 1.75rem);
+    line-height: 1.08;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-price-sheet {
+    margin-top: 8px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-price-sheet .store-price {
+    font-size: 1.35rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-sheet-copy > .store-product-sheet-info > .store-unit {
+    margin-top: 4px;
+    font-size: 0.72rem;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-qty-row {
+    margin-top: 13px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-qty-row .store-chip {
+    min-height: 40px;
+    padding: 0 13px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-stepper {
+    margin-top: 12px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-sheet-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    margin: auto -16px 0;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--customer-border);
+    background: rgba(16, 17, 19, 0.98);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-product-sheet-selection {
+    margin: 0 0 7px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-checkout-sheet {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-checkout-progress {
+    padding: 10px 16px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-checkout-step {
+    padding: 14px 16px calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html body .store-shell.storefront-public-v2 .store-checkout-primary-action {
+    position: sticky;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 8;
+    min-height: 54px;
+    margin-top: 18px;
+    background: var(--customer-red);
+    color: #fff;
+    opacity: 1;
+    box-shadow: 0 -12px 24px 8px var(--customer-bg), 0 10px 28px rgba(0, 0, 0, 0.34);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-checkout-primary-action:disabled {
+    border-color: #5f252f;
+    background: #5f252f;
+    color: #d7c6c9;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-order-line {
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-order-line > img {
+    width: 54px;
+    height: 54px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-order-line-controls {
+    flex-wrap: wrap;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-choice-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html body .store-shell.storefront-public-v2 .store-choice-card {
+    min-height: 104px;
+    padding: 13px 10px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-coupon-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-app-page {
+    margin: 0 -16px;
+    padding: 0 16px calc(var(--customer-nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-page-head {
+    min-height: calc(62px + env(safe-area-inset-top, 0px));
+    margin: 0 -16px 18px;
+    padding: calc(9px + env(safe-area-inset-top, 0px)) 16px 9px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-category-tile {
+    aspect-ratio: 1.16 / 1;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-category-drilldown-hero {
+    height: 174px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-page-card {
+    padding: 14px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-activity-hero,
+  html body .store-shell.storefront-public-v2 .store-mobile-profile-hero {
+    padding: 18px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-mobile-profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  html body .store-shell.storefront-public-v2 .store-friendly-status {
+    border-radius: 16px;
+  }
+
+  html body .store-shell.storefront-public-v2 .sm-gold-screen-nav {
+    min-height: calc(62px + env(safe-area-inset-top, 0px));
+    padding: calc(9px + env(safe-area-inset-top, 0px)) 16px 9px;
+  }
+
+  html body .store-shell.storefront-public-v2 .sm-gold-screen-content {
+    padding: 16px 16px calc(var(--customer-nav-height) + env(safe-area-inset-bottom, 0px) + 28px);
+  }
+
+  html body .store-shell.storefront-public-v2 .sm-gold-hero {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  html body .store-shell.storefront-public-v2 .sm-gold-rewards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  html body .store-shell.storefront-public-v2 .sm-gold-reward-card {
+    border-radius: 16px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 980px) {
+  html body .store-shell.storefront-public-v2 .store-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1400px) {
+  html body .store-shell.storefront-public-v2 .store-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body .store-shell.storefront-public-v2 *,
+  html body .store-shell.storefront-public-v2 *::before,
+  html body .store-shell.storefront-public-v2 *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
