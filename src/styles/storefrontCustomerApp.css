@@ -690,8 +690,11 @@ html body .store-shell.storefront-public-v2 .store-product {
 }
 
 html body .store-shell.storefront-public-v2 .store-product-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -711,15 +714,24 @@ html body .store-shell.storefront-public-v2 .store-product-media,
 html body .store-shell.storefront-public-v2 .store-product-image-shell,
 html body .store-shell.storefront-public-v2 .store-product-image {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 html body .store-shell.storefront-public-v2 .store-product-media {
+  display: block;
+  flex: 0 0 auto;
+  height: auto;
   aspect-ratio: 1 / 1;
   margin: 0 0 11px;
+  overflow: hidden;
 }
 
 html body .store-shell.storefront-public-v2 .store-product-image-shell {
-  height: 100%;
+  display: block;
+  height: auto;
+  aspect-ratio: 1 / 1;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--customer-border);
@@ -731,6 +743,7 @@ html body .store-shell.storefront-public-v2 .store-product-image-shell {
 html body .store-shell.storefront-public-v2 .store-product-image {
   height: 100%;
   display: block;
+  overflow: hidden;
 }
 
 html body .store-shell.storefront-public-v2 .store-product-image img {
@@ -1880,6 +1893,7 @@ html body .store-shell.storefront-public-v2 .store-success-check {
 
   html body .store-shell.storefront-public-v2 .store-product-group .store-grid {
     display: flex;
+    align-items: flex-start;
     gap: 12px;
     margin: 0 -16px;
     padding: 0 16px 6px;
@@ -1895,6 +1909,9 @@ html body .store-shell.storefront-public-v2 .store-success-check {
 
   html body .store-shell.storefront-public-v2 .store-product-group .store-product {
     flex: 0 0 calc((100vw - 56px) / 2.2);
+    align-self: flex-start;
+    width: calc((100vw - 56px) / 2.2);
+    max-width: calc((100vw - 56px) / 2.2);
     scroll-snap-align: start;
   }
 
