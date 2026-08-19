@@ -163,6 +163,7 @@ import {
 import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import '../styles/storefrontPublic.css';
 import '../styles/storefrontCustomerApp.css';
+import '../styles/storefrontBrand2026.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
@@ -4402,7 +4403,7 @@ export default function TiendaVirtualView({
   return (
     <div
       className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''} ${
-        usePublicStorefrontDesign ? 'storefront-public-v2' : ''
+        usePublicStorefrontDesign ? 'storefront-public-v2 storefront-brand-v3' : ''
       }`}
     >
       <style>{`
@@ -9376,7 +9377,7 @@ export default function TiendaVirtualView({
                           alt=""
                           loading="lazy"
                           decoding="async"
-                          fetchPriority="low"
+                          fetchpriority="low"
                         />
                       ) : null}
                     </span>

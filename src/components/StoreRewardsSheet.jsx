@@ -417,6 +417,7 @@ function GuestRewardsPrompt({ displayName = CLUB_DISPLAY_NAME, onOpenAuth }) {
   void displayName;
   return (
     <div
+      className="sm-gold-guest-prompt"
       style={{
         borderRadius: 24,
         padding: 22,

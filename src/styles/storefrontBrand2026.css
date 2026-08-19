@@ -1,0 +1,1929 @@
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/tienda/fonts/space-grotesk-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+/*
+ * Carnes San Martin customer storefront, 2026 visual layer.
+ * This file is deliberately scoped to the public storefront shell so internal
+ * modules keep their existing theme and behavior.
+ */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 {
+  --customer-canvas: #0f0f0f;
+  --customer-bg: #0f0f0f;
+  --customer-surface: #191919;
+  --customer-surface-raised: #202020;
+  --customer-surface-soft: #292929;
+  --customer-border: #333333;
+  --customer-border-strong: #4a4a4a;
+  --customer-text: #ffffff;
+  --customer-text-soft: #b8b8b8;
+  --customer-text-faint: #7d7d7d;
+  --customer-red: #ff000c;
+  --customer-red-pressed: #d9000a;
+  --customer-cream: #fef1e7;
+  --customer-gold: #fac85a;
+  --customer-green: #38b87c;
+  --customer-amber: #fac85a;
+  --customer-danger: #ff5a64;
+  --customer-radius-sm: 10px;
+  --customer-radius-md: 16px;
+  --customer-radius-lg: 22px;
+  --customer-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+  min-height: 100dvh;
+  overflow-x: clip;
+  background: var(--customer-canvas);
+  color: var(--customer-text);
+  color-scheme: dark;
+  font-family: "Space Grotesk", Arial, sans-serif;
+  font-feature-settings: "ss01" 1, "ss02" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3::before {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 input,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 textarea,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 select {
+  font-family: inherit;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 button:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 input:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 textarea:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 select:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 a:focus-visible {
+  outline: 3px solid rgba(255, 0, 12, 0.55);
+  outline-offset: 3px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-page {
+  width: min(100%, 1480px);
+  max-width: 1480px;
+  padding-inline: 28px;
+  background: transparent;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-page.with-floating-cart {
+  max-width: 1480px;
+}
+
+/* Header and search */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-top {
+  border-bottom-color: var(--customer-border);
+  background: rgba(15, 15, 15, 0.97);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-logo {
+  width: 42px;
+  height: 42px;
+  flex-basis: 42px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-brand-kicker {
+  color: #a8a8a8;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-title {
+  color: #ffffff;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-status-button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-icon-button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-status-button:hover,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-icon-button:hover,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill:hover {
+  border-color: var(--customer-border-strong);
+  background: #242424;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-cart-button-count {
+  border-color: #0f0f0f;
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill-icon {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill small,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill-chevron {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coverage-alert {
+  border-color: rgba(250, 200, 90, 0.34);
+  background: #211c12;
+  color: #f3d99d;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coverage-alert-button {
+  border-color: #65542d;
+  background: transparent;
+  color: #f3d99d;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coverage-alert-button.primary {
+  border-color: var(--customer-red);
+  background: var(--customer-red);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-wrap {
+  min-height: 54px;
+  border-color: var(--customer-border);
+  background: #202020;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-wrap:focus-within {
+  border-color: #656565;
+  background: #242424;
+  box-shadow: 0 0 0 3px rgba(255, 0, 12, 0.12);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search::placeholder {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search::placeholder {
+  color: #999999;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag::before {
+  border-color: #b7b7b7;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag::after {
+  background: #b7b7b7;
+}
+
+/* Entry surfaces */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-icon {
+  background: rgba(255, 0, 12, 0.13);
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-message strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-message span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-button {
+  border-color: var(--customer-red);
+  border-radius: var(--customer-radius-sm);
+  background: var(--customer-red);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-button:hover,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-button:hover {
+  border-color: var(--customer-red-pressed);
+  background: var(--customer-red-pressed);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-button.secondary {
+  border-color: var(--customer-border);
+  background: #202020;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-button.secondary:hover {
+  border-color: var(--customer-border-strong);
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-reward-summary-card {
+  border: 1px solid rgba(250, 200, 90, 0.46) !important;
+  background: #17130d !important;
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-reward-summary-card > div > div:nth-child(2) > div {
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-reward-summary-card > div > div:nth-child(2) > div:not(:first-child) {
+  color: var(--customer-gold) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-reward-summary-card > div > div:nth-child(3) > div,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-reward-summary-card > div > div:nth-child(4) {
+  border-color: rgba(250, 200, 90, 0.34) !important;
+  background: #2a2111 !important;
+  color: var(--customer-gold) !important;
+  box-shadow: none !important;
+}
+
+/* Filters and categories */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 main {
+  padding-top: 26px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filters-panel {
+  border-bottom-color: var(--customer-border);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-count {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip div > span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip > span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-kicker {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card {
+  border-color: #363636;
+  background: #1b1b1b;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card:hover {
+  border-color: #696969;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-photo {
+  background: #252525;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-photo img {
+  opacity: 0.88;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-shade {
+  background: linear-gradient(180deg, rgba(5, 5, 5, 0.06) 12%, rgba(5, 5, 5, 0.94) 100%);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-meta {
+  color: #d4d4d4;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card.active,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card[aria-pressed="true"] {
+  border-color: var(--customer-red);
+  box-shadow: inset 0 0 0 2px var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-selected {
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-subtabs .store-chip,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-chip {
+  border-color: var(--customer-border);
+  background: #1c1c1c;
+  color: #c1c1c1;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-subtabs .store-chip:hover,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-chip:hover {
+  border-color: var(--customer-border-strong);
+  background: #282828;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-subtabs .store-chip.active,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-chip.active {
+  border-color: var(--customer-red);
+  background: var(--customer-red);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-badge {
+  background: #303030;
+  color: #c3c3c3;
+}
+
+/* Catalogue */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-grouped-sections {
+  gap: 42px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group {
+  border-bottom-color: var(--customer-border);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:first-child {
+  border-bottom-color: var(--customer-border);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-kicker {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-title {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-meta {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-card {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-image-shell {
+  border-color: #303030;
+  background: #202020;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-image img {
+  background: #f5f3ef;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-code {
+  color: #858585;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-name {
+  color: #ffffff;
+  font-weight: 650;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-promo-badge {
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-price,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-price-stack.promo .store-price {
+  color: #ff3943;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-price-old {
+  color: #818181;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-unit {
+  color: #a6a6a6;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-add {
+  border-color: #0f0f0f;
+  background: var(--customer-red);
+  box-shadow: 0 7px 20px rgba(255, 0, 12, 0.22);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-add.has-quantity {
+  background: #ffffff;
+  color: #0f0f0f;
+}
+
+/* Empty, loading and mobile chrome */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-empty {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-empty strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-empty span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-media,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-line,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-skeleton {
+  border-color: #303030;
+  background: #1d1d1d;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-media,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-line {
+  background-image: linear-gradient(90deg, #1c1c1c 0%, #2c2c2c 48%, #1c1c1c 100%);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-cart {
+  border: 0;
+  background: var(--customer-red);
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-bottom-nav {
+  border-color: #323232;
+  background: rgba(22, 22, 22, 0.98);
+  box-shadow: 0 -10px 34px rgba(0, 0, 0, 0.34);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-nav-button {
+  background: transparent;
+  color: #969696;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-nav-button.active {
+  background: #292929;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-nav-button.active::before {
+  background: var(--customer-red);
+}
+
+/* Product, cart and checkout */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-overlay {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet.full,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-sheet {
+  border-color: var(--customer-border);
+  background: var(--customer-bg);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-head,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-head.product {
+  border-bottom-color: var(--customer-border);
+  background: rgba(15, 15, 15, 0.98) !important;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-head strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-heading strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-back {
+  border-color: var(--customer-border);
+  background: #1c1c1c;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-back:hover {
+  border-color: var(--customer-border-strong);
+  background: #292929;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-heading span {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-detail-image {
+  border-color: #303030;
+  background: #202020;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-detail-image img {
+  background: #f5f3ef;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-title {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-qty-row .store-chip {
+  border-color: var(--customer-border);
+  background: #1c1c1c;
+  color: #d2d2d2;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-qty-row .store-chip.active {
+  border-color: var(--customer-red);
+  background: var(--customer-red);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-stepper button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-stepper .store-qty-input {
+  border-color: var(--customer-border);
+  background: #202020;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-footer {
+  border-top-color: var(--customer-border);
+  background: rgba(15, 15, 15, 0.98);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress {
+  border-bottom-color: var(--customer-border);
+  background: #0f0f0f;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress span {
+  background: #1b1b1b;
+  color: #777777;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress span.active {
+  background: #272727;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress span.active::after {
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line {
+  border-bottom-color: var(--customer-border);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > img {
+  background: #f5f3ef;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > div > strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > div > div {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line-controls button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-floating-qty-input {
+  border-color: var(--customer-border);
+  background: #222222;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-section,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-location-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-location-selected,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-payment-note,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-cash-change,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note {
+  border-color: var(--customer-border) !important;
+  background: #191919 !important;
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card h3,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-title,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note strong {
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-fulfillment-help,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-location-feedback,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note p {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-pill {
+  background: #2a2a2a;
+  color: #c1c1c1;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card {
+  border-color: var(--customer-border);
+  background: #1c1c1c;
+  color: #b8b8b8;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card:hover {
+  border-color: var(--customer-border-strong);
+  background: #252525;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card.active {
+  border-color: var(--customer-red);
+  background: #2a1416;
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card.active strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card.active span:not(.store-checkout-icon) {
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-icon {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-input,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-field,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-textarea,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-select {
+  border-color: var(--customer-border);
+  background: #202020;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-input::placeholder,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-field::placeholder,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-textarea::placeholder {
+  color: #858585;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-input:focus,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-field:focus,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-textarea:focus,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-select:focus {
+  border-color: var(--customer-red);
+  box-shadow: 0 0 0 3px rgba(255, 0, 12, 0.12);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-primary-action {
+  background: var(--customer-red);
+  color: #ffffff;
+  box-shadow: 0 -12px 24px 8px #0f0f0f, 0 12px 28px rgba(0, 0, 0, 0.38);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-primary-action:disabled {
+  border-color: #383838;
+  background: #292929;
+  color: #737373;
+}
+
+/* Authentication */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-page {
+  background: #0f0f0f;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-page::before {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-sheet,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card.inline {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-brand h1,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card h2,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card label,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-toggle {
+  border-color: var(--customer-border);
+  background: #202020;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-toggle button {
+  color: #999999;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-toggle button.active {
+  background: #303030;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card .store-google-button {
+  border-color: var(--customer-border);
+  background: #ffffff;
+  color: #111111;
+}
+
+/* Categories, activity and profile pages */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-app-page {
+  background: #0f0f0f;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-head {
+  border-bottom-color: var(--customer-border);
+  background: rgba(15, 15, 15, 0.98);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-title span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-subcategory-head span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-stat span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-summary-copy span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-title h2,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-section-title {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-drilldown-hero {
+  border-color: var(--customer-border);
+  background: #1b1b1b;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile.active {
+  border-color: var(--customer-red);
+  box-shadow: inset 0 0 0 2px var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-stat,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-expander,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-activity-hero,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-hero {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-activity-hero p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-hero p {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-expander summary {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-status-pill {
+  background: #292929;
+  color: #c4c4c4;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-subcategory-button {
+  border-color: var(--customer-border);
+  background: #1c1c1c;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-subcategory-button.active {
+  border-color: var(--customer-red);
+  background: #2b1517;
+  color: #ffffff;
+}
+
+/* Order tracking */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-friendly-status {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-card-topline,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-visual,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-meta,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-items {
+  border-color: var(--customer-border);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-eyebrow,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-message,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-meta span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-items span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-friendly-status h3,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-friendly-status strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-progress {
+  background: #292929;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-progress-step {
+  color: #777777;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-progress-step.active,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-progress-step.done {
+  color: var(--customer-red);
+}
+
+/* Miembro Gold stays premium and distinct. */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-screen,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-screen-scroll {
+  background: #0f0f0f;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-screen-nav {
+  border-bottom-color: #2f2a20;
+  background: rgba(15, 15, 15, 0.98);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-screen-nav > strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-identity strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-progress-labels strong {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-identity span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-progress-labels {
+  color: #d8d0bf;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-back-button {
+  border-color: #393329;
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-hero {
+  border-color: rgba(250, 200, 90, 0.45);
+  background: #17130d;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-history-button {
+  border-color: rgba(250, 200, 90, 0.35);
+  background: #2a2111;
+  color: var(--customer-gold);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-progress-track {
+  background: #332b1c;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-progress-track > span {
+  background: var(--customer-gold);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-section-heading h1,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-section-heading h2,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-section-heading span {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-section-heading > span {
+  background: #24211c;
+  color: var(--customer-gold);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-card {
+  border-color: #343434;
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-card.is-locked {
+  opacity: 0.42;
+  filter: saturate(0.22);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-card.is-unlocked {
+  border-color: var(--customer-gold);
+  opacity: 1;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-image {
+  background: #242424;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-state {
+  background: rgba(15, 15, 15, 0.9);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-card.is-unlocked .sm-gold-reward-state {
+  background: var(--customer-gold);
+  color: #111111;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-copy,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-copy strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-copy span {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-button {
+  border-color: var(--customer-gold);
+  background: var(--customer-gold);
+  color: #111111;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-button.is-secondary {
+  border-color: #484137;
+  background: #24211c;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-choices small {
+  color: #aaa08a;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-choices button {
+  border-color: #484137;
+  background: #24211c;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-reward-choices button.is-active {
+  border-color: var(--customer-gold);
+  background: var(--customer-gold);
+  color: #111111;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-transactions-list > * {
+  border-color: #343434 !important;
+  background: #191919 !important;
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-empty-state {
+  border-color: #484137;
+  background: #191919;
+  color: #b8b8b8;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-guest-prompt {
+  border-color: #484137 !important;
+  background: #191919 !important;
+  box-shadow: none !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-guest-prompt h2 {
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-guest-prompt p {
+  color: #b8b8b8 !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-guest-prompt button {
+  border-radius: var(--customer-radius-control) !important;
+  background: var(--customer-red) !important;
+  color: #ffffff !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-success-card {
+  border-color: var(--customer-border);
+  background: #191919;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-success-check {
+  background: rgba(56, 184, 124, 0.15);
+  color: var(--customer-green);
+}
+
+@media (max-width: 760px) {
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-page,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-page.with-floating-cart,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-page.with-mobile-nav {
+    padding-inline: 16px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-top {
+    background: #0f0f0f;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-logo {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-title {
+    color: #ffffff;
+    font-size: 0.9rem;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-wrap {
+    min-height: 52px;
+    border-radius: 14px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag {
+    height: 52px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite {
+    border-radius: 14px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group {
+    border-bottom-color: var(--customer-border);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card {
+    border-color: #383838;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-bottom-nav {
+    border-color: #343434;
+    background: rgba(20, 20, 20, 0.98);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-overlay {
+    background: #0f0f0f;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet.full,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-sheet,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-sheet {
+    background: #0f0f0f;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-detail-image {
+    max-height: 30dvh;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-copy {
+    padding-top: 16px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-title {
+    font-size: clamp(1.3rem, 6vw, 1.68rem);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-footer {
+    background: rgba(15, 15, 15, 0.98);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-primary-action {
+    box-shadow: 0 -12px 24px 8px #0f0f0f, 0 10px 28px rgba(0, 0, 0, 0.34);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-head,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-screen-nav {
+    background: rgba(15, 15, 15, 0.98);
+  }
+}
+
+@media (min-width: 761px) {
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet {
+    box-shadow: 0 28px 84px rgba(0, 0, 0, 0.48);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 *,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 *::before,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Corporate light palette.
+ * Keeps the 2026 storefront layout while returning food and product imagery to
+ * bright, appetizing surfaces. Colors follow the CSM brand guide.
+ */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 {
+  --customer-canvas: #eef6ff;
+  --customer-bg: #f8fbff;
+  --customer-surface: #ffffff;
+  --customer-surface-raised: #ffffff;
+  --customer-surface-soft: #edf5ff;
+  --customer-border: #d6e4f3;
+  --customer-border-strong: #9dbce0;
+  --customer-text: #102d4f;
+  --customer-text-soft: #59708a;
+  --customer-text-faint: #8093a8;
+  --customer-blue: #0044c5;
+  --customer-blue-deep: #07345f;
+  --customer-blue-soft: #dcecff;
+  --customer-red: #ff000c;
+  --customer-red-pressed: #d9000a;
+  --customer-line-daily: #ff000c;
+  --customer-line-daily-soft: #fef1e7;
+  --customer-line-grill: #f45e22;
+  --customer-line-gold: #fac85a;
+  --customer-line-wellness: #b0d7de;
+  --customer-line-practical: #ac875c;
+  --customer-line-special: #8f0a23;
+  --customer-shadow: 0 16px 38px rgba(0, 68, 197, 0.1);
+  background:
+    radial-gradient(circle at 8% 5%, rgba(0, 68, 197, 0.1), transparent 24rem),
+    radial-gradient(circle at 94% 18%, rgba(255, 0, 12, 0.065), transparent 22rem),
+    linear-gradient(180deg, #ffffff 0%, #f4f9ff 38%, #eef6ff 100%);
+  color: var(--customer-text);
+  color-scheme: light;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3::before {
+  display: block;
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.34;
+  background-image: url("data:image/svg+xml,%3Csvg width='520' height='420' viewBox='0 0 520 420' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke-linecap='round'%3E%3Cpath d='M-18 92 C60 18 140 18 218 92 S376 166 454 92 S612 18 690 92' stroke='%230044c5' stroke-width='6' opacity='.16'/%3E%3Cpath d='M-22 132 C56 58 136 58 214 132 S372 206 450 132 S608 58 686 132' stroke='%23b0d7de' stroke-width='5' opacity='.35'/%3E%3Ccircle cx='470' cy='316' r='54' stroke='%230044c5' stroke-width='18' opacity='.10'/%3E%3Ccircle cx='470' cy='316' r='22' stroke='%23ff000c' stroke-width='6' opacity='.11'/%3E%3Cpath d='M66 316 h112 M94 344 h112 M124 372 h112' stroke='%230044c5' stroke-width='7' opacity='.11'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 520px 420px;
+  background-position: 2% 4%;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 button:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 input:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 textarea:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 select:focus-visible,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 a:focus-visible {
+  outline-color: rgba(0, 68, 197, 0.54);
+}
+
+/* Header, location and search */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-top {
+  border-bottom-color: rgba(0, 68, 197, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 30px rgba(7, 52, 95, 0.07);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-brand-kicker {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-title,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill strong {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-status-button {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue);
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(0, 68, 197, 0.2);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-icon-button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill {
+  border-color: rgba(0, 68, 197, 0.16);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 10px 24px rgba(0, 68, 197, 0.08);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-status-button:hover {
+  border-color: #00389f;
+  background: #00389f;
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-icon-button:hover,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill:hover {
+  border-color: rgba(0, 68, 197, 0.38);
+  background: #f2f7ff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-cart-button-count {
+  border-color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill-icon {
+  background: var(--customer-blue);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill small,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-branch-pill-chevron {
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coverage-alert {
+  border-color: rgba(244, 94, 34, 0.28);
+  background: #fff7ec;
+  color: #7f3d0f;
+  box-shadow: 0 10px 24px rgba(244, 94, 34, 0.08);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coverage-alert-button {
+  border-color: rgba(0, 68, 197, 0.24);
+  background: #ffffff;
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-wrap {
+  border-color: rgba(0, 68, 197, 0.18);
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(0, 68, 197, 0.07);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-wrap:focus-within {
+  border-color: var(--customer-blue);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(0, 68, 197, 0.1), 0 14px 30px rgba(0, 68, 197, 0.09);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search::placeholder {
+  color: #71859b;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag::before {
+  border-color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag::after {
+  background: var(--customer-blue);
+}
+
+/* Account and loyalty entry surfaces */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite {
+  border-color: rgba(0, 68, 197, 0.16);
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.06), transparent 42%),
+    var(--customer-blue);
+  color: #ffffff;
+  box-shadow: 0 16px 32px rgba(0, 68, 197, 0.18);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-icon {
+  background: #ffffff;
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-message strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-message span {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-message span {
+  opacity: 0.78;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-guest-invite-button {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-button.secondary {
+  border-color: rgba(0, 68, 197, 0.2);
+  background: #ffffff;
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-button.secondary:hover {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue-deep);
+}
+
+/* Catalogue navigation */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filters-panel {
+  border-color: rgba(0, 68, 197, 0.14);
+  background:
+    linear-gradient(112deg, rgba(176, 215, 222, 0.28), transparent 42%),
+    #ffffff;
+  box-shadow: var(--customer-shadow);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-count {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip div > span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip > span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-kicker {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-kicker {
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  box-shadow: 0 12px 25px rgba(7, 52, 95, 0.08);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card:hover {
+  border-color: var(--customer-blue);
+  box-shadow: 0 15px 30px rgba(0, 68, 197, 0.14);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-photo {
+  background: #e8f2ff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-photo img {
+  opacity: 1;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-shade {
+  background: linear-gradient(180deg, rgba(7, 52, 95, 0.02) 15%, rgba(7, 36, 66, 0.9) 100%);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-meta {
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card.active,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card[aria-pressed='true'] {
+  border-color: var(--customer-red);
+  box-shadow: inset 0 0 0 2px var(--customer-red), 0 15px 30px rgba(255, 0, 12, 0.12);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-selected {
+  background: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-subtabs .store-chip,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-chip {
+  border-color: rgba(0, 68, 197, 0.15);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 8px 20px rgba(0, 68, 197, 0.07);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-subtabs .store-chip:hover,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-chip:hover {
+  border-color: var(--customer-blue);
+  background: #f2f7ff;
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-subtabs .store-chip.active,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-chip.active {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(0, 68, 197, 0.2);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-badge {
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue);
+}
+
+/* Product-line color bands from the brand guide */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group {
+  --product-line-accent: var(--customer-line-daily);
+  position: relative;
+  padding-top: 20px;
+  border-top: 4px solid var(--product-line-accent);
+  border-bottom-color: rgba(0, 68, 197, 0.12);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:nth-child(6n + 2) {
+  --product-line-accent: var(--customer-line-gold);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:nth-child(6n + 3) {
+  --product-line-accent: var(--customer-line-grill);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:nth-child(6n + 4) {
+  --product-line-accent: var(--customer-line-wellness);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:nth-child(6n + 5) {
+  --product-line-accent: var(--customer-line-practical);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:nth-child(6n) {
+  --product-line-accent: var(--customer-line-special);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: 0;
+  width: min(34%, 220px);
+  height: 4px;
+  background: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group:first-child {
+  border-bottom-color: rgba(0, 68, 197, 0.12);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-kicker {
+  color: var(--product-line-accent, var(--customer-red));
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-title {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-meta {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-card {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-image-shell {
+  border-color: rgba(0, 68, 197, 0.13);
+  background: #ffffff;
+  box-shadow: 0 13px 28px rgba(7, 52, 95, 0.09);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-image img {
+  background: #fffdfa;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-code {
+  color: #71859b;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-name {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-price,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-price-stack.promo .store-price {
+  color: var(--customer-red);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-price-old {
+  color: #8294a7;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-unit {
+  color: #61778f;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-add {
+  border-color: #ffffff;
+  box-shadow: 0 8px 20px rgba(255, 0, 12, 0.24);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-add.has-quantity {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue);
+  color: #ffffff;
+}
+
+/* Empty states, skeletons and mobile navigation */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-empty {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-empty strong {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-empty span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-media,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-line,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-skeleton {
+  border-color: #dbe7f4;
+  background: #edf4fc;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-media,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-skeleton-line {
+  background-image: linear-gradient(90deg, #eaf2fb 0%, #ffffff 48%, #eaf2fb 100%);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-cart {
+  box-shadow: 0 14px 32px rgba(255, 0, 12, 0.2);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-bottom-nav {
+  border-color: rgba(0, 68, 197, 0.16);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -12px 32px rgba(7, 52, 95, 0.14);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-nav-button {
+  background: transparent;
+  color: #6b7f94;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-nav-button.active {
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-nav-button.active::before {
+  background: var(--customer-red);
+}
+
+/* Product detail, cart and checkout */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-overlay {
+  background: rgba(7, 35, 66, 0.42);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet.full,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-sheet {
+  border-color: var(--customer-border);
+  background: #f8fbff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-head,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-head.product {
+  border-bottom-color: rgba(0, 68, 197, 0.14);
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-head strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-heading strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-title {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-back {
+  border-color: rgba(0, 68, 197, 0.17);
+  background: #ffffff;
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-back:hover {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-detail-image {
+  border-color: rgba(0, 68, 197, 0.13);
+  background: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-qty-row .store-chip {
+  border-color: rgba(0, 68, 197, 0.15);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-qty-row .store-chip.active {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-stepper button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-stepper .store-qty-input,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line-controls button,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-floating-qty-input {
+  border-color: rgba(0, 68, 197, 0.17);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-footer {
+  border-top-color: rgba(0, 68, 197, 0.14);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress {
+  border-bottom-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress span {
+  background: #edf4fc;
+  color: #71859b;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-progress span.active {
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line {
+  border-bottom-color: rgba(0, 68, 197, 0.12);
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > div > strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > strong {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-line > div > div {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-section,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-location-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-location-selected,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-payment-note,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-cash-change,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note {
+  border-color: rgba(0, 68, 197, 0.14) !important;
+  background: #ffffff !important;
+  color: var(--customer-blue-deep) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card h3,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-title,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note strong {
+  color: var(--customer-blue-deep) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-card p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-coupon-card p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-fulfillment-help,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-location-feedback,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-total-note p {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-pill {
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card:hover {
+  border-color: var(--customer-blue);
+  background: #f4f8ff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-choice-card.active {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(0, 68, 197, 0.17);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-input,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-field,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-textarea,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-select {
+  border-color: rgba(0, 68, 197, 0.17);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-input::placeholder,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-field::placeholder,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-textarea::placeholder {
+  color: #8192a5;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-primary-action {
+  box-shadow: 0 -10px 25px 7px rgba(248, 251, 255, 0.96), 0 12px 28px rgba(255, 0, 12, 0.18);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-primary-action:disabled {
+  border-color: #dce5ef;
+  background: #e8eef5;
+  color: #8192a5;
+}
+
+/* Authentication and customer app pages */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-page {
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.08), transparent 40%),
+    linear-gradient(135deg, var(--customer-blue-deep), var(--customer-blue) 70%, #2a76e8);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-page::before {
+  display: block;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-sheet,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card.inline {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 24px 64px rgba(7, 52, 95, 0.18);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-brand h1,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card h2,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card strong {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card label,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-card span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-toggle {
+  border-color: rgba(0, 68, 197, 0.12);
+  background: #edf4fc;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-toggle button {
+  color: #6b7f94;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-toggle button.active {
+  background: var(--customer-blue);
+  color: #ffffff;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-app-page {
+  background: transparent;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-head {
+  border-bottom-color: rgba(0, 68, 197, 0.14);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-title span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-subcategory-head span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-stat span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-summary-copy span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-title h2,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-section-title,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-expander summary {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-drilldown-hero,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-card,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-stat,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-expander,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-activity-hero,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-hero {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 12px 28px rgba(7, 52, 95, 0.08);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-activity-hero p,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-profile-hero p {
+  color: var(--customer-text-soft) !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-order-status-pill {
+  background: var(--customer-blue-soft);
+  color: var(--customer-blue);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-subcategory-button {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-subcategory-button.active {
+  border-color: var(--customer-blue);
+  background: var(--customer-blue);
+  color: #ffffff;
+}
+
+/* Order tracking remains calm and readable on a light surface. */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-friendly-status {
+  border-color: rgba(0, 68, 197, 0.15);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 16px 36px rgba(7, 52, 95, 0.09);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-card-topline,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-visual,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-meta,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-items {
+  border-color: rgba(0, 68, 197, 0.12);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-eyebrow,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-message,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-order-meta span,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-status-items span {
+  color: var(--customer-text-soft);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-friendly-status h3,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-friendly-status strong {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-progress {
+  background: #e2ebf5;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-progress-step {
+  color: #7d90a5;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-success-card {
+  border-color: rgba(0, 68, 197, 0.14);
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+}
+
+@media (max-width: 760px) {
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-top,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-page-head {
+    background: rgba(255, 255, 255, 0.98);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-title {
+    color: var(--customer-blue-deep);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card {
+    border-color: rgba(0, 68, 197, 0.14);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-bottom-nav {
+    border-color: rgba(0, 68, 197, 0.16);
+    background: rgba(255, 255, 255, 0.98);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet-overlay {
+    background: rgba(7, 35, 66, 0.42);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet.full,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-sheet,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-auth-sheet {
+    background: #f8fbff;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-sheet-footer {
+    background: rgba(255, 255, 255, 0.98);
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-checkout-primary-action {
+    box-shadow: 0 -10px 24px 8px rgba(248, 251, 255, 0.98), 0 10px 28px rgba(255, 0, 12, 0.16);
+  }
+
+  /* Gold remains a distinct premium destination, not the food catalogue canvas. */
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .sm-gold-screen-nav {
+    background: rgba(15, 15, 15, 0.98);
+  }
+}
