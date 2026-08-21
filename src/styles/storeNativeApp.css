@@ -207,6 +207,8 @@
 }
 
 .native-store-app .store-search-tag {
+  display: grid !important;
+  place-items: center !important;
   min-width: 42px !important;
   height: 38px !important;
   padding: 0 8px !important;
@@ -216,25 +218,15 @@
   font-size: 0 !important;
 }
 
-.native-store-app .store-search-tag::before {
-  content: "";
-  width: 17px;
-  height: 17px;
-  display: block;
-  margin: auto;
-  border: 2px solid currentColor;
-  border-radius: 50%;
+.native-store-app .store-search-tag::before,
+.native-store-app .store-search-tag::after {
+  display: none !important;
 }
 
-.native-store-app .store-search-tag::after {
-  content: "";
-  width: 7px;
-  height: 2px;
+.native-store-app .store-search-tag svg {
+  width: 22px;
+  height: 22px;
   display: block;
-  margin: -4px 0 0 23px;
-  border-radius: 999px;
-  background: currentColor;
-  transform: rotate(45deg);
 }
 
 .native-store-app .store-search {
@@ -353,6 +345,7 @@
 
 .native-store-app .store-category-gallery .store-category-card {
   position: relative !important;
+  isolation: isolate !important;
   display: block !important;
   flex: 0 0 116px !important;
   width: 116px !important;
@@ -366,6 +359,58 @@
   background: var(--native-blue-950) !important;
   color: #ffffff !important;
   box-shadow: 0 8px 18px rgba(7, 29, 52, 0.16) !important;
+}
+
+.native-store-app .store-category-photo,
+.native-store-app .store-category-shade {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  border-radius: inherit !important;
+  pointer-events: none !important;
+}
+
+.native-store-app .store-category-photo {
+  z-index: 0 !important;
+  overflow: hidden !important;
+  background: var(--native-blue-950) !important;
+}
+
+.native-store-app .store-category-photo img {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  display: block !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.native-store-app .store-category-shade {
+  z-index: 1 !important;
+  background: linear-gradient(180deg, rgba(3, 16, 30, 0.03) 16%, rgba(3, 16, 30, 0.42) 54%, rgba(3, 16, 30, 0.94) 100%) !important;
+}
+
+.native-store-app .store-category-copy {
+  position: absolute !important;
+  right: 9px !important;
+  bottom: 8px !important;
+  left: 9px !important;
+  z-index: 2 !important;
+  display: grid !important;
+  gap: 2px !important;
+  text-align: left !important;
+  pointer-events: none !important;
+}
+
+.native-store-app .store-category-selected {
+  position: absolute !important;
+  top: 7px !important;
+  right: 7px !important;
+  z-index: 3 !important;
 }
 
 .native-store-app .store-category-gallery .store-category-card.active,
@@ -706,7 +751,7 @@
   overscroll-behavior: contain;
   background: var(--native-canvas) !important;
   box-shadow: none !important;
-  animation: native-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: native-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .native-store-app .store-sheet-head {

@@ -9241,7 +9241,12 @@ export default function TiendaVirtualView({
           </div>
 
           <label className="store-search-wrap">
-            <span className="store-search-tag">Buscar</span>
+            <span className="store-search-tag" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
+                <path d="m16 16 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
             <input
               className="store-search"
               value={query}
