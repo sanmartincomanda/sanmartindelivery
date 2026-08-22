@@ -302,6 +302,95 @@ const normalizeRewardOrderItems = (rewardRedemption = {}) => {
     .filter((item) => item.code && item.quantity > 0);
 };
 
+const mergeDuplicateQuoteDetailItems = (items = []) => {
+  const mergedByArticle = new Map();
+
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    const key = Number(item?.artId || 0) > 0
+      ? `art:${Number(item.artId)}`
+      : `code:${normalizeCode(item?.code)}`;
+    const existing = mergedByArticle.get(key);
+    const sourceType = String(item?.sourceType || 'order').trim() || 'order';
+
+    if (!existing) {
+      mergedByArticle.set(key, {
+        ...item,
+        sourceTypes: new Set([sourceType]),
+        orderQuantity: sourceType === 'order' ? roundQuantity(item.quantity) : 0,
+        rewardQuantity: sourceType === 'reward' ? roundQuantity(item.quantity) : 0,
+        deliveryQuantity: sourceType === 'delivery' ? roundQuantity(item.quantity) : 0,
+        rewardNames: new Set(item?.rewardName ? [String(item.rewardName).trim()] : []),
+      });
+      return;
+    }
+
+    existing.quantity = roundQuantity(existing.quantity + item.quantity);
+    existing.orderQuantity = roundQuantity(
+      existing.orderQuantity + (sourceType === 'order' ? item.quantity : 0)
+    );
+    existing.rewardQuantity = roundQuantity(
+      existing.rewardQuantity + (sourceType === 'reward' ? item.quantity : 0)
+    );
+    existing.deliveryQuantity = roundQuantity(
+      existing.deliveryQuantity + (sourceType === 'delivery' ? item.quantity : 0)
+    );
+    existing.sourceTypes.add(sourceType);
+    if (item?.rewardName) {
+      existing.rewardNames.add(String(item.rewardName).trim());
+    }
+
+    [
+      'importeCompra',
+      'importeNorSin',
+      'importeNorCon',
+      'importeSin',
+      'importeCon',
+    ].forEach((field) => {
+      existing[field] = roundMoney(Number(existing[field] || 0) + Number(item[field] || 0));
+    });
+
+    existing.impIds = Array.from(
+      new Set([...(existing.impIds || []), ...(item.impIds || [])].map(Number).filter(Boolean))
+    );
+    existing.order = Math.min(Number(existing.order || 0), Number(item.order || 0));
+  });
+
+  return Array.from(mergedByArticle.values()).map((item) => {
+    const quantity = roundQuantity(item.quantity);
+    const sourceTypes = Array.from(item.sourceTypes || []);
+    const discountTotal = roundMoney(Math.max(item.importeNorCon - item.importeCon, 0));
+    const discountPercent = item.importeNorCon > 0
+      ? roundRate((discountTotal / item.importeNorCon) * 100)
+      : 0;
+    const diferencia = roundMoney(item.importeCon - item.importeCompra);
+    const utilidad = item.importeCon > 0
+      ? roundRate((diferencia / item.importeCon) * 100)
+      : 0;
+    const rewardName = Array.from(item.rewardNames || []).filter(Boolean).join(', ');
+    const rewardUnitLabel = item.rewardQuantity === 1 ? 'UNIDAD' : 'UNIDADES';
+    const rewardNote = item.rewardQuantity > 0
+      ? `CANJE MEMBRESIA GOLD: ${formatStoreQuantityLabel(item.rewardQuantity, 'unidad')} ${rewardUnitLabel} AL 100%`
+      : '';
+
+    return {
+      ...item,
+      quantity,
+      purchasePrice: quantity > 0 ? roundMoney(item.importeCompra / quantity) : 0,
+      priceNorSin: quantity > 0 ? roundMoney(item.importeNorSin / quantity) : 0,
+      priceNorCon: quantity > 0 ? roundMoney(item.importeNorCon / quantity) : 0,
+      priceSin: quantity > 0 ? roundMoney(item.importeSin / quantity) : 0,
+      priceCon: quantity > 0 ? roundMoney(item.importeCon / quantity) : 0,
+      diferencia,
+      utilidad,
+      discountPercent,
+      discountTotal,
+      sourceType: sourceTypes.length === 1 ? sourceTypes[0] : 'mixed',
+      rewardName,
+      characteristics: [normalizeText(item.characteristics), rewardNote].filter(Boolean).join(' | '),
+    };
+  });
+};
+
 const calculateOrderCouponDiscount = (order = {}, baseTotal = 0) => {
   const safeBaseTotal = roundMoney(baseTotal);
   if (safeBaseTotal <= 0) {
@@ -451,6 +540,12 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
     quote?.customerTotal ?? Math.max(roundMoney(quote?.total || 0) - customerDiscount, 0)
   );
   const storeName = normalizeText(order?.storeBranchName || 'Carnes San Martin Granada');
+  const rewardItems = normalizeRewardOrderItems(order.rewardRedemption);
+  const rewardQuantityByCode = rewardItems.reduce((map, item) => {
+    const code = normalizeCode(item.code);
+    map.set(code, roundQuantity(Number(map.get(code) || 0) + Number(item.quantity || 0)));
+    return map;
+  }, new Map());
   const lines = [
     `Hola ${String(order?.cliente || 'cliente').trim()}.`,
     `Tu pedido #${orderNumber} en ${storeName} fue actualizado.`,
@@ -461,10 +556,29 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
   (Array.isArray(quote.items) ? quote.items : [])
     .filter((item) => !isDeliveryServiceCode(item?.code || ''))
     .forEach((item) => {
-    lines.push(
-      `- ${formatStoreQuantityLabel(item.quantity, item.storeUnit)} ${item.storeUnit} ${item.name} [${item.code}] | C$${formatMoney(item.total)}`
-    );
-  });
+      const rewardQuantity = Number(rewardQuantityByCode.get(normalizeCode(item.code)) || 0);
+      const paidQuantity = roundQuantity(Math.max(Number(item.quantity || 0) - rewardQuantity, 0));
+      if (paidQuantity <= 0) {
+        return;
+      }
+
+      const paidTotal = roundMoney(
+        rewardQuantity > 0
+          ? paidQuantity * Number(order?.items?.find(
+              (orderItem) => normalizeCode(orderItem?.codigo ?? orderItem?.code) === normalizeCode(item.code)
+            )?.precioUnitario || item.price || 0)
+          : item.total
+      );
+      lines.push(
+        `- ${formatStoreQuantityLabel(paidQuantity, item.storeUnit)} ${item.storeUnit} ${item.name} [${item.code}] | C$${formatMoney(paidTotal)}`
+      );
+    });
+
+  const rewardLines = buildStoreRewardRedemptionTextLines(order.rewardRedemption);
+  if (rewardLines.length > 0) {
+    lines.push('');
+    lines.push(...rewardLines);
+  }
 
   lines.push('');
   if (customerDiscount > 0) {
@@ -1238,13 +1352,16 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
     const sourceItems = [...orderItems, ...(deliveryItem ? [deliveryItem] : []), ...rewardItems];
     const articleMap = await getSicarArticlesByCodes(sourceItems.map((item) => item.code));
     const missingCodes = [];
-    const detailItems = [];
+    const rawDetailItems = [];
 
     sourceItems.forEach((item, index) => {
       const article = articleMap.get(item.code);
       if (!article) {
         if (item.isDelivery === true) {
           throw new Error(`No existe en SICAR el articulo ${item.code} para servicio a domicilio.`);
+        }
+        if (item.isReward === true) {
+          throw new Error(`No existe en SICAR el articulo ${item.code} del canje Miembro Gold.`);
         }
         missingCodes.push(item.code);
         return;
@@ -1312,7 +1429,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       const utilidad = initialImporteCon > 0 ? roundRate((diferencia / initialImporteCon) * 100) : 0;
       const taxImpIds = (Array.isArray(article.impIds) ? article.impIds : []).filter((impId) => Number(impId) === 1);
 
-      detailItems.push({
+      rawDetailItems.push({
         order: index,
         artId: article.artId,
         code: article.code,
@@ -1346,6 +1463,11 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         couponDiscountCon: 0,
       });
     });
+
+    // SICAR usa (cot_id, art_id) como llave del detalle. Si el cliente compra el
+    // mismo SKU que canjea, se conserva una sola linea con la cantidad total y
+    // el importe del premio completamente descontado.
+    const detailItems = mergeDuplicateQuoteDetailItems(rawDetailItems);
 
     if (detailItems.length === 0) {
       throw new Error('No se pudo crear la cotizacion porque ningun SKU del pedido existe en SICAR.');
@@ -1445,12 +1567,22 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       )
     `);
 
-  const buildDetailTaxValuesSql = (cotIdExpression, draft = {}) =>
-    draft.detailItems.flatMap((item) =>
+  const buildDetailTaxValuesSql = (cotIdExpression, draft = {}) => {
+    const seen = new Set();
+    return draft.detailItems.flatMap((item) =>
       (Array.isArray(item.impIds) ? item.impIds : [])
         .filter((impId) => Number(impId || 0) === 1)
+        .filter((impId) => {
+          const key = `${Number(item.artId || 0)}:${Number(impId || 0)}`;
+          if (seen.has(key)) {
+            return false;
+          }
+          seen.add(key);
+          return true;
+        })
         .map((impId) => `(${cotIdExpression}, ${item.artId}, ${Number(impId)})`)
     );
+  };
 
   const resolveQuoteForeignKeys = async () => {
     const rows = await runMysqlQuery(`
@@ -1867,9 +1999,11 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         .map((item) => [normalizeCode(item?.codigo ?? item?.code ?? ''), item])
         .filter(([code]) => Boolean(code))
     );
-    const rewardCodes = new Set(
-      normalizeRewardOrderItems(order.rewardRedemption).map((item) => normalizeCode(item.code))
-    );
+    const rewardQuantityByCode = normalizeRewardOrderItems(order.rewardRedemption).reduce((map, item) => {
+      const code = normalizeCode(item.code);
+      map.set(code, roundQuantity(Number(map.get(code) || 0) + Number(item.quantity || 0)));
+      return map;
+    }, new Map());
     const grossTotal = roundMoney(quote?.sicarTotal || quote?.total || 0);
     const productSubtotal = deriveQuotedProductSubtotal(
       { ...quote, sicarTotal: grossTotal },
@@ -1894,16 +2028,20 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         if (isDeliveryServiceCode(normalizedCode)) {
           return false;
         }
-
-        if (rewardCodes.has(normalizedCode)) {
-          return false;
-        }
-
         return true;
       })
       .map((item) => {
         const normalizedCode = normalizeCode(item.code);
         const existingItem = existingItemsByCode.get(normalizedCode) || null;
+        const rewardQuantity = Number(rewardQuantityByCode.get(normalizedCode) || 0);
+        const paidQuantity = roundQuantity(
+          Math.max(Number(item.quantity || 0) - rewardQuantity, 0)
+        );
+
+        if (rewardQuantity > 0 && (!existingItem || paidQuantity <= 0)) {
+          return null;
+        }
+
         const existingPromotion = normalizeOrderSpecialPromotion(
           existingItem?.promocionEspecial ?? existingItem?.specialPromotion ?? null
         );
@@ -1917,8 +2055,9 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
             existingItem?.cantidad ??
             item.quantity
         );
-        const actualQuantity = roundQuantity(item.quantity);
+        const actualQuantity = rewardQuantity > 0 ? paidQuantity : roundQuantity(item.quantity);
         const shouldPreserveStorePrice =
+          (rewardQuantity > 0 && Boolean(existingItem)) ||
           existingItem?.precioFijo === true ||
           existingItem?.priceLocked === true ||
           Boolean(existingPromotion) ||
@@ -1969,7 +2108,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         }
 
         return nextItem;
-      });
+      })
+      .filter(Boolean);
     const nowIso = new Date().toISOString();
     const nextCustomerSignature = buildCustomerVisibleOrderSignature({
       items,
