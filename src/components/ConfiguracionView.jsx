@@ -144,6 +144,7 @@ import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import StoreCustomerDiscountsAdminSection from './StoreCustomerDiscountsAdminSection';
 import StoreBranchesAdminSection from './StoreBranchesAdminSection';
+import '../styles/storeAdmin2026.css';
 import {
   buildDefaultStoreWelcomeCouponCampaign,
   getStoreWelcomeCouponEffectiveStatus,
@@ -156,6 +157,90 @@ import {
 } from '../services/storeWelcomeCoupon';
 
 const COUPONS_PIN = '210397';
+
+const STORE_ADMIN_GROUPS = [
+  {
+    id: 'catalogo_maestro',
+    label: 'Catalogo',
+    desktopLabel: 'Catalogo maestro',
+    icon: 'catalog',
+    sections: [
+      { id: 'catalogo', label: 'Articulos' },
+      { id: 'categorias', label: 'Categorias' },
+    ],
+  },
+  {
+    id: 'clientes',
+    label: 'Clientes',
+    desktopLabel: 'Clientes',
+    icon: 'customers',
+    sections: [
+      { id: 'clientes', label: 'Usuarios' },
+      { id: 'pedidos', label: 'Pedidos' },
+    ],
+  },
+  {
+    id: 'sucursales',
+    label: 'Sucursales',
+    desktopLabel: 'Sucursales',
+    icon: 'branches',
+    sections: [{ id: 'sucursales', label: 'Configuracion' }],
+  },
+  {
+    id: 'beneficios',
+    label: 'Beneficios',
+    desktopLabel: 'Beneficios',
+    icon: 'benefits',
+    sections: [
+      { id: 'promos_tienda', label: 'Promos tienda' },
+      { id: 'popup_ads', label: 'Popup ads' },
+      { id: 'descuentos', label: 'Descuentos' },
+      { id: 'recompensas', label: 'Recompensas' },
+      { id: 'cupones', label: 'Cupones' },
+    ],
+  },
+];
+
+const getStoreAdminGroup = (section = '') =>
+  STORE_ADMIN_GROUPS.find((group) => group.sections.some((item) => item.id === section)) ||
+  STORE_ADMIN_GROUPS[0];
+
+function StoreAdminIcon({ name }) {
+  const paths = {
+    catalog: (
+      <>
+        <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z" />
+        <path d="m4.5 7.5 7.5 4 7.5-4M12 11.5V21" />
+      </>
+    ),
+    customers: (
+      <>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </>
+    ),
+    branches: (
+      <>
+        <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+        <circle cx="12" cy="10" r="2.5" />
+      </>
+    ),
+    benefits: (
+      <>
+        <path d="m12 3 2.3 4.66 5.14.75-3.72 3.62.88 5.12L12 14.73l-4.6 2.42.88-5.12-3.72-3.62 5.14-.75L12 3Z" />
+      </>
+    ),
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        {paths[name] || paths.catalog}
+      </g>
+    </svg>
+  );
+}
 
 const formatDateKeyForBridge = (date = new Date()) => {
   const baseDate = date instanceof Date ? new Date(date.getTime()) : new Date(date);
@@ -540,7 +625,7 @@ const cropCatalogImage = async ({
 
 export default function ConfiguracionView({ mode = 'users' }) {
   const isStoreMode = mode === 'store';
-  const [section, setSection] = useState(() => (isStoreMode ? 'categorias' : 'usuarios'));
+  const [section, setSection] = useState(() => (isStoreMode ? 'catalogo' : 'usuarios'));
   const [usersTab, setUsersTab] = useState('administrativo');
   const [products, setProducts] = useState(() =>
     getInitialConfigCollection(
@@ -644,7 +729,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [productEditorOpen, setProductEditorOpen] = useState(false);
 
   useEffect(() => {
-    setSection(isStoreMode ? 'categorias' : 'usuarios');
+    setSection(isStoreMode ? 'catalogo' : 'usuarios');
   }, [isStoreMode]);
 
   useEffect(() => {
@@ -2360,50 +2445,52 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
+  const activeStoreGroup = getStoreAdminGroup(section);
+
   const sectionMeta = isStoreMode
     ? {
         categorias: {
-          path: 'Admintv / Tienda Virtual / Categorias',
-          title: 'Categorias y subcategorias',
+          path: 'Tienda Virtual / Catalogo maestro',
+          title: 'Categorias',
         },
         catalogo: {
-          path: 'Admintv / Tienda Virtual / Catalogo',
-          title: 'Catalogo de tienda virtual',
+          path: 'Tienda Virtual / Catalogo maestro',
+          title: 'Articulos',
         },
         cupones: {
-          path: 'Admintv / Tienda Virtual / Cupones',
+          path: 'Tienda Virtual / Beneficios',
           title: 'Cupones',
         },
         clientes: {
-          path: 'Admintv / Tienda Virtual / Clientes',
-          title: 'Clientes de tienda virtual',
+          path: 'Tienda Virtual / Clientes',
+          title: 'Usuarios',
         },
         descuentos: {
-          path: 'Admintv / Tienda Virtual / Descuentos',
+          path: 'Tienda Virtual / Beneficios',
           title: 'Descuentos por cliente',
         },
         recompensas: {
-          path: 'Admintv / Tienda Virtual / Programa de Recompensas',
-          title: 'Club San Martin Granada',
+          path: 'Tienda Virtual / Beneficios',
+          title: 'Programa de recompensas',
         },
         sucursales: {
-          path: 'Admintv / Tienda Virtual / Sucursales',
-          title: 'Sucursales, entrega y cobertura',
+          path: 'Tienda Virtual / Sucursales',
+          title: 'Configuracion de sucursales',
         },
         pedidos: {
-          path: 'Admintv / Tienda Virtual / Pedidos',
-          title: 'Pedidos de tienda virtual',
+          path: 'Tienda Virtual / Clientes',
+          title: 'Pedidos',
         },
         promociones: {
           path: 'Admintv / Tienda Virtual / Historias',
           title: 'Historias',
         },
         promos_tienda: {
-          path: 'Admintv / Tienda Virtual / Promociones especiales',
-          title: 'Promociones especiales',
+          path: 'Tienda Virtual / Beneficios',
+          title: 'Promos de tienda',
         },
         popup_ads: {
-          path: 'Admintv / Tienda Virtual / Anuncios popup',
+          path: 'Tienda Virtual / Beneficios',
           title: 'Anuncios popup',
         },
       }[section] || {
@@ -2422,10 +2509,11 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
   return (
     <div
+      className={isStoreMode ? 'cfg-page cfg-page--store' : 'cfg-page'}
       style={{
         minHeight: 'calc(100vh - 64px)',
-        background: '#f8fafc',
-        padding: '24px',
+        background: isStoreMode ? undefined : '#f8fafc',
+        padding: isStoreMode ? undefined : '24px',
         color: '#0f172a',
         fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
       }}
@@ -2620,18 +2708,25 @@ export default function ConfiguracionView({ mode = 'users' }) {
         }
       `}</style>
 
-      <div className="cfg-shell">
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
+      <div className={`cfg-shell ${isStoreMode ? 'store-admin-v2' : ''}`}>
+        <div className={isStoreMode ? 'store-admin-header' : ''} style={isStoreMode ? undefined : { display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div className={isStoreMode ? 'store-admin-heading' : ''}>
+            {isStoreMode && (
+              <div className="store-admin-brand-mark" aria-hidden="true">
+                <span />
+              </div>
+            )}
+            <div className={isStoreMode ? 'store-admin-heading-copy' : ''}>
+            <div className={isStoreMode ? 'store-admin-breadcrumb' : ''} style={isStoreMode ? undefined : { color: '#64748b', fontSize: 13, fontWeight: 900 }}>
               {sectionMeta.path}
             </div>
-            <h1 style={{ margin: '6px 0 0', fontSize: 30 }}>
+            <h1 style={isStoreMode ? undefined : { margin: '6px 0 0', fontSize: 30 }}>
               {sectionMeta.title}
             </h1>
+            </div>
           </div>
           {isStoreMode && section === 'catalogo' && (
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="store-admin-header-actions">
               <button
                 type="button"
                 className="cfg-button"
@@ -2670,6 +2765,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
         {message && (
           <div
+            className={isStoreMode ? 'store-admin-feedback' : ''}
             style={{
               marginTop: 16,
               padding: 12,
@@ -2709,85 +2805,43 @@ export default function ConfiguracionView({ mode = 'users' }) {
         )}
 
         {isStoreMode && (
-          <div className="cfg-tabs">
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'categorias' ? 'active' : ''}`}
-              onClick={() => setSection('categorias')}
-            >
-              Categorias
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'catalogo' ? 'active' : ''}`}
-              onClick={() => setSection('catalogo')}
-            >
-              Catalogo
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'cupones' ? 'active' : ''}`}
-              onClick={() => setSection('cupones')}
-            >
-              Cupones
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'clientes' ? 'active' : ''}`}
-              onClick={() => setSection('clientes')}
-            >
-              Clientes
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'descuentos' ? 'active' : ''}`}
-              onClick={() => setSection('descuentos')}
-            >
-              Descuentos
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'recompensas' ? 'active' : ''}`}
-              onClick={() => setSection('recompensas')}
-            >
-              Recompensas
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'sucursales' ? 'active' : ''}`}
-              onClick={() => setSection('sucursales')}
-            >
-              Sucursales
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'pedidos' ? 'active' : ''}`}
-              onClick={() => setSection('pedidos')}
-            >
-              Pedidos
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'promociones' ? 'active' : ''}`}
-              onClick={() => setSection('promociones')}
-            >
-              Historias
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'promos_tienda' ? 'active' : ''}`}
-              onClick={() => setSection('promos_tienda')}
-            >
-              Promos tienda
-            </button>
-            <button
-              type="button"
-              className={`cfg-tab ${section === 'popup_ads' ? 'active' : ''}`}
-              onClick={() => setSection('popup_ads')}
-            >
-              Popup ads
-            </button>
-          </div>
+          <>
+            <nav className="store-admin-primary-nav" aria-label="Modulos de Tienda Virtual">
+              {STORE_ADMIN_GROUPS.map((group) => {
+                const isActive = activeStoreGroup.id === group.id;
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    className={`store-admin-primary-tab ${isActive ? 'active' : ''}`}
+                    onClick={() => setSection(group.sections[0].id)}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <span className="store-admin-primary-icon">
+                      <StoreAdminIcon name={group.icon} />
+                    </span>
+                    <span className="store-admin-primary-label">
+                      <span className="store-admin-primary-label--desktop">{group.desktopLabel}</span>
+                      <span className="store-admin-primary-label--mobile">{group.label}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+            <nav className="store-admin-secondary-nav" aria-label={`Opciones de ${activeStoreGroup.desktopLabel}`}>
+              {activeStoreGroup.sections.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`store-admin-secondary-tab ${section === item.id ? 'active' : ''}`}
+                  onClick={() => setSection(item.id)}
+                  aria-current={section === item.id ? 'page' : undefined}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </>
         )}
 
         {isStoreMode && section === 'categorias' ? (
@@ -2938,11 +2992,17 @@ export default function ConfiguracionView({ mode = 'users' }) {
                 </thead>
                 <tbody>
                   {!catalogHydrated && filteredProducts.length === 0 && (
-                    <tr>
-                      <td colSpan="7" style={{ color: '#64748b', fontWeight: 800 }}>
-                        Cargando catalogo real desde Firebase...
-                      </td>
-                    </tr>
+                    Array.from({ length: 3 }, (_, index) => (
+                      <tr key={`catalog-skeleton-${index}`} className="store-admin-skeleton-row" aria-hidden="true">
+                        <td><span className="store-admin-skeleton store-admin-skeleton--photo" /></td>
+                        <td><span className="store-admin-skeleton store-admin-skeleton--title" /><span className="store-admin-skeleton store-admin-skeleton--short" /></td>
+                        <td><span className="store-admin-skeleton store-admin-skeleton--medium" /></td>
+                        <td><span className="store-admin-skeleton store-admin-skeleton--short" /></td>
+                        <td><span className="store-admin-skeleton store-admin-skeleton--short" /></td>
+                        <td><span className="store-admin-skeleton store-admin-skeleton--pill" /></td>
+                        <td><span className="store-admin-skeleton store-admin-skeleton--button" /></td>
+                      </tr>
+                    ))
                   )}
                   {filteredProducts.map((product) => (
                     <tr key={product.code}>
@@ -4693,17 +4753,14 @@ function StoreOrdersAdminSection({ orders, loading }) {
       </div>
 
       {loading ? (
-        <div
-          style={{
-            padding: 26,
-            borderRadius: 14,
-            border: '1px dashed #cbd5e1',
-            color: '#64748b',
-            fontWeight: 800,
-            textAlign: 'center',
-          }}
-        >
-          Cargando pedidos de tienda virtual...
+        <div className="store-admin-skeleton-stack" aria-label="Cargando pedidos de tienda virtual">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={`order-skeleton-${index}`} className="store-admin-skeleton-card" aria-hidden="true">
+              <span className="store-admin-skeleton store-admin-skeleton--title" />
+              <span className="store-admin-skeleton store-admin-skeleton--medium" />
+              <span className="store-admin-skeleton store-admin-skeleton--wide" />
+            </div>
+          ))}
         </div>
       ) : filteredOrders.length === 0 ? (
         <div
