@@ -1101,6 +1101,202 @@ html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-success-c
   }
 }
 
+/* Final contrast guard for the compact category controls. */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy span {
+  color: var(--customer-blue-deep) !important;
+}
+
+/* Compact category navigation: local icons replace remote photography. */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery {
+  display: flex;
+  grid-template-columns: none;
+  gap: 10px;
+  padding: 2px 1px 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 96px;
+  width: 96px;
+  min-width: 96px;
+  min-height: 84px;
+  height: 84px;
+  padding: 9px 7px 8px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  overflow: visible;
+  scroll-snap-align: start;
+  border: 1px solid rgba(0, 68, 197, 0.15);
+  border-radius: 15px;
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 6px 16px rgba(7, 52, 95, 0.06);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0, 68, 197, 0.34);
+  box-shadow: 0 9px 20px rgba(7, 52, 95, 0.1);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-icon,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-icon {
+  width: 42px;
+  height: 42px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-icon img,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-icon img,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-symbol {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-copy {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label {
+  display: block;
+  overflow: hidden;
+  color: var(--customer-blue-deep);
+  font-size: 11.5px;
+  font-weight: 900;
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-meta {
+  display: none;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card.active,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card[aria-pressed='true'] {
+  border-color: var(--customer-red);
+  background: #fff6f6;
+  color: var(--customer-blue-deep);
+  box-shadow: inset 0 0 0 1px var(--customer-red), 0 9px 20px rgba(255, 0, 12, 0.1);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-selected {
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile {
+  position: relative;
+  display: flex;
+  min-height: 108px;
+  aspect-ratio: auto;
+  padding: 13px 8px 11px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  overflow: visible;
+  border: 1px solid rgba(0, 68, 197, 0.15);
+  border-radius: 18px;
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 8px 20px rgba(7, 52, 95, 0.07);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile::after,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-drilldown-hero::after {
+  content: none;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile.active {
+  border-color: var(--customer-red);
+  background: #fff6f6;
+  box-shadow: inset 0 0 0 1px var(--customer-red), 0 9px 22px rgba(255, 0, 12, 0.08);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-icon {
+  width: 52px;
+  height: 52px;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy {
+  position: static;
+  z-index: auto;
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: center;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy strong,
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy span {
+  color: var(--customer-blue-deep);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy strong {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-drilldown-hero {
+  display: flex;
+  height: auto;
+  min-height: 92px;
+  padding: 16px 18px;
+  align-items: center;
+  gap: 16px;
+  overflow: visible;
+  border: 1px solid rgba(0, 68, 197, 0.15);
+  border-radius: 18px;
+  background: #ffffff;
+  color: var(--customer-blue-deep);
+  box-shadow: 0 9px 24px rgba(7, 52, 95, 0.07);
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-drilldown-hero .store-mobile-category-tile-copy {
+  width: auto;
+  text-align: left;
+}
+
+@media (max-width: 380px) {
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile {
+    min-height: 100px;
+    padding-inline: 6px;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-icon {
+    width: 46px;
+    height: 46px;
+  }
+}
+
 @media (min-width: 761px) {
   html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-sheet {
     box-shadow: 0 28px 84px rgba(0, 0, 0, 0.48);

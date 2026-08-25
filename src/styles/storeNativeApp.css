@@ -1335,3 +1335,76 @@
     transition-duration: 1ms !important;
   }
 }
+
+/* Native shell uses the same compact local category icon system. */
+.native-store-app .store-category-gallery .store-category-card {
+  display: flex !important;
+  flex: 0 0 90px !important;
+  width: 90px !important;
+  min-width: 90px !important;
+  min-height: 80px !important;
+  height: 80px !important;
+  padding: 8px 6px 7px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  overflow: visible !important;
+  border-color: rgba(0, 68, 197, 0.16) !important;
+  border-radius: 15px !important;
+  background: #ffffff !important;
+  color: var(--native-blue-950) !important;
+  box-shadow: 0 6px 16px rgba(7, 29, 52, 0.07) !important;
+}
+
+.native-store-app .store-category-icon {
+  display: grid !important;
+  width: 40px !important;
+  height: 40px !important;
+  place-items: center !important;
+  color: var(--native-blue-950) !important;
+}
+
+.native-store-app .store-category-icon img,
+.native-store-app .store-category-symbol {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+.native-store-app .store-category-copy {
+  position: static !important;
+  inset: auto !important;
+  z-index: auto !important;
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+.native-store-app .store-category-card .store-filter-label {
+  display: block !important;
+  overflow: hidden !important;
+  color: var(--native-blue-950) !important;
+  font-size: 11px !important;
+  line-height: 1.05 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.native-store-app .store-category-card .store-filter-meta {
+  display: none !important;
+}
+
+.native-store-app .store-category-gallery .store-category-card.active,
+.native-store-app .store-category-gallery .store-category-card[aria-pressed='true'] {
+  border-color: var(--native-red) !important;
+  background: #fff5f5 !important;
+  color: var(--native-blue-950) !important;
+  box-shadow: inset 0 0 0 1px var(--native-red), 0 8px 18px rgba(237, 29, 36, 0.1) !important;
+}
+
+.native-store-app .store-category-selected {
+  top: 5px !important;
+  right: 5px !important;
+}

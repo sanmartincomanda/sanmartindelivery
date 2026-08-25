@@ -164,21 +164,19 @@ import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartin
 import '../styles/storefrontPublic.css';
 import '../styles/storefrontCustomerApp.css';
 import '../styles/storefrontBrand2026.css';
+import '../styles/storefrontCategoryIcons.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
-const STORE_PUBLIC_ASSET_ORIGIN = 'https://tiendavirtual-2ced1.web.app';
-const STORE_CATEGORY_IMAGE_BY_KEY = Object.freeze({
-  todos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/todos-stock-v3.webp`,
-  promociones: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v3.webp`,
-  combos: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/combos-stock-v3.webp`,
-  res: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/res-stock-v3.webp`,
-  pollo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/pollo-stock-v3.webp`,
-  cerdo: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/cerdo-stock-v3.webp`,
-  abarroteria: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/abarroteria-stock-v3.webp`,
-  congelados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/congelados-stock-v3.webp`,
-  refrigerados: `${STORE_PUBLIC_ASSET_ORIGIN}/tienda/categorias/refrigerados-stock-v3.webp`,
+const STORE_CATEGORY_ICON_BY_KEY = Object.freeze({
+  todos: '/tienda/categorias/icons/todos.png',
+  res: '/tienda/categorias/icons/res.png',
+  pollo: '/tienda/categorias/icons/pollo.png',
+  cerdo: '/tienda/categorias/icons/cerdo.png',
+  abarroteria: '/tienda/categorias/icons/abarroteria.png',
+  congelados: '/tienda/categorias/icons/congelados.png',
+  refrigerados: '/tienda/categorias/icons/refrigerados.png',
 });
 const STORE_SESSION_KEY = 'sanmartin_store_user';
 const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
@@ -309,21 +307,43 @@ const normalizeStorePriorityText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
 
-const getStoreCategoryImagePath = (category = {}) => {
+const getStoreCategoryKey = (category = {}) => {
   const categoryKey = normalizeStorePriorityText(category.id || category.label).replace(/\s+/g, '-');
   const categoryDescriptor = normalizeStorePriorityText(`${category.id || ''} ${category.label || ''}`);
 
-  let imagePath = STORE_CATEGORY_IMAGE_BY_KEY[categoryKey];
-
-  if (!imagePath) {
-    const matchingKey = Object.keys(STORE_CATEGORY_IMAGE_BY_KEY).find((key) =>
-      categoryDescriptor.includes(key)
-    );
-    imagePath = STORE_CATEGORY_IMAGE_BY_KEY[matchingKey] || STORE_CATEGORY_IMAGE_BY_KEY.todos;
+  if (categoryKey === 'promociones' || categoryKey === 'combos' || categoryDescriptor.includes('combo')) {
+    return 'combos';
   }
 
-  return imagePath;
+  if (STORE_CATEGORY_ICON_BY_KEY[categoryKey]) {
+    return categoryKey;
+  }
+
+  return (
+    Object.keys(STORE_CATEGORY_ICON_BY_KEY).find((key) => categoryDescriptor.includes(key)) || 'todos'
+  );
 };
+
+const getStoreCategoryIconPath = (category = {}) => {
+  const categoryKey = getStoreCategoryKey(category);
+  return STORE_CATEGORY_ICON_BY_KEY[categoryKey] || '';
+};
+
+function StoreCategoryIcon({ category }) {
+  const iconPath = getStoreCategoryIconPath(category);
+
+  if (iconPath) {
+    return <img src={iconPath} alt="" decoding="async" />;
+  }
+
+  return (
+    <svg className="store-category-symbol" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M18 23h28l-2.4 28H20.4L18 23Z" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" />
+      <path d="M24 24c0-6 3.6-11 8-11s8 5 8 11" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+      <path d="M25 34h14M25 42h14" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 const getStoreOrderTimestampMs = (order = {}) => {
   const directTimestamp = Number(
@@ -9372,26 +9392,11 @@ export default function TiendaVirtualView({
                       setActiveSubcategory('todas');
                     }}
                   >
-                    <span
-                      className={`store-category-photo ${categoryMediaReady ? 'is-ready' : ''}`}
-                      aria-hidden="true"
-                    >
-                      {categoryMediaReady ? (
-                        <img
-                          src={getStoreCategoryImagePath(category)}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          fetchpriority="low"
-                        />
-                      ) : null}
+                    <span className="store-category-icon" aria-hidden="true">
+                      <StoreCategoryIcon category={category} />
                     </span>
-                    <span className="store-category-shade" aria-hidden="true" />
                     <span className="store-category-copy">
                       <span className="store-filter-label">{category.label}</span>
-                      <span className="store-filter-meta">
-                        {categoryProductCount} productos
-                      </span>
                     </span>
                     <span className="store-category-selected" aria-hidden="true">
                       <svg viewBox="0 0 20 20" fill="none">
@@ -11571,7 +11576,6 @@ function StoreMobileCategoriesPage({
   activeSubcategory,
   subcategories,
   subcategoryCounts,
-  categoryMediaReady,
   onBack,
   onSelectCategory,
   onSelectSubcategory,
@@ -11606,14 +11610,9 @@ function StoreMobileCategoriesPage({
         </div>
 
         <div className="store-mobile-category-drilldown-hero">
-          {categoryMediaReady ? (
-            <img
-              src={getStoreCategoryImagePath(selectedCategory)}
-              alt=""
-              loading="lazy"
-              decoding="async"
-            />
-          ) : null}
+          <span className="store-mobile-category-icon" aria-hidden="true">
+            <StoreCategoryIcon category={selectedCategory} />
+          </span>
           <span className="store-mobile-category-tile-copy">
             <strong>{selectedCategory.label}</strong>
             <span>{selectedCategoryCount} productos</span>
@@ -11674,7 +11673,6 @@ function StoreMobileCategoriesPage({
       <div className="store-mobile-category-grid">
         {categories.map((category) => {
           const active = category.id === activeCategory;
-          const productCount = Number(counts?.[category.id] || 0);
 
           return (
             <button
@@ -11683,17 +11681,11 @@ function StoreMobileCategoriesPage({
               className={`store-mobile-category-tile ${active ? 'active' : ''}`}
               onClick={() => handleCategoryClick(category)}
             >
-              {categoryMediaReady ? (
-                <img
-                  src={getStoreCategoryImagePath(category)}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : null}
+              <span className="store-mobile-category-icon" aria-hidden="true">
+                <StoreCategoryIcon category={category} />
+              </span>
               <span className="store-mobile-category-tile-copy">
                 <strong>{category.label}</strong>
-                <span>{productCount} productos</span>
               </span>
             </button>
           );
