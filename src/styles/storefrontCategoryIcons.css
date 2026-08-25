@@ -71,3 +71,99 @@ html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-ca
   width: 30px !important;
   height: 30px !important;
 }
+
+/* Keep the first product row visible on entry without changing catalogue behavior. */
+@media (max-width: 760px) {
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-top {
+    gap: 6px !important;
+    padding-bottom: 8px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-wrap {
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 0 10px 0 4px !important;
+    border-radius: 15px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search,
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag {
+    height: 42px !important;
+    min-height: 42px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search-tag {
+    width: 40px !important;
+    min-width: 40px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-search {
+    padding-right: 8px !important;
+    font-size: 0.88rem !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-rewards-entry {
+    margin-top: 6px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 main {
+    padding-top: 8px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filters-panel {
+    padding-bottom: 10px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-filter-strip {
+    margin-bottom: 6px !important;
+    padding-bottom: 2px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery {
+    gap: 7px !important;
+    padding-top: 0 !important;
+    padding-bottom: 4px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-gallery .store-category-card {
+    flex: 0 0 72px !important;
+    width: 72px !important;
+    min-width: 72px !important;
+    max-width: 72px !important;
+    height: 63px !important;
+    min-height: 63px !important;
+    margin-top: 2px !important;
+    padding: 5px 3px 4px !important;
+    gap: 2px !important;
+    border-radius: 12px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-icon {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label {
+    font-size: 9.5px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-selected {
+    top: 3px !important;
+    right: 3px !important;
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-grouped-sections {
+    margin-top: 10px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group {
+    padding-top: 12px !important;
+  }
+
+  html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-product-group-head {
+    margin-bottom: 10px !important;
+  }
+}
