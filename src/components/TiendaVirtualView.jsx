@@ -333,7 +333,13 @@ function StoreCategoryIcon({ category }) {
   const iconPath = getStoreCategoryIconPath(category);
 
   if (iconPath) {
-    return <img src={iconPath} alt="" decoding="async" />;
+    return (
+      <span
+        className="store-category-symbol store-category-symbol-image"
+        style={{ '--store-category-icon-url': `url("${iconPath}")` }}
+        aria-hidden="true"
+      />
+    );
   }
 
   return (

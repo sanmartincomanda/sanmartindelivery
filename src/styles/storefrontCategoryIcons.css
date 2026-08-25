@@ -1,4 +1,29 @@
 /* Loaded last so legacy photo-card colors cannot reduce icon label contrast. */
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-icon {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-icon {
+  width: 39px !important;
+  height: 39px !important;
+}
+
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-symbol-image {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: #0044c5 !important;
+  -webkit-mask-image: var(--store-category-icon-url);
+  mask-image: var(--store-category-icon-url);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
 html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label,
 html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy strong,
 html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy span {
@@ -40,4 +65,9 @@ html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-ca
 
 .native-store-app .store-category-card .store-filter-label {
   color: var(--native-blue-950) !important;
+}
+
+.native-store-app .store-category-icon {
+  width: 30px !important;
+  height: 30px !important;
 }
