@@ -61,13 +61,8 @@ export const buildGoogleMapsEmbedUrl = (location) => {
   return `https://www.google.com/maps?q=${normalized.lat},${normalized.lng}&z=17&output=embed`;
 };
 
-export const getBrowserLocation = () =>
+const requestBrowserPosition = (options) =>
   new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocalizacion no disponible'));
-      return;
-    }
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve(
@@ -79,13 +74,54 @@ export const getBrowserLocation = () =>
         );
       },
       reject,
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000,
-      }
+      options
     );
   });
+
+export const getBrowserLocation = async () => {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    const error = new Error('Geolocalizacion no disponible');
+    error.code = 0;
+    throw error;
+  }
+
+  try {
+    return await requestBrowserPosition({
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 120000,
+    });
+  } catch (error) {
+    // Permission errors cannot be recovered by requesting the same permission again.
+    if (Number(error?.code) === 1) {
+      throw error;
+    }
+
+    return requestBrowserPosition({
+      enableHighAccuracy: false,
+      timeout: 15000,
+      maximumAge: 300000,
+    });
+  }
+};
+
+export const getBrowserLocationErrorMessage = (error) => {
+  const errorCode = Number(error?.code);
+
+  if (errorCode === 1) {
+    return 'El navegador no tiene permiso para usar tu ubicacion. Puedes buscar tu direccion o mover el pin manualmente.';
+  }
+
+  if (errorCode === 3) {
+    return 'El GPS tardo demasiado en responder. Puedes buscar tu direccion o mover el pin manualmente.';
+  }
+
+  if (errorCode === 2) {
+    return 'No recibimos senal de ubicacion. Puedes buscar tu direccion o mover el pin manualmente.';
+  }
+
+  return 'No pudimos usar el GPS en este momento. Puedes buscar tu direccion o mover el pin manualmente.';
+};
 
 const parseNominatimResult = (result = {}) => {
   const normalized = normalizeLocation({

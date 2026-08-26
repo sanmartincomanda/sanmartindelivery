@@ -56,6 +56,7 @@ import {
   buildGoogleMapsEmbedUrl,
   buildGoogleMapsPlaceUrl,
   getBrowserLocation,
+  getBrowserLocationErrorMessage,
   hasLocation,
   normalizeLocation,
   reverseGeocodeLocation,
@@ -6837,6 +6838,39 @@ export default function TiendaVirtualView({
           width: 20px;
           height: 20px;
         }
+        .store-map-location-feedback {
+          position: relative;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 10px;
+          align-items: center;
+          margin-top: 10px;
+          border: 1px solid rgba(12, 77, 136, 0.18);
+          border-radius: 14px;
+          padding: 10px 12px;
+          background: #edf6ff;
+          color: #0c4d88;
+          font-size: 12px;
+          font-weight: 850;
+          line-height: 1.4;
+        }
+        .store-map-location-feedback.error {
+          border-color: rgba(180, 83, 9, 0.2);
+          background: #fff8e8;
+          color: #8a4b08;
+        }
+        .store-map-location-feedback button {
+          width: 34px;
+          height: 34px;
+          border: 0;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.86);
+          color: inherit;
+          font: inherit;
+          font-size: 18px;
+          font-weight: 900;
+          cursor: pointer;
+        }
         .store-map-pin-help {
           position: absolute;
           z-index: 8;
@@ -10932,6 +10966,7 @@ function MapPointPicker({
   const [savingPoint, setSavingPoint] = useState(false);
   const [draggingMap, setDraggingMap] = useState(false);
   const [locatingPoint, setLocatingPoint] = useState(false);
+  const [locationFeedback, setLocationFeedback] = useState(null);
   const [showPinHelp, setShowPinHelp] = useState(true);
   const [useGoogleMap, setUseGoogleMap] = useState(() => hasGoogleMapsApiKey());
   const dragStateRef = useRef(null);
@@ -11029,17 +11064,39 @@ function MapPointPicker({
 
     setSelected(normalized);
     setCenter(normalized);
+    setLocationFeedback(null);
   };
 
   const captureCurrentPoint = async () => {
     setLocatingPoint(true);
+    setLocationFeedback(null);
     try {
       const currentLocation = await getBrowserLocation();
-      const resolvedLocation = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
+      let resolvedLocation = currentLocation;
+
+      try {
+        resolvedLocation = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
+      } catch (addressError) {
+        console.warn('Se obtuvo el GPS, pero no se pudo resolver la direccion:', addressError);
+      }
+
       movePinToLocation(resolvedLocation);
+      setShowPinHelp(false);
+      setLocationFeedback({
+        type: 'success',
+        message: 'Ubicacion encontrada. Ajusta el pin sobre la entrada y presiona Continuar.',
+      });
     } catch (error) {
-      console.error('No se pudo obtener la ubicacion actual en el mapa:', error);
-      alert('No pudimos encontrar tu ubicacion. Revisa el permiso de ubicacion e intenta nuevamente.');
+      if (Number(error?.code) === 1) {
+        console.info('El usuario no concedio permiso de ubicacion en el mapa.');
+      } else {
+        console.warn('No se pudo obtener la ubicacion actual en el mapa:', error);
+      }
+      setShowPinHelp(false);
+      setLocationFeedback({
+        type: 'error',
+        message: getBrowserLocationErrorMessage(error),
+      });
     } finally {
       setLocatingPoint(false);
     }
@@ -11138,6 +11195,7 @@ function MapPointPicker({
       return samePoint ? current : { ...normalized, label: '' };
     });
     setCenter(normalized);
+    setLocationFeedback(null);
   };
 
   const pickerContent = (
@@ -11207,6 +11265,22 @@ function MapPointPicker({
             {locatingPoint ? 'Buscando...' : 'Mi ubicacion'}
           </button>
         </div>
+
+        {locationFeedback && (
+          <div
+            className={`store-map-location-feedback ${locationFeedback.type === 'error' ? 'error' : ''}`}
+            role={locationFeedback.type === 'error' ? 'alert' : 'status'}
+          >
+            <span>{locationFeedback.message}</span>
+            <button
+              type="button"
+              aria-label="Cerrar aviso de ubicacion"
+              onClick={() => setLocationFeedback(null)}
+            >
+              x
+            </button>
+          </div>
+        )}
 
         <div className="store-map-confirm-panel">
           <div className="store-map-confirm-address">
@@ -11364,7 +11438,14 @@ function ProfileSheet({
     setAddressLocating(true);
     try {
       const currentLocation = await getBrowserLocation();
-      const location = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
+      let location = currentLocation;
+
+      try {
+        location = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
+      } catch (addressError) {
+        console.warn('Se obtuvo el GPS, pero no se pudo resolver la direccion:', addressError);
+      }
+
       setAddressDraft((current) => ({
         ...current,
         ubicacion: location,
@@ -11374,7 +11455,7 @@ function ProfileSheet({
       }));
     } catch (error) {
       console.error('No se pudo obtener ubicacion:', error);
-      alert('No pudimos tomar tu ubicacion. Activa permisos o intenta de nuevo.');
+      alert(getBrowserLocationErrorMessage(error));
     } finally {
       setAddressLocating(false);
     }
