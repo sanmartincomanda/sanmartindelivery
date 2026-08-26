@@ -420,6 +420,8 @@ const resolveFallbackSubcategory = (categoryId, category = {}) => {
 const resolveStoreSubcategoryForRow = (row, categoryId, currentCategory = {}) => {
   const existingMap = buildCategorySubcategoryMap(currentCategory);
   const candidates = [
+    normalizeStoreSubcategory(row.storeSubcategory, categoryId),
+    String(row.storeSubcategory || '').trim(),
     normalizeStoreSubcategory(row.sicarCategory, categoryId),
     String(row.sicarCategory || '').trim(),
   ].filter(Boolean);
@@ -713,6 +715,7 @@ const main = async () => {
       name: String(rawRow.name || '').trim(),
       sicarDepartment: departmentName,
       sicarCategory: String(override?.sicarCategory || rawRow.sicarCategory || '').trim(),
+      storeSubcategory: String(override?.storeSubcategory || '').trim(),
     };
 
     if (!isPrintableCode(row.code)) {
@@ -725,11 +728,15 @@ const main = async () => {
       return;
     }
 
+    const targetCategoryId = String(override?.storeCategoryId || departmentConfig.storeCategoryId).trim();
+    const targetCategoryLabel = String(
+      override?.storeCategoryLabel || departmentConfig.storeCategoryLabel
+    ).trim();
     const targetCategory =
-      categoryState.get(departmentConfig.storeCategoryId) || {
-        pathKey: departmentConfig.storeCategoryId,
-        id: departmentConfig.storeCategoryId,
-        label: departmentConfig.storeCategoryLabel,
+      categoryState.get(targetCategoryId) || {
+        pathKey: targetCategoryId,
+        id: targetCategoryId,
+        label: targetCategoryLabel,
         subcategories: [],
         active: true,
         sortOrder: departmentConfig.sortOrder,

@@ -41,6 +41,27 @@ export const SICAR_SYNC_DEPARTMENTS = [
 ];
 
 export const SICAR_SPECIAL_SKU_OVERRIDES = {
+  CASERO2: {
+    sicarDepartment: 'RES',
+    sicarCategory: 'COMBOS',
+    storeCategoryId: 'promociones',
+    storeCategoryLabel: 'Promociones',
+    storeSubcategory: 'Combos',
+  },
+  CASERO3: {
+    sicarDepartment: 'RES',
+    sicarCategory: 'COMBOS',
+    storeCategoryId: 'promociones',
+    storeCategoryLabel: 'Promociones',
+    storeSubcategory: 'Combos',
+  },
+  CASERO4: {
+    sicarDepartment: 'RES',
+    sicarCategory: 'COMBOS',
+    storeCategoryId: 'promociones',
+    storeCategoryLabel: 'Promociones',
+    storeSubcategory: 'Combos',
+  },
   '00446': {
     sicarDepartment: 'CERDO',
     sicarCategory: 'Cerdo',

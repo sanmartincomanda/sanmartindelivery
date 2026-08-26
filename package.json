@@ -10,6 +10,7 @@
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
+    "sicar:publish:combos": "node scripts/publishSicarStoreCombos.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
     "sicar:update:prices": "node scripts/updateSicarPrices.mjs",
     "crm:publish": "node scripts/publishCrmAnalytics.mjs",
