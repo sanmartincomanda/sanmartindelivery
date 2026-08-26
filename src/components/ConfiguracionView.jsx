@@ -358,6 +358,9 @@ const emptyPopupAd = {
   id: '',
   title: '',
   image: '',
+  ctaLabel: '',
+  targetCategory: '',
+  targetSubcategory: '',
   active: true,
   sortOrder: '',
   maxViewsPerUser: '2',
@@ -1329,6 +1332,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
       id: popupAd.id || '',
       title: popupAd.title || '',
       image: popupAd.image || '',
+      ctaLabel: popupAd.ctaLabel || '',
+      targetCategory: popupAd.targetCategory || '',
+      targetSubcategory: popupAd.targetSubcategory || '',
       active: popupAd.active !== false,
       sortOrder: popupAd.sortOrder ?? '',
       maxViewsPerUser: String(popupAd.maxViewsPerUser ?? 2),
@@ -1717,6 +1723,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
     event.preventDefault();
     const startsAt = normalizeDateTimeInputValue(popupAdForm.startsAt);
     const endsAt = normalizeDateTimeInputValue(popupAdForm.endsAt);
+    const ctaLabel = String(popupAdForm.ctaLabel || '').trim();
+    const targetCategory = String(popupAdForm.targetCategory || '').trim();
+    const targetSubcategory = String(popupAdForm.targetSubcategory || '').trim();
 
     if (popupAdForm.startsAt && !startsAt) {
       setMessage('La fecha inicial del popup no es valida.');
@@ -1733,6 +1742,11 @@ export default function ConfiguracionView({ mode = 'users' }) {
       return;
     }
 
+    if (ctaLabel && !targetCategory) {
+      setMessage('Selecciona la categoria a la que debe llevar el boton del popup.');
+      return;
+    }
+
     setSavingPopupAd(true);
     setMessage('');
 
@@ -1743,6 +1757,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
           id: popupAdForm.id,
           title: popupAdForm.title,
           image: popupAdForm.image,
+          ctaLabel,
+          targetCategory: ctaLabel ? targetCategory : '',
+          targetSubcategory: ctaLabel ? targetSubcategory : '',
           active: popupAdForm.active,
           sortOrder: popupAdForm.sortOrder === '' ? popupAds.length * 10 : Number(popupAdForm.sortOrder || 0),
           maxViewsPerUser: Math.max(1, Math.trunc(Number(popupAdForm.maxViewsPerUser || 2))),
@@ -5765,6 +5782,32 @@ function PopupAdsManager({
           placeholder="URL de la imagen o imagen cargada"
         />
         <input className="cfg-input" type="file" accept="image/*" onChange={handlePopupAdImageFile} />
+        <div style={{ display: 'grid', gap: 8 }}>
+          <strong style={{ color: '#0f172a', fontSize: 14 }}>Boton del anuncio (opcional)</strong>
+          <input
+            className="cfg-input"
+            value={popupAdForm.ctaLabel}
+            onChange={(event) => updatePopupAdForm('ctaLabel', event.target.value)}
+            placeholder="Ejemplo: Comprar Combos"
+          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+            <input
+              className="cfg-input"
+              value={popupAdForm.targetCategory}
+              onChange={(event) => updatePopupAdForm('targetCategory', event.target.value)}
+              placeholder="Categoria: promociones"
+            />
+            <input
+              className="cfg-input"
+              value={popupAdForm.targetSubcategory}
+              onChange={(event) => updatePopupAdForm('targetSubcategory', event.target.value)}
+              placeholder="Subcategoria: Combos"
+            />
+          </div>
+          <span style={{ color: '#64748b', fontSize: 12, fontWeight: 700 }}>
+            Para los paquetes Casero usa categoria "promociones" y subcategoria "Combos".
+          </span>
+        </div>
         <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
           Se mostrara maximo las veces configuradas por cliente o por navegador. Si lo activas, los otros popups quedaran apagados automaticamente.
         </div>
