@@ -3827,6 +3827,29 @@ export default function TiendaVirtualView({
     }
   };
 
+  const openPopupAdTarget = () => {
+    const targetCategory = String(openedPopupAd?.targetCategory || '').trim();
+    const targetSubcategory = String(openedPopupAd?.targetSubcategory || '').trim();
+
+    setPopupAdOpen(false);
+    setOpenedPopupAdId('');
+
+    if (!targetCategory) {
+      return;
+    }
+
+    setQuery('');
+    setActiveCategory(targetCategory);
+    setActiveSubcategory(targetSubcategory || 'todas');
+    setMobileNavSection('home');
+
+    if (typeof window !== 'undefined') {
+      window.setTimeout(() => {
+        scrollToStoreRef(filtersPanelRef);
+      }, 80);
+    }
+  };
+
   const openCustomerOrders = () => {
     if (!currentUser) {
       openAuthSheet('login', 'orders');
@@ -9950,6 +9973,7 @@ export default function TiendaVirtualView({
       {popupAdOpen && openedPopupAd && (
         <StorePopupAdModal
           popupAd={openedPopupAd}
+          onAction={openPopupAdTarget}
           onClose={() => {
             setPopupAdOpen(false);
             setOpenedPopupAdId('');
@@ -9977,7 +10001,7 @@ export default function TiendaVirtualView({
   );
 }
 
-function StorePopupAdModal({ popupAd, onClose }) {
+function StorePopupAdModal({ popupAd, onClose, onAction }) {
   if (!popupAd) {
     return null;
   }
@@ -10006,7 +10030,7 @@ function StorePopupAdModal({ popupAd, onClose }) {
           overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.12)',
           boxShadow: '0 38px 90px rgba(0, 0, 0, 0.4)',
-          background: '#14090d',
+          background: '#fff',
         }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -10037,11 +10061,32 @@ function StorePopupAdModal({ popupAd, onClose }) {
           style={{
             display: 'block',
             width: '100%',
-            maxHeight: '92vh',
+            maxHeight: popupAd.ctaLabel ? 'calc(92vh - 86px)' : '92vh',
             objectFit: 'contain',
-            background: '#14090d',
+            background: '#fcebdd',
           }}
         />
+        {popupAd.ctaLabel && (
+          <div style={{ padding: 14 }}>
+            <button
+              type="button"
+              onClick={onAction}
+              style={{
+                width: '100%',
+                minHeight: 54,
+                border: 0,
+                borderRadius: 14,
+                background: '#ff000c',
+                color: '#fff',
+                fontSize: 17,
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              {popupAd.ctaLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

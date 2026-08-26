@@ -89,6 +89,9 @@ export const normalizeStorePopupAd = (popupAd = {}, fallback = {}, index = 0) =>
       source.maxViewsPerUser ?? backup.maxViewsPerUser,
       STORE_DEFAULT_POPUP_ADS[index]?.maxViewsPerUser || 2
     ),
+    ctaLabel: String(source.ctaLabel ?? backup.ctaLabel ?? '').trim(),
+    targetCategory: String(source.targetCategory ?? backup.targetCategory ?? '').trim(),
+    targetSubcategory: String(source.targetSubcategory ?? backup.targetSubcategory ?? '').trim(),
   };
 };
 

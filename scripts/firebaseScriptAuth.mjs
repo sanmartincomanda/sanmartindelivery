@@ -1,6 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
+import { getStorage } from 'firebase/storage';
 
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro',
@@ -42,6 +43,7 @@ const getScriptFirebaseApp = () => {
 };
 
 export const getAuthenticatedFirebaseDatabase = () => getDatabase(getScriptFirebaseApp());
+export const getAuthenticatedFirebaseStorage = () => getStorage(getScriptFirebaseApp());
 
 const resolveScriptCredentials = () => {
   const username = String(process.env.SICAR_FIREBASE_USERNAME || 'admin').trim() || 'admin';
