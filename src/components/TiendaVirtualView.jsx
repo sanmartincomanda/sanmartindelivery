@@ -121,6 +121,11 @@ import {
   updateStoreUserProfile,
 } from '../services/storeUsers';
 import {
+  createStoreAddressDraft,
+  getDefaultStoreAddress,
+  normalizeStoreAddresses,
+} from '../services/storeAddresses';
+import {
   requestStoreAccountDeletion,
   STORE_ACCOUNT_DELETION_URL,
   STORE_PRIVACY_URL,
@@ -222,6 +227,7 @@ const EMPTY_STORE_AUTH_FORM = {
   confirmPassword: '',
   direccion: '',
   referencia: '',
+  nombreDireccion: 'Casa',
   ubicacion: null,
 };
 
@@ -933,12 +939,15 @@ const shouldAutofillAddress = (value) =>
   LOCATION_ADDRESS_PLACEHOLDERS.includes(removeTextAccents(value).trim());
 
 const createEmptyDeliveryDraft = () => ({
+  nombre: '',
   direccion: '',
   referencia: '',
   ubicacion: null,
 });
 
 const createUserDeliveryDraft = (user = {}) => ({
+  id: String(user?.id || '').trim(),
+  nombre: String(user?.nombre || user?.nombreDireccion || 'Casa').trim(),
   direccion: String(user?.direccion || '').trim(),
   referencia: String(user?.referencia || '').trim(),
   ubicacion: normalizeLocation(user?.ubicacion),
@@ -1432,6 +1441,7 @@ export default function TiendaVirtualView({
   });
   const [fulfillmentType, setFulfillmentType] = useState(ORDER_FULFILLMENT_DELIVERY);
   const [deliveryMode, setDeliveryMode] = useState('perfil');
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
   const [alternateDelivery, setAlternateDelivery] = useState(() => createEmptyDeliveryDraft());
   const [alternateLocating, setAlternateLocating] = useState(false);
   const [notes, setNotes] = useState('');
@@ -2050,16 +2060,20 @@ export default function TiendaVirtualView({
 
   useEffect(() => {
     if (!currentUser) {
+      setSelectedSavedAddressId('');
       return;
     }
+
+    const defaultAddress = getDefaultStoreAddress(currentUser);
 
     setCustomer((current) => ({
       ...current,
       nombre: currentUser.nombre || '',
       telefono: currentUser.telefono || '',
-      direccion: currentUser.direccion || '',
-      referencia: currentUser.referencia || '',
+      direccion: defaultAddress?.direccion || currentUser.direccion || '',
+      referencia: defaultAddress?.referencia || currentUser.referencia || '',
     }));
+    setSelectedSavedAddressId(defaultAddress?.id || '');
     setDeliveryMode('perfil');
     setAlternateDelivery(createEmptyDeliveryDraft());
   }, [currentUser]);
@@ -2789,7 +2803,19 @@ export default function TiendaVirtualView({
     [catalog]
   );
 
-  const savedDeliveryAddress = useMemo(() => createUserDeliveryDraft(currentUser), [currentUser]);
+  const savedAddresses = useMemo(() => normalizeStoreAddresses(currentUser || {}), [currentUser]);
+  const selectedSavedAddress = useMemo(
+    () =>
+      savedAddresses.find((address) => address.id === selectedSavedAddressId) ||
+      savedAddresses.find((address) => address.predeterminada) ||
+      savedAddresses[0] ||
+      null,
+    [savedAddresses, selectedSavedAddressId]
+  );
+  const savedDeliveryAddress = useMemo(
+    () => createUserDeliveryDraft(selectedSavedAddress || currentUser),
+    [currentUser, selectedSavedAddress]
+  );
   const savedAddressCoverageQuote = useMemo(
     () =>
       calculateStoreDeliveryQuote({
@@ -3642,6 +3668,12 @@ export default function TiendaVirtualView({
     if (!hasLocation(authForm.ubicacion)) {
       setAuthLoading(false);
       setAuthError('Debes guardar el punto exacto en el mapa antes de crear la cuenta.');
+      return;
+    }
+
+    if (!String(authForm.nombreDireccion || '').trim()) {
+      setAuthLoading(false);
+      setAuthError('Escribe un nombre para guardar la direccion, por ejemplo Casa o Casa de mama.');
       return;
     }
 
@@ -6621,6 +6653,7 @@ export default function TiendaVirtualView({
           letter-spacing: 0.06em;
         }
         .store-map-picker {
+          box-sizing: border-box;
           width: min(720px, calc(100vw - 32px));
           max-height: min(900px, calc(100dvh - 28px));
           border-radius: 28px;
@@ -6663,8 +6696,7 @@ export default function TiendaVirtualView({
         }
         .store-map-canvas {
           position: relative;
-          width: ${MAP_PICKER_WIDTH}px;
-          max-width: 100%;
+          width: 100%;
           height: ${MAP_PICKER_HEIGHT}px;
           margin: 0 auto;
           overflow: hidden;
@@ -6805,6 +6837,61 @@ export default function TiendaVirtualView({
           width: 20px;
           height: 20px;
         }
+        .store-map-pin-help {
+          position: absolute;
+          z-index: 8;
+          left: 50%;
+          top: 54%;
+          width: min(330px, calc(100% - 32px));
+          border-radius: 18px;
+          padding: 18px 38px 18px 18px;
+          background: #0044c5;
+          color: #ffffff;
+          text-align: center;
+          box-shadow: 0 18px 46px rgba(0, 68, 197, 0.3);
+          transform: translate(-50%, -50%);
+          pointer-events: auto;
+        }
+        .store-map-pin-help::before {
+          content: 'i';
+          width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          margin: 0 auto 8px;
+          border: 2px solid rgba(255, 255, 255, 0.86);
+          border-radius: 999px;
+          font-weight: 950;
+        }
+        .store-map-pin-help > button {
+          position: absolute;
+          top: 9px;
+          right: 10px;
+          width: 32px;
+          height: 32px;
+          border: 0;
+          background: transparent;
+          color: #ffffff;
+          font: inherit;
+          font-size: 18px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .store-map-pin-help strong,
+        .store-map-pin-help span {
+          display: block;
+        }
+        .store-map-pin-help strong {
+          color: #ffffff !important;
+          font-size: 16px;
+        }
+        .store-map-pin-help span {
+          margin-top: 5px;
+          color: rgba(255, 255, 255, 0.86) !important;
+          font-size: 12px;
+          font-weight: 750;
+          line-height: 1.45;
+        }
         .store-map-confirm-panel {
           display: grid;
           gap: 10px;
@@ -6864,7 +6951,7 @@ export default function TiendaVirtualView({
         }
         .store-map-picker-actions {
           display: grid;
-          grid-template-columns: minmax(110px, 0.7fr) minmax(190px, 1.6fr);
+          grid-template-columns: minmax(0, 1fr);
           gap: 9px;
           margin-top: 2px;
         }
@@ -6902,8 +6989,8 @@ export default function TiendaVirtualView({
             flex: 0 0 auto;
           }
           .store-map-stage {
-            flex: 1 1 auto;
-            min-height: 280px;
+            flex: 0 0 ${MAP_PICKER_HEIGHT}px;
+            min-height: ${MAP_PICKER_HEIGHT}px;
             border-radius: 20px;
           }
           .store-map-canvas {
@@ -6916,12 +7003,12 @@ export default function TiendaVirtualView({
             padding: 12px;
           }
           .store-map-picker-actions {
-            grid-template-columns: 0.72fr 1.55fr;
+            grid-template-columns: minmax(0, 1fr);
           }
           .store-map-picker-actions .store-button {
-            min-height: 46px;
+            min-height: 54px;
             padding: 0 10px;
-            font-size: 11px;
+            font-size: 13px;
           }
           .store-map-google-link {
             display: none;
@@ -9629,6 +9716,8 @@ export default function TiendaVirtualView({
           customer={customer}
           fulfillmentType={fulfillmentType}
           deliveryMode={deliveryMode}
+          savedAddresses={savedAddresses}
+          selectedSavedAddress={selectedSavedAddress}
           alternateDelivery={alternateDelivery}
           alternateLocating={alternateLocating}
           notes={notes}
@@ -9659,6 +9748,10 @@ export default function TiendaVirtualView({
           onCustomerChange={updateCustomer}
           onFulfillmentTypeChange={setFulfillmentType}
           onDeliveryModeChange={setDeliveryMode}
+          onSavedAddressSelect={(addressId) => {
+            setSelectedSavedAddressId(addressId);
+            setDeliveryMode('perfil');
+          }}
           onQuantityChange={updateQuantity}
           onAlternateDeliveryChange={updateAlternateDelivery}
           onCaptureAlternateLocation={captureAlternateLocation}
@@ -10250,6 +10343,10 @@ function StoreAuthView({
                 }
               }}
             />
+            <AddressNameField
+              value={authForm.nombreDireccion}
+              onChange={(value) => onFormChange('nombreDireccion', value)}
+            />
             <label className="store-field-stack">
               <span className="store-field-caption">Direccion seleccionada</span>
               <input
@@ -10768,6 +10865,53 @@ function LocationCaptureBlock({
   );
 }
 
+function AddressNameField({ value, onChange }) {
+  const presetNames = ['Casa', 'Trabajo'];
+  const currentValue = String(value || '').trim();
+  const customSelected = !presetNames.includes(currentValue);
+
+  return (
+    <fieldset className="store-address-name-field">
+      <legend>Nombre de la direccion</legend>
+      <div className="store-address-name-options">
+        {presetNames.map((name) => (
+          <button
+            key={name}
+            type="button"
+            className={currentValue === name ? 'active' : ''}
+            aria-pressed={currentValue === name}
+            onClick={() => onChange(name)}
+          >
+            {name}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={customSelected ? 'active' : ''}
+          aria-pressed={customSelected}
+          onClick={() => {
+            if (!customSelected) {
+              onChange('');
+            }
+          }}
+        >
+          Otro
+        </button>
+      </div>
+      {customSelected && (
+        <input
+          className="store-field"
+          value={currentValue}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Ej. Casa de mama"
+          maxLength={40}
+          autoFocus
+        />
+      )}
+    </fieldset>
+  );
+}
+
 function MapPointPicker({
   location,
   defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
@@ -10788,19 +10932,57 @@ function MapPointPicker({
   const [savingPoint, setSavingPoint] = useState(false);
   const [draggingMap, setDraggingMap] = useState(false);
   const [locatingPoint, setLocatingPoint] = useState(false);
+  const [showPinHelp, setShowPinHelp] = useState(true);
   const [useGoogleMap, setUseGoogleMap] = useState(() => hasGoogleMapsApiKey());
   const dragStateRef = useRef(null);
+  const fallbackMapRef = useRef(null);
+  const [mapViewport, setMapViewport] = useState({
+    width: MAP_PICKER_WIDTH,
+    height: MAP_PICKER_HEIGHT,
+  });
+
+  useEffect(() => {
+    const mapNode = fallbackMapRef.current;
+    if (useGoogleMap || !mapNode) {
+      return undefined;
+    }
+
+    const updateViewport = () => {
+      const rect = mapNode.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) {
+        return;
+      }
+
+      setMapViewport((current) => {
+        const nextWidth = Math.round(rect.width);
+        const nextHeight = Math.round(rect.height);
+        return current.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight };
+      });
+    };
+
+    updateViewport();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateViewport) : null;
+    observer?.observe(mapNode);
+    window.addEventListener('resize', updateViewport);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, [useGoogleMap]);
 
   const mapGeometry = useMemo(() => {
     const centerPoint = locationToWorldPoint(center, zoom);
     const topLeft = {
-      x: centerPoint.x - MAP_PICKER_WIDTH / 2,
-      y: centerPoint.y - MAP_PICKER_HEIGHT / 2,
+      x: centerPoint.x - mapViewport.width / 2,
+      y: centerPoint.y - mapViewport.height / 2,
     };
     const tileStartX = Math.floor(topLeft.x / MAP_PICKER_TILE_SIZE);
-    const tileEndX = Math.floor((topLeft.x + MAP_PICKER_WIDTH) / MAP_PICKER_TILE_SIZE);
+    const tileEndX = Math.floor((topLeft.x + mapViewport.width) / MAP_PICKER_TILE_SIZE);
     const tileStartY = Math.floor(topLeft.y / MAP_PICKER_TILE_SIZE);
-    const tileEndY = Math.floor((topLeft.y + MAP_PICKER_HEIGHT) / MAP_PICKER_TILE_SIZE);
+    const tileEndY = Math.floor((topLeft.y + mapViewport.height) / MAP_PICKER_TILE_SIZE);
     const tileCount = 2 ** zoom;
     const tiles = [];
 
@@ -10821,7 +11003,7 @@ function MapPointPicker({
     }
 
     return { tiles, topLeft };
-  }, [center, zoom]);
+  }, [center, mapViewport.height, mapViewport.width, zoom]);
 
   const selectedPoint = useMemo(() => {
     const point = locationToWorldPoint(selected, zoom);
@@ -10834,8 +11016,8 @@ function MapPointPicker({
   const getMapEventPoint = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
-      x: (event.clientX - rect.left) * (MAP_PICKER_WIDTH / rect.width),
-      y: (event.clientY - rect.top) * (MAP_PICKER_HEIGHT / rect.height),
+      x: (event.clientX - rect.left) * (mapViewport.width / rect.width),
+      y: (event.clientY - rect.top) * (mapViewport.height / rect.height),
     };
   };
 
@@ -10889,8 +11071,8 @@ function MapPointPicker({
       return;
     }
 
-    const deltaX = (event.clientX - dragState.startClientX) * (MAP_PICKER_WIDTH / dragState.rectWidth);
-    const deltaY = (event.clientY - dragState.startClientY) * (MAP_PICKER_HEIGHT / dragState.rectHeight);
+    const deltaX = (event.clientX - dragState.startClientX) * (mapViewport.width / dragState.rectWidth);
+    const deltaY = (event.clientY - dragState.startClientY) * (mapViewport.height / dragState.rectHeight);
 
     if (Math.abs(deltaX) + Math.abs(deltaY) > 4) {
       dragState.dragged = true;
@@ -10958,13 +11140,13 @@ function MapPointPicker({
     setCenter(normalized);
   };
 
-  return (
+  const pickerContent = (
     <div className="store-sheet-overlay">
       <div className="store-map-picker">
         <div className="store-map-picker-head">
           <div>
-            <strong>Confirma tu direccion</strong>
-            <span>Mueve el mapa hasta dejar el pin exactamente donde debemos entregar.</span>
+            <strong>Ubica el punto exacto</strong>
+            <span>Mueve el mapa y deja el pin sobre la entrada.</span>
           </div>
           <StoreBackButton onClick={onClose} />
         </div>
@@ -10985,6 +11167,7 @@ function MapPointPicker({
             />
           ) : (
             <div
+              ref={fallbackMapRef}
               className={`store-map-canvas ${draggingMap ? 'dragging' : ''}`}
               onPointerDown={handleMapPointerDown}
               onPointerMove={handleMapPointerMove}
@@ -11003,6 +11186,15 @@ function MapPointPicker({
               ))}
               <span className="store-map-pin" style={{ left: selectedPoint.left, top: selectedPoint.top }} />
               <div className="store-map-hint">Arrastra el mapa o toca para mover el pin</div>
+            </div>
+          )}
+          {showPinHelp && (
+            <div className="store-map-pin-help" role="status">
+              <button type="button" aria-label="Cerrar ayuda" onClick={() => setShowPinHelp(false)}>
+                x
+              </button>
+              <strong>El pin no esta bien ubicado?</strong>
+              <span>Mueve el mapa hasta que el pin quede sobre la entrada donde recibiras el pedido.</span>
             </div>
           )}
           <button
@@ -11029,9 +11221,6 @@ function MapPointPicker({
             Ver punto en Google Maps
           </a>
           <div className="store-map-picker-actions">
-            <button type="button" className="store-button secondary" onClick={onClose}>
-              Cancelar
-            </button>
             <button
               type="button"
               className="store-button"
@@ -11049,13 +11238,17 @@ function MapPointPicker({
                 }
               }}
             >
-              {savingPoint ? 'Confirmando direccion...' : 'Confirmar esta direccion'}
+              {savingPoint ? 'Confirmando direccion...' : 'Continuar'}
             </button>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(pickerContent, document.body)
+    : pickerContent;
 }
 
 function ProfileSheet({
@@ -11067,49 +11260,123 @@ function ProfileSheet({
   onSignOut,
   onRequestDeletion,
 }) {
-  const [profile, setProfile] = useState({
-    nombre: user?.nombre || '',
-    direccion: user?.direccion || '',
-    referencia: user?.referencia || '',
-    ubicacion: user?.ubicacion || null,
-  });
-  const [locating, setLocating] = useState(false);
+  const [profileName, setProfileName] = useState(user?.nombre || '');
+  const [addresses, setAddresses] = useState(() => normalizeStoreAddresses(user || {}));
+  const [addressDraft, setAddressDraft] = useState(null);
+  const [addressLocating, setAddressLocating] = useState(false);
   const [deletionOpen, setDeletionOpen] = useState(false);
   const [deletionReason, setDeletionReason] = useState('');
   const [deletionBusy, setDeletionBusy] = useState(false);
 
-  const updateProfile = (field, value) => {
-    setProfile((current) => ({
+  const updateAddressDraft = (field, value) => {
+    setAddressDraft((current) => ({
       ...current,
       [field]: value,
     }));
   };
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const openAddressEditor = (address = null) => {
+    setAddressDraft(
+      createStoreAddressDraft(
+        address || {
+          nombre: addresses.length === 0 ? 'Casa' : '',
+          predeterminada: addresses.length === 0,
+        }
+      )
+    );
+  };
 
-    if (!profile.nombre.trim() || !profile.direccion.trim() || !hasLocation(profile.ubicacion)) {
-      alert('Nombre, direccion y punto exacto en el mapa son obligatorios.');
+  const saveAddressDraft = () => {
+    if (
+      !String(addressDraft?.nombre || '').trim() ||
+      !String(addressDraft?.direccion || '').trim() ||
+      !hasLocation(addressDraft?.ubicacion)
+    ) {
+      alert('Escribe el nombre, la direccion y confirma el punto exacto en el mapa.');
       return;
     }
 
-    onSave(profile);
+    const nextAddress = createStoreAddressDraft(addressDraft);
+    const alreadyExists = addresses.some((address) => address.id === nextAddress.id);
+    const shouldBeDefault = nextAddress.predeterminada || addresses.length === 0;
+    const nextAddresses = alreadyExists
+      ? addresses.map((address) => (address.id === nextAddress.id ? nextAddress : address))
+      : [...addresses, nextAddress];
+
+    setAddresses(
+      nextAddresses.map((address, index) => ({
+        ...address,
+        predeterminada: shouldBeDefault
+          ? address.id === nextAddress.id
+          : address.predeterminada || (index === 0 && !nextAddresses.some((item) => item.predeterminada)),
+      }))
+    );
+    setAddressDraft(null);
+  };
+
+  const removeAddress = (addressId) => {
+    if (addresses.length <= 1) {
+      alert('Debes conservar al menos una direccion para tus pedidos.');
+      return;
+    }
+
+    const removedAddress = addresses.find((address) => address.id === addressId);
+    if (!window.confirm(`Eliminar ${removedAddress?.nombre || 'esta direccion'}?`)) {
+      return;
+    }
+
+    const nextAddresses = addresses.filter((address) => address.id !== addressId);
+    setAddresses(
+      nextAddresses.map((address, index) => ({
+        ...address,
+        predeterminada: removedAddress?.predeterminada ? index === 0 : address.predeterminada,
+      }))
+    );
+  };
+
+  const setDefaultAddress = (addressId) => {
+    setAddresses((current) =>
+      current.map((address) => ({
+        ...address,
+        predeterminada: address.id === addressId,
+      }))
+    );
+  };
+
+  const handleSubmit = () => {
+    const primaryAddress = addresses.find((address) => address.predeterminada) || addresses[0];
+    if (!profileName.trim() || !primaryAddress || !hasLocation(primaryAddress.ubicacion)) {
+      alert('Nombre y al menos una direccion con punto exacto son obligatorios.');
+      return;
+    }
+
+    onSave({
+      nombre: profileName,
+      nombreDireccion: primaryAddress.nombre,
+      direccion: primaryAddress.direccion,
+      referencia: primaryAddress.referencia,
+      ubicacion: primaryAddress.ubicacion,
+      direccionesGuardadas: addresses,
+    });
   };
 
   const captureProfileLocation = async () => {
-    setLocating(true);
+    setAddressLocating(true);
     try {
       const currentLocation = await getBrowserLocation();
       const location = (await reverseGeocodeLocation(currentLocation)) || currentLocation;
-      updateProfile('ubicacion', location);
-      if (shouldAutofillAddress(profile.direccion)) {
-        updateProfile('direccion', location?.label || 'Ubicacion guardada desde el mapa');
-      }
+      setAddressDraft((current) => ({
+        ...current,
+        ubicacion: location,
+        direccion: shouldAutofillAddress(current?.direccion)
+          ? location?.label || 'Ubicacion guardada desde el mapa'
+          : current?.direccion,
+      }));
     } catch (error) {
       console.error('No se pudo obtener ubicacion:', error);
       alert('No pudimos tomar tu ubicacion. Activa permisos o intenta de nuevo.');
     } finally {
-      setLocating(false);
+      setAddressLocating(false);
     }
   };
 
@@ -11135,56 +11402,138 @@ function ProfileSheet({
 
   return (
     <div className="store-sheet-overlay">
-      <div className="store-sheet">
+      <div className="store-sheet store-profile-address-sheet">
         <div className="store-sheet-head">
-          <StoreBackButton onClick={onClose} />
-          <strong>Mi perfil</strong>
+          <StoreBackButton onClick={addressDraft ? () => setAddressDraft(null) : onClose} />
+          <strong>{addressDraft ? (addresses.some((address) => address.id === addressDraft.id) ? 'Editar direccion' : 'Nueva direccion') : 'Mi perfil'}</strong>
         </div>
 
-        <form className="store-form" onSubmit={handleSubmit}>
-          <input
-            className="store-field"
-            value={profile.nombre}
-            onChange={(event) => updateProfile('nombre', event.target.value)}
-            placeholder="Nombre completo"
-          />
-          <input className="store-field" value={user?.telefono || ''} disabled />
-          <input
-            className="store-field"
-            value={profile.direccion}
-            onChange={(event) => updateProfile('direccion', event.target.value)}
-            placeholder="Direccion de entrega"
-          />
-          <input
-            className="store-field"
-            value={profile.referencia}
-            onChange={(event) => updateProfile('referencia', event.target.value)}
-            placeholder="Ejemplo: Claro 3 1/2 cuadra al lago. Porton negro"
-          />
-          <LocationCaptureBlock
-            location={profile.ubicacion}
-            defaultLocation={defaultLocation}
-            locating={locating}
-            onCapture={captureProfileLocation}
-            onManualLocation={(location) => {
-              updateProfile('ubicacion', location);
-              if (shouldAutofillAddress(profile.direccion)) {
-                updateProfile('direccion', location?.label || 'Ubicacion seleccionada en el mapa');
-              }
-            }}
-            onAddressResolved={(value) => {
-              if (shouldAutofillAddress(profile.direccion)) {
-                updateProfile('direccion', value);
-              }
-            }}
-          />
-          <button type="submit" className="store-button" disabled={saving}>
-            {saving ? 'Guardando...' : 'Guardar perfil'}
-          </button>
-          <button type="button" className="store-button secondary" onClick={onSignOut}>
-            Cerrar sesion
-          </button>
-          <div style={{ borderTop: '1px solid #dbe5ef', marginTop: 8, paddingTop: 16 }}>
+        {addressDraft ? (
+          <div className="store-address-editor store-form">
+            <AddressNameField
+              value={addressDraft.nombre}
+              onChange={(value) => updateAddressDraft('nombre', value)}
+            />
+            <LocationCaptureBlock
+              location={addressDraft.ubicacion}
+              defaultLocation={defaultLocation}
+              locating={addressLocating}
+              onCapture={captureProfileLocation}
+              onManualLocation={(location) => {
+                setAddressDraft((current) => ({
+                  ...current,
+                  ubicacion: location,
+                  direccion: shouldAutofillAddress(current?.direccion)
+                    ? location?.label || 'Ubicacion seleccionada en el mapa'
+                    : current?.direccion,
+                }));
+              }}
+              onAddressResolved={(value) => {
+                setAddressDraft((current) => ({
+                  ...current,
+                  direccion: shouldAutofillAddress(current?.direccion) ? value : current?.direccion,
+                }));
+              }}
+            />
+            <label className="store-field-stack">
+              <span className="store-field-caption">Direccion escrita</span>
+              <textarea
+                className="store-field store-address-textarea"
+                value={addressDraft.direccion}
+                onChange={(event) => updateAddressDraft('direccion', event.target.value)}
+                placeholder="Ej. Residencial, kilometro, calle y numero de casa"
+                maxLength={250}
+              />
+            </label>
+            <label className="store-field-stack">
+              <span className="store-field-caption">Indicaciones de entrega</span>
+              <textarea
+                className="store-field store-address-textarea"
+                value={addressDraft.referencia}
+                onChange={(event) => updateAddressDraft('referencia', event.target.value)}
+                placeholder="Ej. Porton blanco, tocar timbre"
+                maxLength={180}
+              />
+            </label>
+            <button
+              type="button"
+              className={`store-address-default-toggle ${addressDraft.predeterminada ? 'active' : ''}`}
+              aria-pressed={addressDraft.predeterminada}
+              onClick={() => updateAddressDraft('predeterminada', !addressDraft.predeterminada)}
+            >
+              <span>{addressDraft.predeterminada ? '✓' : ''}</span>
+              Usar como direccion principal
+            </button>
+            <button type="button" className="store-button" onClick={saveAddressDraft}>
+              Guardar direccion
+            </button>
+          </div>
+        ) : (
+          <div className="store-profile-address-content">
+            <div className="store-profile-contact-card">
+              <label className="store-field-stack">
+                <span className="store-field-caption">Nombre y apellido</span>
+                <input
+                  className="store-field"
+                  value={profileName}
+                  onChange={(event) => setProfileName(event.target.value)}
+                  placeholder="Nombre completo"
+                />
+              </label>
+              <label className="store-field-stack">
+                <span className="store-field-caption">Numero de contacto</span>
+                <input className="store-field" value={user?.telefono || ''} disabled />
+              </label>
+            </div>
+
+            <section className="store-saved-addresses">
+              <div className="store-saved-addresses-head">
+                <div>
+                  <span>Tus ubicaciones</span>
+                  <h2>Direcciones guardadas</h2>
+                </div>
+                <button type="button" onClick={() => openAddressEditor()}>
+                  + Agregar
+                </button>
+              </div>
+
+              <div className="store-saved-address-list">
+                {addresses.map((address) => (
+                  <article key={address.id} className={`store-saved-address-card ${address.predeterminada ? 'active' : ''}`}>
+                    <span className="store-saved-address-pin"><StoreMapPinGlyph /></span>
+                    <div className="store-saved-address-copy">
+                      <div>
+                        <strong>{address.nombre}</strong>
+                        {address.predeterminada && <small>Principal</small>}
+                      </div>
+                      <p>{address.direccion}</p>
+                      {address.referencia && <span>{address.referencia}</span>}
+                    </div>
+                    <div className="store-saved-address-actions">
+                      {!address.predeterminada && (
+                        <button type="button" onClick={() => setDefaultAddress(address.id)}>
+                          Hacer principal
+                        </button>
+                      )}
+                      <button type="button" onClick={() => openAddressEditor(address)}>Editar</button>
+                      {addresses.length > 1 && (
+                        <button type="button" className="danger" onClick={() => removeAddress(address.id)}>
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <button type="button" className="store-button" disabled={saving} onClick={handleSubmit}>
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+            <button type="button" className="store-button secondary" onClick={onSignOut}>
+              Cerrar sesion
+            </button>
+            <div style={{ borderTop: '1px solid #dbe5ef', marginTop: 8, paddingTop: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <a
                 className="store-button secondary"
@@ -11237,7 +11586,8 @@ function ProfileSheet({
               </div>
             )}
           </div>
-        </form>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -12115,6 +12465,8 @@ function CheckoutSheet({
   customer,
   fulfillmentType,
   deliveryMode,
+  savedAddresses = [],
+  selectedSavedAddress,
   alternateDelivery,
   alternateLocating,
   notes,
@@ -12151,6 +12503,7 @@ function CheckoutSheet({
   onCouponInputChange,
   onFulfillmentTypeChange,
   onDeliveryModeChange,
+  onSavedAddressSelect,
   onEditProfile,
   onNotesChange,
   onOpenLogin,
@@ -12184,20 +12537,6 @@ function CheckoutSheet({
       icon: 'pickup',
       title: 'Pickup',
       detail: 'Retirar en tienda',
-    },
-  ];
-  const addressChoices = [
-    {
-      value: 'perfil',
-      icon: 'home',
-      title: 'Mi direccion',
-      detail: 'Usar guardada',
-    },
-    {
-      value: 'otra',
-      icon: 'pin',
-      title: 'Otra',
-      detail: 'Nueva entrega',
     },
   ];
   const paymentChoices = STORE_PAYMENT_OPTIONS.map(getPaymentMeta);
@@ -12706,36 +13045,53 @@ function CheckoutSheet({
                     <div className="store-choice-section compact">
                       <div className="store-choice-title">
                         <StoreCheckoutIcon name="pin" />
-                        <span>Direccion</span>
+                        <span>Donde lo recibes?</span>
                       </div>
-                      <div className="store-choice-grid two">
-                        {addressChoices.map((choice) => (
+                      <div className="store-checkout-address-options">
+                        {savedAddresses.map((address) => (
                           <button
-                            key={choice.value}
+                            key={address.id}
                             type="button"
-                            className={`store-choice-card mini ${deliveryMode === choice.value ? 'active' : ''}`}
-                            aria-pressed={deliveryMode === choice.value}
-                            onClick={() => onDeliveryModeChange(choice.value)}
+                            className={`store-checkout-address-option ${deliveryMode === 'perfil' && selectedSavedAddress?.id === address.id ? 'active' : ''}`}
+                            aria-pressed={deliveryMode === 'perfil' && selectedSavedAddress?.id === address.id}
+                            onClick={() => onSavedAddressSelect(address.id)}
                           >
-                            <StoreCheckoutIcon name={choice.icon} />
-                            <strong>{choice.title}</strong>
-                            <span>{choice.detail}</span>
+                            <StoreCheckoutIcon name="home" />
+                            <span>
+                              <strong>{address.nombre}</strong>
+                              <small>{address.direccion}</small>
+                            </span>
+                            {address.predeterminada && <em>Principal</em>}
                           </button>
                         ))}
+                        <button
+                          type="button"
+                          className={`store-checkout-address-option add ${deliveryMode === 'otra' ? 'active' : ''}`}
+                          aria-pressed={deliveryMode === 'otra'}
+                          onClick={() => onDeliveryModeChange('otra')}
+                        >
+                          <StoreCheckoutIcon name="pin" />
+                          <span>
+                            <strong>Otra direccion</strong>
+                            <small>Usar solo para este pedido</small>
+                          </span>
+                        </button>
                       </div>
                     </div>
 
                     {deliveryMode === 'perfil' ? (
                       <div className="store-status-card" style={{ marginTop: 0 }}>
-                        <div className="store-status-pill">Entrega</div>
+                        <div className="store-status-pill">{selectedSavedAddress?.nombre || 'Entrega'}</div>
                         <h3 style={{ margin: '10px 0 4px' }}>{currentUser.nombre}</h3>
                         <div style={{ color: '#6b7280', lineHeight: 1.5 }}>
                           {currentUser.telefono}
                           <br />
-                          {currentUser.direccion}
-                          {currentUser.referencia ? ` | Ref: ${currentUser.referencia}` : ''}
+                          {selectedSavedAddress?.direccion || currentUser.direccion}
+                          {(selectedSavedAddress?.referencia || currentUser.referencia)
+                            ? ` | Ref: ${selectedSavedAddress?.referencia || currentUser.referencia}`
+                            : ''}
                         </div>
-                        {!hasLocation(currentUser.ubicacion) && (
+                        {!hasLocation(selectedSavedAddress?.ubicacion || currentUser.ubicacion) && (
                           <div className="store-location-feedback error" style={{ marginTop: 10 }}>
                             Debes guardar el punto exacto del mapa en tu perfil antes de pedir.
                           </div>
@@ -12746,7 +13102,7 @@ function CheckoutSheet({
                           style={{ marginTop: 10 }}
                           onClick={onEditProfile}
                         >
-                          Editar mi direccion
+                          Administrar mis direcciones
                         </button>
                       </div>
                     ) : (

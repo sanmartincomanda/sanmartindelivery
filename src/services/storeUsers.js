@@ -15,6 +15,11 @@ import {
 import { normalizeBirthdayValue } from './customerBirthday';
 import { setClientDirectoryEntry } from './clientDirectory';
 import { ensureStoreWelcomeCouponForUser } from './storeWelcomeCoupon';
+import {
+  getDefaultStoreAddress,
+  normalizeStoreAddresses,
+  serializeStoreAddresses,
+} from './storeAddresses';
 
 export const STORE_USERS_PATH = 'storeUsers';
 
@@ -119,6 +124,7 @@ export const sanitizeStoreUser = (user, key) => {
   const { passwordHash, ...safeUser } = user;
   return {
     ...safeUser,
+    direccionesGuardadas: normalizeStoreAddresses(safeUser),
     key,
     hasPassword: Boolean(passwordHash),
   };
@@ -224,6 +230,8 @@ export async function ensureStoreUser({
   telefono,
   direccion,
   referencia,
+  nombreDireccion,
+  direccionesGuardadas,
   fechaCumpleanos,
   fechaNacimiento,
   passwordHash,
@@ -234,7 +242,7 @@ export async function ensureStoreUser({
   const cleanEmail = cleanStoreEmail(email);
   const userKey = String(authUid || getCurrentAuthUser()?.uid || '').trim() || getStoreUserKey(cleanPhone);
 
-  if (!userKey || !String(nombre || '').trim() || !cleanPhone || !String(direccion || '').trim()) {
+  if (!userKey || !String(nombre || '').trim() || !cleanPhone) {
     throw new Error('Datos de cliente incompletos');
   }
 
@@ -242,12 +250,25 @@ export async function ensureStoreUser({
   const userRef = ref(database, `${STORE_USERS_PATH}/${userKey}`);
   const userSnapshot = await get(userRef);
   const existingUser = userSnapshot.val();
-  const normalizedLocation = normalizeLocation(ubicacion) || normalizeLocation(existingUser?.ubicacion);
+  const normalizedAddresses = normalizeStoreAddresses({
+    direccionesGuardadas:
+      direccionesGuardadas !== undefined
+        ? direccionesGuardadas
+        : existingUser?.direccionesGuardadas,
+    nombreDireccion: nombreDireccion || existingUser?.nombreDireccion,
+    direccion: direccion ?? existingUser?.direccion,
+    referencia: referencia ?? existingUser?.referencia,
+    ubicacion: ubicacion ?? existingUser?.ubicacion,
+    createdAt: existingUser?.createdAt,
+    updatedAt: now,
+  });
+  const primaryAddress = getDefaultStoreAddress({ direccionesGuardadas: normalizedAddresses });
+  const normalizedLocation = normalizeLocation(primaryAddress?.ubicacion);
   const normalizedBirthday = normalizeBirthdayValue(
     fechaCumpleanos || fechaNacimiento || existingUser?.fechaCumpleanos || existingUser?.fechaNacimiento
   );
 
-  if (!hasLocation(normalizedLocation)) {
+  if (!primaryAddress?.direccion || !hasLocation(normalizedLocation)) {
     const error = new Error('Ubicacion exacta requerida');
     error.code = 'LOCATION_REQUIRED';
     throw error;
@@ -264,8 +285,10 @@ export async function ensureStoreUser({
     nombre: String(nombre || '').trim(),
     email: cleanEmail,
     telefono: cleanPhone,
-    direccion: String(direccion || '').trim(),
-    referencia: String(referencia || '').trim(),
+    direccion: primaryAddress.direccion,
+    referencia: primaryAddress.referencia,
+    nombreDireccion: primaryAddress.nombre,
+    direccionesGuardadas: serializeStoreAddresses(normalizedAddresses),
     fechaCumpleanos: normalizedBirthday,
     ubicacion: normalizedLocation,
     codigo: resolvedClientCode,
@@ -327,13 +350,14 @@ export async function ensureStoreUser({
 
   return {
     ...profile,
+    direccionesGuardadas: normalizedAddresses,
     key: userKey,
     clientKey,
   };
 }
 
-export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, fechaCumpleanos, password, ubicacion }) {
-  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, fechaCumpleanos, password, ubicacion });
+export async function registerStoreUser({ nombre, email, telefono, direccion, referencia, nombreDireccion, fechaCumpleanos, password, ubicacion }) {
+  return registerStoreUserWithEmail({ nombre, email, telefono, direccion, referencia, nombreDireccion, fechaCumpleanos, password, ubicacion });
 }
 
 export async function registerStoreUserWithEmail({
@@ -342,6 +366,7 @@ export async function registerStoreUserWithEmail({
   telefono,
   direccion,
   referencia,
+  nombreDireccion,
   fechaCumpleanos,
   password,
   ubicacion,
@@ -395,6 +420,7 @@ export async function registerStoreUserWithEmail({
     telefono: cleanPhone,
     direccion,
     referencia,
+    nombreDireccion,
     fechaCumpleanos,
     ubicacion,
     passwordHash,
@@ -595,6 +621,7 @@ export async function completeExistingStoreUserProfile({
   telefono,
   direccion,
   referencia,
+  nombreDireccion,
   fechaCumpleanos,
   ubicacion,
   provider = 'google',
@@ -622,6 +649,7 @@ export async function completeExistingStoreUserProfile({
     telefono: cleanPhone,
     direccion,
     referencia,
+    nombreDireccion,
     fechaCumpleanos,
     ubicacion,
     authUid: authUser.uid,
@@ -660,6 +688,8 @@ export async function updateStoreUserProfile(user, patch) {
     telefono: currentUser.telefono,
     direccion: patch.direccion ?? currentUser.direccion,
     referencia: patch.referencia ?? currentUser.referencia,
+    nombreDireccion: patch.nombreDireccion ?? currentUser.nombreDireccion,
+    direccionesGuardadas: patch.direccionesGuardadas ?? currentUser.direccionesGuardadas,
     fechaCumpleanos: patch.fechaCumpleanos ?? currentUser.fechaCumpleanos ?? currentUser.fechaNacimiento,
     ubicacion: patch.ubicacion ?? currentUser.ubicacion,
     authUid: currentUser.key || getCurrentAuthUser()?.uid,
