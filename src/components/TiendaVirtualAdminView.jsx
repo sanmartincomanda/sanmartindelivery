@@ -2,7 +2,12 @@ import React from 'react';
 import ConfiguracionView from './ConfiguracionView';
 import BranchStoreAdminView from './BranchStoreAdminView';
 
-export default function TiendaVirtualAdminView({ branchScope = null, username = '' }) {
+export default function TiendaVirtualAdminView({
+  branchScope = null,
+  username = '',
+  initialSection = 'resumen',
+  navigationScope = 'storefront',
+}) {
   if (branchScope?.id) {
     return (
       <BranchStoreAdminView
@@ -13,5 +18,11 @@ export default function TiendaVirtualAdminView({ branchScope = null, username = 
     );
   }
 
-  return <ConfiguracionView mode="store" />;
+  return (
+    <ConfiguracionView
+      mode="store"
+      initialSection={initialSection}
+      navigationScope={navigationScope}
+    />
+  );
 }

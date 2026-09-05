@@ -358,8 +358,12 @@ const buildHistoryExportRows = (orders) =>
     PedidoDetalle: (order.pedido || '').replace(/\n/g, ' '),
   }));
 
-export default function BaseDatosView({ clientes = [] }) {
-  const [section, setSection] = useState('clientes');
+export default function BaseDatosView({
+  clientes = [],
+  initialSection = 'clientes',
+  showModuleNav = true,
+}) {
+  const [section, setSection] = useState(initialSection);
   const [toast, setToast] = useState(null);
   const [historyOrders, setHistoryOrders] = useState([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -369,6 +373,10 @@ export default function BaseDatosView({ clientes = [] }) {
     dateFrom: shiftIsoDate(hoyISO(), -7),
     dateTo: hoyISO(),
   }));
+
+  useEffect(() => {
+    setSection(initialSection);
+  }, [initialSection]);
 
   useEffect(() => {
     if (!toast) {
@@ -473,6 +481,7 @@ export default function BaseDatosView({ clientes = [] }) {
 
   return (
     <div
+      className={`admin-data-module${showModuleNav ? '' : ' is-embedded'}`}
       style={{
         minHeight: '100vh',
         background:
@@ -619,8 +628,8 @@ export default function BaseDatosView({ clientes = [] }) {
         </div>
       )}
 
-      <div className="bd-layout" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '24px' }}>
-        <aside
+      <div className={`bd-layout${showModuleNav ? '' : ' bd-layout--single'}`} style={{ display: 'grid', gridTemplateColumns: showModuleNav ? '280px 1fr' : '1fr', gap: showModuleNav ? '24px' : 0 }}>
+        {showModuleNav && <aside
           className="bd-glass bd-sidebar bd-animate"
           style={{
             borderRadius: '28px',
@@ -705,7 +714,7 @@ export default function BaseDatosView({ clientes = [] }) {
               {historySyncAt ? `Ultima sincronizacion: ${formatDateTimeLabel(historySyncAt)}` : 'Historial aun no sincronizado'}
             </div>
           </div>
-        </aside>
+        </aside>}
 
         <main
           className="bd-glass bd-animate"
@@ -716,7 +725,7 @@ export default function BaseDatosView({ clientes = [] }) {
             boxShadow: '0 28px 50px rgba(15, 23, 42, 0.22)',
           }}
         >
-          <div className="bd-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: '18px', marginBottom: '26px' }}>
+          {showModuleNav && <div className="bd-hero-grid" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: '18px', marginBottom: '26px' }}>
             <div
               style={{
                 padding: '24px',
@@ -754,7 +763,7 @@ export default function BaseDatosView({ clientes = [] }) {
                 {new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
-          </div>
+          </div>}
 
           {section === 'clientes' ? (
             <ClientesManager clientes={clientes} onToast={showToast} />

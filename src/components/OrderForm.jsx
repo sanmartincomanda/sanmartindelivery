@@ -442,6 +442,7 @@ export default function OrderForm({
 
   return (
     <div
+      className="admin-order-console"
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -468,7 +469,7 @@ export default function OrderForm({
       `}</style>
 
       <div
-        className="animate-slideIn"
+        className="animate-slideIn admin-order-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -571,8 +572,9 @@ export default function OrderForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
+      <form className="admin-order-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
         <div
+          className="admin-order-layout"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
@@ -580,7 +582,7 @@ export default function OrderForm({
           }}
         >
           <div
-            className="animate-slideUp card-hover"
+            className="animate-slideUp card-hover admin-order-panel admin-order-panel--setup"
             style={{
               background: 'rgba(255,255,255,0.05)',
               borderRadius: '24px',
@@ -788,7 +790,7 @@ export default function OrderForm({
           </div>
 
           <div
-            className="animate-slideUp card-hover"
+            className="animate-slideUp card-hover admin-order-panel admin-order-panel--client"
             style={{
               background: 'rgba(255,255,255,0.05)',
               borderRadius: '24px',
@@ -1139,7 +1141,7 @@ export default function OrderForm({
         </div>
 
         <div
-          className="animate-slideUp card-hover"
+          className="animate-slideUp card-hover admin-order-panel admin-order-panel--detail"
           style={{
             background: 'rgba(255,255,255,0.05)',
             borderRadius: '24px',

@@ -479,7 +479,7 @@ export default function ListaPedidos({ pedidos = [] }) {
   };
 
   return (
-    <div style={{
+    <div className="admin-orders-page" style={{
       minHeight: '100vh',
       background: LIST_THEME.darkGradient,
       padding: '24px',
@@ -742,7 +742,7 @@ export default function ListaPedidos({ pedidos = [] }) {
       )}
 
       {/* Header */}
-      <div style={{
+      <div className="admin-orders-header" style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -829,7 +829,7 @@ export default function ListaPedidos({ pedidos = [] }) {
       </div>
 
       {/* Stats Bar */}
-      <div style={{
+      <div className="admin-orders-stats" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
         gap: '16px',
@@ -883,18 +883,17 @@ export default function ListaPedidos({ pedidos = [] }) {
 
       {/* Orders Grid */}
       {pedidosOrdenados.length === 0 ? (
-        <div style={{
+        <div className="admin-operation-empty" style={{
           textAlign: 'center',
           padding: '60px 20px',
           opacity: 0.5,
           animation: 'slideIn 0.5s ease-out'
         }}>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>📋</div>
           <h3 style={{ fontSize: '24px', margin: 0 }}>No hay pedidos en este filtro</h3>
           <p>Los pedidos aparecerán aquí automáticamente</p>
         </div>
       ) : (
-        <div style={{
+        <div className="admin-orders-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))',
           gap: '24px'
@@ -910,7 +909,7 @@ export default function ListaPedidos({ pedidos = [] }) {
             return (
               <div
                 key={pedido.firebaseKey}
-                className={`card-enter card-transition ${isAnimating ? 'card-transition' : ''}`}
+                className={`admin-order-card card-enter card-transition ${isAnimating ? 'card-transition' : ''}`}
                 style={{
                   background: config.bg,
                   borderRadius: '28px',

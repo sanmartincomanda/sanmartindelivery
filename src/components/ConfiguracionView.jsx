@@ -161,6 +161,16 @@ const COUPONS_PIN = '210397';
 
 const STORE_ADMIN_GROUPS = [
   {
+    id: 'storefront',
+    label: 'Tienda',
+    desktopLabel: 'Tienda virtual',
+    icon: 'branches',
+    sections: [
+      { id: 'resumen', label: 'Resumen' },
+      { id: 'sucursales', label: 'Sucursales y entrega' },
+    ],
+  },
+  {
     id: 'catalogo_maestro',
     label: 'Catalogo',
     desktopLabel: 'Catalogo maestro',
@@ -193,11 +203,8 @@ const STORE_ADMIN_GROUPS = [
     desktopLabel: 'Beneficios',
     icon: 'benefits',
     sections: [
-      { id: 'promos_tienda', label: 'Promos tienda' },
-      { id: 'popup_ads', label: 'Popup ads' },
       { id: 'descuentos', label: 'Descuentos' },
       { id: 'recompensas', label: 'Recompensas' },
-      { id: 'cupones', label: 'Cupones' },
     ],
   },
   {
@@ -205,13 +212,57 @@ const STORE_ADMIN_GROUPS = [
     label: 'Marketing',
     desktopLabel: 'Marketing',
     icon: 'marketing',
-    sections: [{ id: 'regalias', label: 'Regalias' }],
+    sections: [
+      { id: 'promos_tienda', label: 'Promociones' },
+      { id: 'popup_ads', label: 'Anuncios popup' },
+      { id: 'cupones', label: 'Cupones' },
+      { id: 'regalias', label: 'Regalias' },
+    ],
   },
 ];
 
-const getStoreAdminGroup = (section = '') =>
-  STORE_ADMIN_GROUPS.find((group) => group.sections.some((item) => item.id === section)) ||
-  STORE_ADMIN_GROUPS[0];
+const STORE_ADMIN_SCOPES = {
+  catalogo: {
+    label: 'Catalogo',
+    sections: [
+      { id: 'catalogo', label: 'Articulos' },
+      { id: 'categorias', label: 'Categorias' },
+    ],
+  },
+  storefront: {
+    label: 'Tienda virtual',
+    sections: [
+      { id: 'resumen', label: 'Resumen' },
+      { id: 'sucursales', label: 'Sucursales y entrega' },
+      { id: 'categorias', label: 'Presentacion de categorias' },
+    ],
+  },
+  marketing: {
+    label: 'Marketing',
+    sections: [
+      { id: 'promos_tienda', label: 'Promociones' },
+      { id: 'popup_ads', label: 'Anuncios popup' },
+      { id: 'cupones', label: 'Cupones' },
+      { id: 'regalias', label: 'Regalias' },
+    ],
+  },
+  beneficios: {
+    label: 'Beneficios',
+    sections: [
+      { id: 'recompensas', label: 'Recompensas' },
+      { id: 'descuentos', label: 'Descuentos' },
+    ],
+  },
+};
+
+const getScopedStoreAdminGroups = (scope = 'all') => {
+  const scopedGroup = STORE_ADMIN_SCOPES[scope];
+  if (!scopedGroup) return STORE_ADMIN_GROUPS;
+  return [{ id: scope, label: scopedGroup.label, desktopLabel: scopedGroup.label, icon: 'catalog', sections: scopedGroup.sections }];
+};
+
+const getStoreAdminGroup = (section = '', groups = STORE_ADMIN_GROUPS) =>
+  groups.find((group) => group.sections.some((item) => item.id === section)) || groups[0];
 
 function StoreAdminIcon({ name }) {
   const paths = {
@@ -254,6 +305,61 @@ function StoreAdminIcon({ name }) {
         {paths[name] || paths.catalog}
       </g>
     </svg>
+  );
+}
+
+function StorefrontAdminOverview({ products = [], categories = [], popupAds = [], onNavigate }) {
+  const visibleProducts = products.filter((product) => product.active !== false);
+  const activeCategories = categories.filter((category) => category.active !== false);
+  const productsWithoutImage = visibleProducts.filter((product) => !String(product.image || '').trim());
+  const productsWithoutPrice = visibleProducts.filter((product) => Number(product.price || 0) <= 0);
+  const activeAds = popupAds.filter((ad) => ad.active !== false);
+
+  const metrics = [
+    { label: 'Productos visibles', value: visibleProducts.length, tone: 'blue' },
+    { label: 'Categorias activas', value: activeCategories.length, tone: 'blue' },
+    { label: 'Sin fotografia', value: productsWithoutImage.length, tone: productsWithoutImage.length ? 'amber' : 'green' },
+    { label: 'Sin precio', value: productsWithoutPrice.length, tone: productsWithoutPrice.length ? 'red' : 'green' },
+    { label: 'Anuncios configurados', value: activeAds.length, tone: 'blue' },
+  ];
+
+  return (
+    <div className="storefront-overview">
+      <section className="storefront-overview-status">
+        <div>
+          <span className="storefront-overview-kicker">Preparacion del storefront</span>
+          <h2>Estado del contenido visible</h2>
+          <p>Resumen construido con la informacion real disponible en catalogo. La publicacion y los servicios se conservan en sus controles actuales.</p>
+        </div>
+        <button type="button" className="cfg-button secondary" onClick={() => onNavigate('sucursales')}>
+          Revisar sucursales
+        </button>
+      </section>
+
+      <section className="storefront-overview-metrics" aria-label="Estado del catalogo de la tienda">
+        {metrics.map((metric) => (
+          <article className={`storefront-overview-metric tone-${metric.tone}`} key={metric.label}>
+            <i />
+            <span><small>{metric.label}</small><strong>{metric.value}</strong></span>
+          </article>
+        ))}
+      </section>
+
+      <section className="storefront-overview-actions">
+        <button type="button" onClick={() => onNavigate('categorias')}>
+          <span><strong>Presentacion de categorias</strong><small>Orden, imagenes y navegacion que ve el cliente</small></span>
+          <span aria-hidden="true">›</span>
+        </button>
+        <button type="button" onClick={() => onNavigate('sucursales')}>
+          <span><strong>Sucursales y entrega</strong><small>Horarios, cobertura, tarifas y responsables</small></span>
+          <span aria-hidden="true">›</span>
+        </button>
+      </section>
+
+      <p className="storefront-overview-note">
+        No se muestra un estado de publicacion o conexion SICAR hasta que esos datos tengan una fuente autoritativa comun en el backend.
+      </p>
+    </div>
   );
 }
 
@@ -641,9 +747,19 @@ const cropCatalogImage = async ({
   return canvas.toDataURL('image/jpeg', 0.9);
 };
 
-export default function ConfiguracionView({ mode = 'users' }) {
+export default function ConfiguracionView({
+  mode = 'users',
+  initialSection = '',
+  navigationScope = 'all',
+  username = '',
+}) {
   const isStoreMode = mode === 'store';
-  const [section, setSection] = useState(() => (isStoreMode ? 'catalogo' : 'usuarios'));
+  const scopedStoreGroups = useMemo(
+    () => getScopedStoreAdminGroups(navigationScope),
+    [navigationScope]
+  );
+  const defaultSection = initialSection || (isStoreMode ? scopedStoreGroups[0]?.sections[0]?.id || 'catalogo' : 'usuarios');
+  const [section, setSection] = useState(defaultSection);
   const [usersTab, setUsersTab] = useState('administrativo');
   const [products, setProducts] = useState(() =>
     getInitialConfigCollection(
@@ -747,8 +863,9 @@ export default function ConfiguracionView({ mode = 'users' }) {
   const [productEditorOpen, setProductEditorOpen] = useState(false);
 
   useEffect(() => {
-    setSection(isStoreMode ? 'catalogo' : 'usuarios');
-  }, [isStoreMode]);
+    const nextSection = initialSection || (isStoreMode ? scopedStoreGroups[0]?.sections[0]?.id || 'catalogo' : 'usuarios');
+    setSection(nextSection);
+  }, [initialSection, isStoreMode, scopedStoreGroups]);
 
   useEffect(() => {
     if (isStoreMode && section === 'entrega') {
@@ -757,7 +874,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || !['catalogo', 'categorias', 'recompensas', 'promos_tienda'].includes(section)) {
+    if (!isStoreMode || !['resumen', 'catalogo', 'categorias', 'recompensas', 'promos_tienda'].includes(section)) {
       return undefined;
     }
 
@@ -879,7 +996,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || section !== 'popup_ads') {
+    if (!isStoreMode || !['resumen', 'popup_ads'].includes(section)) {
       return undefined;
     }
 
@@ -2477,7 +2594,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
     }
   };
 
-  const activeStoreGroup = getStoreAdminGroup(section);
+  const activeStoreGroup = getStoreAdminGroup(section, scopedStoreGroups);
 
   const sectionMeta = isStoreMode
     ? {
@@ -2542,6 +2659,12 @@ export default function ConfiguracionView({ mode = 'users' }) {
         path: 'Admintv / Configuracion',
         title: 'Configuracion',
       };
+  const visibleSectionMeta = isStoreMode && navigationScope !== 'all'
+    ? {
+        ...sectionMeta,
+        path: `${STORE_ADMIN_SCOPES[navigationScope]?.label || 'Administracion'} / ${sectionMeta.title}`,
+      }
+    : sectionMeta;
 
   return (
     <div
@@ -2744,7 +2867,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
         }
       `}</style>
 
-      <div className={`cfg-shell ${isStoreMode ? 'store-admin-v2' : ''}`}>
+      <div className={`cfg-shell ${isStoreMode ? `store-admin-v2 store-admin-v2--${navigationScope}` : ''}`}>
         <div className={isStoreMode ? 'store-admin-header' : ''} style={isStoreMode ? undefined : { display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div className={isStoreMode ? 'store-admin-heading' : ''}>
             {isStoreMode && (
@@ -2754,10 +2877,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
             )}
             <div className={isStoreMode ? 'store-admin-heading-copy' : ''}>
             <div className={isStoreMode ? 'store-admin-breadcrumb' : ''} style={isStoreMode ? undefined : { color: '#64748b', fontSize: 13, fontWeight: 900 }}>
-              {sectionMeta.path}
+              {visibleSectionMeta.path}
             </div>
             <h1 style={isStoreMode ? undefined : { margin: '6px 0 0', fontSize: 30 }}>
-              {sectionMeta.title}
+              {visibleSectionMeta.title}
             </h1>
             </div>
           </div>
@@ -2840,10 +2963,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           </div>
         )}
 
-        {isStoreMode && (
+        {isStoreMode && navigationScope === 'all' && (
           <>
             <nav className="store-admin-primary-nav" aria-label="Modulos de Tienda Virtual">
-              {STORE_ADMIN_GROUPS.map((group) => {
+              {scopedStoreGroups.map((group) => {
                 const isActive = activeStoreGroup.id === group.id;
                 return (
                   <button
@@ -2864,23 +2987,33 @@ export default function ConfiguracionView({ mode = 'users' }) {
                 );
               })}
             </nav>
-            <nav className="store-admin-secondary-nav" aria-label={`Opciones de ${activeStoreGroup.desktopLabel}`}>
-              {activeStoreGroup.sections.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`store-admin-secondary-tab ${section === item.id ? 'active' : ''}`}
-                  onClick={() => setSection(item.id)}
-                  aria-current={section === item.id ? 'page' : undefined}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
           </>
         )}
 
-        {isStoreMode && section === 'categorias' ? (
+        {isStoreMode && activeStoreGroup?.sections.length > 1 && (
+          <nav className="store-admin-secondary-nav" aria-label={`Opciones de ${activeStoreGroup.desktopLabel}`}>
+            {activeStoreGroup.sections.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`store-admin-secondary-tab ${section === item.id ? 'active' : ''}`}
+                onClick={() => setSection(item.id)}
+                aria-current={section === item.id ? 'page' : undefined}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        )}
+
+        {isStoreMode && section === 'resumen' ? (
+          <StorefrontAdminOverview
+            products={products}
+            categories={categories}
+            popupAds={popupAds}
+            onNavigate={setSection}
+          />
+        ) : isStoreMode && section === 'categorias' ? (
           <section className="cfg-section-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
@@ -3405,6 +3538,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
           <StoreCustomerDiscountsAdminSection storeUsers={storeUsers} />
         ) : (
           <UsersManager
+            currentUsername={username}
             usersTab={usersTab}
             setUsersTab={setUsersTab}
             kitchenUser={kitchenUser}
@@ -6741,6 +6875,7 @@ function CouponsManager({
 }
 
 function UsersManager({
+  currentUsername,
   usersTab,
   setUsersTab,
   kitchenUser,
@@ -6832,7 +6967,7 @@ function UsersManager({
               Este espacio queda separado para los usuarios del sistema administrativo.
             </p>
             <div style={{ marginTop: 14, color: '#0f172a', fontWeight: 900 }}>
-              Usuario actual: delivery
+              Usuario actual: {currentUsername || 'Administrador'}
             </div>
           </div>
           <div
@@ -6846,8 +6981,8 @@ function UsersManager({
               fontWeight: 700,
             }}
           >
-            En esta etapa dejamos listo el modulo administrativo separado. El control completo de clientes
-            ahora se gestiona dentro de Tienda Virtual, en su propia pestana Clientes.
+            El directorio de consumidores se gestiona desde el modulo Clientes. Los roles y permisos
+            administrativos siguen siendo validados por la autoridad actual del backend.
           </div>
         </div>
       ) : usersTab === 'cocina' ? (

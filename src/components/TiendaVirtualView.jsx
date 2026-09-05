@@ -191,6 +191,7 @@ import '../styles/storefrontPublic.css';
 import '../styles/storefrontCustomerApp.css';
 import '../styles/storefrontBrand2026.css';
 import '../styles/storefrontCategoryIcons.css';
+import '../styles/storefrontRefinement2026.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
@@ -1509,7 +1510,6 @@ export default function TiendaVirtualView({
   const [firstOrderGiftCelebrate, setFirstOrderGiftCelebrate] = useState(false);
   const [storeClosedNoticeOpen, setStoreClosedNoticeOpen] = useState(false);
   const [registerCoverageNotice, setRegisterCoverageNotice] = useState(null);
-  const [storeClosedNoticeDismissed, setStoreClosedNoticeDismissed] = useState(false);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
@@ -3078,16 +3078,10 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (storeOperationStatus?.open === false && !storeClosedNoticeDismissed) {
-      setStoreClosedNoticeOpen(true);
-      return;
-    }
-
     if (storeOperationStatus?.open !== false) {
       setStoreClosedNoticeOpen(false);
-      setStoreClosedNoticeDismissed(false);
     }
-  }, [deliverySettingsReady, storeClosedNoticeDismissed, storeOperationStatus?.open]);
+  }, [deliverySettingsReady, storeOperationStatus?.open]);
 
   const cartCount = cartItems.length;
 
@@ -9675,6 +9669,24 @@ export default function TiendaVirtualView({
           </label>
         </header>
 
+        {deliverySettingsReady && storeOperationStatus?.open === false && (
+          <section className="store-closed-inline" role="status" aria-label="Estado de la tienda">
+            <span className="store-closed-inline-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+                <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="store-closed-inline-copy">
+              <strong>Cerrado ahora</strong>
+              <span>Puedes explorar productos y preparar tu carrito.</span>
+            </span>
+            <button type="button" onClick={() => setStoreClosedNoticeOpen(true)}>
+              Ver horario
+            </button>
+          </section>
+        )}
+
         {showMobileBottomNav && mobileNavSection === 'categories' ? (
           <StoreMobileCategoriesPage
             categories={categoryOptions}
@@ -10110,7 +10122,6 @@ export default function TiendaVirtualView({
         <StoreClosedNoticeModal
           scheduleRows={storeOperationScheduleRows}
           onClose={() => {
-            setStoreClosedNoticeDismissed(true);
             setStoreClosedNoticeOpen(false);
           }}
         />
@@ -10619,6 +10630,8 @@ function StoreAuthView({
             value={authForm.nombre}
             onChange={(event) => onFormChange('nombre', event.target.value)}
             placeholder="Nombre completo"
+            aria-label="Nombre completo"
+            autoComplete="name"
             required
           />
         )}
@@ -10630,6 +10643,7 @@ function StoreAuthView({
           placeholder={isRegister ? 'Correo electronico' : 'Correo o telefono'}
           disabled={isAuthProfileCompletion}
           autoComplete={isRegister ? 'email' : 'username'}
+          aria-label={isRegister ? 'Correo electronico' : 'Correo o telefono'}
           required
         />
         {isRegister && (
@@ -10638,6 +10652,8 @@ function StoreAuthView({
             value={authForm.telefono}
             onChange={(event) => onFormChange('telefono', event.target.value)}
             placeholder="Telefono o WhatsApp"
+            aria-label="Telefono o WhatsApp"
+            autoComplete="tel"
             required
           />
         )}
@@ -10649,6 +10665,8 @@ function StoreAuthView({
               value={authForm.password}
               onChange={(event) => onFormChange('password', event.target.value)}
               placeholder="Contrasena"
+              aria-label="Contrasena"
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
               required
             />
             {!isRegister && (
@@ -10670,6 +10688,8 @@ function StoreAuthView({
             value={authForm.confirmPassword}
             onChange={(event) => onFormChange('confirmPassword', event.target.value)}
             placeholder="Confirmar contrasena"
+            aria-label="Confirmar contrasena"
+            autoComplete="new-password"
             required
           />
         )}
@@ -12352,18 +12372,9 @@ function StoreMobileCategoriesPage({
         <div className="store-mobile-page-head">
           <StoreBackButton onClick={() => setDrilldownCategoryId('')} label="Categorias" />
           <div className="store-mobile-page-title">
+            <span>{selectedCategoryCount} productos</span>
             <h2>{selectedCategory.label}</h2>
           </div>
-        </div>
-
-        <div className="store-mobile-category-drilldown-hero">
-          <span className="store-mobile-category-icon" aria-hidden="true">
-            <StoreCategoryIcon category={selectedCategory} />
-          </span>
-          <span className="store-mobile-category-tile-copy">
-            <strong>{selectedCategory.label}</strong>
-            <span>{selectedCategoryCount} productos</span>
-          </span>
         </div>
 
         <div className="store-mobile-page-card store-mobile-subcategory-panel">
@@ -13715,84 +13726,49 @@ function OrderSuccessSheet({ onClose }) {
 function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 240,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 18,
-        background: 'rgba(15, 23, 42, 0.56)',
-        backdropFilter: 'blur(8px)',
-      }}
+      className="store-closed-sheet-overlay"
       onClick={onClose}
+      role="presentation"
     >
       <div
-        style={{
-          width: 'min(460px, 100%)',
-          borderRadius: 28,
-          border: '1px solid rgba(15, 23, 42, 0.08)',
-          background: '#ffffff',
-          boxShadow: '0 32px 90px rgba(15, 23, 42, 0.28)',
-          padding: '24px 22px 20px',
-          display: 'grid',
-          gap: 16,
-        }}
+        className="store-closed-sheet"
         onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="store-closed-title"
       >
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 54,
-              height: 54,
-              borderRadius: 20,
-              background: 'linear-gradient(135deg, rgba(190, 24, 93, 0.12) 0%, rgba(239, 68, 68, 0.22) 100%)',
-              color: '#b91c1c',
-              fontSize: 28,
-              fontWeight: 900,
-            }}
-          >
-            !
+        <span className="store-closed-sheet-handle" aria-hidden="true" />
+        <div className="store-closed-sheet-head">
+          <div className="store-closed-sheet-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 7.5V12l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
           </div>
-          <h2 style={{ margin: 0, fontSize: '1.8rem', lineHeight: 1, color: '#0f172a' }}>Tienda Cerrada</h2>
-          <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.55 }}>
-            Horario de atencion:
-          </p>
+          <div>
+            <span>Horario de atencion</span>
+            <h2 id="store-closed-title">Cerrado por ahora</h2>
+            <p>Puedes explorar productos y preparar tu carrito.</p>
+          </div>
+          <button type="button" className="store-closed-sheet-close" onClick={onClose} aria-label="Cerrar horario">
+            x
+          </button>
         </div>
 
-        <div
-          style={{
-            borderRadius: 20,
-            border: '1px solid rgba(15, 59, 130, 0.08)',
-            background: 'linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)',
-            padding: 16,
-            display: 'grid',
-            gap: 10,
-          }}
-        >
+        <div className="store-closed-schedule">
           {scheduleRows.map((row) => (
-            <div
-              key={row.key}
-              style={{
-                display: 'grid',
-                gap: 4,
-                paddingBottom: 10,
-                borderBottom: '1px solid #e2e8f0',
-              }}
-            >
-              <strong style={{ color: '#0f172a', fontSize: 15 }}>{row.label}:</strong>
-              <span style={{ color: '#0f3b82', fontWeight: 900 }}>{row.summary}</span>
+            <div key={row.key} className="store-closed-schedule-row">
+              <strong>{row.label}</strong>
+              <span>{row.summary}</span>
             </div>
           ))}
         </div>
 
-        <button type="button" className="store-button" onClick={onClose}>
-          Navegar tienda
-        </button>
+        <div className="store-closed-sheet-footer">
+          <button type="button" className="store-button" onClick={onClose}>
+            Seguir comprando
+          </button>
+        </div>
       </div>
     </div>
   );

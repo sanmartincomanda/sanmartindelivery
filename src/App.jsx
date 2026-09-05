@@ -36,6 +36,9 @@ import BaseDatosView from './components/BaseDatosView';
 import CrmView from './components/CrmView';
 import PrivacyPolicyView from './components/PrivacyPolicyView';
 import AccountDeletionView from './components/AccountDeletionView';
+import MerchantAdminShell from './components/admin/MerchantAdminShell';
+import MerchantAdminHome from './components/admin/MerchantAdminHome';
+import './styles/adminMerchant2026.css';
 
 const Icons = {
   plus: (
@@ -100,6 +103,13 @@ const PUBLIC_HOST_ROUTE_MAP = new Map([
 ]);
 const BRAND_LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const APP_THEME = SAN_MARTIN_THEME;
+const ADMIN_VIEW_STORAGE_KEY = 'sanmartin_admin_active_view';
+const ADMIN_SIDEBAR_STORAGE_KEY = 'sanmartin_admin_sidebar_collapsed';
+
+const getInitialAdminView = () => {
+  if (typeof window === 'undefined') return 'home';
+  return window.sessionStorage.getItem(ADMIN_VIEW_STORAGE_KEY) || 'home';
+};
 
 const isStoreHost = (hostname = '') => STORE_HOSTS.has(String(hostname || '').trim().toLowerCase());
 const getPublicHostRoute = (hostname = '') =>
@@ -206,8 +216,11 @@ function App() {
 
   const [orders, setOrders] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [view, setView] = useState('ingreso');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [view, setView] = useState(getInitialAdminView);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(ADMIN_SIDEBAR_STORAGE_KEY) === 'true';
+  });
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pendientes: 0, preparando: 0 });
   const [todayCounter, setTodayCounter] = useState(0);
@@ -224,10 +237,11 @@ function App() {
   const ordersBranchId = getOrdersBranchScope(dashboardRoleRecord, {
     forceKitchenScope: isKitchenRoute && kitchenAuth,
   });
-  const dashboardBranch = dashboardBranchId
-    ? DEFAULT_STORE_BRANCHES[dashboardBranchId] || {
-        id: dashboardBranchId,
-        name: dashboardRoleRecord?.branchName || dashboardBranchId,
+  const dashboardContextBranchId = dashboardBranchId || (isOperatorDashboard ? ordersBranchId : null);
+  const dashboardBranch = dashboardContextBranchId
+    ? DEFAULT_STORE_BRANCHES[dashboardContextBranchId] || {
+        id: dashboardContextBranchId,
+        name: dashboardRoleRecord?.branchName || dashboardContextBranchId,
       }
     : null;
 
@@ -270,6 +284,16 @@ function App() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || route !== 'dashboard') return;
+    window.sessionStorage.setItem(ADMIN_VIEW_STORAGE_KEY, view);
+  }, [route, view]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(ADMIN_SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -321,7 +345,7 @@ function App() {
       !isPublicStoreRoute &&
       !isDriverRoute &&
       (isAuthenticated || (isKitchenRoute && kitchenAuth)) &&
-      ((route === 'dashboard' && (view === 'ingreso' || view === 'lista' || view === 'cocina')) ||
+      ((route === 'dashboard' && (view === 'home' || view === 'ingreso' || view === 'lista' || view === 'cocina')) ||
         isKitchenRoute);
 
     if (!shouldSubscribeOrders) {
@@ -390,7 +414,7 @@ function App() {
     const shouldLoadClients =
       !isPublicStoreRoute &&
       route === 'dashboard' &&
-      ((isAdminDashboard && (view === 'ingreso' || view === 'basedatos')) ||
+      ((isAdminDashboard && (view === 'ingreso' || view === 'clientes')) ||
         (isOperatorDashboard && view === 'ingreso'));
 
     if (!shouldLoadClients) {
@@ -498,7 +522,7 @@ function App() {
     setDashboardRoleRecord(null);
     setInputPass('');
     setLoginError(false);
-    setView('ingreso');
+    setView('home');
   };
 
   const handleKitchenLogin = async ({ user, password }) => {
@@ -572,28 +596,39 @@ function App() {
     });
   };
 
+  const merchantStats = useMemo(() => ({
+    ...stats,
+    listos: orders.filter((order) => ['Preparado', 'Listo'].includes(order.estado)).length,
+  }), [orders, stats]);
+
   const navItems = [
-    { id: 'ingreso', label: 'Nuevo Pedido', icon: Icons.plus, color: APP_THEME.red, short: 'Nuevo' },
-    { id: 'cocina', label: 'Vista Cocina', icon: Icons.chef, color: '#f59e0b', short: 'Cocina' },
-    { id: 'lista', label: 'Lista Pedidos', icon: Icons.list, color: APP_THEME.blue, short: 'Lista' },
-    { id: 'basedatos', label: 'Base de Datos', icon: Icons.database, color: '#10b981', short: 'Datos' },
-    { id: 'tienda_virtual', label: 'Tienda Virtual', icon: Icons.store, color: APP_THEME.blueBright, short: 'Tienda' },
-    { id: 'configuracion', label: 'Configuraciones', icon: Icons.settings, color: APP_THEME.blueDeep, short: 'Config' },
+    { id: 'home', label: 'Inicio', mobileLabel: 'Inicio', icon: 'home', group: 'Operación', description: 'Resumen del negocio' },
+    { id: 'lista', label: 'Pedidos', mobileLabel: 'Pedidos', icon: 'orders', group: 'Operación', description: 'Estados y entregas', badge: merchantStats.pendientes || null },
+    { id: 'cocina', label: 'Cocina', mobileLabel: 'Cocina', icon: 'kitchen', group: 'Operación', description: 'Preparación en curso' },
+    { id: 'catalogo', label: 'Catálogo', mobileLabel: 'Catálogo', icon: 'catalog', group: 'Comercio', description: 'Productos y categorías' },
+    { id: 'clientes', label: 'Clientes', mobileLabel: 'Clientes', icon: 'customers', group: 'Comercio', description: 'Directorio y actividad' },
+    { id: 'tienda_virtual', label: 'Tienda Virtual', mobileLabel: 'Tienda', icon: 'store', group: 'Comercio', description: 'Storefront y sucursales' },
+    { id: 'marketing', label: 'Marketing', mobileLabel: 'Marketing', icon: 'marketing', group: 'Crecimiento', description: 'Promociones y campañas' },
+    { id: 'beneficios', label: 'Beneficios', mobileLabel: 'Beneficios', icon: 'benefits', group: 'Crecimiento', description: 'Fidelización y premios' },
+    { id: 'reportes', label: 'Reportes', mobileLabel: 'Reportes', icon: 'reports', group: 'Análisis', description: 'Ventas y comportamiento' },
+    { id: 'configuracion', label: 'Configuración', mobileLabel: 'Config.', icon: 'settings', group: 'Sistema', description: 'Usuarios y permisos' },
   ];
 
   const availableNavItems = isAdminDashboard
     ? navItems
     : isBranchAdminDashboard
-      ? navItems.filter((item) => ['ingreso', 'cocina', 'lista', 'tienda_virtual'].includes(item.id))
-      : navItems.filter((item) => ['ingreso', 'cocina', 'lista'].includes(item.id));
-  const currentViewMeta = availableNavItems.find((item) => item.id === view) || availableNavItems[0];
+      ? navItems.filter((item) => ['home', 'cocina', 'lista', 'tienda_virtual'].includes(item.id))
+      : navItems.filter((item) => ['home', 'cocina', 'lista'].includes(item.id));
+  const currentViewMeta = view === 'ingreso'
+    ? { id: 'ingreso', label: 'Nuevo pedido', icon: 'plus' }
+    : availableNavItems.find((item) => item.id === view) || availableNavItems[0];
 
   useEffect(() => {
-    if (!isAuthenticated || availableNavItems.some((item) => item.id === view)) {
+    if (!isAuthenticated || view === 'ingreso' || availableNavItems.some((item) => item.id === view)) {
       return;
     }
 
-    setView('ingreso');
+    setView(isBranchAdminDashboard ? 'tienda_virtual' : 'home');
   }, [availableNavItems, isAuthenticated, view]);
 
   if (route === 'privacy') {
@@ -804,307 +839,76 @@ function App() {
   }
 
   return (
-    <div
-      className={`admin-shell${view === 'tienda_virtual' ? ' admin-shell--store' : ''}`}
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        background: APP_THEME.blueSoftAlt,
-        fontFamily: "'Trebuchet MS', 'Segoe UI', sans-serif",
-      }}
+    <MerchantAdminShell
+      activeView={view}
+      branch={dashboardBranch}
+      collapsed={sidebarCollapsed}
+      navItems={availableNavItems}
+      onCollapsedChange={setSidebarCollapsed}
+      onCreateOrder={() => setView('ingreso')}
+      onLogout={handleDashboardLogout}
+      onNavigate={setView}
+      role={dashboardRole}
+      stats={merchantStats}
+      title={currentViewMeta?.label || 'Inicio'}
+      username={dashboardRoleRecord?.username || ''}
     >
-      <style>{`
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-slideIn { animation: slideIn 0.3s ease-out; }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .nav-item { transition: all 0.2s ease; }
-        .nav-item:hover { background: rgba(255,255,255,0.1); }
-      `}</style>
+      <section className={`merchant-module merchant-module--${view}`}>
+        {view === 'home' && (
+          <MerchantAdminHome
+            branch={dashboardBranch}
+            navItems={availableNavItems}
+            onNavigate={setView}
+            orders={orders}
+            role={dashboardRole}
+            stats={merchantStats}
+          />
+        )}
 
-      <aside
-        className="admin-sidebar"
-        style={{
-          width: sidebarCollapsed ? '80px' : '260px',
-          background: APP_THEME.darkGradient,
-          color: 'white',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'fixed',
-          height: '100vh',
-          transition: 'width 0.3s ease',
-          zIndex: 1000,
-        }}
-      >
-        <div
-          style={{
-            padding: '24px 20px',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '10px',
-              background: APP_THEME.heroGradient,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <img
-              src={BRAND_LOGO_PATH}
-              alt="Logo"
-              style={{ width: '36px', height: '36px', objectFit: 'contain' }}
-            />
-          </div>
-          {!sidebarCollapsed && (
-            <div>
-              <div style={{ fontSize: '16px', fontWeight: 800 }}>San Martin</div>
-              <div style={{ fontSize: '11px', opacity: 0.6 }}>Delivery + Tienda</div>
-            </div>
-          )}
-        </div>
+        {view === 'ingreso' && (
+          <OrderForm
+            onAddOrder={addOrder}
+            clientes={clientes}
+            allowClientDirectory={isAdminDashboard || isOperatorDashboard}
+            nextOrderNumber={nextOrderNumber}
+            branchId={ordersBranchId || 'granada'}
+          />
+        )}
 
-        <nav style={{ flex: 1, padding: '12px 0' }}>
-          {availableNavItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              style={{
-                width: '100%',
-                padding: sidebarCollapsed ? '16px' : '14px 20px',
-                margin: '4px 0',
-                border: 'none',
-                background: view === item.id ? 'rgba(255,255,255,0.12)' : 'transparent',
-                color: view === item.id ? item.color : 'rgba(255,255,255,0.7)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                fontSize: '14px',
-                fontWeight: view === item.id ? 700 : 600,
-                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                borderLeft: view === item.id ? `3px solid ${item.color}` : '3px solid transparent',
-                transition: 'all 0.2s',
-              }}
-            >
-              <span
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  background: view === item.id ? `${item.color}24` : 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {item.icon}
-              </span>
-              {!sidebarCollapsed && <span>{item.label}</span>}
-            </button>
-          ))}
-        </nav>
+        {view === 'cocina' && <KitchenView orders={orders} allowRuta={isAdminDashboard} />}
+        {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
 
-        <button
-          type="button"
-          onClick={handleDashboardLogout}
-          aria-label="Cerrar sesion"
-          title="Cerrar sesion"
-          style={{
-            margin: sidebarCollapsed ? '8px 12px' : '8px 16px',
-            padding: sidebarCollapsed ? '13px' : '12px 14px',
-            border: '1px solid rgba(255,255,255,0.16)',
-            borderRadius: '12px',
-            background: 'rgba(255,255,255,0.08)',
-            color: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-            gap: '11px',
-            fontSize: '13px',
-            fontWeight: 800,
-          }}
-        >
-          <span style={{ display: 'flex', color: '#fca5a5' }}>{Icons.logout}</span>
-          {!sidebarCollapsed && (
-            <span style={{ minWidth: 0, textAlign: 'left' }}>
-              <span style={{ display: 'block' }}>Cerrar sesion</span>
-              <small
-                style={{
-                  display: 'block',
-                  marginTop: '2px',
-                  maxWidth: '165px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  opacity: 0.6,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {dashboardRoleRecord?.username || 'Administrador'}
-              </small>
-            </span>
-          )}
-        </button>
+        {view === 'catalogo' && isAdminDashboard && (
+          <ConfiguracionView key="catalogo" mode="store" initialSection="catalogo" navigationScope="catalogo" />
+        )}
 
-        <button
-          onClick={() => setSidebarCollapsed((current) => !current)}
-          style={{
-            padding: '16px 20px',
-            border: 'none',
-            background: 'rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.5)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-            gap: '12px',
-            fontSize: '12px',
-            borderTop: '1px solid rgba(255,255,255,0.1)',
-          }}
-        >
-          <span style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </span>
-          {!sidebarCollapsed && <span>Colapsar</span>}
-        </button>
-      </aside>
+        {view === 'clientes' && isAdminDashboard && (
+          <BaseDatosView clientes={clientes} initialSection="clientes" showModuleNav={false} />
+        )}
 
-      <main
-        className="admin-main"
-        style={{
-          flex: 1,
-          marginLeft: sidebarCollapsed ? '80px' : '260px',
-          transition: 'margin-left 0.3s ease',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <header
-          className="admin-topbar"
-          style={{
-            height: '64px',
-            background: 'rgba(255,255,255,0.96)',
-            borderBottom: `1px solid ${APP_THEME.border}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 24px',
-            position: 'sticky',
-            top: 0,
-            zIndex: 100,
-          }}
-        >
-          <h1
-            style={{
-              margin: 0,
-              fontSize: '20px',
-              fontWeight: 800,
-              color: APP_THEME.text,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-            }}
-          >
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: currentViewMeta?.color || '#64748b',
-              }}
-            />
-            {currentViewMeta?.label || 'Dashboard'}
-            {dashboardBranch?.name && (
-              <span
-                style={{
-                  borderRadius: 999,
-                  background: APP_THEME.blueSoft,
-                  color: APP_THEME.blueDeep,
-                  padding: '5px 10px',
-                  fontSize: 11,
-                  fontWeight: 900,
-                }}
-              >
-                {dashboardBranch.name}
-              </span>
-            )}
-          </h1>
+        {view === 'tienda_virtual' && (isAdminDashboard || isBranchAdminDashboard) && (
+          <TiendaVirtualAdminView
+            branchScope={isBranchAdminDashboard ? dashboardBranch : null}
+            username={dashboardRoleRecord?.username || ''}
+            initialSection="resumen"
+            navigationScope="storefront"
+          />
+        )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <div style={{ display: 'flex', gap: '24px' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: APP_THEME.textSoft, fontWeight: 700, textTransform: 'uppercase' }}>
-                  Hoy
-                </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: APP_THEME.text }}>{stats.total}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Pendientes
-                </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#f59e0b' }}>{stats.pendientes}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '11px', color: APP_THEME.blue, fontWeight: 700, textTransform: 'uppercase' }}>
-                  Cocina
-                </div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: APP_THEME.blue }}>{stats.preparando}</div>
-              </div>
-            </div>
+        {view === 'marketing' && isAdminDashboard && (
+          <ConfiguracionView key="marketing" mode="store" initialSection="promos_tienda" navigationScope="marketing" />
+        )}
 
-            <div style={{ width: '1px', height: '32px', background: APP_THEME.border }} />
+        {view === 'beneficios' && isAdminDashboard && (
+          <ConfiguracionView key="beneficios" mode="store" initialSection="recompensas" navigationScope="beneficios" />
+        )}
 
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: APP_THEME.text }}>
-                {new Date().toLocaleDateString('es-NI', { day: 'numeric', month: 'short' })}
-              </div>
-              <div style={{ fontSize: '11px', color: APP_THEME.textSoft, fontWeight: 600 }}>
-                {new Date().toLocaleTimeString('es-NI', { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="animate-fadeIn" style={{ flex: 1 }}>
-          {view === 'ingreso' && (
-            <OrderForm
-              onAddOrder={addOrder}
-              clientes={clientes}
-              allowClientDirectory={isAdminDashboard || isOperatorDashboard}
-              nextOrderNumber={nextOrderNumber}
-              branchId={ordersBranchId || 'granada'}
-            />
-          )}
-
-          {view === 'cocina' && <KitchenView orders={orders} allowRuta={isAdminDashboard} />}
-
-          {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
-
-          {view === 'tienda_virtual' && (isAdminDashboard || isBranchAdminDashboard) && (
-            <TiendaVirtualAdminView
-              branchScope={isBranchAdminDashboard ? dashboardBranch : null}
-              username={dashboardRoleRecord?.username || ''}
-            />
-          )}
-
-          {view === 'configuracion' && isAdminDashboard && <ConfiguracionView mode="users" />}
-
-          {view === 'basedatos' && isAdminDashboard && <BaseDatosView clientes={clientes} />}
-        </div>
-      </main>
-    </div>
+        {view === 'reportes' && isAdminDashboard && <CrmView />}
+        {view === 'configuracion' && isAdminDashboard && (
+          <ConfiguracionView mode="users" username={dashboardRoleRecord?.username || ''} />
+        )}
+      </section>
+    </MerchantAdminShell>
   );
 }
 
