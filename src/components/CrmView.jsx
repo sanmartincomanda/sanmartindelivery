@@ -6,10 +6,13 @@ import {
 import { fetchOrdersByDateRange } from '../services/orders';
 import {
   buildAdminSalesReport,
+  formatReportDateKey,
   getReportBranchOptions,
   getReportDateRange,
   REPORT_PERIOD_OPTIONS,
 } from '../services/adminReports';
+import { getOrderHistoryRetentionStartDate } from '../services/orderArchive';
+import OrderHistoryReport from './reports/OrderHistoryReport';
 import '../styles/adminReports2026.css';
 
 const moneyFormatter = new Intl.NumberFormat('es-NI', {
@@ -112,6 +115,7 @@ function EmptyReport({ title, message }) {
 }
 
 export default function CrmView() {
+  const [activeSection, setActiveSection] = useState('performance');
   const [periodDays, setPeriodDays] = useState(7);
   const [branchId, setBranchId] = useState('all');
   const [orders, setOrders] = useState([]);
@@ -120,8 +124,22 @@ export default function CrmView() {
   const [partialWarning, setPartialWarning] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [historyOrders, setHistoryOrders] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyWarning, setHistoryWarning] = useState('');
+  const [historyUpdatedAt, setHistoryUpdatedAt] = useState(null);
+  const [historyReloadKey, setHistoryReloadKey] = useState(0);
+  const [historyLoadedKey, setHistoryLoadedKey] = useState(-1);
 
   const range = useMemo(() => getReportDateRange(periodDays), [periodDays]);
+  const historyRange = useMemo(
+    () => ({
+      dateFrom: getOrderHistoryRetentionStartDate(),
+      dateTo: formatReportDateKey(),
+    }),
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -172,6 +190,58 @@ export default function CrmView() {
     };
   }, [range.dateTo, range.previousDateFrom, reloadKey]);
 
+  useEffect(() => {
+    if (activeSection !== 'history' || historyLoadedKey === historyReloadKey) return undefined;
+
+    let cancelled = false;
+    const loadHistoryOrders = async () => {
+      setHistoryLoading(true);
+      setHistoryError('');
+      setHistoryWarning('');
+
+      const [cloudResult, liveResult] = await Promise.allSettled([
+        fetchCloudOrderHistoryByDateRange(historyRange.dateFrom, historyRange.dateTo),
+        fetchOrdersByDateRange(historyRange.dateFrom, historyRange.dateTo),
+      ]);
+
+      if (cancelled) return;
+
+      const cloudOrders = cloudResult.status === 'fulfilled' ? cloudResult.value : [];
+      const liveOrders = liveResult.status === 'fulfilled' ? liveResult.value : [];
+
+      if (cloudResult.status === 'rejected' && liveResult.status === 'rejected') {
+        console.error('No se pudo cargar el historial de reportes:', {
+          cloud: cloudResult.reason,
+          live: liveResult.reason,
+        });
+        setHistoryError('No pudimos consultar los pedidos archivados ni los pedidos activos.');
+        setHistoryLoadedKey(historyReloadKey);
+        setHistoryLoading(false);
+        return;
+      }
+
+      if (cloudResult.status === 'rejected') {
+        console.warn('Historial de reportes cargado sin archivo cloud:', cloudResult.reason);
+        setHistoryWarning('Se muestran los pedidos activos; parte del historial archivado podria faltar.');
+      } else if (liveResult.status === 'rejected') {
+        console.warn('Historial de reportes cargado sin pedidos activos:', liveResult.reason);
+        setHistoryWarning('Se muestra el archivo historico; los pedidos mas recientes podrian tardar en aparecer.');
+      }
+
+      startTransition(() => {
+        setHistoryOrders(mergeOrderHistoryRecords(cloudOrders, liveOrders));
+        setHistoryUpdatedAt(Date.now());
+        setHistoryLoadedKey(historyReloadKey);
+        setHistoryLoading(false);
+      });
+    };
+
+    loadHistoryOrders();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, historyLoadedKey, historyRange, historyReloadKey]);
+
   const branchOptions = useMemo(() => getReportBranchOptions(orders), [orders]);
 
   useEffect(() => {
@@ -193,14 +263,16 @@ export default function CrmView() {
     <div className="admin-reports-page">
       <header className="reports-page-header">
         <div>
-          <span className="reports-eyebrow">Tienda Virtual</span>
-          <h1>Reportes de ventas</h1>
+          <span className="reports-eyebrow">Administracion operativa</span>
+          <h1>Reportes</h1>
           <p>
-            Rendimiento comercial y entregas del {formatDateLabel(range.dateFrom)} al {formatDateLabel(range.dateTo, true)}.
+            {activeSection === 'performance'
+              ? `Rendimiento comercial y entregas del ${formatDateLabel(range.dateFrom)} al ${formatDateLabel(range.dateTo, true)}.`
+              : 'Consulta todos los pedidos disponibles y revisa su trazabilidad operativa.'}
           </p>
         </div>
 
-        <div className="reports-toolbar">
+        {activeSection === 'performance' ? <div className="reports-toolbar">
           <label className="reports-branch-select">
             <span>Sucursal</span>
             <select value={branchId} onChange={(event) => setBranchId(event.target.value)}>
@@ -234,8 +306,43 @@ export default function CrmView() {
             <ReportIcon name="refresh" />
             <span>{loading ? 'Actualizando' : 'Actualizar'}</span>
           </button>
-        </div>
+        </div> : null}
       </header>
+
+      <nav className="reports-section-tabs" aria-label="Apartados de reportes">
+        <button
+          type="button"
+          className={activeSection === 'performance' ? 'active' : ''}
+          aria-current={activeSection === 'performance' ? 'page' : undefined}
+          onClick={() => setActiveSection('performance')}
+        >
+          <ReportIcon name="sales" />
+          <span><strong>Rendimiento</strong><small>Ventas, pedidos y drivers</small></span>
+        </button>
+        <button
+          type="button"
+          className={activeSection === 'history' ? 'active' : ''}
+          aria-current={activeSection === 'history' ? 'page' : undefined}
+          onClick={() => setActiveSection('history')}
+        >
+          <ReportIcon name="orders" />
+          <span><strong>Historial y trazabilidad</strong><small>Base de datos de pedidos</small></span>
+        </button>
+      </nav>
+
+      {activeSection === 'history' ? (
+        <OrderHistoryReport
+          orders={historyOrders}
+          loading={historyLoading}
+          error={historyError}
+          warning={historyWarning}
+          availableDateFrom={historyRange.dateFrom}
+          availableDateTo={historyRange.dateTo}
+          lastUpdated={historyUpdatedAt}
+          onRefresh={() => setHistoryReloadKey((value) => value + 1)}
+        />
+      ) : (
+        <>
 
       <div className="reports-scope-note">
         <ReportIcon name="info" />
@@ -452,6 +559,8 @@ export default function CrmView() {
             </>
           )}
         </main>
+      )}
+        </>
       )}
     </div>
   );

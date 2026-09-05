@@ -32,6 +32,7 @@ import {
 } from '../services/storeCoupons';
 import {
   applyStoreProductPromotionsToCatalog,
+  getStoreProductPromotionDiscountRange,
   mergeStoreProductPromotions,
   isStoreProductPromotionActive,
   STORE_PRODUCT_PROMOTIONS_PATH,
@@ -2131,7 +2132,10 @@ export default function TiendaVirtualView({
             return Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
           }
 
-          return Number(right.discountPct || 0) - Number(left.discountPct || 0);
+          return (
+            getStoreProductPromotionDiscountRange(right).maximum -
+            getStoreProductPromotionDiscountRange(left).maximum
+          );
         }),
     [currentTimeMs, productPromotions]
   );
@@ -2378,13 +2382,19 @@ export default function TiendaVirtualView({
         ),
       }))
       .filter((promotion) => promotion.products.length > 0)
-      .map((promotion) => ({
-        id: `promo-${promotion.id}`,
-        title: promotion.title,
-        kicker: `Promocion especial - ${formatPromotionPercent(promotion.discountPct)} OFF`,
-        subtitle: `${promotion.products.length} productos`,
-        products: promotion.products,
-      }));
+      .map((promotion) => {
+        const discountRange = getStoreProductPromotionDiscountRange(promotion);
+
+        return {
+          id: `promo-${promotion.id}`,
+          title: promotion.title,
+          kicker: discountRange.varies
+            ? 'Promocion especial - descuentos por producto'
+            : `Promocion especial - ${formatPromotionPercent(discountRange.maximum)} OFF`,
+          subtitle: `${promotion.products.length} productos`,
+          products: promotion.products,
+        };
+      });
 
     const promotedProductCodeSet = new Set(
       productPromotionSections.flatMap((section) =>

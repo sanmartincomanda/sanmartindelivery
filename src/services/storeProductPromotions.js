@@ -1,5 +1,17 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
+import {
+  getStoreProductPromotionDiscountPct,
+  getStoreProductPromotionDiscountRange,
+  normalizeStoreProductDiscountAssignments,
+  normalizeStoreProductPromotionCodes,
+} from './storeProductPromotionCore';
+
+export {
+  getStoreProductPromotionDiscountPct,
+  getStoreProductPromotionDiscountRange,
+  normalizeStoreProductDiscountAssignments,
+} from './storeProductPromotionCore';
 
 export const STORE_PRODUCT_PROMOTIONS_PATH = 'storeProductPromotions';
 
@@ -25,21 +37,6 @@ const normalizePromotionDate = (value) => {
   return parsed.toISOString();
 };
 
-const normalizePromotionCodes = (value) => {
-  const source = Array.isArray(value)
-    ? value
-    : String(value || '')
-        .split(/[\n,;]+/);
-
-  return Array.from(
-    new Set(
-      source
-        .map((entry) => String(entry || '').trim())
-        .filter(Boolean)
-    )
-  );
-};
-
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 
 const pickFirstNonEmptyString = (...values) => {
@@ -59,7 +56,7 @@ const buildFallbackPromotionTitle = (source = {}, backup = {}) => {
     return directTitle;
   }
 
-  const productCodes = normalizePromotionCodes(source.productCodes ?? backup.productCodes);
+  const productCodes = normalizeStoreProductPromotionCodes(source.productCodes ?? backup.productCodes);
   const discountPct = roundMoney(source.discountPct ?? backup.discountPct ?? 0);
 
   if (productCodes.length === 1 && discountPct > 0) {
@@ -83,7 +80,8 @@ const buildFallbackPromotionTitle = (source = {}, backup = {}) => {
 
 const sortProductPromotions = (left, right) =>
   Number(left.sortOrder || 0) - Number(right.sortOrder || 0) ||
-  Number(right.discountPct || 0) - Number(left.discountPct || 0) ||
+  getStoreProductPromotionDiscountRange(right).maximum -
+    getStoreProductPromotionDiscountRange(left).maximum ||
   String(left.title || '').localeCompare(String(right.title || ''), 'es', {
     sensitivity: 'base',
   });
@@ -97,14 +95,28 @@ export const normalizeStoreProductPromotion = (promotion = {}, fallback = {}, in
   const title = buildFallbackPromotionTitle(source, backup);
   const rawId = pickFirstNonEmptyString(source.id, backup.id, title);
   const id = normalizePromotionId(rawId);
-  const productCodes = normalizePromotionCodes(source.productCodes ?? backup.productCodes);
-  const discountPct = Math.min(100, Math.max(0, Number(source.discountPct ?? backup.discountPct ?? 0) || 0));
+  const fallbackDiscountPct = Math.min(
+    100,
+    Math.max(0, Number(source.discountPct ?? backup.discountPct ?? 0) || 0)
+  );
+  const rawProductDiscounts = source.productDiscounts ?? backup.productDiscounts;
+  const explicitAssignments = normalizeStoreProductDiscountAssignments(rawProductDiscounts);
+  const productCodes = normalizeStoreProductPromotionCodes([
+    ...normalizeStoreProductPromotionCodes(source.productCodes ?? backup.productCodes),
+    ...explicitAssignments.map((assignment) => assignment.code),
+  ]);
+  const productDiscounts = normalizeStoreProductDiscountAssignments(
+    rawProductDiscounts,
+    productCodes,
+    fallbackDiscountPct
+  );
 
   return {
     id,
     title: title || id,
     productCodes,
-    discountPct: roundMoney(discountPct),
+    productDiscounts,
+    discountPct: roundMoney(fallbackDiscountPct),
     active: source.active ?? backup.active ?? true,
     deleted: source.deleted ?? backup.deleted ?? false,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? (index + 1) * 10),
@@ -130,7 +142,9 @@ export const getStoreProductPromotionStatus = (promotion, now = Date.now()) => {
     !normalized.id ||
     normalized.active === false ||
     normalized.deleted === true ||
-    normalized.discountPct <= 0 ||
+    !normalized.productCodes.some(
+      (code) => getStoreProductPromotionDiscountPct(normalized, code) > 0
+    ) ||
     normalized.productCodes.length === 0
   ) {
     return 'inactive';
@@ -163,6 +177,11 @@ export const resolveStoreProductPromotionForCode = (code = '', promotions = [], 
         isStoreProductPromotionActive(promotion, now) &&
         promotion.productCodes.includes(cleanCode)
     )
+    .map((promotion) => ({
+      ...promotion,
+      discountPct: getStoreProductPromotionDiscountPct(promotion, cleanCode),
+    }))
+    .filter((promotion) => promotion.discountPct > 0)
     .sort((left, right) => {
       if (Number(right.discountPct || 0) !== Number(left.discountPct || 0)) {
         return Number(right.discountPct || 0) - Number(left.discountPct || 0);
@@ -216,12 +235,15 @@ export async function saveStoreProductPromotion(promotion, existingPromotion = n
     throw new Error('No se pudo generar el titulo de la promocion.');
   }
 
-  if (normalized.discountPct <= 0) {
-    throw new Error('Define un porcentaje de descuento mayor a 0.');
-  }
-
   if (normalized.productCodes.length === 0) {
     throw new Error('Selecciona al menos un articulo para la promocion.');
+  }
+
+  const invalidProductCode = normalized.productCodes.find(
+    (code) => getStoreProductPromotionDiscountPct(normalized, code) <= 0
+  );
+  if (invalidProductCode) {
+    throw new Error(`Define un porcentaje de descuento para el articulo ${invalidProductCode}.`);
   }
 
   await set(
@@ -246,7 +268,14 @@ export async function updateStoreProductPromotion(id, patch = {}) {
     normalizedPatch.endsAt = normalizePromotionDate(normalizedPatch.endsAt);
   }
   if (Object.prototype.hasOwnProperty.call(normalizedPatch, 'productCodes')) {
-    normalizedPatch.productCodes = normalizePromotionCodes(normalizedPatch.productCodes);
+    normalizedPatch.productCodes = normalizeStoreProductPromotionCodes(normalizedPatch.productCodes);
+  }
+  if (Object.prototype.hasOwnProperty.call(normalizedPatch, 'productDiscounts')) {
+    normalizedPatch.productDiscounts = normalizeStoreProductDiscountAssignments(
+      normalizedPatch.productDiscounts,
+      normalizedPatch.productCodes || [],
+      normalizedPatch.discountPct || 0
+    );
   }
   if (Object.prototype.hasOwnProperty.call(normalizedPatch, 'discountPct')) {
     normalizedPatch.discountPct = roundMoney(

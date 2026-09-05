@@ -11,6 +11,8 @@
     "preview": "vite preview",
     "test:first-order-rewards": "node scripts/testFirstOrderRewards.mjs",
     "test:admin-reports": "node scripts/testAdminReports.mjs",
+    "test:order-traceability": "node scripts/testOrderTraceability.mjs",
+    "test:store-product-promotions": "node scripts/testStoreProductPromotions.mjs",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:publish:combos": "node scripts/publishSicarStoreCombos.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",

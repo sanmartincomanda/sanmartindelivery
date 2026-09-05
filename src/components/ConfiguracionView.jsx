@@ -48,8 +48,10 @@ import {
 import {
   cleanupExpiredStoreProductPromotions,
   deleteStoreProductPromotion,
+  getStoreProductPromotionDiscountRange,
   getStoreProductPromotionStatus,
   mergeStoreProductPromotions,
+  normalizeStoreProductDiscountAssignments,
   saveStoreProductPromotion,
   STORE_PRODUCT_PROMOTIONS_PATH,
   updateStoreProductPromotion,
@@ -469,6 +471,7 @@ const emptyProductPromotion = {
   title: '',
   discountPct: '',
   productCodes: [],
+  productDiscounts: [],
   active: true,
   sortOrder: '',
   startsAt: '',
@@ -1447,11 +1450,18 @@ export default function ConfiguracionView({
   };
 
   const editProductPromotion = (promotion) => {
+    const productDiscounts = normalizeStoreProductDiscountAssignments(
+      promotion.productDiscounts,
+      promotion.productCodes,
+      promotion.discountPct
+    );
+
     setProductPromotionForm({
       id: promotion.id || '',
       title: promotion.title || '',
       discountPct: promotion.discountPct ?? '',
       productCodes: Array.isArray(promotion.productCodes) ? promotion.productCodes : [],
+      productDiscounts,
       active: promotion.active !== false,
       sortOrder: promotion.sortOrder ?? '',
       startsAt: toDateTimeInputValue(promotion.startsAt),
@@ -1803,6 +1813,14 @@ export default function ConfiguracionView({
     const startsAt = normalizeDateTimeInputValue(productPromotionForm.startsAt);
     const endsAt = normalizeDateTimeInputValue(productPromotionForm.endsAt);
     const promotionTitle = String(productPromotionForm.title || '').trim();
+    const selectedProductCodes = Array.isArray(productPromotionForm.productCodes)
+      ? productPromotionForm.productCodes
+      : [];
+    const productDiscounts = normalizeStoreProductDiscountAssignments(
+      productPromotionForm.productDiscounts,
+      selectedProductCodes,
+      productPromotionForm.discountPct
+    );
 
     if (productPromotionForm.startsAt && !startsAt) {
       setMessage('La fecha inicial de la promocion especial no es valida.');
@@ -1819,6 +1837,19 @@ export default function ConfiguracionView({
       return;
     }
 
+    if (selectedProductCodes.length === 0) {
+      setMessage('Selecciona al menos un articulo para la promocion.');
+      return;
+    }
+
+    const invalidProductDiscount = productDiscounts.find(
+      (assignment) => Number(assignment.discountPct || 0) <= 0
+    );
+    if (invalidProductDiscount) {
+      setMessage(`Define el porcentaje de descuento para ${invalidProductDiscount.code}.`);
+      return;
+    }
+
     setSavingProductPromotion(true);
     setMessage('');
 
@@ -1830,7 +1861,8 @@ export default function ConfiguracionView({
           id: productPromotionForm.id,
           title: promotionTitle,
           discountPct: Number(productPromotionForm.discountPct || 0),
-          productCodes: productPromotionForm.productCodes || [],
+          productCodes: selectedProductCodes,
+          productDiscounts,
           active: productPromotionForm.active,
           sortOrder:
             productPromotionForm.sortOrder === ''
@@ -5480,6 +5512,20 @@ function ProductPromotionsManager({
   const [productSearch, setProductSearch] = useState('');
   const selectedCodes = Array.isArray(promotionForm.productCodes) ? promotionForm.productCodes : [];
   const selectedCodeSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
+  const productDiscounts = Array.isArray(promotionForm.productDiscounts)
+    ? promotionForm.productDiscounts
+    : [];
+  const discountByCode = useMemo(
+    () =>
+      new Map(
+        normalizeStoreProductDiscountAssignments(
+          productDiscounts,
+          selectedCodes,
+          promotionForm.discountPct
+        ).map((assignment) => [assignment.code, assignment.discountPct])
+      ),
+    [productDiscounts, promotionForm.discountPct, selectedCodes]
+  );
   const normalizedSearch = String(productSearch || '').trim().toLowerCase();
   const activeCount = promotions.filter((promotion) => getStoreProductPromotionStatus(promotion) === 'active').length;
   const expiredCount = promotions.filter((promotion) => getStoreProductPromotionStatus(promotion) === 'expired').length;
@@ -5502,8 +5548,17 @@ function ProductPromotionsManager({
 
   const selectedProducts = useMemo(() => {
     const source = Array.isArray(products) ? products : [];
-    return source.filter((product) => selectedCodeSet.has(product.code));
-  }, [products, selectedCodeSet]);
+    const productByCode = new Map(
+      source.map((product) => [String(product.code || '').trim(), product])
+    );
+
+    return selectedCodes.map((code) =>
+      productByCode.get(code) || {
+        code,
+        name: 'Articulo fuera del catalogo actual',
+      }
+    );
+  }, [products, selectedCodes]);
 
   const toggleProductCode = (code) => {
     const cleanCode = String(code || '').trim();
@@ -5511,11 +5566,45 @@ function ProductPromotionsManager({
       return;
     }
 
-    const nextCodes = selectedCodeSet.has(cleanCode)
+    const isSelected = selectedCodeSet.has(cleanCode);
+    const nextCodes = isSelected
       ? selectedCodes.filter((entry) => entry !== cleanCode)
       : [...selectedCodes, cleanCode];
+    const currentAssignments = normalizeStoreProductDiscountAssignments(
+      productDiscounts,
+      selectedCodes,
+      promotionForm.discountPct
+    );
+    const nextDiscounts = isSelected
+      ? currentAssignments.filter((assignment) => assignment.code !== cleanCode)
+      : [
+          ...currentAssignments,
+          {
+            code: cleanCode,
+            discountPct: promotionForm.discountPct,
+          },
+        ];
 
     updatePromotionForm('productCodes', nextCodes);
+    updatePromotionForm('productDiscounts', nextDiscounts);
+  };
+
+  const updateProductDiscount = (code, discountPct) => {
+    const nextDiscounts = selectedCodes.map((selectedCode) => ({
+      code: selectedCode,
+      discountPct:
+        selectedCode === code ? discountPct : discountByCode.get(selectedCode) ?? '',
+    }));
+
+    updatePromotionForm('productDiscounts', nextDiscounts);
+  };
+
+  const applyDefaultDiscountToSelected = () => {
+    const discountPct = promotionForm.discountPct;
+    updatePromotionForm(
+      'productDiscounts',
+      selectedCodes.map((code) => ({ code, discountPct }))
+    );
   };
 
   return (
@@ -5576,6 +5665,15 @@ function ProductPromotionsManager({
             {promotions.map((promotion) => {
               const status = getStoreProductPromotionStatus(promotion);
               const statusClass = status === 'active' ? '' : 'off';
+              const discountRange = getStoreProductPromotionDiscountRange(promotion);
+              const discountSummary = discountRange.varies
+                ? `${discountRange.minimum}% a ${discountRange.maximum}% por articulo`
+                : `${discountRange.maximum}% de descuento`;
+              const promotionDiscounts = normalizeStoreProductDiscountAssignments(
+                promotion.productDiscounts,
+                promotion.productCodes,
+                promotion.discountPct
+              );
 
               return (
                 <div
@@ -5592,7 +5690,7 @@ function ProductPromotionsManager({
                     <div>
                       <strong style={{ fontSize: 18 }}>{promotion.title}</strong>
                       <div style={{ color: '#0f172a', marginTop: 6, fontWeight: 900 }}>
-                        {Number(promotion.discountPct || 0)}% de descuento
+                        {discountSummary}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -5607,8 +5705,23 @@ function ProductPromotionsManager({
                     <div>Inicio: {promotion.startsAt ? formatAdminDateTime(promotion.startsAt) : 'Inmediato'}</div>
                     <div>Finaliza: {promotion.endsAt ? formatAdminDateTime(promotion.endsAt) : 'Sin vencimiento'}</div>
                   </div>
-                  <div style={{ color: '#334155', fontWeight: 700, fontSize: 13 }}>
-                    {Array.isArray(promotion.productCodes) ? promotion.productCodes.join(', ') : ''}
+                  <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                    {promotionDiscounts.map((assignment) => (
+                      <span
+                        key={`${promotion.id}-${assignment.code}`}
+                        style={{
+                          border: '1px solid #dbeafe',
+                          borderRadius: 8,
+                          padding: '6px 8px',
+                          background: '#eff6ff',
+                          color: '#0b438b',
+                          fontSize: 12,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {assignment.code} · {assignment.discountPct}%
+                      </span>
+                    ))}
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <button type="button" className="cfg-button secondary" onClick={() => editPromotion(promotion)}>
@@ -5647,25 +5760,34 @@ function ProductPromotionsManager({
           placeholder="Titulo de promocion (opcional)"
         />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <input
-            className="cfg-input"
-            type="number"
-            min="1"
-            max="100"
-            step="0.01"
-            value={promotionForm.discountPct}
-            onChange={(event) => updatePromotionForm('discountPct', event.target.value)}
-            placeholder="% descuento"
-          />
-          <input
-            className="cfg-input"
-            type="number"
-            min="0"
-            step="1"
-            value={promotionForm.sortOrder}
-            onChange={(event) => updatePromotionForm('sortOrder', event.target.value)}
-            placeholder="Orden"
-          />
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Porcentaje inicial</span>
+            <input
+              className="cfg-input"
+              type="number"
+              min="1"
+              max="100"
+              step="0.01"
+              value={promotionForm.discountPct}
+              onChange={(event) => updatePromotionForm('discountPct', event.target.value)}
+              placeholder="Ej. 10"
+            />
+          </label>
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: '#0f172a' }}>Orden</span>
+            <input
+              className="cfg-input"
+              type="number"
+              min="0"
+              step="1"
+              value={promotionForm.sortOrder}
+              onChange={(event) => updatePromotionForm('sortOrder', event.target.value)}
+              placeholder="Orden"
+            />
+          </label>
+        </div>
+        <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>
+          El porcentaje inicial se asigna a los articulos nuevos. Luego puedes definir un porcentaje distinto para cada uno.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <select
@@ -5707,17 +5829,89 @@ function ProductPromotionsManager({
           placeholder="Buscar articulos por codigo, nombre o categoria"
         />
         {selectedProducts.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {selectedProducts.map((product) => (
+          <div
+            style={{
+              display: 'grid',
+              gap: 8,
+              padding: 12,
+              border: '1px solid #dbeafe',
+              borderRadius: 12,
+              background: '#f8fbff',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <strong style={{ color: '#0f172a' }}>Descuento por articulo</strong>
               <button
-                key={`selected-${product.code}`}
                 type="button"
                 className="cfg-button secondary"
-                style={{ padding: '8px 10px', borderRadius: 999 }}
-                onClick={() => toggleProductCode(product.code)}
+                style={{ padding: '8px 10px' }}
+                onClick={applyDefaultDiscountToSelected}
+                disabled={!promotionForm.discountPct}
               >
-                {product.code} · {product.name}
+                Aplicar {promotionForm.discountPct || 0}% a todos
               </button>
+            </div>
+            {selectedProducts.map((product) => (
+              <div
+                key={`selected-${product.code}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1fr) minmax(82px, 112px) 42px',
+                  gap: 8,
+                  alignItems: 'center',
+                  padding: '9px 0',
+                  borderTop: '1px solid #e2e8f0',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ display: 'block', overflowWrap: 'anywhere' }}>{product.name}</strong>
+                  <span style={{ color: '#64748b', fontSize: 12, fontWeight: 800 }}>{product.code}</span>
+                </div>
+                <label style={{ position: 'relative' }}>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      width: 1,
+                      height: 1,
+                      padding: 0,
+                      margin: -1,
+                      overflow: 'hidden',
+                      clip: 'rect(0, 0, 0, 0)',
+                      whiteSpace: 'nowrap',
+                      border: 0,
+                    }}
+                  >
+                    Porcentaje para {product.name}
+                  </span>
+                  <input
+                    className="cfg-input"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="0.01"
+                    value={discountByCode.get(product.code) ?? ''}
+                    onChange={(event) => updateProductDiscount(product.code, event.target.value)}
+                    placeholder="%"
+                    aria-label={`Porcentaje de descuento para ${product.name}`}
+                    style={{ paddingRight: 28 }}
+                  />
+                  <span
+                    aria-hidden="true"
+                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#64748b' }}
+                  >
+                    %
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  className="cfg-button secondary"
+                  onClick={() => toggleProductCode(product.code)}
+                  aria-label={`Quitar ${product.name} de la promocion`}
+                  style={{ width: 42, height: 42, padding: 0, color: '#b91c1c', fontSize: 20 }}
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         )}
