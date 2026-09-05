@@ -6,6 +6,7 @@ import {
 } from './_shared/poket.mjs';
 import {
   FIRST_ORDER_REWARD_CAMPAIGN_TYPE,
+  buildFirstOrderRewardTextLines,
   campaignAppliesToBranch,
   isIncentiveCampaignActive,
   isIncentiveItemAvailable,
@@ -177,6 +178,25 @@ const getReservationOrder = async (database, reservation = {}) => {
     : null;
 };
 
+const findOrderByRewardReservation = async (database, reservation = {}) => {
+  const reservationId = String(reservation.id || reservation.reservationId || '').trim();
+  const customerId = String(reservation.customerId || '').trim();
+  if (!reservationId || !customerId) {
+    return null;
+  }
+
+  const snapshot = await database
+    .ref('orders')
+    .orderByChild('storeUserKey')
+    .equalTo(customerId)
+    .once('value');
+
+  return flattenOrders(snapshot.val()).find((order) => {
+    const reward = normalizeFirstOrderRewardSnapshot(order.firstOrderReward);
+    return reward?.reservationId === reservationId;
+  }) || null;
+};
+
 const getRole = async (database, uid) => {
   const snapshot = await database.ref(`userRoles/${uid}/role`).get();
   return String(snapshot.val() || '').trim().toLowerCase();
@@ -300,6 +320,7 @@ const handleReserve = async (database, customer, payload) => {
 
     const reservation = {
       id: reservationId,
+      reservationId,
       status: 'reserved',
       campaignId: campaign.id,
       campaignName: campaign.name,
@@ -440,13 +461,15 @@ const handleConfirm = async (database, customer, payload) => {
     throw error;
   }
 
-  await database.ref(`storeUsers/${customer.uid}`).update({
-    first_order_reward_used: true,
-    reward_campaign_id: orderReward.campaignId,
-    reward_tier_id: orderReward.tierId,
-    reward_item_id: orderReward.itemId,
-    reward_order_id: orderKey,
-    reward_redeemed_at: now,
+  await database.ref().update({
+    [`orders/${orderKey}/firstOrderReward/status`]: 'ordered',
+    [`orders/${orderKey}/firstOrderReward/confirmedAt`]: now,
+    [`storeUsers/${customer.uid}/first_order_reward_used`]: true,
+    [`storeUsers/${customer.uid}/reward_campaign_id`]: orderReward.campaignId,
+    [`storeUsers/${customer.uid}/reward_tier_id`]: orderReward.tierId,
+    [`storeUsers/${customer.uid}/reward_item_id`]: orderReward.itemId,
+    [`storeUsers/${customer.uid}/reward_order_id`]: orderKey,
+    [`storeUsers/${customer.uid}/reward_redeemed_at`]: now,
   });
   return { confirmed: true, reservationId, orderKey };
 };
@@ -537,16 +560,37 @@ const handleReconcile = async (database, uid) => {
   const snapshot = await database.ref('storeIncentives/reservations').get();
   const reservations = Object.values(snapshot.val() || {});
   let cancelled = 0;
+  let confirmed = 0;
   let delivered = 0;
   let expired = 0;
 
   for (const reservation of reservations) {
-    if (
-      reservation?.status === 'reserved' &&
-      Number(reservation.expiresAt || 0) <= Date.now()
-    ) {
-      await releaseReservation(database, reservation.id, 'expired');
-      expired += 1;
+    if (reservation?.status === 'reserved') {
+      const matchingOrder = await findOrderByRewardReservation(database, reservation);
+      if (matchingOrder && isCanceledOrFailedOrder(matchingOrder)) {
+        await releaseReservation(database, reservation.id, 'cancelled');
+        cancelled += 1;
+        continue;
+      }
+      if (matchingOrder) {
+        await handleConfirm(
+          database,
+          {
+            uid: reservation.customerId,
+            phoneKey: reservation.phoneKey,
+          },
+          {
+            reservationId: reservation.id,
+            orderKey: matchingOrder.firebaseKey,
+          }
+        );
+        confirmed += 1;
+        continue;
+      }
+      if (Number(reservation.expiresAt || 0) <= Date.now()) {
+        await releaseReservation(database, reservation.id, 'expired');
+        expired += 1;
+      }
       continue;
     }
     if (reservation?.status !== 'ordered' || !reservation?.orderKey) {
@@ -571,7 +615,170 @@ const handleReconcile = async (database, uid) => {
       delivered += 1;
     }
   }
-  return { reconciled: true, cancelled, delivered, expired };
+  return { reconciled: true, cancelled, confirmed, delivered, expired };
+};
+
+const appendRewardToOrderText = (orderText = '', reward = null) => {
+  const rewardLines = buildFirstOrderRewardTextLines(reward);
+  const currentText = String(orderText || '').trim();
+  if (rewardLines.length === 0 || currentText.includes(rewardLines[0])) {
+    return currentText;
+  }
+  const marker = '\n\nSubtotal actualizado:';
+  const markerIndex = currentText.indexOf(marker);
+  return markerIndex >= 0
+    ? `${currentText.slice(0, markerIndex)}\n\n${rewardLines.join('\n')}${currentText.slice(markerIndex)}`
+    : `${currentText}\n\n${rewardLines.join('\n')}`.trim();
+};
+
+const handleRepairOrderReward = async (database, uid, payload) => {
+  const role = await getRole(database, uid);
+  if (!ADMIN_ROLES.has(role)) {
+    const error = new Error('Permiso administrativo requerido.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const reservationId = String(payload.reservationId || '').trim();
+  const orderKey = String(payload.orderKey || '').trim();
+  if (!reservationId || !orderKey) {
+    const error = new Error('Falta la reserva o el pedido que se debe reparar.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const [orderSnapshot, reservationSnapshot] = await Promise.all([
+    database.ref(`orders/${orderKey}`).get(),
+    database.ref(`storeIncentives/reservations/${reservationId}`).get(),
+  ]);
+  const order = orderSnapshot.val();
+  const reservationPreview = reservationSnapshot.val();
+  if (!order || !reservationPreview) {
+    const error = new Error('No encontramos el pedido o la reserva que se debe reparar.');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (String(order.storeUserKey || '') !== String(reservationPreview.customerId || '')) {
+    const error = new Error('El pedido y la reserva pertenecen a clientes diferentes.');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const now = Date.now();
+  let rejection = 'No se pudo reactivar la reserva.';
+  const transactionResult = await database.ref('storeIncentives').transaction((stateValue) => {
+    if (stateValue === null) {
+      return {};
+    }
+    const state = stateValue || {};
+    const reservation = state?.reservations?.[reservationId];
+    if (!reservation) {
+      rejection = 'La reserva ya no existe.';
+      return;
+    }
+    const finalizedStatus = ['ordered', 'delivered'].includes(String(reservation.status || ''));
+    if (finalizedStatus && reservation.orderKey !== orderKey) {
+      rejection = 'La reserva ya esta vinculada a otro pedido.';
+      return;
+    }
+
+    if (reservation.status !== 'reserved' && !finalizedStatus) {
+      const item = state?.config?.items?.[reservation.campaignId]?.[reservation.tierId]?.[reservation.itemId];
+      if (!item || Number(item.stockAvailable || 0) < 1) {
+        rejection = 'La regalia ya no tiene inventario disponible.';
+        return;
+      }
+      item.stockAvailable = Math.max(0, Number(item.stockAvailable || 0) - 1);
+      item.stockReserved = Math.max(0, Number(item.stockReserved || 0)) + 1;
+      item.updatedAt = now;
+    }
+
+    if (!finalizedStatus) {
+      reservation.reservationId = reservationId;
+      reservation.status = 'reserved';
+      reservation.expiresAt = now + RESERVATION_TTL_MS;
+      reservation.updatedAt = now;
+      delete reservation.releasedAt;
+      delete reservation.orderKey;
+      delete reservation.orderNumber;
+      delete reservation.orderDate;
+      delete reservation.orderedAt;
+      state.claims ||= {};
+      state.claims.users ||= {};
+      state.claims.phones ||= {};
+      const claim = {
+        reservationId,
+        status: 'reserved',
+        campaignId: reservation.campaignId,
+        customerId: reservation.customerId,
+        phoneKey: reservation.phoneKey,
+        reservedAt: reservation.reservedAt,
+        expiresAt: reservation.expiresAt,
+      };
+      state.claims.users[reservation.customerId] = claim;
+      state.claims.phones[reservation.phoneKey] = claim;
+    }
+    return state;
+  }, undefined, false);
+
+  if (!transactionResult.committed) {
+    const error = new Error(rejection);
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const reservation = transactionResult.snapshot.val()?.reservations?.[reservationId];
+  const rewardSnapshot = normalizeFirstOrderRewardSnapshot(reservation);
+  if (!rewardSnapshot) {
+    throw new Error('La reserva reparada no produjo una regalia valida.');
+  }
+
+  const queuedAt = Date.now();
+  await database.ref().update({
+    [`orders/${orderKey}/firstOrderReward`]: rewardSnapshot,
+    [`orders/${orderKey}/pedido`]: appendRewardToOrderText(order.pedido, rewardSnapshot),
+    [`orders/${orderKey}/sicarQuote/status`]: 'pending',
+    [`orders/${orderKey}/sicarQuote/queuedAt`]: new Date(queuedAt).toISOString(),
+    [`orders/${orderKey}/sicarQuote/reprocessReason`]: 'first_order_reward_repair',
+    [`sicarQuoteQueue/${orderKey}`]: {
+      orderKey,
+      fecha: order.fecha,
+      id: order.id,
+      orderNumber: order.orderNumber,
+      orderPrefix: order.orderPrefix,
+      canal: order.canal,
+      status: 'pending',
+      requestedAt: queuedAt,
+      requestedAtIso: new Date(queuedAt).toISOString(),
+      attempts: 0,
+      appOrderNumber: order.id,
+      appOrderCode: order.orderNumber,
+      storeBranchId: order.storeBranchId,
+      storeBranchCode: order.storeBranchCode,
+      storeBranchName: order.storeBranchName,
+    },
+  });
+
+  if (reservation.status !== 'delivered') {
+    await handleConfirm(
+      database,
+      {
+        uid: reservation.customerId,
+        phoneKey: reservation.phoneKey,
+      },
+      { reservationId, orderKey }
+    );
+  }
+
+  return {
+    repaired: true,
+    reservationId,
+    orderKey,
+    rewardSnapshot: {
+      ...rewardSnapshot,
+      status: reservation.status === 'delivered' ? 'delivered' : 'ordered',
+    },
+  };
 };
 
 export const handler = async (event) => {
@@ -592,6 +799,8 @@ export const handler = async (event) => {
     let result;
     if (action === 'reconcile') {
       result = await handleReconcile(database, decodedToken.uid);
+    } else if (action === 'repair-order') {
+      result = await handleRepairOrderReward(database, decodedToken.uid, payload);
     } else {
       const customer = await getCustomerContext(database, decodedToken.uid);
       if (action === 'eligibility') {

@@ -61,4 +61,11 @@ assert.equal(rewardSnapshot?.subtotal, 0);
 assert.equal(rewardSnapshot?.quantity, 1);
 assert.equal(rewardSnapshot?.eligibleSubtotal, 500);
 
+const legacyReservationSnapshot = normalizeFirstOrderRewardSnapshot({
+  ...rewardSnapshot,
+  reservationId: undefined,
+  id: 'fir_legacy_reservation',
+});
+assert.equal(legacyReservationSnapshot?.reservationId, 'fir_legacy_reservation');
+
 console.log('Regalo de primera compra: limites, progreso, stock y snapshot correctos.');

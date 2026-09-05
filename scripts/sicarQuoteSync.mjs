@@ -541,6 +541,11 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
     lines.push(...rewardLines);
   }
 
+  if (firstOrderRewardLines.length > 0) {
+    lines.push('');
+    lines.push(...firstOrderRewardLines);
+  }
+
   if (subtotal > 0) {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatMoney(subtotal)}`);
@@ -619,10 +624,6 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
     lines.push(...rewardLines);
   }
 
-  if (firstOrderRewardLines.length > 0) {
-    lines.push('');
-    lines.push(...firstOrderRewardLines);
-  }
   if (firstOrderRewardLines.length > 0) {
     lines.push('');
     lines.push(...firstOrderRewardLines);

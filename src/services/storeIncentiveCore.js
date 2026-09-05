@@ -221,7 +221,7 @@ export const normalizeFirstOrderRewardSnapshot = (value = null) => {
   if (!value || typeof value !== 'object') {
     return null;
   }
-  const reservationId = String(value.reservationId || '').trim();
+  const reservationId = String(value.reservationId || value.id || '').trim();
   const campaignId = sanitizeIncentiveId(value.campaignId);
   const tierId = sanitizeIncentiveId(value.tierId);
   const itemId = sanitizeIncentiveId(value.itemId);
