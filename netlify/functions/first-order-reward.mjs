@@ -231,9 +231,22 @@ const handleReserve = async (database, customer, payload) => {
     throw error;
   }
 
+  const configSnapshot = await database.ref('storeIncentives/config').get();
+  if (!findFirstOrderCampaign(configSnapshot.val(), requestedCampaignId, branchId, now)) {
+    const error = new Error('La campana de bienvenida no esta disponible.');
+    error.statusCode = 409;
+    error.code = 'CAMPAIGN_UNAVAILABLE';
+    throw error;
+  }
+
   const reservationId = `fir_${now}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   let rejection = 'No pudimos reservar este regalo.';
   const result = await database.ref('storeIncentives').transaction((currentValue) => {
+    // Realtime Database starts a transaction from its local cache. Returning a
+    // value here forces the server round-trip before applying validations.
+    if (currentValue === null) {
+      return {};
+    }
     const state = currentValue || {};
     state.config ||= {};
     state.reservations ||= {};
@@ -359,9 +372,21 @@ const handleConfirm = async (database, customer, payload) => {
     throw error;
   }
 
+  const reservationPreview = await database
+    .ref(`storeIncentives/reservations/${reservationId}`)
+    .get();
+  if (!reservationPreview.exists()) {
+    const error = new Error('La reserva ya no esta disponible.');
+    error.statusCode = 409;
+    throw error;
+  }
+
   const now = Date.now();
   let rejection = 'La reserva ya no esta disponible.';
   const result = await database.ref('storeIncentives').transaction((stateValue) => {
+    if (stateValue === null) {
+      return {};
+    }
     const state = stateValue || {};
     const reservation = state?.reservations?.[reservationId];
     if (!reservation || reservation.customerId !== customer.uid) {
@@ -427,9 +452,18 @@ const handleConfirm = async (database, customer, payload) => {
 };
 
 const releaseReservation = async (database, reservationId, status = 'cancelled') => {
+  const reservationPreview = await database
+    .ref(`storeIncentives/reservations/${reservationId}`)
+    .get();
+  if (!reservationPreview.exists()) {
+    return null;
+  }
   const now = Date.now();
   let releasedReservation = null;
   const result = await database.ref('storeIncentives').transaction((stateValue) => {
+    if (stateValue === null) {
+      return {};
+    }
     const state = stateValue || {};
     const reservation = state?.reservations?.[reservationId];
     if (!reservation) {
