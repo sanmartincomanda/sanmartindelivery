@@ -39,7 +39,8 @@ export const STORE_SUBCATEGORY_CANONICALS = {
     'Sumplementos para asado',
     'Z - Otros',
   ],
-  congelados: ['Derivado pollo', 'Mariscos', 'Otros Congelados'],
+  congelados: ['Otros Congelados'],
+  mariscos: ['Mariscos'],
   refrigerados: ['Bebidas', 'Embutidos', 'Lacteos', 'Otros Refrigerados'],
   promociones: ['Combos'],
 };
@@ -80,9 +81,11 @@ const STORE_SUBCATEGORY_ALIASES = {
     'z - otros': 'Z - Otros',
   },
   congelados: {
-    'derivado pollo': 'Derivado pollo',
-    mariscos: 'Mariscos',
+    'derivado pollo': 'Otros Congelados',
     'otros congelados': 'Otros Congelados',
+  },
+  mariscos: {
+    mariscos: 'Mariscos',
   },
   refrigerados: {
     bebidas: 'Bebidas',
@@ -120,6 +123,23 @@ Object.values(STORE_SUBCATEGORY_CANONICALS).forEach((labels) => {
     }
   });
 });
+
+export const normalizeStoreCategoryId = (category, subcategory = '') => {
+  const normalizedCategoryId = normalizeCategoryKey(category);
+  const normalizedSubcategory = normalizeSubcategoryKey(subcategory);
+
+  if (normalizedCategoryId === 'carniceria') {
+    return normalizedSubcategory.includes('gallina') || normalizedSubcategory.includes('pollo')
+      ? 'pollo'
+      : 'res';
+  }
+
+  if (normalizedCategoryId === 'congelados' && normalizedSubcategory === 'mariscos') {
+    return 'mariscos';
+  }
+
+  return normalizedCategoryId || 'res';
+};
 
 export const getForcedSicarSubcategories = (categoryId) => {
   const normalizedCategoryId = normalizeCategoryKey(categoryId);

@@ -32,13 +32,14 @@ import StoreOperationHoursEditor from './StoreOperationHoursEditor';
 
 const money = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 const CATALOG_PAGE_SIZE = 24;
-const CATEGORY_PRIORITY = ['res', 'pollo', 'cerdo', 'abarroteria', 'congelados', 'refrigerados', 'combos', 'promociones', 'otros'];
+const CATEGORY_PRIORITY = ['res', 'pollo', 'cerdo', 'abarroteria', 'congelados', 'mariscos', 'refrigerados', 'combos', 'promociones', 'otros'];
 const CATEGORY_LABELS = {
   res: 'Res',
   pollo: 'Pollo',
   cerdo: 'Cerdo',
   abarroteria: 'Abarroteria',
   congelados: 'Congelados',
+  mariscos: 'Mariscos',
   refrigerados: 'Refrigerados',
   combos: 'Combos',
   promociones: 'Promociones',

@@ -1,7 +1,11 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { STORE_CATEGORIES } from '../data/tiendaVirtual';
-import { normalizeStoreSubcategories, normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
+import {
+  normalizeStoreCategoryId,
+  normalizeStoreSubcategories,
+  normalizeStoreSubcategory,
+} from '../data/storeSubcategoryRules';
 
 export const STORE_CATEGORIES_PATH = 'storeCategories';
 
@@ -14,8 +18,17 @@ const normalizeId = (value) =>
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
 
-const normalizeSubcategories = (value, categoryId = '') =>
-  normalizeStoreSubcategories(value, categoryId);
+const normalizeSubcategories = (value, categoryId = '') => {
+  if (categoryId === 'congelados') {
+    return ['Otros Congelados'];
+  }
+
+  if (categoryId === 'mariscos') {
+    return ['Mariscos'];
+  }
+
+  return normalizeStoreSubcategories(value, categoryId);
+};
 
 export const normalizeStoreCategory = (category = {}, fallback = {}) => {
   const source = category || {};
@@ -97,12 +110,14 @@ export const buildStoreCategoriesFromCatalogProducts = (products = []) => {
   const byId = new Map();
 
   products.forEach((product, index) => {
-    const categoryId = normalizeId(product?.category);
+    const categoryId = normalizeStoreCategoryId(product?.category, product?.subcategory);
     if (!categoryId) {
       return;
     }
 
-    const categoryLabel = String(product?.categoryLabel || product?.category || '').trim() || categoryId;
+    const categoryLabel = categoryId === 'mariscos'
+      ? 'Mariscos'
+      : String(product?.categoryLabel || product?.category || '').trim() || categoryId;
     const subcategory = normalizeStoreSubcategory(product?.subcategory, categoryId);
     const current = byId.get(categoryId) || {
       id: categoryId,

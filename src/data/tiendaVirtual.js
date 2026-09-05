@@ -107,6 +107,11 @@ export const STORE_CATEGORIES = [
     subcategories: STORE_SUBCATEGORY_CANONICALS.congelados,
   },
   {
+    id: 'mariscos',
+    label: 'Mariscos',
+    subcategories: STORE_SUBCATEGORY_CANONICALS.mariscos,
+  },
+  {
     id: 'refrigerados',
     label: 'Refrigerados',
     subcategories: STORE_SUBCATEGORY_CANONICALS.refrigerados,

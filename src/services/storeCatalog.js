@@ -1,7 +1,7 @@
 import { get, ref, set, update } from 'firebase/database';
 import { database } from '../firebase';
 import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
-import { normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
+import { normalizeStoreCategoryId, normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
 import { isDataUrlImage, uploadCatalogImage } from './storeMedia';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
@@ -84,20 +84,8 @@ export const hasCustomProductQuantityRules = (product = {}) =>
   roundQuantityRule(getProductMinQuantity(product)) !== roundQuantityRule(getDefaultProductMinQuantity(product?.unit)) ||
   roundQuantityRule(getProductQuantityStep(product)) !== roundQuantityRule(getDefaultProductQuantityStep(product?.unit));
 
-const normalizeCategoryValue = (category, subcategory) => {
-  const rawCategory = String(category || '').trim().toLowerCase();
-  const rawSubcategory = String(subcategory || '').trim().toLowerCase();
-
-  if (rawCategory === 'carniceria') {
-    if (rawSubcategory.includes('gallina') || rawSubcategory.includes('pollo')) {
-      return 'pollo';
-    }
-
-    return 'res';
-  }
-
-  return rawCategory || 'res';
-};
+const normalizeCategoryValue = (category, subcategory) =>
+  normalizeStoreCategoryId(category, subcategory);
 
 const normalizeSubcategoryValue = (subcategory, category) =>
   normalizeStoreSubcategory(subcategory, category);
@@ -180,6 +168,8 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
   const rawCategory = source.category ?? fallback.category ?? 'res';
   const rawSubcategory = source.subcategory ?? fallback.subcategory ?? '';
   const category = normalizeCategoryValue(rawCategory, rawSubcategory);
+  const rawCategoryLabel = String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim();
+  const categoryLabel = category === 'mariscos' ? 'Mariscos' : rawCategoryLabel;
   const sync = normalizeSyncMetadata(source.sync, fallback.sync);
   const unit = String(source.unit ?? fallback.unit ?? 'lb').trim() || 'lb';
   const minQuantity = normalizePositiveQuantityRule(
@@ -207,8 +197,8 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
     imageStoragePath: String(source.imageStoragePath ?? fallback.imageStoragePath ?? '').trim(),
     description: String(source.description ?? fallback.description ?? '').trim(),
     branchSettings: normalizeBranchSettings(source.branchSettings, fallback.branchSettings),
-    ...(String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim()
-      ? { categoryLabel: String(source.categoryLabel ?? fallback.categoryLabel ?? '').trim() }
+    ...(categoryLabel
+      ? { categoryLabel }
       : {}),
     ...(sync ? { sync } : {}),
   };

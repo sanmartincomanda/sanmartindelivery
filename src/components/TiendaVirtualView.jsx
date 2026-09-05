@@ -204,6 +204,7 @@ const STORE_CATEGORY_ICON_BY_KEY = Object.freeze({
   cerdo: '/tienda/categorias/icons/cerdo.png',
   abarroteria: '/tienda/categorias/icons/abarroteria.png',
   congelados: '/tienda/categorias/icons/congelados.png',
+  mariscos: '/tienda/categorias/icons/mariscos.png',
   refrigerados: '/tienda/categorias/icons/refrigerados.png',
 });
 const STORE_SESSION_KEY = 'sanmartin_store_user';
@@ -447,7 +448,8 @@ const STORE_ALL_PRODUCTS_PRIORITY_GROUPS = [
     kicker: 'Top 5 mas vendido',
     homeLimit: STORE_GROUP_PAGE_SIZE,
   })),
-  { category: 'congelados', subcategory: 'mariscos', title: 'Congelados · Mariscos' },
+  { category: 'mariscos', subcategory: 'mariscos', title: 'Mariscos' },
+  { category: 'congelados', subcategory: 'otros congelados', title: 'Congelados · Otros congelados' },
   { category: 'refrigerados', subcategory: 'embutidos', title: 'Refrigerados · Embutidos' },
 ];
 
@@ -496,6 +498,7 @@ const STORE_SEARCH_CATEGORY_PRIORITY = [
   STORE_COMBOS_CATEGORY_ID,
   'cerdo',
   'congelados',
+  'mariscos',
   'refrigerados',
   'abarroteria',
 ];

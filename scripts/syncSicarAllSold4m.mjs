@@ -6,7 +6,11 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase, get, ref, update } from 'firebase/database';
 import { getDownloadURL, getStorage, ref as storageRef, uploadString } from 'firebase/storage';
 import { getSicarDepartmentConfig, SICAR_SPECIAL_SKU_OVERRIDES, SICAR_SYNC_DEPARTMENTS } from '../src/data/sicarCatalogRules.js';
-import { normalizeStoreSubcategory, normalizeSubcategoryKey } from '../src/data/storeSubcategoryRules.js';
+import {
+  normalizeStoreCategoryId,
+  normalizeStoreSubcategory,
+  normalizeSubcategoryKey,
+} from '../src/data/storeSubcategoryRules.js';
 
 const FIREBASE_CONFIG = {
   apiKey: 'AIzaSyA6LKWFpuIUH4g6owCzIbMbqOzNwV_UIro',
@@ -59,7 +63,8 @@ const DEFAULT_CATEGORY_SORT_ORDER = {
   cerdo: 20,
   abarroteria: 30,
   congelados: 40,
-  refrigerados: 50,
+  mariscos: 50,
+  refrigerados: 60,
 };
 
 const pad = (value) => String(value).padStart(2, '0');
@@ -419,6 +424,15 @@ const resolveFallbackSubcategory = (categoryId, category = {}) => {
 
 const resolveStoreSubcategoryForRow = (row, categoryId, currentCategory = {}) => {
   const existingMap = buildCategorySubcategoryMap(currentCategory);
+  const canonicalSubcategory = normalizeStoreSubcategory(
+    row.storeSubcategory || row.sicarCategory,
+    categoryId
+  );
+
+  if (categoryId === 'congelados' || categoryId === 'mariscos') {
+    return canonicalSubcategory || resolveFallbackSubcategory(categoryId, currentCategory);
+  }
+
   const candidates = [
     normalizeStoreSubcategory(row.storeSubcategory, categoryId),
     String(row.storeSubcategory || '').trim(),
@@ -694,6 +708,18 @@ const main = async () => {
   const skipped = [];
   const movedKeys = {};
 
+  const frozenCategory = categoryState.get('congelados');
+  if (frozenCategory) {
+    frozenCategory.subcategories = ['Otros Congelados'];
+    categoryUpdates[frozenCategory.pathKey] = {
+      id: frozenCategory.id,
+      label: frozenCategory.label,
+      active: frozenCategory.active,
+      sortOrder: frozenCategory.sortOrder,
+      subcategories: frozenCategory.subcategories,
+    };
+  }
+
   soldRows.forEach((rawRow) => {
     const override = SICAR_SPECIAL_SKU_OVERRIDES[rawRow.code] || null;
     const departmentName = override?.sicarDepartment || rawRow.sicarDepartment;
@@ -728,10 +754,14 @@ const main = async () => {
       return;
     }
 
-    const targetCategoryId = String(override?.storeCategoryId || departmentConfig.storeCategoryId).trim();
-    const targetCategoryLabel = String(
-      override?.storeCategoryLabel || departmentConfig.storeCategoryLabel
-    ).trim();
+    const sourceCategoryId = String(override?.storeCategoryId || departmentConfig.storeCategoryId).trim();
+    const targetCategoryId = normalizeStoreCategoryId(
+      sourceCategoryId,
+      row.storeSubcategory || row.sicarCategory
+    );
+    const targetCategoryLabel = targetCategoryId === 'mariscos'
+      ? 'Mariscos'
+      : String(override?.storeCategoryLabel || departmentConfig.storeCategoryLabel).trim();
     const targetCategory =
       categoryState.get(targetCategoryId) || {
         pathKey: targetCategoryId,
@@ -739,7 +769,7 @@ const main = async () => {
         label: targetCategoryLabel,
         subcategories: [],
         active: true,
-        sortOrder: departmentConfig.sortOrder,
+        sortOrder: DEFAULT_CATEGORY_SORT_ORDER[targetCategoryId] ?? departmentConfig.sortOrder,
       };
     const resolvedSubcategory = resolveStoreSubcategoryForRow(row, targetCategory.id, targetCategory);
     const currentSubcategories = Array.isArray(targetCategory.subcategories)

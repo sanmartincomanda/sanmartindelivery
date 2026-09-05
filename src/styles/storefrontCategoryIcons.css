@@ -24,6 +24,10 @@ html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-
   mask-size: contain;
 }
 
+html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-symbol:not(.store-category-symbol-image) {
+  color: #0044c5 !important;
+}
+
 html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-category-card .store-filter-label,
 html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy strong,
 html body .store-shell.storefront-public-v2.storefront-brand-v3 .store-mobile-category-tile-copy span {
