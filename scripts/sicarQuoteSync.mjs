@@ -8,6 +8,10 @@ import {
   buildStoreRewardRedemptionTextLines,
   normalizeStoreRewardRedemption,
 } from '../src/services/storeRewards.js';
+import {
+  buildFirstOrderRewardTextLines,
+  normalizeFirstOrderRewardSnapshot,
+} from '../src/services/storeIncentiveCore.js';
 
 const STORE_CHANNEL = 'tienda_virtual';
 const MANUAL_CHANNEL = 'manual';
@@ -297,10 +301,38 @@ const normalizeRewardOrderItems = (rewardRedemption = {}) => {
       subtotal: 0,
       rewardId: String(normalizedRewardRedemption.rewardId || '').trim(),
       rewardName: String(normalizedRewardRedemption.rewardName || '').trim(),
+      rewardKind: 'membership',
       isReward: true,
     }))
     .filter((item) => item.code && item.quantity > 0);
 };
+
+const normalizeFirstOrderRewardItems = (firstOrderReward = null) => {
+  const reward = normalizeFirstOrderRewardSnapshot(firstOrderReward);
+  if (!reward) {
+    return [];
+  }
+
+  return [{
+    code: reward.sku,
+    name: reward.itemName,
+    description: '',
+    unit: 'unidad',
+    quantity: 1,
+    unitPrice: 0,
+    subtotal: 0,
+    rewardId: reward.campaignId,
+    rewardName: 'Regalia primera compra',
+    rewardKind: 'first_order',
+    isReward: true,
+    isFirstOrderReward: true,
+  }];
+};
+
+const normalizeComplimentaryOrderItems = (order = {}) => [
+  ...normalizeRewardOrderItems(order.rewardRedemption),
+  ...normalizeFirstOrderRewardItems(order.firstOrderReward),
+];
 
 const mergeDuplicateQuoteDetailItems = (items = []) => {
   const mergedByArticle = new Map();
@@ -320,6 +352,7 @@ const mergeDuplicateQuoteDetailItems = (items = []) => {
         rewardQuantity: sourceType === 'reward' ? roundQuantity(item.quantity) : 0,
         deliveryQuantity: sourceType === 'delivery' ? roundQuantity(item.quantity) : 0,
         rewardNames: new Set(item?.rewardName ? [String(item.rewardName).trim()] : []),
+        rewardKinds: new Set(item?.rewardKind ? [String(item.rewardKind).trim()] : []),
       });
       return;
     }
@@ -337,6 +370,9 @@ const mergeDuplicateQuoteDetailItems = (items = []) => {
     existing.sourceTypes.add(sourceType);
     if (item?.rewardName) {
       existing.rewardNames.add(String(item.rewardName).trim());
+    }
+    if (item?.rewardKind) {
+      existing.rewardKinds.add(String(item.rewardKind).trim());
     }
 
     [
@@ -367,9 +403,10 @@ const mergeDuplicateQuoteDetailItems = (items = []) => {
       ? roundRate((diferencia / item.importeCon) * 100)
       : 0;
     const rewardName = Array.from(item.rewardNames || []).filter(Boolean).join(', ');
+    const rewardKinds = Array.from(item.rewardKinds || []);
     const rewardUnitLabel = item.rewardQuantity === 1 ? 'UNIDAD' : 'UNIDADES';
     const rewardNote = item.rewardQuantity > 0
-      ? `CANJE MEMBRESIA GOLD: ${formatStoreQuantityLabel(item.rewardQuantity, 'unidad')} ${rewardUnitLabel} AL 100%`
+      ? `${rewardKinds.includes('first_order') ? 'REGALIA PRIMERA COMPRA' : 'CANJE MEMBRESIA GOLD'}: ${formatStoreQuantityLabel(item.rewardQuantity, 'unidad')} ${rewardUnitLabel} AL 100%`
       : '';
 
     return {
@@ -484,6 +521,7 @@ const buildOrderText = (items = [], notes = '', summary = {}) => {
   const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
   const lines = [];
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
+  const firstOrderRewardLines = buildFirstOrderRewardTextLines(summary.firstOrderReward);
   const cleanNotes = normalizeText(notes || summary.notes || '');
   const discountLabel = getOrderDiscountLabel(summary.order || summary);
 
@@ -540,7 +578,7 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
     quote?.customerTotal ?? Math.max(roundMoney(quote?.total || 0) - customerDiscount, 0)
   );
   const storeName = normalizeText(order?.storeBranchName || 'Carnes San Martin Granada');
-  const rewardItems = normalizeRewardOrderItems(order.rewardRedemption);
+  const rewardItems = normalizeComplimentaryOrderItems(order);
   const rewardQuantityByCode = rewardItems.reduce((map, item) => {
     const code = normalizeCode(item.code);
     map.set(code, roundQuantity(Number(map.get(code) || 0) + Number(item.quantity || 0)));
@@ -575,9 +613,19 @@ const buildCustomerQuoteMessage = (order = {}, quote = {}) => {
     });
 
   const rewardLines = buildStoreRewardRedemptionTextLines(order.rewardRedemption);
+  const firstOrderRewardLines = buildFirstOrderRewardTextLines(order.firstOrderReward);
   if (rewardLines.length > 0) {
     lines.push('');
     lines.push(...rewardLines);
+  }
+
+  if (firstOrderRewardLines.length > 0) {
+    lines.push('');
+    lines.push(...firstOrderRewardLines);
+  }
+  if (firstOrderRewardLines.length > 0) {
+    lines.push('');
+    lines.push(...firstOrderRewardLines);
   }
 
   lines.push('');
@@ -1348,7 +1396,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
   const buildQuoteDraft = async (order = {}) => {
     const orderItems = normalizeOrderItems(order.items);
     const deliveryItem = buildDeliveryServiceOrderItem(order);
-    const rewardItems = normalizeRewardOrderItems(order.rewardRedemption);
+    const rewardItems = normalizeComplimentaryOrderItems(order);
     const sourceItems = [...orderItems, ...(deliveryItem ? [deliveryItem] : []), ...rewardItems];
     const articleMap = await getSicarArticlesByCodes(sourceItems.map((item) => item.code));
     const missingCodes = [];
@@ -1361,7 +1409,8 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
           throw new Error(`No existe en SICAR el articulo ${item.code} para servicio a domicilio.`);
         }
         if (item.isReward === true) {
-          throw new Error(`No existe en SICAR el articulo ${item.code} del canje Miembro Gold.`);
+          const rewardLabel = item.isFirstOrderReward ? 'de la regalia de primera compra' : 'del canje Miembro Gold';
+          throw new Error(`No existe en SICAR el articulo ${item.code} ${rewardLabel}.`);
         }
         missingCodes.push(item.code);
         return;
@@ -1999,7 +2048,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         .map((item) => [normalizeCode(item?.codigo ?? item?.code ?? ''), item])
         .filter(([code]) => Boolean(code))
     );
-    const rewardQuantityByCode = normalizeRewardOrderItems(order.rewardRedemption).reduce((map, item) => {
+    const rewardQuantityByCode = normalizeComplimentaryOrderItems(order).reduce((map, item) => {
       const code = normalizeCode(item.code);
       map.set(code, roundQuantity(Number(map.get(code) || 0) + Number(item.quantity || 0)));
       return map;
@@ -2137,6 +2186,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
         totalLabel: 'Total actualizado de pedido',
         subtotalLabel: 'Subtotal actualizado',
         rewardRedemption: order.rewardRedemption,
+        firstOrderReward: order.firstOrderReward,
         order,
       }),
       subtotalEstimado: productSubtotal,

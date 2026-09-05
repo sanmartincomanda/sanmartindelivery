@@ -145,7 +145,7 @@ const getKitchenRewardItems = (pedido = {}) => {
   const redemption = pedido?.rewardRedemption;
   const rewardName = String(redemption?.rewardName || 'Premio Miembro Gold').trim();
 
-  return (Array.isArray(redemption?.items) ? redemption.items : [])
+  const memberRewardItems = (Array.isArray(redemption?.items) ? redemption.items : [])
     .map((item, index) => ({
       id: String(item?.id || `${item?.productCode || 'premio'}-${index}`).trim(),
       codigo: String(item?.productCode || '').trim(),
@@ -155,6 +155,19 @@ const getKitchenRewardItems = (pedido = {}) => {
       rewardName,
     }))
     .filter((item) => item.codigo && item.nombre);
+  const firstOrderReward = pedido?.firstOrderReward;
+  const welcomeRewardItem = firstOrderReward?.sku && firstOrderReward?.itemName
+    ? [{
+        id: String(firstOrderReward.itemId || firstOrderReward.sku),
+        codigo: String(firstOrderReward.sku),
+        nombre: String(firstOrderReward.itemName),
+        cantidad: 1,
+        unidad: 'unidad',
+        rewardName: 'Regalia de primera compra',
+      }]
+    : [];
+
+  return [...memberRewardItems, ...welcomeRewardItem];
 };
 
 const getRequestedStoreQuantity = (item = {}) =>
@@ -256,6 +269,7 @@ const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
       subtotalLabel: 'Subtotal actualizado',
       observaciones: pedido?.observaciones,
       rewardRedemption: pedido?.rewardRedemption,
+      firstOrderReward: pedido?.firstOrderReward,
     }),
     subtotalEstimado: subtotal,
     total,
@@ -293,6 +307,7 @@ const getKitchenOrderText = (pedido = {}) => {
         pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado',
       observaciones: pedido.observaciones,
       rewardRedemption: pedido.rewardRedemption,
+      firstOrderReward: pedido.firstOrderReward,
     });
   }
 

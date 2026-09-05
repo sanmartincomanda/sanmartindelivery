@@ -144,6 +144,7 @@ import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import StoreCustomerDiscountsAdminSection from './StoreCustomerDiscountsAdminSection';
 import StoreBranchesAdminSection from './StoreBranchesAdminSection';
+import FirstOrderRewardAdminSection from './FirstOrderRewardAdminSection';
 import '../styles/storeAdmin2026.css';
 import {
   buildDefaultStoreWelcomeCouponCampaign,
@@ -199,6 +200,13 @@ const STORE_ADMIN_GROUPS = [
       { id: 'cupones', label: 'Cupones' },
     ],
   },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    desktopLabel: 'Marketing',
+    icon: 'marketing',
+    sections: [{ id: 'regalias', label: 'Regalias' }],
+  },
 ];
 
 const getStoreAdminGroup = (section = '') =>
@@ -229,6 +237,13 @@ function StoreAdminIcon({ name }) {
     benefits: (
       <>
         <path d="m12 3 2.3 4.66 5.14.75-3.72 3.62.88 5.12L12 14.73l-4.6 2.42.88-5.12-3.72-3.62 5.14-.75L12 3Z" />
+      </>
+    ),
+    marketing: (
+      <>
+        <path d="M4 13V9l13-5v14L4 13Z" />
+        <path d="M4 10H2v2h2M8 14l1.5 6h3L11 13" />
+        <path d="M20 8v6" />
       </>
     ),
   };
@@ -911,7 +926,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || !['pedidos', 'cupones', 'recompensas', 'clientes'].includes(section)) {
+    if (!isStoreMode || !['pedidos', 'cupones', 'recompensas', 'clientes', 'regalias'].includes(section)) {
       return undefined;
     }
 
@@ -1030,7 +1045,7 @@ export default function ConfiguracionView({ mode = 'users' }) {
 
   useEffect(() => {
     if (
-      (isStoreMode && !['cupones', 'recompensas', 'clientes', 'descuentos'].includes(section)) ||
+      (isStoreMode && !['cupones', 'recompensas', 'clientes', 'descuentos', 'regalias'].includes(section)) ||
       (!isStoreMode && usersTab !== 'clientes')
     ) {
       return undefined;
@@ -2510,6 +2525,10 @@ export default function ConfiguracionView({ mode = 'users' }) {
           path: 'Tienda Virtual / Beneficios',
           title: 'Anuncios popup',
         },
+        regalias: {
+          path: 'Tienda Virtual / Marketing / Regalias',
+          title: 'Regalo Primera Compra',
+        },
       }[section] || {
         path: 'Admintv / Tienda Virtual',
         title: 'Tienda Virtual',
@@ -3300,6 +3319,11 @@ export default function ConfiguracionView({ mode = 'users' }) {
         ) : isStoreMode && section === 'recompensas' ? (
           <StoreRewardsAdminSection
             catalog={products}
+            storeUsers={storeUsers}
+            storeOrders={storeOrders}
+          />
+        ) : isStoreMode && section === 'regalias' ? (
+          <FirstOrderRewardAdminSection
             storeUsers={storeUsers}
             storeOrders={storeOrders}
           />

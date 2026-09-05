@@ -4,6 +4,10 @@ import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
 import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards.js';
 import {
+  buildFirstOrderRewardTextLines,
+  normalizeFirstOrderRewardSnapshot,
+} from './storeIncentiveCore.js';
+import {
   buildStoreWelcomeCouponReservationState,
   isStoreWelcomeCouponCoupon,
 } from './storeWelcomeCoupon.js';
@@ -283,10 +287,16 @@ export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
 
   const cleanNotes = String(notes || '').trim();
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
+  const firstOrderRewardLines = buildFirstOrderRewardTextLines(summary.firstOrderReward);
 
   if (rewardLines.length > 0) {
     lines.push('');
     lines.push(...rewardLines);
+  }
+
+  if (firstOrderRewardLines.length > 0) {
+    lines.push('');
+    lines.push(...firstOrderRewardLines);
   }
 
   if (cleanNotes) {
@@ -346,10 +356,16 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
     ...normalizedItems.map((item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim())
   );
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
+  const firstOrderRewardLines = buildFirstOrderRewardTextLines(summary.firstOrderReward);
 
   if (rewardLines.length > 0) {
     lines.push('');
     lines.push(...rewardLines);
+  }
+
+  if (firstOrderRewardLines.length > 0) {
+    lines.push('');
+    lines.push(...firstOrderRewardLines);
   }
 
   if (subtotal > 0) {
@@ -574,6 +590,7 @@ export async function createOrder(payload, options = {}) {
     : null;
   const discountBenefit = normalizeOrderDiscountBenefit(payload.discountBenefit, couponDiscount);
 
+  const normalizedFirstOrderReward = normalizeFirstOrderRewardSnapshot(payload.firstOrderReward);
   const rawPedidoTexto = String(payload.pedido || '').trim();
   const generatedKitchenPedidoTexto = buildStoreKitchenOrderText(normalizedItems, {
     couponCode: coupon?.code,
@@ -588,6 +605,7 @@ export async function createOrder(payload, options = {}) {
     metodoPago: payload.metodoPago,
     observaciones: payload.observaciones,
     rewardRedemption: payload.rewardRedemption,
+    firstOrderReward: normalizedFirstOrderReward,
   });
   const pedidoTexto =
     normalizedItems.length > 0
@@ -631,6 +649,7 @@ export async function createOrder(payload, options = {}) {
     cupon: coupon,
     discountBenefit,
     rewardRedemption: normalizedRewardRedemption,
+    firstOrderReward: normalizedFirstOrderReward,
     total,
     totalAproximado: shouldQueueSicarQuote,
     estado: 'Pendiente',

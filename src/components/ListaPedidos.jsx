@@ -8,6 +8,7 @@ import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
+import { reconcileFirstOrderRewards } from '../services/storeIncentives';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -322,7 +323,7 @@ export default function ListaPedidos({ pedidos = [] }) {
     });
   };
 
-  const handleCancelarPedido = (pedido) => {
+  const handleCancelarPedido = async (pedido) => {
     if (!pedido?.firebaseKey) return;
 
     const cancellationPin = window.prompt('Ingresa el PIN para anular este pedido:');
@@ -345,7 +346,7 @@ export default function ListaPedidos({ pedidos = [] }) {
       return next;
     }), 300);
 
-    update(ref(database, `${getBasePath()}/${pedido.firebaseKey}`), {
+    await update(ref(database, `${getBasePath()}/${pedido.firebaseKey}`), {
       estado: 'Cancelado',
       canceladoPor: 'Administracion - lista de pedidos',
       canceladoOrigen: 'tienda',
@@ -359,6 +360,11 @@ export default function ListaPedidos({ pedidos = [] }) {
       timestampFinalizado: nowMs,
       timestamp: nowMs
     });
+    if (pedido?.firstOrderReward?.reservationId) {
+      reconcileFirstOrderRewards().catch((error) => {
+        console.warn('La devolución de la regalía quedó pendiente de conciliación:', error);
+      });
+    }
   };
 
   const mostrarNombreCocinero = (nombre) => {
@@ -459,6 +465,7 @@ export default function ListaPedidos({ pedidos = [] }) {
           pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado',
         observaciones,
         rewardRedemption: pedido.rewardRedemption,
+        firstOrderReward: pedido.firstOrderReward,
       });
     }
 

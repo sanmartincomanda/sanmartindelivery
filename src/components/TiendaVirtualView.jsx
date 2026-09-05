@@ -151,6 +151,12 @@ import {
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
 import StoreRewardsSheet, { StoreRewardsSummaryCard } from './StoreRewardsSheet';
+import {
+  FirstOrderRewardCheckoutCard,
+  FirstOrderRewardLine,
+  FirstOrderRewardProgress,
+  FirstOrderRewardSelector,
+} from './FirstOrderRewardExperience';
 import StoreBranchSelector, { StoreBranchButton } from './StoreBranchSelector';
 import {
   buildStoreRewardRedemptionSnapshot,
@@ -166,6 +172,20 @@ import {
   subscribeStoreRewardTransactions,
   subscribeStoreRewards,
 } from '../services/storeRewards';
+import {
+  checkFirstOrderRewardEligibility,
+  confirmFirstOrderReward,
+  getCampaignItems,
+  getCampaignTiers,
+  getFirstOrderRewardCampaign,
+  releaseFirstOrderReward,
+  reserveFirstOrderReward,
+  subscribeStoreIncentiveConfig,
+} from '../services/storeIncentives';
+import {
+  buildIncentiveProgress,
+  getAvailableIncentiveItems,
+} from '../services/storeIncentiveCore';
 import { SAN_MARTIN_STORE_CSS_VARS, SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import '../styles/storefrontPublic.css';
 import '../styles/storefrontCustomerApp.css';
@@ -1232,6 +1252,9 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
     `${totalLabel}: ${formatCurrency(order.total)}`,
     'Productos:',
     buildOrderItemsMessage(order),
+    order?.firstOrderReward?.itemName
+      ? `Regalia de primera compra: ${order.firstOrderReward.itemName} [${order.firstOrderReward.sku || '-'}] - C$0.00`
+      : '',
     order?.totalAproximado === false
       ? ''
       : 'Nota: El total puede *variar* por el peso exacto de cada producto.',
@@ -1477,6 +1500,13 @@ export default function TiendaVirtualView({
   const [selectedRewardRedemption, setSelectedRewardRedemption] = useState(null);
   const [rewardActionBusy, setRewardActionBusy] = useState(false);
   const [rewardsReturnTarget, setRewardsReturnTarget] = useState('');
+  const [incentiveConfig, setIncentiveConfig] = useState({ campaigns: [], tiers: [], items: [] });
+  const [firstOrderEligibility, setFirstOrderEligibility] = useState(null);
+  const [, setFirstOrderEligibilityLoading] = useState(false);
+  const [selectedFirstOrderGift, setSelectedFirstOrderGift] = useState(null);
+  const [firstOrderGiftOpen, setFirstOrderGiftOpen] = useState(false);
+  const [firstOrderGiftNotice, setFirstOrderGiftNotice] = useState('');
+  const [firstOrderGiftCelebrate, setFirstOrderGiftCelebrate] = useState(false);
   const [storeClosedNoticeOpen, setStoreClosedNoticeOpen] = useState(false);
   const [registerCoverageNotice, setRegisterCoverageNotice] = useState(null);
   const [storeClosedNoticeDismissed, setStoreClosedNoticeDismissed] = useState(false);
@@ -1488,6 +1518,7 @@ export default function TiendaVirtualView({
   const autoClaimingWelcomeCouponRef = useRef('');
   const popupAdSessionRef = useRef('');
   const branchLocationRequestedRef = useRef(false);
+  const firstOrderTierRef = useRef('');
   const pageTopRef = useRef(null);
   const filtersPanelRef = useRef(null);
 
@@ -1673,6 +1704,18 @@ export default function TiendaVirtualView({
         console.error('No se pudieron cargar las sucursales:', error);
         setStoreBranches(mergeStoreBranches());
         setStoreBranchesReady(true);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreIncentiveConfig(
+      setIncentiveConfig,
+      (error) => {
+        console.error('No se pudo cargar la campaña de regalo de primera compra:', error);
+        setIncentiveConfig({ campaigns: [], tiers: [], items: [] });
       }
     );
 
@@ -2560,6 +2603,125 @@ export default function TiendaVirtualView({
     () => getStoreCartOriginalSubtotal(cartItems),
     [cartItems]
   );
+
+  const firstOrderCampaign = useMemo(
+    () => getFirstOrderRewardCampaign(incentiveConfig, selectedBranch?.id, currentTimeMs),
+    [currentTimeMs, incentiveConfig, selectedBranch?.id]
+  );
+  const firstOrderTiers = useMemo(
+    () => getCampaignTiers(incentiveConfig, firstOrderCampaign?.id),
+    [firstOrderCampaign?.id, incentiveConfig]
+  );
+  const firstOrderItems = useMemo(
+    () => getCampaignItems(incentiveConfig, firstOrderCampaign?.id),
+    [firstOrderCampaign?.id, incentiveConfig]
+  );
+  const firstOrderProgress = useMemo(
+    () => buildIncentiveProgress(firstOrderTiers, originalProductTotal),
+    [firstOrderTiers, originalProductTotal]
+  );
+  const availableFirstOrderGifts = useMemo(
+    () =>
+      getAvailableIncentiveItems(firstOrderItems, firstOrderProgress.currentTier?.id, {
+        branchId: selectedBranch?.id,
+        now: currentTimeMs,
+      }),
+    [currentTimeMs, firstOrderItems, firstOrderProgress.currentTier?.id, selectedBranch?.id]
+  );
+  const firstOrderRewardEnabled = Boolean(
+    currentUser?.key && firstOrderCampaign && firstOrderEligibility?.eligible === true
+  );
+
+  useEffect(() => {
+    if (!currentUser?.key || !firstOrderCampaign?.id || !selectedBranch?.id) {
+      setFirstOrderEligibility(null);
+      setSelectedFirstOrderGift(null);
+      firstOrderTierRef.current = '';
+      return undefined;
+    }
+
+    let cancelled = false;
+    let retryTimer = null;
+    setFirstOrderEligibilityLoading(true);
+    setFirstOrderEligibility(null);
+
+    const loadEligibility = async (allowRetry = true) => {
+      try {
+        const result = await checkFirstOrderRewardEligibility({
+          campaignId: firstOrderCampaign.id,
+          branchId: selectedBranch.id,
+        });
+        if (!cancelled) setFirstOrderEligibility(result);
+      } catch (error) {
+        if (allowRetry && /sesion|session|inicia/i.test(String(error?.message || ''))) {
+          retryTimer = window.setTimeout(() => {
+            retryTimer = null;
+            loadEligibility(false);
+          }, 700);
+          return;
+        }
+        if (!cancelled) {
+          console.warn('No se pudo verificar el regalo de primera compra:', error);
+          setFirstOrderEligibility({ eligible: false, reason: 'verification_failed' });
+        }
+      } finally {
+        if (!cancelled && !retryTimer) setFirstOrderEligibilityLoading(false);
+      }
+    };
+
+    loadEligibility();
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [currentUser?.key, currentUser?.telefono, firstOrderCampaign?.id, selectedBranch?.id]);
+
+  useEffect(() => {
+    if (!firstOrderRewardEnabled || !firstOrderProgress.currentTier?.id) {
+      if (!firstOrderProgress.currentTier?.id) setSelectedFirstOrderGift(null);
+      firstOrderTierRef.current = '';
+      return;
+    }
+
+    const selectedStillAvailable = selectedFirstOrderGift
+      ? availableFirstOrderGifts.some((item) => item.id === selectedFirstOrderGift.id)
+      : true;
+    if (!selectedStillAvailable) {
+      setSelectedFirstOrderGift(null);
+      setFirstOrderGiftNotice(
+        'Tu carrito cambio. Elige nuevamente entre los regalos disponibles para tu compra actual.'
+      );
+      setFirstOrderGiftOpen(true);
+    }
+
+    const tierId = firstOrderProgress.currentTier.id;
+    if (firstOrderTierRef.current === tierId || availableFirstOrderGifts.length === 0) {
+      return;
+    }
+
+    const previousTierId = firstOrderTierRef.current;
+    firstOrderTierRef.current = tierId;
+    const celebrationKey = `csm_first_reward_${currentUser.key}_${firstOrderCampaign.id}_${tierId}`;
+    const celebrated = typeof window !== 'undefined' && window.sessionStorage.getItem(celebrationKey) === '1';
+    if (!celebrated) {
+      window.sessionStorage.setItem(celebrationKey, '1');
+      setFirstOrderGiftNotice(
+        previousTierId
+          ? 'Desbloqueaste nuevas opciones de regalo.'
+          : 'Gracias por estrenar nuestra App. Elige uno para agregar gratis a tu pedido.'
+      );
+      setFirstOrderGiftCelebrate(true);
+      setFirstOrderGiftOpen(true);
+      window.navigator?.vibrate?.(20);
+    }
+  }, [
+    availableFirstOrderGifts,
+    currentUser?.key,
+    firstOrderCampaign?.id,
+    firstOrderProgress.currentTier?.id,
+    firstOrderRewardEnabled,
+    selectedFirstOrderGift,
+  ]);
 
   const discountBenefit = useMemo(
     () =>
@@ -3525,6 +3687,13 @@ export default function TiendaVirtualView({
 
     try {
       await update(ref(database, `orders/${order.firebaseKey}`), cancelPayload);
+      if (order?.firstOrderReward?.reservationId) {
+        await releaseFirstOrderReward({
+          reservationId: order.firstOrderReward.reservationId,
+        }).catch((releaseError) => {
+          console.warn('La devolucion de inventario de la regalia quedo pendiente:', releaseError);
+        });
+      }
       setCreatedOrder((current) =>
         isSameStoreCustomerOrder(current, order) ? { ...current, ...cancelPayload } : current
       );
@@ -4125,6 +4294,18 @@ export default function TiendaVirtualView({
     setSelectedRewardRedemption(null);
   };
 
+  const openFirstOrderGiftSelector = (notice = '') => {
+    if (notice) setFirstOrderGiftNotice(notice);
+    setFirstOrderGiftCelebrate(false);
+    setFirstOrderGiftOpen(true);
+  };
+
+  const selectFirstOrderGift = (item) => {
+    setSelectedFirstOrderGift(item);
+    setFirstOrderGiftNotice('Tu regalo quedo seleccionado y se agregara al pedido por C$0.00.');
+    window.navigator?.vibrate?.(14);
+  };
+
   const submitOrder = async (event) => {
     event?.preventDefault?.();
 
@@ -4161,6 +4342,31 @@ export default function TiendaVirtualView({
 
     if (!pickupFlow && !deliveryQuote?.available) {
       alert(deliverySummary.message || 'No pudimos calcular el servicio a domicilio para este pedido.');
+      return;
+    }
+
+    let checkoutFirstOrderEligibility = firstOrderEligibility;
+    if (firstOrderCampaign) {
+      try {
+        checkoutFirstOrderEligibility = await checkFirstOrderRewardEligibility({
+          campaignId: firstOrderCampaign.id,
+          branchId: selectedBranch.id,
+        });
+        setFirstOrderEligibility(checkoutFirstOrderEligibility);
+      } catch (error) {
+        console.warn('No se pudo verificar el regalo antes del checkout:', error);
+      }
+    }
+
+    if (
+      checkoutFirstOrderEligibility?.eligible === true &&
+      firstOrderProgress.currentTier &&
+      availableFirstOrderGifts.length > 0 &&
+      !selectedFirstOrderGift
+    ) {
+      openFirstOrderGiftSelector(
+        'No olvides tu regalo. Ya lo desbloqueaste: elige uno antes de terminar tu pedido.'
+      );
       return;
     }
 
@@ -4239,6 +4445,8 @@ export default function TiendaVirtualView({
     setSubmitting(true);
 
     let reservedReward = null;
+    let reservedFirstOrderReward = null;
+    let createdOrderKey = '';
 
     try {
       const paymentMethod = normalizeCheckoutPayment(customer.metodoPago);
@@ -4270,6 +4478,21 @@ export default function TiendaVirtualView({
           catalog: activeProducts,
           cartAmount: checkoutProductTotal,
           settings: rewardSettings,
+        });
+      }
+
+      if (
+        checkoutFirstOrderEligibility?.eligible === true &&
+        selectedFirstOrderGift &&
+        firstOrderCampaign &&
+        firstOrderProgress.currentTier
+      ) {
+        reservedFirstOrderReward = await reserveFirstOrderReward({
+          campaignId: firstOrderCampaign.id,
+          tierId: firstOrderProgress.currentTier.id,
+          itemId: selectedFirstOrderGift.id,
+          eligibleSubtotal: originalProductTotal,
+          branchId: selectedBranch.id,
         });
       }
 
@@ -4336,9 +4559,25 @@ export default function TiendaVirtualView({
           storeBranchWhatsapp: selectedBranch.whatsapp,
           storeBranchLocation: selectedBranch.storeLocation,
           rewardRedemption: reservedReward?.rewardSnapshot || null,
+          firstOrderReward: reservedFirstOrderReward?.rewardSnapshot || null,
         },
         { channel: STORE_CHANNEL }
       );
+      createdOrderKey = String(order?.firebaseKey || '').trim();
+
+      if (reservedFirstOrderReward?.reservationId && createdOrderKey) {
+        try {
+          await confirmFirstOrderReward({
+            reservationId: reservedFirstOrderReward.reservationId,
+            orderKey: createdOrderKey,
+          });
+        } catch (confirmationError) {
+          console.warn(
+            'El pedido se creo, pero la confirmacion de la regalia quedo pendiente de conciliacion:',
+            confirmationError
+          );
+        }
+      }
 
       if (
         winningCoupon?.welcomeCoupon === true &&
@@ -4373,9 +4612,16 @@ export default function TiendaVirtualView({
       setDeliveryMode('perfil');
       setAlternateDelivery(createEmptyDeliveryDraft());
       setSelectedRewardRedemption(null);
+      setSelectedFirstOrderGift(null);
+      setFirstOrderEligibility({ eligible: false, reason: 'order_created' });
       setOrderSuccessOpen(true);
     } catch (error) {
       console.error('Error creando pedido virtual:', error);
+      if (reservedFirstOrderReward?.reservationId && !createdOrderKey) {
+        releaseFirstOrderReward({ reservationId: reservedFirstOrderReward.reservationId }).catch(
+          (releaseError) => console.warn('No se pudo liberar inmediatamente la regalia reservada:', releaseError)
+        );
+      }
       if (error.code === 'ORDER_LIMIT_REACHED') {
         alert('Hoy ya no quedan numeros disponibles.');
       } else if (error.code === 'INSUFFICIENT_POINTS' || error.code === 'MIN_PURCHASE_REQUIRED') {
@@ -4463,6 +4709,7 @@ export default function TiendaVirtualView({
     authSheetOpen ||
     orderSuccessOpen ||
     welcomeCouponOpen ||
+    firstOrderGiftOpen ||
     popupAdOpen ||
     branchSelectorOpen;
 
@@ -9795,6 +10042,9 @@ export default function TiendaVirtualView({
           totalAmount={originalProductTotal}
           rewardSettings={rewardSettings}
           selectedReward={selectedRewardRedemption}
+          firstOrderRewardEnabled={firstOrderRewardEnabled && Boolean(firstOrderProgress.currentTier)}
+          firstOrderProgress={firstOrderProgress}
+          selectedFirstOrderGift={selectedFirstOrderGift}
           welcomeCoupon={welcomeCoupon}
           welcomeCouponStatus={welcomeCouponStatus}
           welcomeCouponExpiryLabel={welcomeCouponExpiryLabel}
@@ -9820,6 +10070,7 @@ export default function TiendaVirtualView({
           onOpenLogin={() => openAuthSheet('login', 'checkout')}
           onOpenRegister={() => openAuthSheet('register', 'checkout')}
           onOpenRewards={() => openRewardsPanel({ closeCheckout: true })}
+          onOpenFirstOrderGift={() => openFirstOrderGiftSelector()}
           onClaimWelcomeCoupon={handleClaimWelcomeCoupon}
           onClearSelectedReward={clearSelectedReward}
           onRemoveCoupon={removeCoupon}
@@ -9908,6 +10159,20 @@ export default function TiendaVirtualView({
         onClearSelectedReward={clearSelectedReward}
         onClose={closeRewardsPanel}
         onOpenAuth={() => openAuthSheet('login', 'rewards')}
+      />
+
+      <FirstOrderRewardSelector
+        open={firstOrderGiftOpen}
+        items={availableFirstOrderGifts}
+        selectedItem={selectedFirstOrderGift}
+        premium={Boolean(firstOrderProgress.premium)}
+        notice={firstOrderGiftNotice}
+        celebrate={firstOrderGiftCelebrate}
+        onSelect={selectFirstOrderGift}
+        onClose={() => {
+          setFirstOrderGiftOpen(false);
+          setFirstOrderGiftCelebrate(false);
+        }}
       />
 
       {authSheetOpen && (
@@ -12613,6 +12878,9 @@ function CheckoutSheet({
   totalAmount,
   rewardSettings,
   selectedReward,
+  firstOrderRewardEnabled,
+  firstOrderProgress,
+  selectedFirstOrderGift,
   welcomeCoupon,
   welcomeCouponStatus,
   welcomeCouponExpiryLabel,
@@ -12635,6 +12903,7 @@ function CheckoutSheet({
   onOpenLogin,
   onOpenRegister,
   onOpenRewards,
+  onOpenFirstOrderGift,
   onClearSelectedReward,
   onQuantityChange,
   onRemoveCoupon,
@@ -12714,6 +12983,13 @@ function CheckoutSheet({
 
         {isCartStep ? (
           <div className="store-checkout-step">
+            {firstOrderRewardEnabled && (
+              <FirstOrderRewardProgress
+                progress={firstOrderProgress}
+                selectedItem={selectedFirstOrderGift}
+                onOpen={onOpenFirstOrderGift}
+              />
+            )}
             {cartItems.map((item) => (
               <div key={item.codigo} className="store-order-line">
                 <img src={item.image || LOGO_PATH} alt={item.nombre} />
@@ -12772,6 +13048,14 @@ function CheckoutSheet({
                 <strong>{formatCurrency(0)}</strong>
               </div>
             )}
+
+            <FirstOrderRewardCheckoutCard
+              eligible={firstOrderRewardEnabled}
+              selectedItem={selectedFirstOrderGift}
+              onOpen={onOpenFirstOrderGift}
+            />
+
+            {selectedFirstOrderGift && <FirstOrderRewardLine item={selectedFirstOrderGift} />}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', margin: '14px 0 8px' }}>
               <strong>Total productos</strong>
@@ -13024,6 +13308,13 @@ function CheckoutSheet({
               <span>Total</span>
               <strong>{formatCurrency(approximateTotalAmount)}</strong>
             </div>
+            <FirstOrderRewardCheckoutCard
+              eligible={firstOrderRewardEnabled}
+              selectedItem={selectedFirstOrderGift}
+              message={selectedFirstOrderGift ? 'Regalia de bienvenida · C$0.00' : 'No olvides elegirlo antes de finalizar.'}
+              onOpen={onOpenFirstOrderGift}
+            />
+            {selectedFirstOrderGift && <FirstOrderRewardLine item={selectedFirstOrderGift} />}
             <p style={{ margin: '0 0 14px', color: 'var(--store-text-soft)', fontSize: '0.92rem' }}>
               Precios incluyen <strong>IVA</strong>.
             </p>
@@ -14227,7 +14518,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
         </div>
       </div>
 
-      {(visibleItems.length > 0 || order.rewardRedemption?.rewardName) && (
+      {(visibleItems.length > 0 || order.rewardRedemption?.rewardName || order.firstOrderReward?.itemName) && (
         <details className="store-order-details">
           <summary>
             <span>Ver detalle del pedido</span>
@@ -14251,6 +14542,12 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
             <div className="store-status-items store-reward-order-item">
               <strong className="store-status-items-title">{STORE_REWARD_REDEMPTION_CART_LABEL}</strong>
               <div>{order.rewardRedemption.rewardName}</div>
+            </div>
+          )}
+          {order.firstOrderReward?.itemName && (
+            <div className="store-status-items store-reward-order-item">
+              <strong className="store-status-items-title">REGALIA DE BIENVENIDA</strong>
+              <div>{order.firstOrderReward.itemName} · C$0.00</div>
             </div>
           )}
         </details>
