@@ -610,7 +610,7 @@ function App() {
     { id: 'tienda_virtual', label: 'Tienda Virtual', mobileLabel: 'Tienda', icon: 'store', group: 'Comercio', description: 'Storefront y sucursales' },
     { id: 'marketing', label: 'Marketing', mobileLabel: 'Marketing', icon: 'marketing', group: 'Crecimiento', description: 'Promociones y campañas' },
     { id: 'beneficios', label: 'Beneficios', mobileLabel: 'Beneficios', icon: 'benefits', group: 'Crecimiento', description: 'Fidelización y premios' },
-    { id: 'reportes', label: 'Reportes', mobileLabel: 'Reportes', icon: 'reports', group: 'Análisis', description: 'Ventas y comportamiento' },
+    { id: 'reportes', label: 'Reportes', mobileLabel: 'Reportes', icon: 'reports', group: 'Análisis', description: 'Ventas online y entregas' },
     { id: 'configuracion', label: 'Configuración', mobileLabel: 'Config.', icon: 'settings', group: 'Sistema', description: 'Usuarios y permisos' },
   ];
 
@@ -674,7 +674,7 @@ function App() {
       return (
         <RoleLogin
           title="CRM"
-          subtitle="Analitica online + SICAR"
+          subtitle="Ventas de Tienda Virtual"
           userPlaceholder="Usuario administrador"
           error={loginError}
           onLogin={handleCrmLogin}

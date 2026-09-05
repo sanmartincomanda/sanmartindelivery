@@ -10,6 +10,7 @@
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "test:first-order-rewards": "node scripts/testFirstOrderRewards.mjs",
+    "test:admin-reports": "node scripts/testAdminReports.mjs",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:publish:combos": "node scripts/publishSicarStoreCombos.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
