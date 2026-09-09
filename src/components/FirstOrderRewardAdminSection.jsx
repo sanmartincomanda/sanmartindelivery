@@ -432,8 +432,8 @@ export default function FirstOrderRewardAdminSection({ storeUsers = [], storeOrd
       </div>
 
       {itemDraft && typeof document !== 'undefined' && createPortal((
-        <div className="first-reward-admin-modal" onMouseDown={() => setItemDraft(null)}>
-          <form className="first-reward-admin-editor" onSubmit={saveItem} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="first-reward-admin-modal admin-viewport-dialog" onMouseDown={() => setItemDraft(null)}>
+          <form className="first-reward-admin-editor admin-viewport-dialog__panel" onSubmit={saveItem} onMouseDown={(event) => event.stopPropagation()}>
             <div className="first-reward-admin-section-head"><div><small>REGALIA</small><h3>{itemDraft.id ? 'Editar opción' : 'Nueva opción'}</h3></div><button type="button" className="first-reward-admin-close" onClick={() => setItemDraft(null)}>×</button></div>
             <div className="first-reward-admin-editor__preview"><img src={itemDraft.image || '/tienda/branding/product-placeholder.svg'} alt="Vista previa" /><label><span>Imagen del producto</span><input type="file" accept="image/*" onChange={async (event) => { const file = event.target.files?.[0]; if (file) { const image = await readImageFile(file); setItemDraft((current) => ({ ...current, image })); } }} /></label></div>
             <div className="first-reward-admin-form-grid">

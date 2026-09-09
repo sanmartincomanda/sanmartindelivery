@@ -1054,7 +1054,7 @@ export default function StoreRewardsAdminSection({
 
       {selectedCustomerRow && (
         <div
-          className="cfg-driver-modal-overlay"
+          className="cfg-driver-modal-overlay admin-viewport-dialog"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               closeCustomerEditor();
@@ -1062,7 +1062,7 @@ export default function StoreRewardsAdminSection({
           }}
         >
           <div
-            className="cfg-driver-modal"
+            className="cfg-driver-modal admin-viewport-dialog__panel"
             style={{ width: 'min(1080px, 100%)', display: 'grid', gap: 16 }}
             onClick={(event) => event.stopPropagation()}
           >
@@ -1317,7 +1317,7 @@ export default function StoreRewardsAdminSection({
 
       {editorOpen && (
         <div
-          className="cfg-driver-modal-overlay"
+          className="cfg-driver-modal-overlay admin-viewport-dialog"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               closeEditor();
@@ -1326,7 +1326,7 @@ export default function StoreRewardsAdminSection({
         >
           <form
             onSubmit={saveRewardEditor}
-            className="cfg-driver-modal"
+            className="cfg-driver-modal admin-viewport-dialog__panel"
             style={{ width: 'min(1120px, 100%)', display: 'grid', gap: 16 }}
             onClick={(event) => event.stopPropagation()}
           >

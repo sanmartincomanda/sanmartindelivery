@@ -2177,6 +2177,8 @@ function HistoryDetailModal({ order, onClose }) {
 
   return (
     <div
+      className="admin-viewport-dialog"
+      role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -2195,7 +2197,10 @@ function HistoryDetailModal({ order, onClose }) {
       }}
     >
       <div
-        className="bd-modal-shell bd-glass bd-animate"
+        className="bd-modal-shell bd-glass bd-animate admin-viewport-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Historial del pedido ${formatOrderNumber(order)}`}
         style={{
           width: 'min(1080px, 100%)',
           maxHeight: 'calc(100vh - 48px)',

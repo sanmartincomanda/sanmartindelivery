@@ -683,7 +683,7 @@ export default function StoreCustomersAdminSection({
 
       {selectedCustomer && (
         <div
-          className="cfg-driver-modal-overlay"
+          className="cfg-driver-modal-overlay admin-viewport-dialog"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setSelectedUserKey('');
@@ -691,7 +691,7 @@ export default function StoreCustomersAdminSection({
           }}
         >
           <div
-            className="cfg-driver-modal"
+            className="cfg-driver-modal admin-viewport-dialog__panel"
             style={{ width: 'min(1120px, 100%)', display: 'grid', gap: 18 }}
             onClick={(event) => event.stopPropagation()}
           >

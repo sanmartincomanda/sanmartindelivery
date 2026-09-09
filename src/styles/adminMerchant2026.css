@@ -540,12 +540,12 @@
 .merchant-module {
   max-width: 1720px;
   margin: 0 auto;
-  animation: merchant-page-in 220ms ease both;
+  animation: merchant-page-in 220ms ease;
 }
 
 @keyframes merchant-page-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .merchant-mobile-nav,
@@ -1564,5 +1564,105 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Viewport-bound dialogs shared by every AdminTV module. */
+body:has(.admin-viewport-dialog) {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.admin-viewport-dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10000 !important;
+  box-sizing: border-box;
+  width: 100% !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)) !important;
+  overscroll-behavior: contain;
+}
+
+.admin-viewport-dialog__panel {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100% !important;
+  max-height: calc(100dvh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  margin: auto;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.admin-viewport-dialog__panel > * {
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .admin-viewport-dialog {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important;
+  }
+
+  .admin-viewport-dialog__panel {
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-viewport-dialog {
+    align-items: stretch !important;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left) !important;
+  }
+
+  .admin-viewport-dialog__panel {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .admin-dialog-header {
+    position: sticky;
+    z-index: 4;
+    top: 0;
+    padding-top: 2px;
+    padding-bottom: 12px;
+    background: #ffffff;
+  }
+
+  .admin-dialog-header > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .admin-dialog-actions {
+    position: sticky;
+    z-index: 4;
+    bottom: 0;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding-top: 12px;
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+    background: #ffffff;
+  }
+
+  .admin-dialog-actions > button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .admin-viewport-dialog__panel .bd-modal-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }

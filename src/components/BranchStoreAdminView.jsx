@@ -449,8 +449,8 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
       )}
 
       {selectedProduct && (
-        <div className="branch-admin__modal" role="presentation" onMouseDown={() => setSelectedProduct(null)}>
-          <form className="branch-admin__form" onSubmit={saveProduct} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="branch-admin__modal admin-viewport-dialog" role="presentation" onMouseDown={() => setSelectedProduct(null)}>
+          <form className="branch-admin__form admin-viewport-dialog__panel" role="dialog" aria-modal="true" aria-label={`Editar ${selectedProduct.name}`} onSubmit={saveProduct} onMouseDown={(event) => event.stopPropagation()}>
             <div>
               <small>{selectedProduct.code}</small>
               <h2>{selectedProduct.name}</h2>
@@ -476,8 +476,8 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
       )}
 
       {inactivityPreview && (
-        <div className="branch-admin__modal" role="presentation" onMouseDown={() => setInactivityPreview(null)}>
-          <section className="branch-sales-review" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="branch-admin__modal admin-viewport-dialog" role="presentation" onMouseDown={() => setInactivityPreview(null)}>
+          <section className="branch-sales-review admin-viewport-dialog__panel" role="dialog" aria-modal="true" aria-label="Vista previa de productos sin ventas" onMouseDown={(event) => event.stopPropagation()}>
             <div>
               <small>Vista previa SICAR - {branchName}</small>
               <h2>Productos sin ventas en 60 dias</h2>

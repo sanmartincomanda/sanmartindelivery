@@ -654,8 +654,8 @@ export default function KitchenView({ orders, allowRuta = true }) {
           background: rgba(0,0,0,0.7);
           backdrop-filter: blur(4px);
           display: flex;
-          alignItems: center;
-          justifyContent: center;
+          align-items: center;
+          justify-content: center;
           z-index: 1000;
           animation: fadeIn 0.2s ease;
         }
@@ -695,7 +695,8 @@ export default function KitchenView({ orders, allowRuta = true }) {
       {/* 🔥 MODAL PARA SELECCIONAR COCINERO */}
       {modalCocinero && (
         <div 
-          className="modal-overlay"
+          className="modal-overlay admin-viewport-dialog"
+          role="presentation"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setModalCocinero(null);
@@ -703,7 +704,12 @@ export default function KitchenView({ orders, allowRuta = true }) {
             }
           }}
         >
-          <div className="modal-content" style={{
+          <div
+            className="modal-content admin-viewport-dialog__panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Seleccionar carnicero"
+            style={{
             background: 'white',
             borderRadius: '24px',
             padding: '32px',
@@ -713,7 +719,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
             overflow: 'auto',
             boxShadow: '0 25px 50px rgba(0,0,0,0.3)'
           }}>
-            <div style={{
+            <div className="admin-dialog-header" style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -802,7 +808,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="admin-dialog-actions" style={{ display: 'flex', gap: '12px' }}>
               <button
                 onClick={() => {
                   setModalCocinero(null);

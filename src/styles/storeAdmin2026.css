@@ -252,7 +252,7 @@
 .store-admin-v2 > section,
 .store-admin-v2 > .cfg-section-card,
 .store-admin-v2 > div:not(.store-admin-header):not(.store-admin-primary-nav):not(.store-admin-secondary-nav) {
-  animation: store-admin-content-in 210ms ease both;
+  animation: store-admin-content-in 210ms ease;
 }
 
 .store-admin-v2 .cfg-section-card {
@@ -609,7 +609,7 @@
     max-height: min(90dvh, 820px);
     border-radius: 24px 24px 0 0;
     padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
-    animation: store-admin-sheet-in 220ms ease both;
+    animation: store-admin-sheet-in 220ms ease;
   }
 }
 

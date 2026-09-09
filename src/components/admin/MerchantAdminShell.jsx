@@ -199,8 +199,8 @@ export default function MerchantAdminShell({
       </nav>
 
       {commandOpen && (
-        <div className="merchant-command-overlay" role="presentation" onMouseDown={() => setCommandOpen(false)}>
-          <section className="merchant-command-panel" role="dialog" aria-modal="true" aria-label="Buscar en AdminTV" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="merchant-command-overlay admin-viewport-dialog" role="presentation" onMouseDown={() => setCommandOpen(false)}>
+          <section className="merchant-command-panel admin-viewport-dialog__panel" role="dialog" aria-modal="true" aria-label="Buscar en AdminTV" onMouseDown={(event) => event.stopPropagation()}>
             <div className="merchant-command-search"><AdminIcon name="search" /><input ref={commandInputRef} value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="Buscar módulos y herramientas" aria-label="Buscar módulos y herramientas" /><button type="button" onClick={() => setCommandOpen(false)} aria-label="Cerrar búsqueda"><AdminIcon name="close" /></button></div>
             <div className="merchant-command-results">
               {filteredNavigation.map((item) => (

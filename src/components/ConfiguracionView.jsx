@@ -3275,7 +3275,7 @@ export default function ConfiguracionView({
 
             {productEditorOpen && (
               <div
-                className="cfg-driver-modal-overlay"
+                className="cfg-driver-modal-overlay admin-viewport-dialog"
                 onClick={(event) => {
                   if (event.target === event.currentTarget && !saving && !applyingImageCrop) {
                     resetProductEditor();
@@ -3284,7 +3284,7 @@ export default function ConfiguracionView({
               >
                 <form
                   onSubmit={saveProduct}
-                  className="cfg-driver-modal cfg-product-modal"
+                  className="cfg-driver-modal cfg-product-modal admin-viewport-dialog__panel"
                   style={{ display: 'grid', gap: 16 }}
                   onClick={(event) => event.stopPropagation()}
                 >
@@ -3601,7 +3601,7 @@ export default function ConfiguracionView({
 
         {sicarPreview && (
           <div
-            className="cfg-driver-modal-overlay"
+            className="cfg-driver-modal-overlay admin-viewport-dialog"
             onClick={() => {
               if (!syncingSicar) {
                 setSicarPreview(null);
@@ -3609,7 +3609,7 @@ export default function ConfiguracionView({
             }}
           >
             <div
-              className="cfg-driver-modal"
+              className="cfg-driver-modal admin-viewport-dialog__panel"
               style={{ width: 'min(1120px, 100%)' }}
               onClick={(event) => event.stopPropagation()}
             >
@@ -3788,11 +3788,11 @@ export default function ConfiguracionView({
 
         {imageCrop.open && imageCropPreview && (
           <div
-            className="cfg-driver-modal-overlay"
+            className="cfg-driver-modal-overlay admin-viewport-dialog"
             onClick={closeImageCrop}
           >
             <div
-              className="cfg-driver-modal"
+              className="cfg-driver-modal admin-viewport-dialog__panel"
               style={{ width: 'min(760px, 100%)' }}
               onClick={(event) => event.stopPropagation()}
             >
@@ -4274,14 +4274,14 @@ function DriversManager({
 
       {selectorOpen && (
         <div
-          className="cfg-driver-modal-overlay"
+          className="cfg-driver-modal-overlay admin-viewport-dialog"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setSelectorOpen(false);
             }
           }}
         >
-          <div className="cfg-driver-modal">
+          <div className="cfg-driver-modal admin-viewport-dialog__panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'start' }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24 }}>Seleccionar entregador</h2>
@@ -5087,7 +5087,7 @@ function StoreOrdersAdminSection({ orders, loading }) {
 
       {selectedOrder && (
         <div
-          className="cfg-driver-modal-overlay"
+          className="cfg-driver-modal-overlay admin-viewport-dialog"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setSelectedOrderKey('');
@@ -5095,7 +5095,7 @@ function StoreOrdersAdminSection({ orders, loading }) {
           }}
         >
           <div
-            className="cfg-driver-modal"
+            className="cfg-driver-modal admin-viewport-dialog__panel"
             style={{ width: 'min(920px, 100%)', display: 'grid', gap: 18 }}
             onClick={(event) => event.stopPropagation()}
           >

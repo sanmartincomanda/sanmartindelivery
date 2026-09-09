@@ -136,13 +136,13 @@ function OrderTraceModal({ order, onClose }) {
 
   return (
     <div
-      className="trace-modal-backdrop"
+      className="trace-modal-backdrop admin-viewport-dialog"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="trace-modal" role="dialog" aria-modal="true" aria-labelledby="trace-modal-title">
+      <section className="trace-modal admin-viewport-dialog__panel" role="dialog" aria-modal="true" aria-labelledby="trace-modal-title">
         <header className="trace-modal-header">
           <div>
             <span>EXPEDIENTE OPERATIVO</span>
