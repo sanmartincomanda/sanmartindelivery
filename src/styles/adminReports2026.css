@@ -1397,6 +1397,30 @@
 .trace-channel-store { background: #e9f2ff; color: var(--reports-blue); }
 .trace-channel-manual { background: #fff4da; color: #946200; }
 
+.trace-integrity-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 210px;
+  margin-top: 6px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.trace-integrity-pill.is-protected {
+  background: #e9f2ff;
+  color: #1655a7;
+}
+
+.trace-integrity-pill.is-missing {
+  background: #ffe8e9;
+  color: #a8000a;
+}
+
 .trace-open-button {
   display: inline-flex;
   align-items: center;
@@ -1523,6 +1547,24 @@
   height: 21px;
 }
 
+.trace-integrity-alert {
+  display: grid;
+  gap: 3px;
+  margin: 14px 18px 0;
+  padding: 12px 14px;
+  border: 1px solid #ffc4c7;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #8f1119;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.trace-integrity-alert strong {
+  color: #760b12;
+  font-size: 12px;
+}
+
 .trace-modal-body {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
@@ -1622,6 +1664,42 @@
   color: #5e3440;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.trace-version-panel {
+  border-left-width: 4px;
+}
+
+.trace-version-original {
+  border-left-color: var(--reports-blue);
+  background: #f9fbff;
+}
+
+.trace-version-updated {
+  border-left-color: var(--reports-green);
+}
+
+.trace-version-helper {
+  margin: -5px 0 11px;
+  color: var(--reports-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.trace-version-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.trace-version-summary span {
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #edf3f9;
+  color: #38516c;
+  font-size: 9px;
+  font-weight: 850;
 }
 
 .trace-internal-panel {

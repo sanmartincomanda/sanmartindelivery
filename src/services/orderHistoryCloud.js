@@ -3,6 +3,7 @@ import { database } from '../firebase';
 import {
   getOrderHistoryRetentionStartDate,
   ORDER_HISTORY_CLOUD_PATH,
+  ORDER_ORIGINALS_PATH,
   sortOrdersByDateAndNumberDesc,
 } from './orderArchive';
 
@@ -23,11 +24,13 @@ const parseLocalDate = (value = '') => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const listHistoryDates = (dateFrom, dateTo) => {
-  const retentionStart = getOrderHistoryRetentionStartDate();
+const listDateKeys = (dateFrom, dateTo, minimumDate = '') => {
   const cleanFrom = String(dateFrom || '').trim();
   const cleanTo = String(dateTo || '').trim();
-  const start = parseLocalDate(cleanFrom > retentionStart ? cleanFrom : retentionStart);
+  const cleanMinimumDate = String(minimumDate || '').trim();
+  const start = parseLocalDate(
+    cleanMinimumDate && cleanFrom < cleanMinimumDate ? cleanMinimumDate : cleanFrom
+  );
   const end = parseLocalDate(cleanTo);
 
   if (!start || !end || start > end) {
@@ -42,6 +45,9 @@ const listHistoryDates = (dateFrom, dateTo) => {
   }
   return dates;
 };
+
+const listHistoryDates = (dateFrom, dateTo) =>
+  listDateKeys(dateFrom, dateTo, getOrderHistoryRetentionStartDate());
 
 const splitIntoBatches = (entries, size = CLOUD_HISTORY_READ_BATCH_SIZE) => {
   const batches = [];
@@ -80,6 +86,29 @@ export async function fetchCloudOrderHistoryByDateRange(dateFrom, dateTo) {
           firebaseKey,
           archivedSource: order?.archivedSource || 'orders',
           ...order,
+        });
+      });
+    });
+  }
+
+  return sortOrdersByDateAndNumberDesc(orders);
+}
+
+export async function fetchOrderOriginalsByDateRange(dateFrom, dateTo) {
+  const dates = listDateKeys(dateFrom, dateTo);
+  const orders = [];
+
+  for (const dateBatch of splitIntoBatches(dates)) {
+    const snapshots = await Promise.all(
+      dateBatch.map((dateKey) => get(ref(database, `${ORDER_ORIGINALS_PATH}/${dateKey}`)))
+    );
+
+    snapshots.forEach((snapshot) => {
+      Object.entries(snapshot.val() || {}).forEach(([firebaseKey, order]) => {
+        orders.push({
+          ...order,
+          firebaseKey,
+          snapshotType: 'original',
         });
       });
     });

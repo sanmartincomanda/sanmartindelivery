@@ -1607,6 +1607,97 @@ body:has(.admin-viewport-dialog) {
   min-width: 0;
 }
 
+.store-customer-dialog {
+  background: rgba(7, 31, 61, 0.76);
+  backdrop-filter: blur(6px);
+}
+
+.store-customer-dialog__panel {
+  width: min(1120px, 100%);
+  padding: 24px;
+  border: 1px solid #dbe6f2;
+  border-radius: 24px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 28px 90px rgba(7, 31, 61, 0.34);
+}
+
+.store-customer-dialog__header {
+  position: sticky;
+  top: -24px;
+  z-index: 5;
+  margin: -24px -24px 0;
+  padding: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.bd-store-customers .cfg-button,
+.store-customer-dialog .cfg-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid #0044c5;
+  border-radius: 12px;
+  background: #0044c5;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.bd-store-customers .cfg-button.secondary,
+.store-customer-dialog .cfg-button.secondary {
+  border-color: #cbd9e8;
+  background: #ffffff;
+  color: #073b72;
+}
+
+.bd-store-customers .cfg-badge,
+.store-customer-dialog .cfg-badge {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eaf3ff;
+  color: #0756a4;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.bd-store-customers .cfg-input,
+.store-customer-dialog .cfg-input,
+.store-customer-dialog .cfg-select,
+.store-customer-dialog .cfg-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #cbd9e8;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+}
+
+.store-customer-dialog .cfg-textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.bd-store-customers .cfg-input:focus-visible,
+.store-customer-dialog .cfg-input:focus-visible,
+.store-customer-dialog .cfg-select:focus-visible,
+.store-customer-dialog .cfg-textarea:focus-visible,
+.bd-store-customers .cfg-button:focus-visible,
+.store-customer-dialog .cfg-button:focus-visible {
+  outline: 3px solid rgba(0, 68, 197, 0.22);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1024px) {
   .admin-viewport-dialog {
     padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important;
@@ -1630,6 +1721,20 @@ body:has(.admin-viewport-dialog) {
     max-height: none !important;
     margin: 0 !important;
     border-radius: 0 !important;
+  }
+
+  .store-customer-dialog__panel {
+    padding: 16px 16px calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .store-customer-dialog__header {
+    top: -16px;
+    margin: -16px -16px 0;
+    padding: max(14px, env(safe-area-inset-top)) 16px 14px;
+  }
+
+  .store-customer-dialog__header h2 {
+    font-size: clamp(22px, 7vw, 28px) !important;
   }
 
   .admin-dialog-header {

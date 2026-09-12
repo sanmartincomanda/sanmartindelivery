@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { push, ref, remove, update } from 'firebase/database';
+import { onValue, push, ref, remove, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, getBrowserLocation, hasLocation, normalizeLocation } from '../services/geo';
 import { fetchOrdersByDateRange, formatOrderNumber } from '../services/orders';
@@ -16,12 +16,18 @@ import {
   setClientDirectoryEntry,
 } from '../services/clientDirectory';
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
-import { ORDER_HISTORY_RETENTION_DAYS } from '../services/orderArchive';
+import {
+  mergeOrdersWithOriginalSnapshots,
+  ORDER_HISTORY_RETENTION_DAYS,
+} from '../services/orderArchive';
 import {
   fetchCloudOrderHistoryByDateRange,
+  fetchOrderOriginalsByDateRange,
   mergeOrderHistoryRecords,
 } from '../services/orderHistoryCloud';
+import { sanitizeStoreUser, STORE_USERS_PATH } from '../services/storeUsers';
 import { hoyISO, normalizar } from './Utils';
+import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 
 const Icons = {
@@ -167,6 +173,7 @@ const STATUS_META = {
 };
 
 const DATA_THEME = SAN_MARTIN_THEME;
+const STORE_CUSTOMER_HISTORY_DAYS = 90;
 
 let xlsxModulePromise;
 
@@ -323,6 +330,10 @@ const getOrderChannelFilterValue = (order = {}) => {
   return channel.includes('tienda') || channel.includes('virtual') ? 'tienda_virtual' : 'manual';
 };
 
+const isVirtualStoreClient = (client = {}) =>
+  normalizar(client?.origen || '').includes('tienda') ||
+  Boolean(String(client?.storeUserKey || '').trim());
+
 const truncateText = (value = '', maxLength = 180) => {
   const cleanValue = value.replace(/\s+/g, ' ').trim();
   if (cleanValue.length <= maxLength) {
@@ -355,6 +366,8 @@ const buildHistoryExportRows = (orders) =>
     'Hora envio': order.timestampEnviado || '-',
     'Hora entrega': order.timestampEntregado || '-',
     'Entregado por': order.entregadoPor || '-',
+    'Registro operativo': order.currentRecordMissing ? 'Eliminado; se conserva original' : 'Disponible',
+    'Pedido original': order.originalOrder?.pedido || order.pedido || '-',
     PedidoDetalle: (order.pedido || '').replace(/\n/g, ' '),
   }));
 
@@ -373,6 +386,18 @@ export default function BaseDatosView({
     dateFrom: shiftIsoDate(hoyISO(), -7),
     dateTo: hoyISO(),
   }));
+  const [clientSource, setClientSource] = useState('manual');
+  const [storeUsers, setStoreUsers] = useState([]);
+  const [storeUsersLoaded, setStoreUsersLoaded] = useState(false);
+  const [storeCustomerOrders, setStoreCustomerOrders] = useState([]);
+  const [storeCustomersLoaded, setStoreCustomersLoaded] = useState(false);
+  const [storeCustomersLoading, setStoreCustomersLoading] = useState(false);
+  const [storeCustomersError, setStoreCustomersError] = useState('');
+
+  const manualClients = useMemo(
+    () => clientes.filter((client) => !isVirtualStoreClient(client)),
+    [clientes]
+  );
 
   useEffect(() => {
     setSection(initialSection);
@@ -413,17 +438,35 @@ export default function BaseDatosView({
       let liveOrders = [];
       let cloudOrders = [];
       let bridgeOrders = [];
+      let originalOrders = [];
       let cloudLoaded = false;
 
-      try {
-        [cloudOrders, liveOrders] = await Promise.all([
-          fetchCloudOrderHistoryByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
-          fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
-        ]);
-        cloudLoaded = true;
-      } catch (cloudError) {
-        console.warn('Cloud history fallback:', cloudError);
-        liveOrders = await fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo);
+      const [cloudResult, liveResult, originalsResult] = await Promise.allSettled([
+        fetchCloudOrderHistoryByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
+        fetchOrdersByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
+        fetchOrderOriginalsByDateRange(requestedRange.dateFrom, requestedRange.dateTo),
+      ]);
+
+      cloudOrders = cloudResult.status === 'fulfilled' ? cloudResult.value : [];
+      liveOrders = liveResult.status === 'fulfilled' ? liveResult.value : [];
+      originalOrders = originalsResult.status === 'fulfilled' ? originalsResult.value : [];
+      cloudLoaded = cloudResult.status === 'fulfilled';
+
+      if (cloudResult.status === 'rejected') {
+        console.warn('Cloud history fallback:', cloudResult.reason);
+      }
+      if (liveResult.status === 'rejected') {
+        console.warn('Live orders fallback:', liveResult.reason);
+      }
+      if (originalsResult.status === 'rejected') {
+        console.warn('Original orders fallback:', originalsResult.reason);
+      }
+      if (
+        cloudResult.status === 'rejected' &&
+        liveResult.status === 'rejected' &&
+        originalsResult.status === 'rejected'
+      ) {
+        throw liveResult.reason || cloudResult.reason || originalsResult.reason;
       }
 
       if (canUseLocalBridgeHistory()) {
@@ -438,7 +481,10 @@ export default function BaseDatosView({
       }
 
       const nextOrders = sortOrders(
-        mergeOrderHistoryRecords(cloudOrders, bridgeOrders, liveOrders)
+        mergeOrdersWithOriginalSnapshots(
+          mergeOrderHistoryRecords(cloudOrders, bridgeOrders, liveOrders),
+          originalOrders
+        )
       );
 
       setHistoryOrders(nextOrders);
@@ -465,6 +511,102 @@ export default function BaseDatosView({
       loadHistory({ force: true, range: historyRange });
     }
   }, [section, historyLoaded, historyRange]);
+
+  useEffect(() => {
+    if (section !== 'clientes' || clientSource !== 'store') {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setStoreCustomersLoading(true);
+    setStoreCustomersError('');
+
+    const unsubscribeUsers = onValue(
+      ref(database, STORE_USERS_PATH),
+      (snapshot) => {
+        const users = Object.entries(snapshot.val() || {})
+          .map(([key, value]) => sanitizeStoreUser(value, key))
+          .filter(Boolean)
+          .sort((left, right) =>
+            String(left.nombre || '').localeCompare(String(right.nombre || ''), 'es-NI')
+          );
+
+        if (!cancelled) {
+          startTransition(() => {
+            setStoreUsers(users);
+            setStoreUsersLoaded(true);
+          });
+        }
+      },
+      (error) => {
+        console.error('No se pudieron cargar los clientes de tienda virtual:', error);
+        if (!cancelled) {
+          setStoreUsersLoaded(true);
+          setStoreCustomersError('No se pudieron cargar los perfiles de Tienda Virtual.');
+        }
+      }
+    );
+
+    const loadStoreCustomerOrders = async () => {
+      const dateFrom = shiftIsoDate(hoyISO(), -(STORE_CUSTOMER_HISTORY_DAYS - 1));
+      const dateTo = hoyISO();
+      const [cloudResult, liveResult, originalsResult] = await Promise.allSettled([
+        fetchCloudOrderHistoryByDateRange(dateFrom, dateTo),
+        fetchOrdersByDateRange(dateFrom, dateTo),
+        fetchOrderOriginalsByDateRange(dateFrom, dateTo),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      const cloudOrders = cloudResult.status === 'fulfilled' ? cloudResult.value : [];
+      const liveOrders = liveResult.status === 'fulfilled' ? liveResult.value : [];
+      const originalOrders = originalsResult.status === 'fulfilled' ? originalsResult.value : [];
+
+      if (cloudResult.status === 'rejected') {
+        console.warn('Clientes de tienda sin historial cloud:', cloudResult.reason);
+      }
+      if (liveResult.status === 'rejected') {
+        console.warn('Clientes de tienda sin pedidos activos:', liveResult.reason);
+      }
+      if (originalsResult.status === 'rejected') {
+        console.warn('Clientes de tienda sin registros originales:', originalsResult.reason);
+      }
+
+      if (
+        cloudResult.status === 'rejected' &&
+        liveResult.status === 'rejected' &&
+        originalsResult.status === 'rejected'
+      ) {
+        setStoreCustomersError('No se pudieron cargar las transacciones de Tienda Virtual.');
+      }
+
+      const mergedOrders = mergeOrdersWithOriginalSnapshots(
+        mergeOrderHistoryRecords(cloudOrders, liveOrders),
+        originalOrders
+      ).filter((order) => getOrderChannelFilterValue(order) === 'tienda_virtual');
+
+      startTransition(() => {
+        setStoreCustomerOrders(mergedOrders);
+        setStoreCustomersLoaded(true);
+        setStoreCustomersLoading(false);
+      });
+    };
+
+    loadStoreCustomerOrders().catch((error) => {
+      console.error('No se pudo cargar el detalle de clientes de tienda virtual:', error);
+      if (!cancelled) {
+        setStoreCustomersError('No se pudo cargar el detalle de clientes de Tienda Virtual.');
+        setStoreCustomersLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribeUsers();
+    };
+  }, [clientSource, section]);
 
   const systemStats = useMemo(() => {
     const totalPedidos = historyLoaded ? historyOrders.length : '--';
@@ -570,6 +712,52 @@ export default function BaseDatosView({
           animation: bdPulse 1.4s ease-in-out infinite;
         }
 
+        .bd-client-source-tabs {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 20px;
+          padding: 6px;
+          border-radius: 18px;
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .bd-client-source-tab {
+          min-height: 52px;
+          border: 0;
+          border-radius: 14px;
+          padding: 10px 16px;
+          background: transparent;
+          color: rgba(226, 232, 240, 0.72);
+          font: inherit;
+          font-weight: 850;
+          cursor: pointer;
+          transition: color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+        }
+
+        .bd-client-source-tab:hover {
+          color: white;
+        }
+
+        .bd-client-source-tab.is-active {
+          color: white;
+          background: linear-gradient(135deg, #0044c5, #1268d8);
+          box-shadow: 0 12px 24px rgba(0, 68, 197, 0.24);
+        }
+
+        .bd-store-customers {
+          color: #0f172a;
+        }
+
+        .bd-store-customers > .cfg-section-card {
+          border-radius: 22px;
+          padding: 20px;
+          background: #f8fafc;
+          border: 1px solid #dbe3ef;
+          box-shadow: none;
+        }
+
         @media (max-width: 1120px) {
           .bd-layout {
             grid-template-columns: 1fr !important;
@@ -601,6 +789,10 @@ export default function BaseDatosView({
           .bd-modal-shell {
             width: calc(100vw - 24px) !important;
             max-height: calc(100vh - 24px) !important;
+          }
+
+          .bd-client-source-tabs {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
@@ -766,7 +958,57 @@ export default function BaseDatosView({
           </div>}
 
           {section === 'clientes' ? (
-            <ClientesManager clientes={clientes} onToast={showToast} />
+            <>
+              <div className="bd-client-source-tabs" role="tablist" aria-label="Tipo de cliente">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={clientSource === 'manual'}
+                  className={`bd-client-source-tab${clientSource === 'manual' ? ' is-active' : ''}`}
+                  onClick={() => setClientSource('manual')}
+                >
+                  Clientes Manuales · {manualClients.length}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={clientSource === 'store'}
+                  className={`bd-client-source-tab${clientSource === 'store' ? ' is-active' : ''}`}
+                  onClick={() => setClientSource('store')}
+                >
+                  Clientes Tienda Virtual · {storeUsersLoaded ? storeUsers.length : '...'}
+                </button>
+              </div>
+
+              {clientSource === 'manual' ? (
+                <ClientesManager clientes={manualClients} onToast={showToast} />
+              ) : storeCustomersLoading && !storeCustomersLoaded ? (
+                <LoadingState />
+              ) : (
+                <div className="bd-store-customers">
+                  {storeCustomersError && (
+                    <div
+                      role="alert"
+                      style={{
+                        marginBottom: 14,
+                        padding: '12px 14px',
+                        borderRadius: 14,
+                        border: '1px solid #fecaca',
+                        background: '#fff7f7',
+                        color: '#991b1b',
+                        fontWeight: 800,
+                      }}
+                    >
+                      {storeCustomersError}
+                    </div>
+                  )}
+                  <StoreCustomersAdminSection
+                    storeUsers={storeUsers}
+                    storeOrders={storeCustomerOrders}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <HistorialPanel
               orders={historyOrders}
@@ -2119,6 +2361,20 @@ function HistoryCard({ order, onOpen }) {
         {order.telefono && (
           <MiniChip icon={Icons.phone} label={order.telefono} tone={{ color: '#34d399', soft: 'rgba(16, 185, 129, 0.12)' }} />
         )}
+        {order.currentRecordMissing && (
+          <MiniChip
+            icon={Icons.history}
+            label="Registro operativo eliminado; original protegido"
+            tone={{ color: '#fca5a5', soft: 'rgba(239, 68, 68, 0.14)' }}
+          />
+        )}
+        {!order.currentRecordMissing && order.originalSnapshotAvailable && (
+          <MiniChip
+            icon={Icons.history}
+            label="Original protegido"
+            tone={{ color: '#93c5fd', soft: 'rgba(59, 130, 246, 0.12)' }}
+          />
+        )}
       </div>
 
       <div
@@ -2174,6 +2430,7 @@ function HistoryDetailModal({ order, onClose }) {
   const statusKey = normalizeStatus(order.estado);
   const statusMeta = getStatusMeta(statusKey);
   const paymentTone = getMetodoPagoTone(order.metodoPago || 'Efectivo');
+  const originalOrder = order.originalOrder || null;
 
   return (
     <div
@@ -2254,6 +2511,24 @@ function HistoryDetailModal({ order, onClose }) {
           </button>
         </div>
 
+        {order.currentRecordMissing && (
+          <div
+            role="status"
+            style={{
+              marginBottom: 18,
+              padding: '14px 16px',
+              borderRadius: 16,
+              border: '1px solid rgba(248, 113, 113, 0.34)',
+              background: 'rgba(127, 29, 29, 0.24)',
+              color: '#fecaca',
+              fontWeight: 800,
+              lineHeight: 1.55,
+            }}
+          >
+            El registro operativo fue eliminado. Este expediente se recupero desde la copia original inmutable.
+          </div>
+        )}
+
         <div className="bd-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.95fr', gap: '18px' }}>
           <div style={{ display: 'grid', gap: '18px' }}>
             <DetailPanel title="Cliente" icon={Icons.user}>
@@ -2268,21 +2543,23 @@ function HistoryDetailModal({ order, onClose }) {
               </div>
             </DetailPanel>
 
-            <DetailPanel title="Detalle del pedido" icon={Icons.notes}>
-              <pre
-                style={{
-                  margin: 0,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  fontFamily: "'Segoe UI', system-ui, sans-serif",
-                  fontSize: '16px',
-                  lineHeight: 1.75,
-                  color: '#e2e8f0',
-                }}
-              >
-                {order.pedido || 'Sin detalle'}
-              </pre>
-            </DetailPanel>
+            {originalOrder && (
+              <OrderVersionPanel
+                title="Pedido original del cliente"
+                order={originalOrder}
+                helper={`Capturado al crear el pedido · ${formatDateTimeLabel(originalOrder.capturedAt)}`}
+                accent="#60a5fa"
+              />
+            )}
+
+            {!order.currentRecordMissing && (
+              <OrderVersionPanel
+                title={originalOrder ? 'Pedido actualizado en operacion' : 'Detalle del pedido'}
+                order={order}
+                helper={originalOrder ? 'Incluye ajustes posteriores de cocina o SICAR.' : ''}
+                accent="#34d399"
+              />
+            )}
           </div>
 
           <div style={{ display: 'grid', gap: '18px' }}>
@@ -2306,6 +2583,48 @@ function HistoryDetailModal({ order, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function OrderVersionPanel({ title, order, helper = '', accent = '#60a5fa' }) {
+  return (
+    <DetailPanel title={title} icon={Icons.notes}>
+      {helper && (
+        <div style={{ marginBottom: 12, color: 'rgba(226, 232, 240, 0.64)', fontSize: 13 }}>
+          {helper}
+        </div>
+      )}
+      <pre
+        style={{
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          fontFamily: "'Segoe UI', system-ui, sans-serif",
+          fontSize: '16px',
+          lineHeight: 1.75,
+          color: '#e2e8f0',
+        }}
+      >
+        {order?.pedido || 'Sin detalle textual guardado'}
+      </pre>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          marginTop: 14,
+          paddingTop: 14,
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          color: accent,
+          fontWeight: 850,
+          fontSize: 13,
+        }}
+      >
+        <span>{Array.isArray(order?.items) ? order.items.length : 0} articulos</span>
+        <span>Subtotal C${Number(order?.subtotalEstimado || 0).toFixed(2)}</span>
+        <span>Total C${Number(order?.total || 0).toFixed(2)}</span>
+      </div>
+    </DetailPanel>
   );
 }
 

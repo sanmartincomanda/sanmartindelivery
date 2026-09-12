@@ -1,5 +1,6 @@
 export const STORE_COUPON_ARCHIVE_USAGE_PATH = 'storeCouponUsageArchive';
 export const ORDER_HISTORY_CLOUD_PATH = 'orderHistory';
+export const ORDER_ORIGINALS_PATH = 'orderOriginals';
 export const ORDER_HISTORY_RETENTION_DAYS = 60;
 
 export const normalizeCouponCode = (value = '') =>
@@ -125,6 +126,60 @@ export const buildArchivedOrderRecord = (orderKey, order = {}, sourcePath = 'ord
   archivedCouponCode: normalizeCouponCode(order?.cupon?.code),
   ...order,
 });
+
+export const buildOriginalOrderRecord = (orderKey, order = {}, capturedAt = Date.now()) => ({
+  ...order,
+  firebaseKey: String(orderKey || '').trim(),
+  snapshotType: 'original',
+  snapshotSource: 'order_creation',
+  capturedAt,
+  capturedAtIso: new Date(capturedAt).toISOString(),
+});
+
+export const mergeOrdersWithOriginalSnapshots = (orders = [], originalOrders = []) => {
+  const originalsByKey = new Map();
+
+  (Array.isArray(originalOrders) ? originalOrders : []).forEach((order) => {
+    const key = String(order?.firebaseKey || '').trim();
+    if (key) {
+      originalsByKey.set(key, order);
+    }
+  });
+
+  const seenKeys = new Set();
+  const mergedOrders = (Array.isArray(orders) ? orders : []).map((order) => {
+    const key = String(order?.firebaseKey || '').trim();
+    const originalOrder = originalsByKey.get(key) || null;
+    if (key) {
+      seenKeys.add(key);
+    }
+
+    return originalOrder
+      ? {
+          ...order,
+          originalOrder,
+          originalSnapshotAvailable: true,
+          currentRecordMissing: false,
+        }
+      : order;
+  });
+
+  originalsByKey.forEach((originalOrder, key) => {
+    if (seenKeys.has(key)) {
+      return;
+    }
+
+    mergedOrders.push({
+      ...originalOrder,
+      originalOrder,
+      originalSnapshotAvailable: true,
+      currentRecordMissing: true,
+      recordSource: 'original_only',
+    });
+  });
+
+  return sortOrdersByDateAndNumberDesc(mergedOrders);
+};
 
 export const sortOrdersByDateAndNumberDesc = (orders = []) =>
   [...orders].sort((left, right) => {

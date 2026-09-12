@@ -85,6 +85,16 @@ function StatusPill({ order }) {
   return <span className={`trace-status trace-status-${statusKey}`}>{getOrderTraceStatusLabel(order)}</span>;
 }
 
+function RecordIntegrityPill({ order }) {
+  if (order?.currentRecordMissing) {
+    return <span className="trace-integrity-pill is-missing">Operativo eliminado · original protegido</span>;
+  }
+  if (order?.originalSnapshotAvailable) {
+    return <span className="trace-integrity-pill is-protected">Original protegido</span>;
+  }
+  return null;
+}
+
 function SummaryCard({ icon, label, value, helper, tone }) {
   return (
     <article className={`trace-summary-card trace-summary-${tone}`}>
@@ -120,6 +130,7 @@ function DetailField({ label, value, wide = false }) {
 
 function OrderTraceModal({ order, onClose }) {
   const timeline = useMemo(() => buildOrderTraceTimeline(order), [order]);
+  const originalOrder = order?.originalOrder || null;
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -157,6 +168,13 @@ function OrderTraceModal({ order, onClose }) {
           </button>
         </header>
 
+        {order.currentRecordMissing ? (
+          <div className="trace-integrity-alert" role="status">
+            <strong>El registro operativo fue eliminado.</strong>
+            <span>El expediente sigue disponible porque conservamos la copia original inmutable.</span>
+          </div>
+        ) : null}
+
         <div className="trace-modal-body">
           <div className="trace-modal-main">
             <section className="trace-detail-panel">
@@ -173,11 +191,23 @@ function OrderTraceModal({ order, onClose }) {
               </div>
             </section>
 
-            <section className="trace-detail-panel">
-              <div className="trace-detail-heading"><TraceIcon name="receipt" /><h3>Detalle registrado</h3></div>
-              <pre className="trace-order-copy">{order.pedido || 'Este pedido no tiene detalle textual guardado.'}</pre>
-              {order.observaciones ? <p className="trace-order-notes"><strong>Observaciones:</strong> {order.observaciones}</p> : null}
-            </section>
+            {originalOrder ? (
+              <OrderVersionDetail
+                title="Pedido original del cliente"
+                order={originalOrder}
+                tone="original"
+                helper={`Capturado al crear el pedido · ${formatDateTime(originalOrder.capturedAt)}`}
+              />
+            ) : null}
+
+            {!order.currentRecordMissing ? (
+              <OrderVersionDetail
+                title={originalOrder ? 'Pedido actualizado en operacion' : 'Detalle registrado'}
+                order={order}
+                tone={originalOrder ? 'updated' : 'current'}
+                helper={originalOrder ? 'Incluye ajustes posteriores realizados en cocina o SICAR.' : ''}
+              />
+            ) : null}
 
             <section className="trace-detail-panel trace-internal-panel">
               <div className="trace-detail-heading"><TraceIcon name="history" /><h3>Registro interno</h3></div>
@@ -185,6 +215,7 @@ function OrderTraceModal({ order, onClose }) {
                 <DetailField label="Clave en base de datos" value={order.firebaseKey} wide />
                 <DetailField label="Ultima actualizacion" value={formatDateTime(order.timestamp)} />
                 <DetailField label="Fuente archivada" value={order.archivedSource || 'Pedidos activos'} />
+                <DetailField label="Copia original" value={originalOrder ? 'Protegida e inmutable' : 'No disponible para este pedido anterior'} />
               </div>
             </section>
           </div>
@@ -211,6 +242,22 @@ function OrderTraceModal({ order, onClose }) {
   );
 }
 
+function OrderVersionDetail({ title, order, tone = 'current', helper = '' }) {
+  return (
+    <section className={`trace-detail-panel trace-version-panel trace-version-${tone}`}>
+      <div className="trace-detail-heading"><TraceIcon name="receipt" /><h3>{title}</h3></div>
+      {helper ? <p className="trace-version-helper">{helper}</p> : null}
+      <pre className="trace-order-copy">{order?.pedido || 'Este pedido no tiene detalle textual guardado.'}</pre>
+      {order?.observaciones ? <p className="trace-order-notes"><strong>Observaciones:</strong> {order.observaciones}</p> : null}
+      <div className="trace-version-summary">
+        <span>{Array.isArray(order?.items) ? order.items.length : 0} articulos</span>
+        <span>Subtotal {moneyFormatter.format(Number(order?.subtotalEstimado || 0))}</span>
+        <span>Total {moneyFormatter.format(Number(order?.total || 0))}</span>
+      </div>
+    </section>
+  );
+}
+
 function MobileOrderCard({ order, onOpen }) {
   const kitchen = String(order?.cocinero || '').trim();
   const driver = String(order?.repartidorPublico || order?.repartidor || order?.entregadoPor || '').trim();
@@ -221,6 +268,7 @@ function MobileOrderCard({ order, onOpen }) {
         <div><small>PEDIDO</small><strong>#{formatOrderNumber(order)}</strong></div>
         <StatusPill order={order} />
       </div>
+      <RecordIntegrityPill order={order} />
       <h3>{order.cliente || 'Cliente sin nombre'}</h3>
       <p>{formatDate(order.fecha)} · {order.timestampIngreso || 'Sin hora de ingreso'}</p>
       <div className="trace-mobile-meta">
@@ -310,7 +358,7 @@ export default function OrderHistoryReport({
         <TraceIcon name="history" />
         <div>
           <strong>Historial disponible: {formatDate(availableDateFrom)} al {formatDate(availableDateTo)}</strong>
-          <span>Incluye pedidos activos y archivados que conserva actualmente el sistema.</span>
+          <span>Incluye pedidos activos, archivados y copias originales protegidas.</span>
         </div>
       </div>
 
@@ -367,7 +415,7 @@ export default function OrderHistoryReport({
                   const driver = String(order?.repartidorPublico || order?.repartidor || order?.entregadoPor || '').trim();
                   return (
                     <tr key={orderKey(order)}>
-                      <td><strong>#{formatOrderNumber(order)}</strong><small>{order.timestampIngreso || 'Sin hora'}</small></td>
+                      <td><strong>#{formatOrderNumber(order)}</strong><small>{order.timestampIngreso || 'Sin hora'}</small><RecordIntegrityPill order={order} /></td>
                       <td><strong>{order.cliente || 'Cliente sin nombre'}</strong><small>{formatDate(order.fecha)} · {getOrderTraceBranchName(order)}</small></td>
                       <td><span className={`trace-channel trace-channel-${getOrderTraceChannel(order)}`}>{getOrderTraceChannelLabel(order)}</span></td>
                       <td><StatusPill order={order} /></td>

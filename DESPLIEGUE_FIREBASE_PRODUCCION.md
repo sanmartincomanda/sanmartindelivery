@@ -43,7 +43,7 @@ npm run firebase:use
 
 ## Paso 1. Subir reglas e indices de Firebase
 
-Este paso debe ir primero, antes de usar la migracion de fotos en la app.
+Este paso debe ir primero, antes de usar la migracion de fotos o publicar la app.
 
 ```powershell
 npm run firebase:deploy:rules
@@ -55,6 +55,11 @@ Que aplica:
 - indice para `rutaOrders.fecha`
 - indice para `clients.codigo` y `clients.telefono`
 - reglas de Storage para `/store/catalog/**`
+- registro inmutable `orderOriginals/{fecha}/{pedido}` para conservar el pedido tal como fue creado
+
+La version nueva crea `orders/{pedido}` y `orderOriginals/{fecha}/{pedido}` en una sola
+operacion atomica. Si se publica la app antes de estas reglas, Firebase rechazara la
+creacion completa del pedido. No inviertas este orden.
 
 ## Paso 2. Publicar la app
 
@@ -119,10 +124,12 @@ Revisa estos flujos:
 
 1. Crear pedido manual.
 2. Crear pedido en tienda virtual.
-3. Ver pedido del cliente autenticado.
-4. Enviar pedido desde lista.
-5. Ver pedido en app driver.
-6. Ver historial por rango de fechas.
+3. Confirmar en Firebase que existe la copia en `orderOriginals/{fecha}/{pedido}`.
+4. Editar el pedido operativo y confirmar que el original no cambia.
+5. Ver pedido del cliente autenticado.
+6. Enviar pedido desde lista.
+7. Ver pedido en app driver.
+8. Ver historial por rango de fechas y comparar original con actualizado.
 
 ### Consumo esperado
 

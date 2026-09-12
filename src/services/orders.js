@@ -11,6 +11,10 @@ import {
   buildStoreWelcomeCouponReservationState,
   isStoreWelcomeCouponCoupon,
 } from './storeWelcomeCoupon.js';
+import {
+  buildOriginalOrderRecord,
+  ORDER_ORIGINALS_PATH,
+} from './orderArchive.js';
 
 export const ORDER_LIMIT_PER_DAY = 10000;
 export const MANUAL_CHANNEL = 'manual';
@@ -711,6 +715,11 @@ export async function createOrder(payload, options = {}) {
   const orderKey = buildOrderKey(fecha, orderNumber);
   const updates = {
     [`orders/${orderKey}`]: orderRecord,
+    [`${ORDER_ORIGINALS_PATH}/${fecha}/${orderKey}`]: buildOriginalOrderRecord(
+      orderKey,
+      orderRecord,
+      createdAt
+    ),
   };
 
   const storeUserKey = String(payload.storeUserKey || '').trim();

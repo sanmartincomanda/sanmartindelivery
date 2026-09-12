@@ -31,6 +31,15 @@
       ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
       ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service')"
     },
+    "orderOriginals": {
+      ".read": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin'",
+      "$date": {
+        "$orderId": {
+          ".write": "auth != null && !data.exists() && newData.exists() && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || (root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' && newData.child('storeBranchId').val() == root.child('userRoles').child(auth.uid).child('branchId').val()) || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && newData.child('canal').val() == 'tienda_virtual' && newData.child('storeUserKey').val() == auth.uid))",
+          ".validate": "newData.hasChildren(['firebaseKey', 'fecha', 'id', 'cliente', 'canal', 'snapshotType', 'capturedAt']) && newData.child('firebaseKey').val() == $orderId && newData.child('fecha').val() == $date && newData.child('snapshotType').val() == 'original' && newData.child('capturedAt').isNumber()"
+        }
+      }
+    },
     "rutaOrders": {
       ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin') || (root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' && query.orderByChild == 'fecha' && query.equalTo != null))",
       ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')",

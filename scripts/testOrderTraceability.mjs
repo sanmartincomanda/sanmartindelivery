@@ -5,6 +5,10 @@ import {
   filterOrderTraceHistory,
   getOrderTraceStatusKey,
 } from '../src/services/orderTraceability.js';
+import {
+  buildOriginalOrderRecord,
+  mergeOrdersWithOriginalSnapshots,
+} from '../src/services/orderArchive.js';
 
 const orders = [
   {
@@ -65,5 +69,36 @@ assert.equal(deliveredTrace.find((event) => event.id === 'delivered').actor, 'Dr
 const canceledTrace = buildOrderTraceTimeline(orders[1]);
 assert.equal(canceledTrace.at(-1).id, 'canceled');
 assert.equal(canceledTrace.at(-1).actor, 'Administracion');
+
+const originalSnapshot = buildOriginalOrderRecord(
+  orders[0].firebaseKey,
+  { ...orders[0], pedido: '2 LB - Producto original' },
+  1_725_552_000_000
+);
+assert.equal(originalSnapshot.snapshotType, 'original');
+assert.equal(originalSnapshot.firebaseKey, orders[0].firebaseKey);
+assert.equal(originalSnapshot.pedido, '2 LB - Producto original');
+
+const mergedWithOriginal = mergeOrdersWithOriginalSnapshots(orders, [
+  originalSnapshot,
+  buildOriginalOrderRecord(
+    '2026-09-02-GR-004',
+    {
+      id: 4,
+      orderNumber: 'GR-004',
+      fecha: '2026-09-02',
+      canal: 'tienda_virtual',
+      cliente: 'Cliente Recuperado',
+      pedido: '1 PZA - Pedido protegido',
+    },
+    1_725_465_600_000
+  ),
+]);
+const protectedOrder = mergedWithOriginal.find((order) => order.firebaseKey === orders[0].firebaseKey);
+const recoveredOrder = mergedWithOriginal.find((order) => order.firebaseKey === '2026-09-02-GR-004');
+assert.equal(protectedOrder.originalOrder.pedido, '2 LB - Producto original');
+assert.equal(protectedOrder.currentRecordMissing, false);
+assert.equal(recoveredOrder.currentRecordMissing, true);
+assert.equal(recoveredOrder.originalSnapshotAvailable, true);
 
 console.log('Historial de reportes: filtros, responsables y trazabilidad correctos.');

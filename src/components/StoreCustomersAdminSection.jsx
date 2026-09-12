@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { formatOrderNumber } from '../services/orders';
@@ -142,12 +143,48 @@ const resolveOrderAmount = (order = {}) => {
     return customerTotal;
   }
 
+  const sicarCustomerTotal = Number(order?.sicarQuote?.customerTotal || 0);
+  if (sicarCustomerTotal > 0) {
+    return sicarCustomerTotal;
+  }
+
+  const localTotal = Number(order?.total || order?.subtotalEstimado || 0);
+  if (localTotal > 0) {
+    return localTotal;
+  }
+
   const sicarTotal = Number(order?.sicarQuote?.total || 0);
-  if (sicarTotal > 0 && order?.totalAproximado === false) {
+  if (sicarTotal > 0) {
     return sicarTotal;
   }
 
-  return Number(order?.total || order?.subtotalEstimado || 0);
+  return 0;
+};
+
+const getOrderDetailText = (order = {}) => {
+  const detail = String(order?.pedido || '').trim();
+  if (detail) {
+    return detail;
+  }
+
+  const items = Array.isArray(order?.items) ? order.items : [];
+  if (items.length === 0) {
+    const quoteId = Number(order?.sicarQuote?.cotId || 0);
+    if (quoteId > 0) {
+      const linkedAmount = resolveOrderAmount(order);
+      return linkedAmount > 0
+        ? `El detalle de articulos ya no esta disponible en Firebase. Cotizacion SICAR #${quoteId} vinculada por ${formatCurrency(linkedAmount)}.`
+        : `El detalle de articulos ya no esta disponible en Firebase. Cotizacion SICAR #${quoteId} vinculada; consulta SICAR para revisar lineas y total.`;
+    }
+    return 'Sin detalle textual guardado.';
+  }
+
+  return items
+    .map((item) => {
+      const quantity = Number(item?.cantidad ?? item?.cantidadReal ?? 0);
+      return `${quantity} ${item?.unidad || ''} - ${item?.nombre || item?.codigo || 'Articulo'}`.trim();
+    })
+    .join('\n');
 };
 
 const getOrderSummaryByUser = (orders = []) => {
@@ -288,6 +325,21 @@ export default function StoreCustomersAdminSection({
     setPasswordForm({ password: '', confirmPassword: '' });
     setAdjustmentForm({ mode: 'sumar', points: '', note: '' });
     setMessage('');
+  }, [selectedUserKey]);
+
+  useEffect(() => {
+    if (!selectedUserKey) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setSelectedUserKey('');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedUserKey]);
 
   const rewards = useMemo(() => mergeStoreRewards(rewardMap), [rewardMap]);
@@ -681,9 +733,10 @@ export default function StoreCustomersAdminSection({
         </div>
       )}
 
-      {selectedCustomer && (
+      {selectedCustomer && createPortal((
         <div
-          className="cfg-driver-modal-overlay admin-viewport-dialog"
+          className="cfg-driver-modal-overlay admin-viewport-dialog store-customer-dialog"
+          role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setSelectedUserKey('');
@@ -691,16 +744,19 @@ export default function StoreCustomersAdminSection({
           }}
         >
           <div
-            className="cfg-driver-modal admin-viewport-dialog__panel"
+            className="cfg-driver-modal admin-viewport-dialog__panel store-customer-dialog__panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="store-customer-dialog-title"
             style={{ width: 'min(1120px, 100%)', display: 'grid', gap: 18 }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div className="store-customer-dialog__header" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ color: '#64748b', fontSize: 13, fontWeight: 900 }}>
                   Tienda Virtual / Cliente
                 </div>
-                <h2 style={{ margin: '6px 0 0', fontSize: 30 }}>
+                <h2 id="store-customer-dialog-title" style={{ margin: '6px 0 0', fontSize: 30 }}>
                   {selectedCustomer.nombre || 'Cliente sin nombre'}
                 </h2>
                 <div style={{ color: '#64748b', fontWeight: 800, marginTop: 4 }}>
@@ -841,6 +897,7 @@ export default function StoreCustomersAdminSection({
                 <input
                   className="cfg-input"
                   type="password"
+                  autoComplete="new-password"
                   value={passwordForm.password}
                   onChange={(event) => setPasswordForm((current) => ({ ...current, password: event.target.value }))}
                   placeholder="Nueva contrasena"
@@ -848,6 +905,7 @@ export default function StoreCustomersAdminSection({
                 <input
                   className="cfg-input"
                   type="password"
+                  autoComplete="new-password"
                   value={passwordForm.confirmPassword}
                   onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
                   placeholder="Confirmar contrasena"
@@ -971,7 +1029,7 @@ export default function StoreCustomersAdminSection({
               </InfoCard>
             </div>
 
-            <InfoCard title="Pedidos del cliente">
+            <InfoCard title="Pedidos del cliente · ultimos 90 dias">
               {selectedCustomerOrders.length === 0 ? (
                 <div style={{ color: '#64748b', fontWeight: 700 }}>
                   Este cliente aun no tiene pedidos en tienda virtual.
@@ -1002,6 +1060,34 @@ export default function StoreCustomersAdminSection({
                         {order.direccion || 'Sin direccion'}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {order.currentRecordMissing && (
+                          <span
+                            style={{
+                              borderRadius: 999,
+                              padding: '6px 10px',
+                              background: '#fee2e2',
+                              color: '#991b1b',
+                              fontSize: 12,
+                              fontWeight: 900,
+                            }}
+                          >
+                            Registro operativo eliminado · original protegido
+                          </span>
+                        )}
+                        {!order.currentRecordMissing && order.originalSnapshotAvailable && (
+                          <span
+                            style={{
+                              borderRadius: 999,
+                              padding: '6px 10px',
+                              background: '#dbeafe',
+                              color: '#1d4ed8',
+                              fontSize: 12,
+                              fontWeight: 900,
+                            }}
+                          >
+                            Original protegido
+                          </span>
+                        )}
                         {String(order?.cupon?.code || '').trim() && (
                           <span className="cfg-badge">Cupon {order.cupon.code}</span>
                         )}
@@ -1011,7 +1097,60 @@ export default function StoreCustomersAdminSection({
                         {String(order?.fulfillmentLabel || '').trim() && (
                           <span className="cfg-badge">{order.fulfillmentLabel}</span>
                         )}
+                        {Number(order?.sicarQuote?.cotId || 0) > 0 && (
+                          <span className="cfg-badge">Cotizacion SICAR #{order.sicarQuote.cotId}</span>
+                        )}
                       </div>
+                      {order.originalOrder && (
+                        <details
+                          style={{
+                            border: '1px solid #bfdbfe',
+                            borderRadius: 12,
+                            padding: 12,
+                            background: '#eff6ff',
+                          }}
+                        >
+                          <summary style={{ color: '#1d4ed8', fontWeight: 900, cursor: 'pointer' }}>
+                            Ver pedido original del cliente
+                          </summary>
+                          <pre
+                            style={{
+                              margin: '12px 0 0',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              color: '#1e3a8a',
+                              font: '700 13px/1.6 inherit',
+                            }}
+                          >
+                            {getOrderDetailText(order.originalOrder)}
+                          </pre>
+                        </details>
+                      )}
+                      {!order.currentRecordMissing && (
+                        <details
+                          style={{
+                            border: '1px solid #d1fae5',
+                            borderRadius: 12,
+                            padding: 12,
+                            background: '#f0fdf4',
+                          }}
+                        >
+                          <summary style={{ color: '#166534', fontWeight: 900, cursor: 'pointer' }}>
+                            {order.originalOrder ? 'Ver pedido actualizado' : 'Ver detalle del pedido'}
+                          </summary>
+                          <pre
+                            style={{
+                              margin: '12px 0 0',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              color: '#14532d',
+                              font: '700 13px/1.6 inherit',
+                            }}
+                          >
+                            {getOrderDetailText(order)}
+                          </pre>
+                        </details>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1019,7 +1158,7 @@ export default function StoreCustomersAdminSection({
             </InfoCard>
           </div>
         </div>
-      )}
+      ), document.body)}
     </section>
   );
 }

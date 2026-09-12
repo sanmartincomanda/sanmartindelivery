@@ -1,6 +1,7 @@
 import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import {
   fetchCloudOrderHistoryByDateRange,
+  fetchOrderOriginalsByDateRange,
   mergeOrderHistoryRecords,
 } from '../services/orderHistoryCloud';
 import { fetchOrdersByDateRange } from '../services/orders';
@@ -11,7 +12,10 @@ import {
   getReportDateRange,
   REPORT_PERIOD_OPTIONS,
 } from '../services/adminReports';
-import { getOrderHistoryRetentionStartDate } from '../services/orderArchive';
+import {
+  getOrderHistoryRetentionStartDate,
+  mergeOrdersWithOriginalSnapshots,
+} from '../services/orderArchive';
 import OrderHistoryReport from './reports/OrderHistoryReport';
 import '../styles/adminReports2026.css';
 
@@ -199,22 +203,29 @@ export default function CrmView() {
       setHistoryError('');
       setHistoryWarning('');
 
-      const [cloudResult, liveResult] = await Promise.allSettled([
+      const [cloudResult, liveResult, originalsResult] = await Promise.allSettled([
         fetchCloudOrderHistoryByDateRange(historyRange.dateFrom, historyRange.dateTo),
         fetchOrdersByDateRange(historyRange.dateFrom, historyRange.dateTo),
+        fetchOrderOriginalsByDateRange(historyRange.dateFrom, historyRange.dateTo),
       ]);
 
       if (cancelled) return;
 
       const cloudOrders = cloudResult.status === 'fulfilled' ? cloudResult.value : [];
       const liveOrders = liveResult.status === 'fulfilled' ? liveResult.value : [];
+      const originalOrders = originalsResult.status === 'fulfilled' ? originalsResult.value : [];
 
-      if (cloudResult.status === 'rejected' && liveResult.status === 'rejected') {
+      if (
+        cloudResult.status === 'rejected' &&
+        liveResult.status === 'rejected' &&
+        originalsResult.status === 'rejected'
+      ) {
         console.error('No se pudo cargar el historial de reportes:', {
           cloud: cloudResult.reason,
           live: liveResult.reason,
+          originals: originalsResult.reason,
         });
-        setHistoryError('No pudimos consultar los pedidos archivados ni los pedidos activos.');
+        setHistoryError('No pudimos consultar los pedidos archivados, activos ni originales.');
         setHistoryLoadedKey(historyReloadKey);
         setHistoryLoading(false);
         return;
@@ -226,10 +237,18 @@ export default function CrmView() {
       } else if (liveResult.status === 'rejected') {
         console.warn('Historial de reportes cargado sin pedidos activos:', liveResult.reason);
         setHistoryWarning('Se muestra el archivo historico; los pedidos mas recientes podrian tardar en aparecer.');
+      } else if (originalsResult.status === 'rejected') {
+        console.warn('Historial de reportes cargado sin copias originales:', originalsResult.reason);
+        setHistoryWarning('Se muestran los pedidos disponibles, pero las copias originales no pudieron consultarse.');
       }
 
       startTransition(() => {
-        setHistoryOrders(mergeOrderHistoryRecords(cloudOrders, liveOrders));
+        setHistoryOrders(
+          mergeOrdersWithOriginalSnapshots(
+            mergeOrderHistoryRecords(cloudOrders, liveOrders),
+            originalOrders
+          )
+        );
         setHistoryUpdatedAt(Date.now());
         setHistoryLoadedKey(historyReloadKey);
         setHistoryLoading(false);
