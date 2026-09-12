@@ -4,6 +4,7 @@ import {
   getAuthenticatedFirebaseDatabase,
   refreshAuthenticatedFirebaseSession,
 } from './firebaseScriptAuth.mjs';
+import { buildSicarCustomerTextFields } from './sicarCustomerFields.mjs';
 import {
   buildStoreRewardRedemptionTextLines,
   normalizeStoreRewardRedemption,
@@ -1040,6 +1041,10 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
 
   const createSicarCustomer = async (customer = {}) => {
     let rows = [];
+    const customerFields = buildSicarCustomerTextFields({
+      fullAddress: customer.address,
+      commentPrefix: STORE_CUSTOMER_COMMENT,
+    });
 
     try {
       rows = await runMysqlQuery(`
@@ -1071,7 +1076,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
           clave
         ) VALUES (
           ${escapeSqlText(customer.name || 'Cliente tienda virtual', sqlEscape)},
-          ${escapeSqlText(customer.address || '-', sqlEscape)},
+          ${escapeSqlText(customerFields.domicilio || '-', sqlEscape)},
           '',
           '',
           '',
@@ -1085,7 +1090,7 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
           ${escapeSqlText(customer.phone || '', sqlEscape)},
           ${escapeSqlText(customer.phone || '', sqlEscape)},
           ${escapeSqlText(customer.email || '', sqlEscape)},
-          ${escapeSqlText(STORE_CUSTOMER_COMMENT, sqlEscape)},
+          ${escapeSqlText(customerFields.comentario || STORE_CUSTOMER_COMMENT, sqlEscape)},
           1,
           0,
           1,
@@ -1143,14 +1148,18 @@ export function createSicarQuoteSyncManager({ runMysqlQuery, sqlEscape, branchId
       desiredCustomer.shouldOverwriteAddress || !normalizeText(existingCustomer?.address)
         ? desiredCustomer.address || existingCustomer?.address || '-'
         : existingCustomer?.address || '-';
+    const customerFields = buildSicarCustomerTextFields({
+      fullAddress: nextAddress,
+      commentPrefix: STORE_CUSTOMER_COMMENT,
+    });
 
     const desiredPatch = {
       nombre: desiredCustomer.name || existingCustomer?.name || 'Cliente tienda virtual',
-      domicilio: nextAddress,
+      domicilio: customerFields.domicilio || '-',
       telefono: desiredCustomer.phone || existingCustomer?.phone || '',
       celular: desiredCustomer.phone || existingCustomer?.mobile || '',
       mail: desiredCustomer.email || existingCustomer?.email || '',
-      comentario: STORE_CUSTOMER_COMMENT,
+      comentario: customerFields.comentario || STORE_CUSTOMER_COMMENT,
       status: 1,
       notificar: 1,
       clave: desiredCustomer.code || existingCustomer?.clave || '',

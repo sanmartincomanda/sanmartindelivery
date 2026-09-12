@@ -14,6 +14,7 @@
     "test:order-traceability": "node scripts/testOrderTraceability.mjs",
     "test:store-product-promotions": "node scripts/testStoreProductPromotions.mjs",
     "test:store-categories": "node scripts/testStoreCategoryStructure.mjs",
+    "test:sicar-customer-fields": "node scripts/testSicarCustomerFields.mjs",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:publish:combos": "node scripts/publishSicarStoreCombos.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
