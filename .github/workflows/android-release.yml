@@ -66,7 +66,7 @@ jobs:
       - name: Upload Play Console bundle
         uses: actions/upload-artifact@v4
         with:
-          name: Carnes-San-Martin-v1.2.6-release
+          name: Carnes-San-Martin-v1.2.7-release
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 3
