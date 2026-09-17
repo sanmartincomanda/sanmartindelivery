@@ -16,6 +16,24 @@ export const STORE_REWARDS_PATH = 'storeRewards';
 export const STORE_REWARD_ACCOUNTS_PATH = 'storeRewardAccounts';
 export const STORE_REWARD_TRANSACTIONS_PATH = 'storeRewardTransactions';
 export const STORE_ORDER_REWARD_REDEMPTIONS_PATH = 'storeOrderRewardRedemptions';
+export const STORE_REWARD_SENT_STATUS_EFFECTIVE_DATE = '2026-09-16';
+
+export const isStoreRewardCreditReadyOrder = (order = {}) => {
+  const status = String(order?.estado || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+  if (status.includes('entregado')) {
+    return true;
+  }
+
+  return (
+    status.includes('enviado') &&
+    String(order?.fecha || '').trim() >= STORE_REWARD_SENT_STATUS_EFFECTIVE_DATE
+  );
+};
 
 export const STORE_REWARD_TYPES = {
   SINGLE_PRODUCT: 'single_product',

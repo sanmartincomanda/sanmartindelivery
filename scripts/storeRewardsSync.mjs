@@ -13,6 +13,7 @@ import {
 import {
   applyStoreRewardEarnedPoints,
   calculateEarnedRewardPoints,
+  isStoreRewardCreditReadyOrder,
   normalizeStoreRewardSettings,
   releaseStoreRewardReservation,
   resolveStoreRewardOrderFinalAmount,
@@ -212,7 +213,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
       }
     }
 
-    if (isDeliveredStoreOrder(order) && !isCanceledStoreOrder(order)) {
+    if (isStoreRewardCreditReadyOrder(order) && !isCanceledStoreOrder(order)) {
       const finalAmount = resolveStoreRewardOrderFinalAmount(order);
       const shouldCredit =
         settings.enabled === true &&
@@ -227,7 +228,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
             userKey: cleanUserKey,
             orderKey,
             points: earnedPoints,
-            note: 'Puntos acreditados por pedido entregado con total final actualizado.',
+            note: 'Puntos acreditados al enviar el pedido con total final actualizado.',
             databaseInstance: database,
           });
 
@@ -341,7 +342,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
       return true;
     }
 
-    if (isDeliveredStoreOrder(order) && !isCanceledStoreOrder(order)) {
+    if (isStoreRewardCreditReadyOrder(order) && !isCanceledStoreOrder(order)) {
       const rewardStatus = String(order?.rewardPoints?.status || '').trim().toLowerCase();
       const hasPendingRewardIntent =
         rewardStatus === 'pending' || Number(order?.rewardPoints?.estimatedPoints || 0) > 0;

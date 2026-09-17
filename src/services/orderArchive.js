@@ -1,3 +1,5 @@
+import { isStoreRewardCreditReadyOrder } from './storeRewards.js';
+
 export const STORE_COUPON_ARCHIVE_USAGE_PATH = 'storeCouponUsageArchive';
 export const ORDER_HISTORY_CLOUD_PATH = 'orderHistory';
 export const ORDER_ORIGINALS_PATH = 'orderOriginals';
@@ -99,7 +101,7 @@ export const hasPendingStoreRewardSettlement = (order = {}) => {
   const redemptionStatus = String(order?.rewardRedemption?.status || '').trim().toLowerCase();
 
   if (
-    isDelivered &&
+    isStoreRewardCreditReadyOrder(order) &&
     !isCanceled &&
     order?.rewardPoints?.awarded !== true &&
     (rewardStatus === 'pending' || Number(order?.rewardPoints?.estimatedPoints || 0) > 0)
