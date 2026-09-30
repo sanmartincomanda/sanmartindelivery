@@ -28,6 +28,7 @@ import { CLIENT_DIRECTORY_PATH } from './services/clientDirectory';
 import OrderForm from './components/OrderForm';
 import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
+import { isRouteSanMartinOrder } from './services/routeSanMartin';
 import TiendaVirtualView from './components/TiendaVirtualView';
 import TiendaVirtualAdminView from './components/TiendaVirtualAdminView';
 import ConfiguracionView from './components/ConfiguracionView';
@@ -215,6 +216,7 @@ function App() {
   const [kitchenUser, setKitchenUser] = useState(() => normalizeKitchenUser());
 
   const [orders, setOrders] = useState([]);
+  const [carryoverRouteOrders, setCarryoverRouteOrders] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [view, setView] = useState(getInitialAdminView);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -229,7 +231,11 @@ function App() {
   const isKitchenRoute = route === 'cocina';
   const isDriverRoute = route === 'driver';
   const isCrmRoute = route === 'crm';
-  const todayKey = hoyISO();
+  const [todayKey, setTodayKey] = useState(hoyISO);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTodayKey(hoyISO()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
   const isAdminDashboard = dashboardRole === AUTH_ROLES.ADMIN;
   const isBranchAdminDashboard = dashboardRole === AUTH_ROLES.BRANCH_ADMIN;
   const isOperatorDashboard = dashboardRole === AUTH_ROLES.OPERATOR;
@@ -362,12 +368,32 @@ function App() {
     }, 1800);
 
     const subscribe = ordersBranchId
-      ? (onData, onError) => subscribeOrdersForBranch(ordersBranchId, onData, onError, todayKey)
+      ? (onData, onError) => subscribeOrdersForBranch(ordersBranchId, onData, onError)
       : (onData, onError) => subscribeOrdersForDate(todayKey, onData, onError);
+    const routeOrdersByDate = new Map();
+    const routeUnsubscribers = ordersBranchId ? [] : [1, 2, 3].map((daysAgo) => {
+      const previousDay = new Date(`${todayKey}T12:00:00`);
+      previousDay.setDate(previousDay.getDate() - daysAgo);
+      const dateKey = `${previousDay.getFullYear()}-${String(previousDay.getMonth() + 1).padStart(2, '0')}-${String(previousDay.getDate()).padStart(2, '0')}`;
+      return subscribeOrdersForDate(dateKey, (previousOrders) => {
+        routeOrdersByDate.set(dateKey, previousOrders.filter((order) =>
+          isRouteSanMartinOrder(order) && order.scheduledDeliveryDate >= todayKey
+        ));
+        setCarryoverRouteOrders([...routeOrdersByDate.values()].flat());
+      }, console.error);
+    });
     const unsubscribe = subscribe(
-      (todayOrders) => {
+      (receivedOrders) => {
         finishedFirstLoad = true;
         window.clearTimeout(safeUnlockTimer);
+        if (ordersBranchId) {
+          setCarryoverRouteOrders(receivedOrders.filter((order) =>
+            order.fecha < todayKey && isRouteSanMartinOrder(order) && order.scheduledDeliveryDate >= todayKey
+          ));
+        }
+        const todayOrders = ordersBranchId
+          ? receivedOrders.filter((order) => order.fecha === todayKey)
+          : receivedOrders;
         if (!Array.isArray(todayOrders) || todayOrders.length === 0) {
           setOrders([]);
           setStats({ total: 0, pendientes: 0, preparando: 0 });
@@ -407,6 +433,7 @@ function App() {
       finishedFirstLoad = true;
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
+      routeUnsubscribers.forEach((unsubscribeRoute) => unsubscribeRoute());
     };
   }, [isAuthenticated, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, ordersBranchId, route, todayKey, view]);
 
@@ -666,7 +693,7 @@ function App() {
       );
     }
 
-    return <KitchenView orders={orders} />;
+    return <KitchenView orders={orders} carryoverRouteOrders={carryoverRouteOrders} />;
   }
 
   if (isCrmRoute) {
@@ -875,8 +902,8 @@ function App() {
           />
         )}
 
-        {view === 'cocina' && <KitchenView orders={orders} allowRuta={isAdminDashboard} />}
-        {view === 'lista' && <ListaPedidos pedidos={orders} onEnviarPedido={handleEnviarPedido} />}
+        {view === 'cocina' && <KitchenView orders={orders} carryoverRouteOrders={carryoverRouteOrders} allowRuta={isAdminDashboard} />}
+        {view === 'lista' && <ListaPedidos pedidos={[...orders, ...carryoverRouteOrders]} onEnviarPedido={handleEnviarPedido} />}
 
         {view === 'catalogo' && isAdminDashboard && (
           <ConfiguracionView key="catalogo" mode="store" initialSection="catalogo" navigationScope="catalogo" />

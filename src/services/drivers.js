@@ -114,6 +114,7 @@ export const normalizeDriver = (driver = {}, fallback = {}) => {
     storeBranchId: String(source.storeBranchId ?? source.branchId ?? backup.storeBranchId ?? backup.branchId ?? 'granada')
       .trim()
       .toLowerCase() || 'granada',
+    serviceArea: source.serviceArea === 'all' || backup.serviceArea === 'all' ? 'all' : 'branch',
     active: source.active ?? backup.active ?? true,
     sortOrder: Number(source.sortOrder ?? backup.sortOrder ?? 999),
     loginUsername,

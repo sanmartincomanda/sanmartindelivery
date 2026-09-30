@@ -8,6 +8,7 @@ import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
+import { isRouteSanMartinOrder } from '../services/routeSanMartin';
 
 const KITCHEN_THEME = SAN_MARTIN_THEME;
 
@@ -328,7 +329,7 @@ const getKitchenStatusConfig = (pedido = {}) => {
   return baseConfig;
 };
 
-export default function KitchenView({ orders, allowRuta = true }) {
+export default function KitchenView({ orders, carryoverRouteOrders = [], allowRuta = true }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const audioRef = useRef(null);
@@ -562,7 +563,11 @@ export default function KitchenView({ orders, allowRuta = true }) {
     }
   }, [orders, kitchenTab]);
 
-  const currentOrdersRaw = allowRuta && kitchenTab === 'ruta' ? rutaOrders : orders;
+  const currentOrdersRaw = kitchenTab === 'ruta_san_martin'
+    ? [...orders, ...carryoverRouteOrders].filter(isRouteSanMartinOrder)
+    : allowRuta && kitchenTab === 'ruta'
+      ? rutaOrders
+      : orders.filter((order) => !isRouteSanMartinOrder(order));
   
   // 🔥 NUEVA LÓGICA DE ORDENAMIENTO:
   // 1. Primero por estado: Pendiente -> En preparación -> Preparado -> Cancelado
@@ -902,7 +907,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
           borderRadius: '16px',
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
-          {(allowRuta ? ['delivery', 'ruta'] : ['delivery']).map((tab) => (
+          {['delivery', 'ruta_san_martin', ...(allowRuta ? ['ruta'] : [])].map((tab) => (
             <button
               key={tab}
               onClick={() => setKitchenTab(tab)}
@@ -925,7 +930,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
               }}
             >
               {tab === 'delivery' ? Icons.delivery : Icons.route}
-              {tab === 'delivery' ? 'Delivery' : 'Ruta'}
+              {tab === 'delivery' ? 'Delivery' : tab === 'ruta_san_martin' ? 'Ruta San Martin' : 'Ruta manual'}
             </button>
           ))}
         </div>
@@ -1008,7 +1013,7 @@ export default function KitchenView({ orders, allowRuta = true }) {
             const storeProductItems = getStoreProductItems(pedido);
             const kitchenRewardItems = getKitchenRewardItems(pedido);
             const isStructuredStoreOrder =
-              kitchenTab === 'delivery' &&
+              kitchenTab !== 'ruta' &&
               String(pedido?.canal || '').trim() === 'tienda_virtual' &&
               (storeProductItems.length > 0 || kitchenRewardItems.length > 0);
             const storeSyncEntry = storeSyncState[pedido.firebaseKey] || {};
@@ -1094,6 +1099,11 @@ export default function KitchenView({ orders, allowRuta = true }) {
                           {config.icon}
                           {config.label}
                         </div>
+                        {isRouteSanMartinOrder(pedido) && (
+                          <div style={{ color: '#0c4d88', fontWeight: 900, fontSize: 14 }}>
+                            RUTA SAN MARTIN · Entrega {pedido.scheduledDeliveryDate} · {pedido.scheduledWindowLabel || 'Franja pendiente'}
+                          </div>
+                        )}
                         <div style={{ 
                           fontSize: '15px', 
                           color: '#475569', 

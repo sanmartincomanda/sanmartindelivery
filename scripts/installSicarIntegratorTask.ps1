@@ -20,12 +20,18 @@ if (-not (Test-Path -LiteralPath $scriptPath)) {
   throw "No se encontro el supervisor del integrador en $scriptPath"
 }
 
+$launcherPath = Join-Path $repoRoot 'scripts\runPowerShellHidden.vbs'
+if (-not (Test-Path -LiteralPath $launcherPath)) {
+  throw "No se encontro el lanzador oculto en $launcherPath"
+}
+
+$escapedLauncherPath = '"' + $launcherPath + '"'
 $escapedScriptPath = '"' + $scriptPath + '"'
 $escapedRepoRoot = '"' + $repoRoot + '"'
 $escapedNodePath = '"' + $nodePath + '"'
-$arguments = "-NoProfile -ExecutionPolicy Bypass -File $escapedScriptPath -RepoRoot $escapedRepoRoot -NodeExePath $escapedNodePath"
+$arguments = "$escapedLauncherPath $escapedScriptPath -RepoRoot $escapedRepoRoot -NodeExePath $escapedNodePath"
 
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments
+$action = New-ScheduledTaskAction -Execute "$env:WINDIR\System32\wscript.exe" -Argument $arguments -WorkingDirectory $repoRoot
 $settings = New-ScheduledTaskSettingsSet `
   -AllowStartIfOnBatteries `
   -DontStopIfGoingOnBatteries `

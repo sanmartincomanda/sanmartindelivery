@@ -4,14 +4,14 @@ import { resolve } from 'node:path';
 
 export default defineConfig(({ mode }) => ({
   // Web deployments must load their hashed chunks from the same release and
-  // host as index.html. The native build keeps relative paths inside the APK.
-  base: mode === 'android' ? './' : '/',
+  // host as index.html. Native builds keep relative paths inside the app bundle.
+  base: ['android', 'ios'].includes(mode) ? './' : '/',
   plugins: [react()],
   resolve: {
     alias: {
       '@app-entry': resolve(
         process.cwd(),
-        mode === 'android' ? 'src/StoreApp.jsx' : 'src/App.jsx'
+        ['android', 'ios'].includes(mode) ? 'src/StoreApp.jsx' : 'src/App.jsx'
       ),
     },
   },

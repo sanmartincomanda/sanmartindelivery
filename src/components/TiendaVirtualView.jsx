@@ -144,11 +144,13 @@ import {
   isPickupOrder,
   ORDER_FULFILLMENT_DELIVERY,
   ORDER_FULFILLMENT_PICKUP,
+  ORDER_FULFILLMENT_ROUTE_SAN_MARTIN,
   subscribeOrdersForStoreUser,
   formatOrderNumber,
   formatWeight,
   STORE_CHANNEL,
 } from '../services/orders';
+import { getRouteSanMartinQuote, getRouteSanMartinSchedule, getRouteSanMartinSlots } from '../services/routeSanMartin';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
 import StoreRewardsSheet, { StoreRewardsSummaryCard } from './StoreRewardsSheet';
@@ -1048,7 +1050,11 @@ const resolveActiveStoreCustomerOrder = (orders = [], createdOrder = null) => {
 };
 
 const getFulfillmentTypeLabel = (fulfillmentType) =>
-  fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Pickup en tienda' : 'Entrega a domicilio';
+  fulfillmentType === ORDER_FULFILLMENT_PICKUP
+    ? 'Pickup en tienda'
+    : fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN
+      ? 'Ruta San Martin'
+      : 'Entrega a domicilio';
 
 const getOrderProgressSteps = (order = {}) =>
   isPickupOrder(order) ? PICKUP_ORDER_PROGRESS_STEPS : ORDER_PROGRESS_STEPS;
@@ -1243,7 +1249,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
   const storeName = String(order.storeBranchName || 'Carnes San Martin Granada').trim();
   const totalLabel = order?.totalAproximado === false ? 'Total actualizado' : 'Total aproximado';
   const fulfillmentLabel = getFulfillmentTypeLabel(
-    isPickupOrder(order) ? ORDER_FULFILLMENT_PICKUP : ORDER_FULFILLMENT_DELIVERY
+    order.fulfillmentType || ORDER_FULFILLMENT_DELIVERY
   );
 
   return [
@@ -1253,6 +1259,7 @@ const buildOrderWhatsAppMessage = (order = {}, currentUser = {}) => {
     `Cliente: ${customerName}`,
     customerPhone ? `Telefono: ${customerPhone}` : '',
     `Tipo: ${fulfillmentLabel}`,
+    order.scheduledDeliveryDate ? `Entrega programada: ${order.scheduledDeliveryDate}` : '',
     `Estado actual: ${order.estado || 'Pendiente'}`,
     `${totalLabel}: ${formatCurrency(order.total)}`,
     'Productos:',
@@ -1517,6 +1524,7 @@ export default function TiendaVirtualView({
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
+  const [routeSlotId, setRouteSlotId] = useState('');
   const quantityNoticeTimeoutRef = useRef(null);
   const autoAppliedCouponRef = useRef('');
   const autoClaimingWelcomeCouponRef = useRef('');
@@ -3006,17 +3014,61 @@ export default function TiendaVirtualView({
     hasLocation(savedDeliveryAddress?.ubicacion) &&
     savedAddressCoverageQuote?.reason === 'out_of_coverage'
   );
+  const savedAddressRouteQuote = useMemo(
+    () => getRouteSanMartinQuote({ branch: selectedBranch, destination: savedDeliveryAddress?.ubicacion }),
+    [savedDeliveryAddress?.ubicacion, selectedBranch]
+  );
+  const granadaRouteBranch = useMemo(
+    () => storeBranches.find((branch) => branch.id === 'granada' && branch.active !== false) || null,
+    [storeBranches]
+  );
+  const granadaSavedAddressRouteQuote = useMemo(
+    () => getRouteSanMartinQuote({ branch: granadaRouteBranch, destination: savedDeliveryAddress?.ubicacion }),
+    [granadaRouteBranch, savedDeliveryAddress?.ubicacion]
+  );
+  useEffect(() => {
+    if (currentUser && showSavedAddressCoverageWarning && savedAddressRouteQuote.available &&
+        fulfillmentType === ORDER_FULFILLMENT_DELIVERY) {
+      setFulfillmentType(ORDER_FULFILLMENT_ROUTE_SAN_MARTIN);
+    }
+  }, [currentUser, fulfillmentType, savedAddressRouteQuote.available, showSavedAddressCoverageWarning]);
   const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
+  const routeSanMartinFlow = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
+  const routeSlots = useMemo(() => getRouteSanMartinSlots(new Date(currentTimeMs)), [currentTimeMs]);
+  const routeSanMartinQuote = useMemo(
+    () => getRouteSanMartinQuote({ branch: selectedBranch, destination: activeDeliveryAddress?.ubicacion }),
+    [activeDeliveryAddress?.ubicacion, selectedBranch]
+  );
   const deliveryQuote = useMemo(
-    () =>
-      calculateStoreDeliveryQuote({
+    () => routeSanMartinFlow
+      ? {
+          ...routeSanMartinQuote,
+          reason: routeSanMartinQuote.available ? 'ruta_san_martin' : 'out_of_coverage',
+          isPickup: false,
+          deliveryFree: routeSanMartinQuote.available,
+          promotionLabel: 'Ruta San Martin - envio gratis',
+          promotionType: 'ruta_san_martin',
+          feeKey: 'ruta_san_martin',
+        }
+      : calculateStoreDeliveryQuote({
         settings: activeDeliverySettings,
         destination: activeDeliveryAddress?.ubicacion,
         fulfillmentType,
       }),
-    [activeDeliveryAddress?.ubicacion, activeDeliverySettings, fulfillmentType]
+    [activeDeliveryAddress?.ubicacion, activeDeliverySettings, fulfillmentType, routeSanMartinFlow, routeSanMartinQuote]
   );
-  const deliverySummary = useMemo(() => buildStoreDeliverySummary(deliveryQuote), [deliveryQuote]);
+  const deliverySummary = useMemo(
+    () => routeSanMartinFlow
+      ? {
+          title: 'Ruta San Martin',
+          message: routeSanMartinQuote.available
+            ? 'Envio gratis. Tu pedido se entregara con al menos 24 horas de anticipacion.'
+            : 'Esta direccion queda fuera de los 40 km de Ruta San Martin o no tiene un pin valido.',
+          tone: routeSanMartinQuote.available ? 'active' : 'error',
+        }
+      : buildStoreDeliverySummary(deliveryQuote),
+    [deliveryQuote, routeSanMartinFlow, routeSanMartinQuote.available]
+  );
   const authRegistrationCoverageQuote = useMemo(
     () =>
       calculateStoreDeliveryQuote({
@@ -3073,7 +3125,7 @@ export default function TiendaVirtualView({
     () => Number((discountedProductTotal + deliveryFeeAmount).toFixed(2)),
     [deliveryFeeAmount, discountedProductTotal]
   );
-  const deliveryFreeActive = Boolean(deliveryQuote?.deliveryFree) && !pickupFlow;
+  const deliveryFreeActive = Boolean(deliveryQuote?.available && deliveryQuote?.deliveryFree) && !pickupFlow;
   const deliveryOriginalFeeAmount = useMemo(() => {
     if (!deliveryQuote?.available || deliveryQuote.isPickup) {
       return 0;
@@ -3858,7 +3910,9 @@ export default function TiendaVirtualView({
     const selectedBranchIsOutOfCoverage =
       authRegistrationCoverageQuote?.reason === 'out_of_coverage';
 
-    if (selectedBranchIsOutOfCoverage && !suggestedBranch) {
+    const routeAvailable = granadaRouteBranch?.acceptingOrders !== false &&
+      getRouteSanMartinQuote({ branch: granadaRouteBranch, destination: authForm.ubicacion }).available;
+    if (selectedBranchIsOutOfCoverage && !suggestedBranch && !routeAvailable) {
       setAuthLoading(false);
       setRegisterCoverageNotice({
         branch: selectedBranch,
@@ -3882,6 +3936,15 @@ export default function TiendaVirtualView({
         setRegisterCoverageNotice({
           branch: selectedBranch,
           suggestedBranch,
+        });
+      } else if (selectedBranchIsOutOfCoverage && routeAvailable) {
+        if (selectedBranch?.id === 'granada') {
+          setFulfillmentType(ORDER_FULFILLMENT_ROUTE_SAN_MARTIN);
+        }
+        setRegisterCoverageNotice({
+          branch: selectedBranch,
+          suggestedBranch: selectedBranch?.id === 'granada' ? null : granadaRouteBranch,
+          routeAvailable: true,
         });
       } else if (nextIntent === 'orders') {
         setOrdersOpen(true);
@@ -4090,6 +4153,8 @@ export default function TiendaVirtualView({
 
     if (changingBranch) {
       setSelectedBranchId(branch.id);
+      setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
+      setRouteSlotId('');
       setCart({});
       setAppliedCoupon(null);
       setCouponInput('');
@@ -4322,7 +4387,7 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (!storeOperationStatus.open) {
+    if (!storeOperationStatus.open && !routeSanMartinFlow) {
       setStoreClosedNoticeOpen(true);
       return;
     }
@@ -4349,6 +4414,12 @@ export default function TiendaVirtualView({
 
     if (!pickupFlow && !deliveryQuote?.available) {
       alert(deliverySummary.message || 'No pudimos calcular el servicio a domicilio para este pedido.');
+      return;
+    }
+
+    const routeSchedule = routeSanMartinFlow ? getRouteSanMartinSchedule(new Date(), routeSlotId) : null;
+    if (routeSanMartinFlow && !routeSchedule?.slotId) {
+      alert('Selecciona una franja de Ruta San Martin disponible con al menos 24 horas de anticipacion.');
       return;
     }
 
@@ -4555,6 +4626,11 @@ export default function TiendaVirtualView({
           cambioPara: paymentMethod === STORE_CASH_PAYMENT ? cashChangeText : '',
           deliveryMode,
           fulfillmentType,
+          ...(routeSchedule ? {
+            routeSlotId: routeSchedule.slotId,
+            scheduledDeliveryDate: routeSchedule.deliveryDate,
+            scheduledEarliestAt: routeSchedule.earliestAt,
+          } : {}),
           storeTenantId: selectedBranch.tenantId,
           storeBranchId: selectedBranch.id,
           storeBranchCode: selectedBranch.branchCode,
@@ -4616,6 +4692,7 @@ export default function TiendaVirtualView({
       setCustomer((current) => ({ ...current, cambioPara: '' }));
       setCheckoutOpen(false);
       setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
+      setRouteSlotId('');
       setDeliveryMode('perfil');
       setAlternateDelivery(createEmptyDeliveryDraft());
       setSelectedRewardRedemption(null);
@@ -9638,11 +9715,13 @@ export default function TiendaVirtualView({
               locating={branchLocating}
               onClick={openBranchSelector}
             />
-            {showSavedAddressCoverageWarning && (
+            {showSavedAddressCoverageWarning && !savedAddressRouteQuote.available && (
               <div className="store-coverage-alert" role="status">
                 <div className="store-coverage-alert-copy">
                   <span className="store-coverage-alert-dot" aria-hidden="true" />
-                  <span>Tu dirección no permite entregar desde esta tienda.</span>
+                  <span>{granadaSavedAddressRouteQuote.available
+                    ? 'Tu direccion tiene cobertura de Ruta San Martin desde Granada, con envio gratis y al menos 24 horas de anticipacion.'
+                    : 'Tu dirección no permite entregar desde esta tienda.'}</span>
                 </div>
                 <div className="store-coverage-alert-actions">
                   <button
@@ -9650,7 +9729,7 @@ export default function TiendaVirtualView({
                     className="store-coverage-alert-button primary"
                     onClick={openBranchSelector}
                   >
-                    Cambiar tienda
+                    {granadaSavedAddressRouteQuote.available ? 'Elegir Granada' : 'Cambiar tienda'}
                   </button>
                   <button
                     type="button"
@@ -9659,6 +9738,14 @@ export default function TiendaVirtualView({
                   >
                     Cambiar dirección
                   </button>
+                </div>
+              </div>
+            )}
+            {showSavedAddressCoverageWarning && savedAddressRouteQuote.available && (
+              <div className="store-coverage-alert" role="status">
+                <div className="store-coverage-alert-copy">
+                  <span className="store-coverage-alert-dot" aria-hidden="true" />
+                  <span>Tu direccion tiene cobertura de Ruta San Martin: entrega con 24 horas de anticipacion y envio gratis.</span>
                 </div>
               </div>
             )}
@@ -9692,7 +9779,7 @@ export default function TiendaVirtualView({
             </span>
             <span className="store-closed-inline-copy">
               <strong>Cerrado ahora</strong>
-              <span>Puedes explorar productos y preparar tu carrito.</span>
+              <span>Ruta San Martin sigue disponible para pedir con 24 horas de anticipacion.</span>
             </span>
             <button type="button" onClick={() => setStoreClosedNoticeOpen(true)}>
               Ver horario
@@ -10044,6 +10131,8 @@ export default function TiendaVirtualView({
           currentUser={currentUser}
           customer={customer}
           fulfillmentType={fulfillmentType}
+          routeSlots={routeSlots}
+          routeSlotId={routeSlotId}
           deliveryMode={deliveryMode}
           savedAddresses={savedAddresses}
           selectedSavedAddress={selectedSavedAddress}
@@ -10078,7 +10167,15 @@ export default function TiendaVirtualView({
           selectedBranch={selectedBranch}
           onClose={() => setCheckoutOpen(false)}
           onCustomerChange={updateCustomer}
-          onFulfillmentTypeChange={setFulfillmentType}
+          onFulfillmentTypeChange={(value) => {
+            if (value === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN && selectedBranch?.id !== 'granada') {
+              setCheckoutOpen(false);
+              openBranchSelector();
+              return;
+            }
+            setFulfillmentType(value);
+          }}
+          onRouteSlotChange={setRouteSlotId}
           onDeliveryModeChange={setDeliveryMode}
           onSavedAddressSelect={(addressId) => {
             setSelectedSavedAddressId(addressId);
@@ -10144,11 +10241,15 @@ export default function TiendaVirtualView({
         <RegisterOutOfCoverageModal
           branch={registerCoverageNotice.branch || selectedBranch}
           suggestedBranch={registerCoverageNotice.suggestedBranch}
+          routeAvailable={registerCoverageNotice.routeAvailable}
           onSwitch={() => {
             if (registerCoverageNotice.suggestedBranch) {
               selectStoreBranch(registerCoverageNotice.suggestedBranch, {
                 skipConfirmation: true,
               });
+              if (registerCoverageNotice.routeAvailable) {
+                setFulfillmentType(ORDER_FULFILLMENT_ROUTE_SAN_MARTIN);
+              }
             }
             setRegisterCoverageNotice(null);
           }}
@@ -12874,11 +12975,40 @@ function StoreCheckoutIcon({ name }) {
   return <span className="store-checkout-icon">{icons[name] || icons.wallet}</span>;
 }
 
+function RouteSanMartinSlotPicker({ slots, selectedId, onSelect }) {
+  return (
+    <section className="store-status-card" style={{ marginTop: 0 }} aria-label="Franja de entrega de Ruta San Martin">
+      <div className="store-status-pill active">Ruta San Martin</div>
+      <h3 style={{ margin: '10px 0 4px' }}>Elegí cuándo recibirlo</h3>
+      <p style={{ margin: '0 0 12px' }}>Desde Granada, envío gratis. Cada franja respeta 24 horas de anticipación.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+        {slots.map((slot) => (
+          <button
+            key={slot.id}
+            type="button"
+            className={`store-choice-card ${selectedId === slot.id ? 'active' : ''}`}
+            aria-pressed={selectedId === slot.id}
+            onClick={() => onSelect(slot.id)}
+            style={{ minHeight: 68, textAlign: 'left', justifyContent: 'center' }}
+          >
+            <strong style={{ textTransform: 'capitalize' }}>{slot.dateLabel}</strong>
+            <span style={{ fontSize: '0.82rem', lineHeight: 1.3 }}>{slot.label}</span>
+          </button>
+        ))}
+      </div>
+      {!slots.some((slot) => slot.id === selectedId) &&
+        <p style={{ margin: '12px 0 0', fontWeight: 700 }}>Seleccioná una franja para continuar.</p>}
+    </section>
+  );
+}
+
 function CheckoutSheet({
   cartItems,
   currentUser,
   customer,
   fulfillmentType,
+  routeSlots = [],
+  routeSlotId = '',
   deliveryMode,
   savedAddresses = [],
   selectedSavedAddress,
@@ -12920,6 +13050,7 @@ function CheckoutSheet({
   onCustomerChange,
   onCouponInputChange,
   onFulfillmentTypeChange,
+  onRouteSlotChange,
   onDeliveryModeChange,
   onSavedAddressSelect,
   onEditProfile,
@@ -12936,12 +13067,14 @@ function CheckoutSheet({
 }) {
   const isGuestCheckout = !currentUser;
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
+  const routeSanMartinFlow = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
+  const selectedRouteSlot = routeSlots.find((slot) => slot.id === routeSlotId);
   const paymentValue = normalizeCheckoutPayment(customer.metodoPago);
   const [checkoutStep, setCheckoutStep] = useState('cart');
   const isCartStep = checkoutStep === 'cart';
-  const canSubmitDelivery = pickupFlow || deliveryQuote?.available;
-  const storeClosed = storeOperationStatus?.open === false;
-  const deliveryFreeActive = Boolean(deliveryQuote?.deliveryFree) && !pickupFlow;
+  const canSubmitDelivery = pickupFlow || (deliveryQuote?.available && (!routeSanMartinFlow || Boolean(selectedRouteSlot)));
+  const storeClosed = storeOperationStatus?.open === false && !routeSanMartinFlow;
+  const deliveryFreeActive = Boolean(deliveryQuote?.available && deliveryQuote?.deliveryFree) && !pickupFlow;
   const rewardProgramName = `Miembro Gold San Martin ${selectedBranch?.shortName || 'Granada'}`;
   const rewardCartPreview = getRewardCartPreview(selectedReward);
   const deliveryChoices = [
@@ -12956,6 +13089,12 @@ function CheckoutSheet({
       icon: 'pickup',
       title: 'Pickup',
       detail: 'Retirar en tienda',
+    },
+    {
+      value: ORDER_FULFILLMENT_ROUTE_SAN_MARTIN,
+      icon: 'route',
+      title: 'Ruta San Martin',
+      detail: selectedBranch?.id === 'granada' ? 'Envío gratis · desde Granada' : 'Solo desde Granada',
     },
   ];
   const paymentChoices = STORE_PAYMENT_OPTIONS.map(getPaymentMeta);
@@ -13149,9 +13288,17 @@ function CheckoutSheet({
               <p className="store-fulfillment-help">
                 {pickupFlow
                   ? 'Al pedir en linea enviaremos tu pedido Pickup directamente.'
-                  : 'Luego confirmaras tu direccion y metodo de pago.'}
+                  : routeSanMartinFlow
+                    ? selectedRouteSlot
+                      ? `Entrega ${selectedRouteSlot.dateLabel}, ${selectedRouteSlot.label} · Servicio gratis dentro de 40 km.`
+                      : 'Elegí una franja disponible. Servicio gratis dentro de 40 km desde Granada.'
+                    : 'Luego confirmaras tu direccion y metodo de pago.'}
               </p>
             </div>
+
+            {routeSanMartinFlow && (
+              <RouteSanMartinSlotPicker slots={routeSlots} selectedId={routeSlotId} onSelect={onRouteSlotChange} />
+            )}
 
             {storeClosed && (
               <div className="store-status-card" style={{ marginTop: 0, borderColor: 'rgba(185, 28, 28, 0.18)' }}>
@@ -13332,6 +13479,9 @@ function CheckoutSheet({
               <span>Total</span>
               <strong>{formatCurrency(approximateTotalAmount)}</strong>
             </div>
+            {routeSanMartinFlow && (
+              <RouteSanMartinSlotPicker slots={routeSlots} selectedId={routeSlotId} onSelect={onRouteSlotChange} />
+            )}
             <FirstOrderRewardCheckoutCard
               eligible={firstOrderRewardEnabled}
               selectedItem={selectedFirstOrderGift}
@@ -13787,7 +13937,7 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
   );
 }
 
-function RegisterOutOfCoverageModal({ branch, suggestedBranch, onSwitch, onClose }) {
+function RegisterOutOfCoverageModal({ branch, suggestedBranch, routeAvailable = false, onSwitch, onClose }) {
   const hasSuggestedBranch = Boolean(suggestedBranch?.id);
 
   return (
@@ -13836,18 +13986,22 @@ function RegisterOutOfCoverageModal({ branch, suggestedBranch, onSwitch, onClose
             !
           </div>
           <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.05, color: '#0f172a' }}>
-            {hasSuggestedBranch
-              ? `Tu tienda es ${suggestedBranch.shortName}`
-              : 'Direccion fuera de rango'}
+            {routeAvailable
+              ? 'Tu cuenta tiene cobertura de Ruta San Martin'
+              : hasSuggestedBranch
+                ? `Tu tienda es ${suggestedBranch.shortName}`
+                : 'Direccion fuera de rango'}
           </h2>
           <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.6 }}>
-            {hasSuggestedBranch
-              ? `Tu direccion esta dentro del area de ${suggestedBranch.name}. Tu cuenta y tu sesion continuaran abiertas.`
-              : `${branch?.name || 'La tienda seleccionada'} cubre un radio de ${Number(
+            {routeAvailable
+              ? 'Puedes pedir desde Granada con al menos 24 horas de anticipacion y elegir una franja. El servicio a domicilio es gratis.'
+              : hasSuggestedBranch
+                ? `Tu direccion esta dentro del area de ${suggestedBranch.name}. Tu cuenta y tu sesion continuaran abiertas.`
+                : `${branch?.name || 'La tienda seleccionada'} cubre un radio de ${Number(
                   branch?.coverageRadiusKm || 7.5
                 ).toFixed(1)} km y sus alrededores.`}
           </p>
-          {!hasSuggestedBranch && (
+          {!hasSuggestedBranch && !routeAvailable && (
             <p style={{ margin: 0, color: '#0f3b82', fontWeight: 900, lineHeight: 1.6 }}>
               Proximamente abarcaremos nuevas zonas. 🙌
             </p>
@@ -14413,6 +14567,11 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
           {meta.label}
         </strong>
       </div>
+      {order.fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN && (
+        <p style={{ margin: '8px 0', color: '#0044c5', fontWeight: 800 }}>
+          Ruta San Martin · Entrega {order.scheduledDeliveryDate} · Envio gratis
+        </p>
+      )}
 
       {enRoute ? (
         <div className="store-delivery-route-card">

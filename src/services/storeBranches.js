@@ -139,6 +139,10 @@ export const normalizeStoreBranch = (branch = {}, fallback = {}) => {
       source.coverageRadiusKm,
       normalizePositiveNumber(backup.coverageRadiusKm, 7.5)
     ),
+    routeSanMartinRadiusKm: normalizePositiveNumber(
+      source.routeSanMartinRadiusKm,
+      normalizePositiveNumber(backup.routeSanMartinRadiusKm, 40)
+    ),
     switchPromptRadiusKm: normalizePositiveNumber(
       source.switchPromptRadiusKm,
       normalizePositiveNumber(backup.switchPromptRadiusKm, 12)

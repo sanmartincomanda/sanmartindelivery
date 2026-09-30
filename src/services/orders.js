@@ -2,6 +2,7 @@ import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, ru
 import { database } from '../firebase.js';
 import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
+import { getRouteSanMartinQuote, getRouteSanMartinSchedule } from './routeSanMartin.js';
 import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards.js';
 import {
   buildFirstOrderRewardTextLines,
@@ -23,6 +24,7 @@ export const STORE_ORDER_RETENTION_DAYS = 3;
 export const SICAR_QUOTE_QUEUE_PATH = 'sicarQuoteQueue';
 export const ORDER_FULFILLMENT_DELIVERY = 'delivery';
 export const ORDER_FULFILLMENT_PICKUP = 'pickup';
+export const ORDER_FULFILLMENT_ROUTE_SAN_MARTIN = 'ruta_san_martin';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -95,6 +97,10 @@ const normalizeOrderStatus = (status) => removeTextAccents(status || 'Pendiente'
 
 export const normalizeOrderFulfillmentType = (value = '') => {
   const normalized = removeTextAccents(value || '');
+
+  if (normalized === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN || normalized.includes('ruta san martin')) {
+    return ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
+  }
 
   if (
     normalized.includes('pickup') ||
@@ -350,6 +356,11 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   const paymentMethodLabel = normalizePaymentMethodLabel(summary.paymentMethod || summary.metodoPago);
   const lines = [];
 
+  if (normalizeOrderFulfillmentType(summary.fulfillmentType) === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN) {
+    lines.push(`RUTA SAN MARTIN - Entrega ${summary.scheduledDeliveryDate} ${summary.scheduledWindowLabel}`.trim());
+    lines.push('');
+  }
+
   if (discount > 0) {
     const discountLabel = getOrderDiscountLabel(discountBenefit, summary.couponCode);
     lines.push(`APLICA ${discountLabel.toUpperCase()}: -C$${formatAmount(discount)}`);
@@ -375,7 +386,9 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   if (subtotal > 0) {
     lines.push('');
     lines.push(`${subtotalLabel}: C$${formatAmount(subtotal)}`);
-    if (deliveryFree) {
+    if (normalizeOrderFulfillmentType(summary.fulfillmentType) === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN) {
+      lines.push('Servicio a domicilio: GRATIS - Ruta San Martin');
+    } else if (deliveryFree) {
       lines.push('Servicio a domicilio: DELIVERY GRATIS');
     } else if (deliveryFee > 0) {
       const deliveryLabel = deliveryDistanceKm > 0
@@ -514,6 +527,7 @@ export async function createOrder(payload, options = {}) {
   const createdAt = Date.now();
   const fulfillmentType = normalizeOrderFulfillmentType(payload.fulfillmentType || payload.tipoEntrega);
   const pickupOrder = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
+  const routeSanMartinOrder = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
   const storeBranchId = String(payload.storeBranchId || 'granada').trim().toLowerCase();
   const storeBranchCode = String(payload.storeBranchCode || storeBranchId).trim().toLowerCase();
   const storeBranchName = String(
@@ -521,6 +535,21 @@ export async function createOrder(payload, options = {}) {
   ).trim();
   const storeBranchAddress = String(payload.storeBranchAddress || '').trim();
   const storeBranchLocation = normalizeLocation(payload.storeBranchLocation);
+  const routeQuote = routeSanMartinOrder
+    ? getRouteSanMartinQuote({
+        branch: { id: storeBranchId, storeLocation: storeBranchLocation, active: true },
+        destination: payload.ubicacion,
+      })
+    : null;
+  if (routeSanMartinOrder && !routeQuote.available) {
+    throw new Error('La direccion no tiene cobertura de Ruta San Martin.');
+  }
+  const routeSchedule = routeSanMartinOrder
+    ? getRouteSanMartinSchedule(new Date(createdAt), String(payload.routeSlotId || ''))
+    : null;
+  if (routeSanMartinOrder && (!payload.routeSlotId || !routeSchedule?.slotId)) {
+    throw new Error('Selecciona una franja disponible para Ruta San Martin.');
+  }
   const counterRef = ref(database, getOrderCounterPath(fecha, storeBranchId));
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
@@ -554,21 +583,23 @@ export async function createOrder(payload, options = {}) {
     0,
     Math.min(Number(payload.descuentoCupon || 0), Number(subtotal || 0))
   );
-  const deliveryFee = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFee || 0));
-  const deliveryFeeOriginal = pickupOrder
+  const deliveryFee = pickupOrder || routeSanMartinOrder ? 0 : Math.max(0, Number(payload.deliveryFee || 0));
+  const deliveryFeeOriginal = pickupOrder || routeSanMartinOrder
     ? 0
     : Math.max(0, Number(payload.deliveryFeeOriginal ?? payload.deliveryFee ?? 0));
-  const deliveryFeeBase = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFeeBase || 0));
-  const deliveryFeeTax = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryFeeTax || 0));
-  const deliveryFeeBaseOriginal = pickupOrder
+  const deliveryFeeBase = pickupOrder || routeSanMartinOrder ? 0 : Math.max(0, Number(payload.deliveryFeeBase || 0));
+  const deliveryFeeTax = pickupOrder || routeSanMartinOrder ? 0 : Math.max(0, Number(payload.deliveryFeeTax || 0));
+  const deliveryFeeBaseOriginal = pickupOrder || routeSanMartinOrder
     ? 0
     : Math.max(0, Number(payload.deliveryFeeBaseOriginal ?? payload.deliveryFeeBase ?? 0));
-  const deliveryFeeTaxOriginal = pickupOrder
+  const deliveryFeeTaxOriginal = pickupOrder || routeSanMartinOrder
     ? 0
     : Math.max(0, Number(payload.deliveryFeeTaxOriginal ?? payload.deliveryFeeTax ?? 0));
-  const deliveryFree = !pickupOrder && payload.deliveryFree === true && deliveryFeeOriginal > 0;
-  const deliveryDistanceKm = pickupOrder ? 0 : Math.max(0, Number(payload.deliveryDistanceKm || 0));
-  const coverageRadiusKm = pickupOrder ? 0 : Math.max(0, Number(payload.coverageRadiusKm || 0));
+  const deliveryFree = !pickupOrder && (routeSanMartinOrder || (payload.deliveryFree === true && deliveryFeeOriginal > 0));
+  const deliveryDistanceKm = pickupOrder ? 0 : routeSanMartinOrder ? routeQuote.distanceKm : Math.max(0, Number(payload.deliveryDistanceKm || 0));
+  const coverageRadiusKm = pickupOrder ? 0 : routeSanMartinOrder ? routeQuote.coverageRadiusKm : Math.max(0, Number(payload.coverageRadiusKm || 0));
+  const scheduledDeliveryDate = routeSchedule?.deliveryDate || '';
+  const scheduledEarliestAt = routeSchedule?.earliestAt || 0;
   const deliveryManualWithoutPin =
     !pickupOrder &&
     (payload.deliveryManualWithoutPin === true || payload.deliveryMode === 'manual_without_pin');
@@ -606,6 +637,9 @@ export async function createOrder(payload, options = {}) {
     deliveryFree,
     deliveryDistanceKm,
     total,
+    fulfillmentType,
+    scheduledDeliveryDate,
+    scheduledWindowLabel: routeSchedule?.windowLabel || '',
     metodoPago: payload.metodoPago,
     observaciones: payload.observaciones,
     rewardRedemption: payload.rewardRedemption,
@@ -673,7 +707,13 @@ export async function createOrder(payload, options = {}) {
     deliveryManualWithoutPin,
     deliveryFeePending: deliveryManualWithoutPin && payload.deliveryFeePending !== false,
     fulfillmentType,
-    fulfillmentLabel: pickupOrder ? 'Pickup' : 'Delivery',
+    fulfillmentLabel: pickupOrder ? 'Pickup' : routeSanMartinOrder ? 'Ruta San Martin' : 'Delivery',
+    ...(routeSanMartinOrder ? { scheduledDeliveryDate, scheduledEarliestAt } : {}),
+    ...(routeSanMartinOrder ? {
+      routeSlotId: routeSchedule.slotId,
+      scheduledWindowEndAt: routeSchedule.windowEndAt,
+      scheduledWindowLabel: routeSchedule.windowLabel,
+    } : {}),
     storeTenantId: String(payload.storeTenantId || 'sanmartinsr').trim(),
     storeBranchId,
     storeBranchCode,

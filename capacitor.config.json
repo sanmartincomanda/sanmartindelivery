@@ -9,6 +9,9 @@
     "backgroundColor": "#0d2f51",
     "allowMixedContent": false
   },
+  "ios": {
+    "backgroundColor": "#ffffff"
+  },
   "plugins": {
     "FirebaseAuthentication": {
       "skipNativeAuth": true,

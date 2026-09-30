@@ -3992,7 +3992,7 @@ function DriversManager({
       driverForm.code || driverForm.name
         ? {
             username: getDriverLoginUsername(driverForm),
-            password: getDriverLoginPassword(driverForm),
+            password: driverForm.code === 'E-RUTA' ? '' : getDriverLoginPassword(driverForm),
           }
         : null,
     [driverForm]
@@ -4252,7 +4252,7 @@ function DriversManager({
             }}
           >
             <div>Usuario Driver: {previewDriverCredentials.username}</div>
-            <div>Clave inicial: {previewDriverCredentials.password}</div>
+            <div>Clave inicial: {previewDriverCredentials.password || 'Asignada al usuario de Ruta San Martin; no se muestra aqui.'}</div>
           </div>
         )}
         <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.45 }}>

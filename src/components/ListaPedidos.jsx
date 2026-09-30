@@ -9,6 +9,7 @@ import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { reconcileFirstOrderRewards } from '../services/storeIncentives';
+import { isRouteSanMartinOrder } from '../services/routeSanMartin';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -199,7 +200,9 @@ export default function ListaPedidos({ pedidos = [] }) {
     selectedOrder?.storeBranchId || selectedOrder?.storeBranchCode || 'granada'
   ).trim().toLowerCase();
   const availableDrivers = repartidores.filter(
-    (driver) => String(driver?.branchId || 'granada').trim().toLowerCase() === selectedOrderBranchId
+    (driver) => driver?.serviceArea === 'all'
+      ? isRouteSanMartinOrder(selectedOrder)
+      : String(driver?.branchId || 'granada').trim().toLowerCase() === selectedOrderBranchId
   );
 
   useEffect(() => {
@@ -215,16 +218,19 @@ export default function ListaPedidos({ pedidos = [] }) {
   const isEntregado = (p) => p.estado === 'Entregado';
   const isCancelado = (p) => p.estado === 'Cancelado';
 
-  const porEnviarCount = pedidos.filter(isPorEnviar).length;
-  const enviadosCount = pedidos.filter(isEnviado).length;
-  const entregadosCount = pedidos.filter(isEntregado).length;
-  const canceladosCount = pedidos.filter(isCancelado).length;
+  const regularPedidos = pedidos.filter((order) => !isRouteSanMartinOrder(order));
+  const porEnviarCount = regularPedidos.filter(isPorEnviar).length;
+  const enviadosCount = regularPedidos.filter(isEnviado).length;
+  const entregadosCount = regularPedidos.filter(isEntregado).length;
+  const canceladosCount = regularPedidos.filter(isCancelado).length;
 
   const filtrar = (arr) => {
-    if (filtro === 'enviados') return arr.filter(isEnviado);
-    if (filtro === 'entregados') return arr.filter(isEntregado);
-    if (filtro === 'cancelados') return arr.filter(isCancelado);
-    if (filtro === 'por_enviar') return arr.filter(isPorEnviar);
+    if (filtro === 'ruta_san_martin') return arr.filter(isRouteSanMartinOrder);
+    const regularOrders = arr.filter((order) => !isRouteSanMartinOrder(order));
+    if (filtro === 'enviados') return regularOrders.filter(isEnviado);
+    if (filtro === 'entregados') return regularOrders.filter(isEntregado);
+    if (filtro === 'cancelados') return regularOrders.filter(isCancelado);
+    if (filtro === 'por_enviar') return regularOrders.filter(isPorEnviar);
     return arr;
   };
 
@@ -792,6 +798,7 @@ export default function ListaPedidos({ pedidos = [] }) {
         }}>
           {[
             { key: 'por_enviar', label: 'Por Enviar', count: porEnviarCount, color: '#10b981' },
+            { key: 'ruta_san_martin', label: 'Ruta San Martin', count: pedidos.filter(isRouteSanMartinOrder).length, color: '#0044c5' },
             { key: 'enviados', label: 'Enviados', count: enviadosCount, color: '#6366f1' },
             { key: 'entregados', label: 'Entregados', count: entregadosCount, color: '#16a34a' },
             { key: 'cancelados', label: 'Cancelados', count: canceladosCount, color: '#ef4444' },
@@ -1127,6 +1134,11 @@ export default function ListaPedidos({ pedidos = [] }) {
                           fontWeight: 900
                         }}>
                           SUCURSAL: {pedido.storeBranchShortName || pedido.storeBranchCity || pedido.storeBranchName}
+                        </div>
+                      )}
+                      {isRouteSanMartinOrder(pedido) && (
+                        <div style={{ padding: '10px 16px', background: '#e8f1ff', borderRadius: 10, color: '#0044c5', fontWeight: 900 }}>
+                          RUTA SAN MARTIN · Entrega {pedido.scheduledDeliveryDate} · {pedido.scheduledWindowLabel || 'Franja pendiente'}
                         </div>
                       )}
                       {pickupOrder && (

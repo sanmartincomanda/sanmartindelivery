@@ -13,6 +13,7 @@ import {
 } from '../services/geo';
 import { fetchDriverByCode, getDriverPublicName } from '../services/drivers';
 import { formatOrderNumber, subscribeOrdersForDriverCode } from '../services/orders';
+import { getRouteSanMartinDispatchDate, isRouteSanMartinOrder } from '../services/routeSanMartin';
 import {
   assertRole,
   AUTH_ROLES,
@@ -232,7 +233,9 @@ const getOrderDeliveredAt = (order = {}) =>
   Number(order.timestampEntregadoMs || order.timestampFinalizado || order.timestamp || 0);
 
 const getOrderLeadMinutes = (order = {}, fallbackNow = Date.now()) => {
-  const createdAt = getOrderCreatedAt(order);
+  const createdAt = isRouteSanMartinOrder(order)
+    ? Number(order.scheduledEarliestAt || 0)
+    : getOrderCreatedAt(order);
   const finishedAt = isDeliveredOrder(order) ? getOrderDeliveredAt(order) : fallbackNow;
   if (!createdAt || !finishedAt) {
     return 0;
@@ -242,7 +245,7 @@ const getOrderLeadMinutes = (order = {}, fallbackNow = Date.now()) => {
 };
 
 const compareDriverActiveOrders = (left = {}, right = {}) => {
-  const dateDiff = String(left.fecha || '').localeCompare(String(right.fecha || ''));
+  const dateDiff = getRouteSanMartinDispatchDate(left).localeCompare(getRouteSanMartinDispatchDate(right));
   if (dateDiff !== 0) {
     return dateDiff;
   }
@@ -267,7 +270,12 @@ const formatElapsedMinutes = (minutes) => {
 };
 
 const getOrderAgeMeta = (order = {}, now = Date.now()) => {
-  const createdAt = getOrderCreatedAt(order);
+  const createdAt = isRouteSanMartinOrder(order)
+    ? Number(order.scheduledEarliestAt || 0)
+    : getOrderCreatedAt(order);
+  if (isRouteSanMartinOrder(order) && createdAt > now) {
+    return { key: 'fresh', label: `Programado ${order.scheduledDeliveryDate}`, tone: 'Programado' };
+  }
   const ageMinutes = createdAt ? Math.max(0, Math.floor((now - createdAt) / 60000)) : 0;
 
   if (ageMinutes >= 60) {
@@ -465,15 +473,22 @@ export default function DriverView() {
   const currentAssignedOrders = useMemo(
     () =>
       activeAssignedOrders
-        .filter((order) => String(order.fecha || '') === todayKey)
+        .filter((order) => getRouteSanMartinDispatchDate(order) === todayKey)
         .sort(compareDriverActiveOrders),
+    [activeAssignedOrders, todayKey]
+  );
+
+  const upcomingRouteOrders = useMemo(
+    () => activeAssignedOrders
+      .filter((order) => isRouteSanMartinOrder(order) && getRouteSanMartinDispatchDate(order) > todayKey)
+      .sort((left, right) => String(left.scheduledDeliveryDate).localeCompare(String(right.scheduledDeliveryDate))),
     [activeAssignedOrders, todayKey]
   );
 
   const hiddenLegacyAssignedOrders = useMemo(
     () =>
       activeAssignedOrders
-        .filter((order) => String(order.fecha || '') !== todayKey)
+        .filter((order) => getRouteSanMartinDispatchDate(order) < todayKey)
         .sort(compareDriverActiveOrders),
     [activeAssignedOrders, todayKey]
   );
@@ -488,13 +503,13 @@ export default function DriverView() {
 
   const deliveredTodayOrders = useMemo(
     () =>
-      deliveredOrders.filter((order) => String(order.fecha || '') === todayKey),
+      deliveredOrders.filter((order) => getRouteSanMartinDispatchDate(order) === todayKey),
     [deliveredOrders, todayKey]
   );
 
   const previousOrders = useMemo(
     () =>
-      [...hiddenLegacyAssignedOrders, ...deliveredOrders.filter((order) => String(order.fecha || '') !== todayKey)]
+      [...hiddenLegacyAssignedOrders, ...deliveredOrders.filter((order) => getRouteSanMartinDispatchDate(order) !== todayKey)]
         .sort(compareDriverPreviousOrders),
     [deliveredOrders, hiddenLegacyAssignedOrders, todayKey]
   );
@@ -705,7 +720,7 @@ export default function DriverView() {
     .sort(compareDriverActiveOrders);
   const delayedCount = delayedActiveOrders.length;
   const visibleRouteOrders = routeOrders;
-  const routeListTitle = 'Pedidos por entregar';
+  const routeListTitle = driver?.serviceArea === 'all' ? 'Ruta San Martin' : 'Pedidos por entregar';
   const deliveredSummary = deliveredTodayOrders[0]?.timestampEntregado
     ? `Ultima entrega ${deliveredTodayOrders[0].timestampEntregado}`
     : 'Revisa pedidos entregados de hoy.';
@@ -779,6 +794,17 @@ export default function DriverView() {
               <span>{`${visibleRouteOrders.length} pedidos en esta vista, ordenados del mas viejo al mas nuevo`}</span>
             </div>
           </section>
+
+          {upcomingRouteOrders.length > 0 && (
+            <section className="driver-inline-warning">
+              <strong>Ruta San Martin · Proximos pedidos</strong>
+              {upcomingRouteOrders.map((order) => (
+                <div key={getOrderKey(order)}>
+                  {formatOrderNumber(order)} · {order.scheduledDeliveryDate} · {order.cliente}
+                </div>
+              ))}
+            </section>
+          )}
 
           {delayedCount > 0 && (
             <div className="driver-delay-banner">
@@ -978,6 +1004,7 @@ export default function DriverView() {
 
       <DriverBottomNav
         section={driverSection}
+        routeLabel={driver?.serviceArea === 'all' ? 'Ruta San Martin' : 'En Ruta'}
         activeCount={activeRouteOrders.length}
         deliveredCount={deliveredCount}
         previousCount={previousCount}
@@ -1065,7 +1092,7 @@ function DriverProfileDelayedOrder({ order, nowMs, onOpenDetails, onOpenMap }) {
   );
 }
 
-function DriverBottomNav({ section, activeCount, deliveredCount, previousCount, profileBadge, onChangeSection }) {
+function DriverBottomNav({ section, routeLabel, activeCount, deliveredCount, previousCount, profileBadge, onChangeSection }) {
   return (
     <nav className="driver-bottom-nav" aria-label="Menu principal driver">
       <button
@@ -1074,7 +1101,7 @@ function DriverBottomNav({ section, activeCount, deliveredCount, previousCount, 
         onClick={() => onChangeSection('ruta')}
       >
         {Icons.bike}
-        <span>En Ruta</span>
+        <span>{routeLabel}</span>
         <b>{activeCount}</b>
       </button>
       <button

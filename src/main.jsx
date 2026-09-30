@@ -22,7 +22,7 @@ const isLocalHostname = (hostname = "") => {
 };
 
 const shouldLoadPublicStore = () => {
-  if (typeof window === "undefined" || import.meta.env.MODE === "android") {
+  if (typeof window === "undefined" || ["android", "ios"].includes(import.meta.env.MODE)) {
     return false;
   }
 
