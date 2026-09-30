@@ -8,7 +8,7 @@ import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
-import { isRouteSanMartinOrder } from '../services/routeSanMartin';
+import { isRouteSanMartinOrder, partitionRouteSanMartinOrders } from '../services/routeSanMartin';
 
 const KITCHEN_THEME = SAN_MARTIN_THEME;
 
@@ -554,8 +554,9 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
 
   useEffect(() => {
     if (kitchenTab !== 'delivery') return;
-    if (audioRef.current && orders.length > 0) {
-      const latestOrder = orders[orders.length - 1];
+    const deliveryOrders = orders.filter((order) => !isRouteSanMartinOrder(order));
+    if (audioRef.current && deliveryOrders.length > 0) {
+      const latestOrder = deliveryOrders[deliveryOrders.length - 1];
       const now = hoyISO();
       if (latestOrder.fecha === now && latestOrder.justAdded) {
         audioRef.current.play().catch(e => console.log('Audio play failed:', e));
@@ -563,11 +564,12 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
     }
   }, [orders, kitchenTab]);
 
+  const orderGroups = partitionRouteSanMartinOrders([...orders, ...carryoverRouteOrders]);
   const currentOrdersRaw = kitchenTab === 'ruta_san_martin'
-    ? [...orders, ...carryoverRouteOrders].filter(isRouteSanMartinOrder)
+    ? orderGroups.route
     : allowRuta && kitchenTab === 'ruta'
       ? rutaOrders
-      : orders.filter((order) => !isRouteSanMartinOrder(order));
+      : orderGroups.delivery;
   
   // 🔥 NUEVA LÓGICA DE ORDENAMIENTO:
   // 1. Primero por estado: Pendiente -> En preparación -> Preparado -> Cancelado
@@ -910,15 +912,15 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
           {['delivery', 'ruta_san_martin', ...(allowRuta ? ['ruta'] : [])].map((tab) => (
             <button
               key={tab}
+              type="button"
               onClick={() => setKitchenTab(tab)}
+              aria-pressed={kitchenTab === tab}
               className="btn-hover"
               style={{
                 padding: '12px 24px',
                 borderRadius: '12px',
                 border: 'none',
-                background: kitchenTab === tab 
-                  ? KITCHEN_THEME.primaryGradient
-                  : 'transparent',
+                background: kitchenTab === tab ? '#0044c5' : 'transparent',
                 color: kitchenTab === tab ? 'white' : 'rgba(255,255,255,0.6)',
                 fontWeight: 700,
                 fontSize: '14px',

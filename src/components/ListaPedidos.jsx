@@ -9,7 +9,7 @@ import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { reconcileFirstOrderRewards } from '../services/storeIncentives';
-import { buildRouteSanMartinDispatchUpdates, getSendableRouteSanMartinOrders, isRouteSanMartinOrder } from '../services/routeSanMartin';
+import { buildRouteSanMartinDispatchUpdates, getSendableRouteSanMartinOrders, isRouteSanMartinOrder, partitionRouteSanMartinOrders } from '../services/routeSanMartin';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -188,6 +188,7 @@ const getListStatusConfig = (pedido = {}) => {
 };
 
 export default function ListaPedidos({ pedidos = [] }) {
+  const [orderScope, setOrderScope] = useState('delivery');
   const [filtro, setFiltro] = useState('por_enviar');
   const [modalRepartidor, setModalRepartidor] = useState(null);
   const [repartidorSeleccionado, setRepartidorSeleccionado] = useState(null);
@@ -198,7 +199,9 @@ export default function ListaPedidos({ pedidos = [] }) {
   const [bulkSendingRoute, setBulkSendingRoute] = useState(false);
   const [bulkRouteError, setBulkRouteError] = useState('');
 
-  const sendableRouteOrders = getSendableRouteSanMartinOrders(pedidos);
+  const orderGroups = partitionRouteSanMartinOrders(pedidos);
+  const scopedPedidos = orderGroups[orderScope];
+  const sendableRouteOrders = getSendableRouteSanMartinOrders(orderGroups.route);
   const selectedRouteOrders = sendableRouteOrders.filter((order) => selectedRouteOrderKeys.has(order.firebaseKey));
   const routeDriver = repartidores.find((driver) => driver.code === 'E-RUTA' && driver.serviceArea === 'all');
 
@@ -233,20 +236,17 @@ export default function ListaPedidos({ pedidos = [] }) {
   const isEntregado = (p) => p.estado === 'Entregado';
   const isCancelado = (p) => p.estado === 'Cancelado';
 
-  const regularPedidos = pedidos.filter((order) => !isRouteSanMartinOrder(order));
-  const porEnviarCount = regularPedidos.filter(isPorEnviar).length;
-  const enviadosCount = regularPedidos.filter(isEnviado).length;
-  const entregadosCount = regularPedidos.filter(isEntregado).length;
-  const canceladosCount = regularPedidos.filter(isCancelado).length;
+  const porEnviarCount = scopedPedidos.filter(isPorEnviar).length;
+  const enviadosCount = scopedPedidos.filter(isEnviado).length;
+  const entregadosCount = scopedPedidos.filter(isEntregado).length;
+  const canceladosCount = scopedPedidos.filter(isCancelado).length;
 
-  const filtrar = (arr) => {
-    if (filtro === 'ruta_san_martin') return arr.filter(isRouteSanMartinOrder);
-    const regularOrders = arr.filter((order) => !isRouteSanMartinOrder(order));
-    if (filtro === 'enviados') return regularOrders.filter(isEnviado);
-    if (filtro === 'entregados') return regularOrders.filter(isEntregado);
-    if (filtro === 'cancelados') return regularOrders.filter(isCancelado);
-    if (filtro === 'por_enviar') return regularOrders.filter(isPorEnviar);
-    return arr;
+  const filtrar = () => {
+    if (filtro === 'enviados') return scopedPedidos.filter(isEnviado);
+    if (filtro === 'entregados') return scopedPedidos.filter(isEntregado);
+    if (filtro === 'cancelados') return scopedPedidos.filter(isCancelado);
+    if (filtro === 'por_enviar') return scopedPedidos.filter(isPorEnviar);
+    return scopedPedidos;
   };
 
   const getBasePath = () => 'orders';
@@ -482,14 +482,14 @@ export default function ListaPedidos({ pedidos = [] }) {
   };
 
   // Ordenar puramente por número de orden (ID) descendente (mayor a menor)
-  const pedidosOrdenados = [...filtrar(pedidos)].sort((a, b) => {
+  const pedidosOrdenados = [...filtrar()].sort((a, b) => {
     return (parseInt(b.id) || 0) - (parseInt(a.id) || 0);
   });
 
   const stats = {
-    pendientes: pedidos.filter(p => (p.estado || 'Pendiente') === 'Pendiente').length,
-    preparando: pedidos.filter(p => p.estado === 'En preparación').length,
-    preparados: pedidos.filter(p => p.estado === 'Preparado').length,
+    pendientes: scopedPedidos.filter(p => (p.estado || 'Pendiente') === 'Pendiente').length,
+    preparando: scopedPedidos.filter(p => p.estado === 'En preparación').length,
+    preparados: scopedPedidos.filter(p => p.estado === 'Preparado').length,
     enviados: enviadosCount,
     entregados: entregadosCount,
     cancelados: canceladosCount
@@ -848,7 +848,7 @@ export default function ListaPedidos({ pedidos = [] }) {
           </div>
         </div>
 
-        {/* Tabs de filtro */}
+        {/* El tipo de servicio se elige antes del estado para evitar mezclar pedidos. */}
         <div style={{
           display: 'flex',
           gap: '8px',
@@ -856,30 +856,32 @@ export default function ListaPedidos({ pedidos = [] }) {
           padding: '6px',
           borderRadius: '16px',
           border: '1px solid rgba(255,255,255,0.1)'
-        }}>
+        }} role="group" aria-label="Tipo de servicio">
           {[
-            { key: 'por_enviar', label: 'Por Enviar', count: porEnviarCount, color: '#10b981' },
-            { key: 'ruta_san_martin', label: 'Ruta San Martin', count: pedidos.filter(isRouteSanMartinOrder).length, color: '#0044c5' },
-            { key: 'enviados', label: 'Enviados', count: enviadosCount, color: '#6366f1' },
-            { key: 'entregados', label: 'Entregados', count: entregadosCount, color: '#16a34a' },
-            { key: 'cancelados', label: 'Cancelados', count: canceladosCount, color: '#ef4444' },
-            { key: 'todos', label: 'Todos', count: pedidos.length, color: '#3b82f6' }
+            { key: 'delivery', label: 'Delivery', count: orderGroups.delivery.length },
+            { key: 'route', label: 'Ruta San Martin', count: orderGroups.route.length }
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setFiltro(tab.key)}
+              type="button"
+              disabled={bulkSendingRoute}
+              onClick={() => {
+                setOrderScope(tab.key);
+                setFiltro('por_enviar');
+                setSelectedRouteOrderKeys(new Set());
+                setBulkRouteError('');
+              }}
+              aria-pressed={orderScope === tab.key}
               className="btn-hover"
               style={{
                 padding: '12px 20px',
                 borderRadius: '12px',
                 border: 'none',
-                background: filtro === tab.key 
-                  ? 'linear-gradient(135deg, ' + tab.color + ' 0%, ' + tab.color + 'dd 100%)' 
-                  : 'transparent',
-                color: filtro === tab.key ? 'white' : 'rgba(255,255,255,0.6)',
+                background: orderScope === tab.key ? '#0044c5' : 'transparent',
+                color: orderScope === tab.key ? 'white' : '#64748b',
                 fontWeight: 700,
                 fontSize: '14px',
-                cursor: 'pointer',
+                cursor: bulkSendingRoute ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -888,7 +890,7 @@ export default function ListaPedidos({ pedidos = [] }) {
             >
               {tab.label}
               <span style={{
-                background: filtro === tab.key ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+                background: orderScope === tab.key ? 'rgba(255,255,255,0.2)' : '#e8eef5',
                 padding: '2px 8px',
                 borderRadius: '10px',
                 fontSize: '12px',
@@ -902,7 +904,34 @@ export default function ListaPedidos({ pedidos = [] }) {
         </div>
       </div>
 
-      {filtro === 'ruta_san_martin' && (
+      <div className="admin-orders-status-tabs" role="group" aria-label="Estado de pedidos" style={{
+        display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10, marginBottom: 12
+      }}>
+        {[
+          { key: 'por_enviar', label: 'Por enviar', count: porEnviarCount },
+          { key: 'enviados', label: 'Enviados', count: enviadosCount },
+          { key: 'entregados', label: 'Entregados', count: entregadosCount },
+          { key: 'cancelados', label: 'Cancelados', count: canceladosCount },
+          { key: 'todos', label: 'Todos', count: scopedPedidos.length }
+        ].map((tab) => (
+          <button key={tab.key} type="button" aria-pressed={filtro === tab.key} disabled={bulkSendingRoute}
+            onClick={() => {
+              setFiltro(tab.key);
+              setSelectedRouteOrderKeys(new Set());
+            }}
+            style={{
+              flex: '0 0 auto', minHeight: 44, padding: '9px 14px', borderRadius: 10,
+              border: filtro === tab.key ? '1px solid #0044c5' : '1px solid #d4deea',
+              background: filtro === tab.key ? '#eaf2ff' : '#fff',
+              color: filtro === tab.key ? '#0044c5' : '#475569', fontWeight: 700,
+              cursor: bulkSendingRoute ? 'wait' : 'pointer'
+            }}>
+            {tab.label} <span style={{ marginLeft: 4 }}>{tab.count}</span>
+          </button>
+        ))}
+      </div>
+
+      {orderScope === 'route' && (filtro === 'por_enviar' || filtro === 'todos') && (
         <section style={{
           display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
           gap: 12, padding: '16px 18px', marginBottom: 20, borderRadius: 16,
@@ -998,7 +1027,7 @@ export default function ListaPedidos({ pedidos = [] }) {
           animation: 'slideIn 0.5s ease-out'
         }}>
           <h3 style={{ fontSize: '24px', margin: 0 }}>No hay pedidos en este filtro</h3>
-          <p>Los pedidos aparecerán aquí automáticamente</p>
+          <p>Los pedidos de {orderScope === 'route' ? 'Ruta San Martin' : 'Delivery'} aparecerán aquí automáticamente.</p>
         </div>
       ) : (
         <div className="admin-orders-grid" style={{
@@ -1113,7 +1142,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     </div>
 
-                    {filtro === 'ruta_san_martin' && status === 'Preparado' && (
+                    {orderScope === 'route' && status === 'Preparado' && (
                       <label style={{
                         display: 'inline-flex', alignItems: 'center', gap: 10, minHeight: 44,
                         padding: '8px 12px', borderRadius: 10, background: '#eaf2ff',

@@ -8,6 +8,7 @@ import {
   getRouteSanMartinSlots,
   getSendableRouteSanMartinOrders,
   isRouteSanMartinOrder,
+  partitionRouteSanMartinOrders,
   ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
   ROUTE_SAN_MARTIN_NOTICE_MS,
 } from '../src/services/routeSanMartin.js';
@@ -66,5 +67,17 @@ assert.equal(getRouteSanMartinSlots(afternoonOrder)[0].id, '2026-10-02:morning')
 assert.equal(getRouteSanMartinDispatchDate({ fulfillmentType: 'ruta_san_martin', scheduledDeliveryDate: scheduled.deliveryDate }), '2026-10-01');
 assert.equal(getRouteSanMartinDispatchDate({ fecha: '2026-09-30' }), '2026-09-30');
 assert.equal(isRouteSanMartinOrder({ fulfillmentType: 'delivery' }), false);
+assert.equal(isRouteSanMartinOrder({ fulfillmentLabel: 'Ruta San Martín' }), true);
+assert.equal(isRouteSanMartinOrder({ deliveryPromotionType: 'ruta_san_martin' }), true);
+assert.equal(isRouteSanMartinOrder({ routeSlotId: '2026-10-01:morning', scheduledDeliveryDate: '2026-10-01' }), true);
+assert.equal(isRouteSanMartinOrder({ fulfillmentLabel: 'Ruta manual' }), false);
+const separatedOrders = partitionRouteSanMartinOrders([
+  { firebaseKey: 'delivery', fulfillmentType: 'delivery' },
+  { firebaseKey: 'pickup', fulfillmentType: 'pickup' },
+  { firebaseKey: 'route', fulfillmentType: 'ruta_san_martin' },
+  { firebaseKey: 'legacy-route', fulfillmentLabel: 'Ruta San Martín' },
+]);
+assert.deepEqual(separatedOrders.delivery.map((order) => order.firebaseKey), ['delivery', 'pickup']);
+assert.deepEqual(separatedOrders.route.map((order) => order.firebaseKey), ['route', 'legacy-route']);
 
 console.log('Ruta San Martin: cobertura, costo y fecha verificados.');

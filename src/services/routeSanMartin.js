@@ -13,8 +13,22 @@ const ROUTE_SLOTS = [
 
 const managuaDateKey = (date) => new Date(date.getTime() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-export const isRouteSanMartinOrder = (order = {}) =>
-  String(order?.fulfillmentType || '').trim().toLowerCase() === ROUTE_SAN_MARTIN_FULFILLMENT;
+const normalizeRouteMarker = (value) => String(value || '').trim().toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+export const isRouteSanMartinOrder = (order = {}) => {
+  const markers = [order?.fulfillmentType, order?.fulfillmentLabel, order?.deliveryPromotionType];
+  return markers.some((marker) => {
+    const value = normalizeRouteMarker(marker);
+    return value === ROUTE_SAN_MARTIN_FULFILLMENT || value === 'ruta san martin';
+  }) || Boolean(order?.routeSlotId && order?.scheduledDeliveryDate);
+};
+
+export const partitionRouteSanMartinOrders = (orders = []) =>
+  orders.reduce((groups, order) => {
+    groups[isRouteSanMartinOrder(order) ? 'route' : 'delivery'].push(order);
+    return groups;
+  }, { delivery: [], route: [] });
 
 export const getSendableRouteSanMartinOrders = (orders = []) =>
   orders.filter((order) => isRouteSanMartinOrder(order) && order.estado === 'Preparado' && order.firebaseKey);
