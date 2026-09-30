@@ -1,6 +1,8 @@
 import { getDistanceKm, normalizeLocation } from './geo.js';
 
 export const ROUTE_SAN_MARTIN_FULFILLMENT = 'ruta_san_martin';
+export const ROUTE_SAN_MARTIN_COUNTER_PATH = 'orderCounters/rutaSanMartin';
+export const ROUTE_SAN_MARTIN_ORDER_PREFIX = 'RS';
 export const ROUTE_SAN_MARTIN_RADIUS_KM = 40;
 export const ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS = 1000;
 export const ROUTE_SAN_MARTIN_NOTICE_MS = 24 * 60 * 60 * 1000;
@@ -29,6 +31,13 @@ export const partitionRouteSanMartinOrders = (orders = []) =>
     groups[isRouteSanMartinOrder(order) ? 'route' : 'delivery'].push(order);
     return groups;
   }, { delivery: [], route: [] });
+
+export const formatRouteSanMartinOrderNumber = (sequence) => {
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new Error('La secuencia de Ruta San Martin no es valida.');
+  }
+  return `${ROUTE_SAN_MARTIN_ORDER_PREFIX}-${String(sequence).padStart(4, '0')}`;
+};
 
 export const getSendableRouteSanMartinOrders = (orders = []) =>
   orders.filter((order) => isRouteSanMartinOrder(order) && order.estado === 'Preparado' && order.firebaseKey);

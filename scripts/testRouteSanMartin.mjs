@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildRouteSanMartinDispatchUpdates,
+  formatRouteSanMartinOrderNumber,
   getRouteSanMartinDispatchDate,
   getRouteSanMartinQuote,
   getRouteSanMartinSchedule,
@@ -10,6 +11,7 @@ import {
   isRouteSanMartinOrder,
   partitionRouteSanMartinOrders,
   ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
+  ROUTE_SAN_MARTIN_COUNTER_PATH,
   ROUTE_SAN_MARTIN_NOTICE_MS,
 } from '../src/services/routeSanMartin.js';
 
@@ -28,6 +30,12 @@ assert.equal(getRouteSanMartinShortfall(0), 1000);
 assert.equal(getRouteSanMartinShortfall(999.99), 0.01);
 assert.equal(getRouteSanMartinShortfall(1000), 0);
 assert.equal(getRouteSanMartinShortfall(1200 - 250), 50);
+assert.equal(ROUTE_SAN_MARTIN_COUNTER_PATH, 'orderCounters/rutaSanMartin');
+assert.equal(formatRouteSanMartinOrderNumber(1), 'RS-0001');
+assert.equal(formatRouteSanMartinOrderNumber(2), 'RS-0002');
+assert.equal(formatRouteSanMartinOrderNumber(9999), 'RS-9999');
+assert.equal(formatRouteSanMartinOrderNumber(10000), 'RS-10000');
+assert.throws(() => formatRouteSanMartinOrderNumber(0), /secuencia/);
 assert.deepEqual(
   getSendableRouteSanMartinOrders([
     { firebaseKey: 'ready-route', fulfillmentType: 'ruta_san_martin', estado: 'Preparado' },

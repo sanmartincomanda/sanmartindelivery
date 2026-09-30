@@ -3,9 +3,12 @@ import { database } from '../firebase.js';
 import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
 import {
+  formatRouteSanMartinOrderNumber,
   getRouteSanMartinQuote,
   getRouteSanMartinSchedule,
   getRouteSanMartinShortfall,
+  ROUTE_SAN_MARTIN_COUNTER_PATH,
+  ROUTE_SAN_MARTIN_ORDER_PREFIX,
 } from './routeSanMartin.js';
 import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards.js';
 import {
@@ -568,11 +571,14 @@ export async function createOrder(payload, options = {}) {
   )) {
     throw new Error('Ruta San Martin requiere un minimo de C$1,000 en productos despues de descuentos.');
   }
-  const counterRef = ref(database, getOrderCounterPath(fecha, storeBranchId));
+  const counterRef = ref(database, routeSanMartinOrder
+    ? ROUTE_SAN_MARTIN_COUNTER_PATH
+    : getOrderCounterPath(fecha, storeBranchId));
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
     const lastNumber = Number(currentValue || 0);
-    if (lastNumber >= ORDER_LIMIT_PER_DAY) {
+    const limit = routeSanMartinOrder ? Number.MAX_SAFE_INTEGER : ORDER_LIMIT_PER_DAY;
+    if (!Number.isSafeInteger(lastNumber) || lastNumber < 0 || lastNumber >= limit) {
       return;
     }
 
@@ -580,16 +586,22 @@ export async function createOrder(payload, options = {}) {
   });
 
   if (!transactionResult.committed) {
-    throw createLimitError();
+    throw routeSanMartinOrder
+      ? new Error('No se pudo asignar un numero de Ruta San Martin.')
+      : createLimitError();
   }
 
   const id = Number(transactionResult.snapshot.val());
-  if (!id || id > ORDER_LIMIT_PER_DAY) {
-    throw createLimitError();
+  if (!Number.isSafeInteger(id) || id < 1 || (!routeSanMartinOrder && id > ORDER_LIMIT_PER_DAY)) {
+    throw routeSanMartinOrder
+      ? new Error('No se pudo asignar un numero de Ruta San Martin.')
+      : createLimitError();
   }
 
-  const orderPrefix = getOrderBranchPrefix(storeBranchId);
-  const orderNumber = formatOrderNumber(id, storeBranchId);
+  const orderPrefix = routeSanMartinOrder ? ROUTE_SAN_MARTIN_ORDER_PREFIX : getOrderBranchPrefix(storeBranchId);
+  const orderNumber = routeSanMartinOrder
+    ? formatRouteSanMartinOrderNumber(id)
+    : formatOrderNumber(id, storeBranchId);
   const shouldQueueSicarQuote =
     channel === STORE_CHANNEL || (channel === MANUAL_CHANNEL && normalizedItems.length > 0);
   const deliveryFee = pickupOrder || routeSanMartinOrder ? 0 : Math.max(0, Number(payload.deliveryFee || 0));
