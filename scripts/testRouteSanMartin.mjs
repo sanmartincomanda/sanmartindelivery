@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import {
+  buildRouteSanMartinDispatchUpdates,
   getRouteSanMartinDispatchDate,
   getRouteSanMartinQuote,
   getRouteSanMartinSchedule,
+  getRouteSanMartinShortfall,
   getRouteSanMartinSlots,
+  getSendableRouteSanMartinOrders,
   isRouteSanMartinOrder,
+  ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
   ROUTE_SAN_MARTIN_NOTICE_MS,
 } from '../src/services/routeSanMartin.js';
 
@@ -18,6 +22,31 @@ assert.equal(getRouteSanMartinQuote({ branch: { ...branch, active: false }, dest
 assert.equal(getRouteSanMartinQuote({ branch: { ...branch, id: 'nindiri' }, destination: destination(12) }).available, false);
 assert.equal(getRouteSanMartinQuote({ branch: { ...branch, routeSanMartinRadiusKm: 80 }, destination: destination(12.31) }).available, false);
 assert.equal(getRouteSanMartinQuote({ branch, destination: destination(12) }).totalFee, 0);
+assert.equal(ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS, 1000);
+assert.equal(getRouteSanMartinShortfall(0), 1000);
+assert.equal(getRouteSanMartinShortfall(999.99), 0.01);
+assert.equal(getRouteSanMartinShortfall(1000), 0);
+assert.equal(getRouteSanMartinShortfall(1200 - 250), 50);
+assert.deepEqual(
+  getSendableRouteSanMartinOrders([
+    { firebaseKey: 'ready-route', fulfillmentType: 'ruta_san_martin', estado: 'Preparado' },
+    { firebaseKey: 'pending-route', fulfillmentType: 'ruta_san_martin', estado: 'Pendiente' },
+    { firebaseKey: 'sent-route', fulfillmentType: 'ruta_san_martin', estado: 'Enviado' },
+    { firebaseKey: 'ready-delivery', fulfillmentType: 'delivery', estado: 'Preparado' },
+  ]).map((order) => order.firebaseKey),
+  ['ready-route']
+);
+const dispatchUpdates = buildRouteSanMartinDispatchUpdates(
+  [{ firebaseKey: 'selected-route', estado: 'Preparado' }],
+  { name: 'Ruta San Martin', code: 'E-RUTA' },
+  'Ruta San Martin',
+  Date.parse('2026-09-30T10:00:00-06:00')
+);
+assert.equal(dispatchUpdates['selected-route/estado'], 'Enviado');
+assert.equal(dispatchUpdates['selected-route/repartidorCodigo'], 'E-RUTA');
+assert.equal(dispatchUpdates['selected-route/timestampEnviado'], '10:00');
+assert.equal(Object.keys(dispatchUpdates).length, 7);
+assert.equal(Object.keys(dispatchUpdates).some((path) => path.startsWith('pending-route/')), false);
 
 const orderedAt = new Date('2026-09-30T23:45:00-06:00');
 const scheduled = getRouteSanMartinSchedule(orderedAt);

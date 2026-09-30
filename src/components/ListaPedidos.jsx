@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { onValue, ref, update } from 'firebase/database';
+import { get, onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { buildGoogleMapsPlaceUrl, hasLocation } from '../services/geo';
 import { DRIVERS_PATH, getDriverPublicName, mergeDrivers } from '../services/drivers';
@@ -9,7 +9,7 @@ import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { reconcileFirstOrderRewards } from '../services/storeIncentives';
-import { isRouteSanMartinOrder } from '../services/routeSanMartin';
+import { buildRouteSanMartinDispatchUpdates, getSendableRouteSanMartinOrders, isRouteSanMartinOrder } from '../services/routeSanMartin';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -194,6 +194,21 @@ export default function ListaPedidos({ pedidos = [] }) {
   const [animatingCards, setAnimatingCards] = useState(new Set());
   const [repartidores, setRepartidores] = useState(() => mergeDrivers().filter((driver) => driver.active !== false));
   const [quoteActions, setQuoteActions] = useState({});
+  const [selectedRouteOrderKeys, setSelectedRouteOrderKeys] = useState(() => new Set());
+  const [bulkSendingRoute, setBulkSendingRoute] = useState(false);
+  const [bulkRouteError, setBulkRouteError] = useState('');
+
+  const sendableRouteOrders = getSendableRouteSanMartinOrders(pedidos);
+  const selectedRouteOrders = sendableRouteOrders.filter((order) => selectedRouteOrderKeys.has(order.firebaseKey));
+  const routeDriver = repartidores.find((driver) => driver.code === 'E-RUTA' && driver.serviceArea === 'all');
+
+  useEffect(() => {
+    const eligibleKeys = new Set(sendableRouteOrders.map((order) => order.firebaseKey));
+    setSelectedRouteOrderKeys((current) => {
+      const next = new Set([...current].filter((key) => eligibleKeys.has(key)));
+      return next.size === current.size ? current : next;
+    });
+  }, [pedidos]);
 
   const selectedOrder = pedidos.find((pedido) => pedido.firebaseKey === modalRepartidor) || null;
   const selectedOrderBranchId = String(
@@ -281,6 +296,52 @@ export default function ListaPedidos({ pedidos = [] }) {
     
     setModalRepartidor(null);
     setRepartidorSeleccionado(null);
+  };
+
+  const toggleRouteOrder = (firebaseKey) => {
+    if (bulkSendingRoute) return;
+    setSelectedRouteOrderKeys((current) => {
+      const next = new Set(current);
+      if (next.has(firebaseKey)) next.delete(firebaseKey);
+      else next.add(firebaseKey);
+      return next;
+    });
+    setBulkRouteError('');
+  };
+
+  const sendSelectedRouteOrders = async () => {
+    if (bulkSendingRoute || selectedRouteOrders.length === 0) return;
+    if (!routeDriver) {
+      setBulkRouteError('El repartidor Ruta San Martin no esta activo. Revisa Configuracion antes de enviar.');
+      return;
+    }
+    if (!window.confirm(`Enviar ${selectedRouteOrders.length} pedido(s) preparados con Ruta San Martin? Los demas quedaran pendientes.`)) {
+      return;
+    }
+
+    setBulkSendingRoute(true);
+    setBulkRouteError('');
+    try {
+      const latestOrders = await Promise.all(selectedRouteOrders.map(async (order) => {
+        const snapshot = await get(ref(database, `orders/${order.firebaseKey}`));
+        return { firebaseKey: order.firebaseKey, ...snapshot.val() };
+      }));
+      if (getSendableRouteSanMartinOrders(latestOrders).length !== selectedRouteOrders.length) {
+        setBulkRouteError('Algunos pedidos cambiaron de estado. Revisa la seleccion antes de enviarlos.');
+        return;
+      }
+      const now = Date.now();
+      const updates = buildRouteSanMartinDispatchUpdates(
+        selectedRouteOrders, routeDriver, getDriverPublicName(routeDriver), now
+      );
+      await update(ref(database, 'orders'), updates);
+      setSelectedRouteOrderKeys(new Set());
+    } catch (error) {
+      console.error('Error enviando pedidos Ruta San Martin:', error);
+      setBulkRouteError('No se pudieron enviar los pedidos. No cambies de pantalla; revisa su estado e intenta nuevamente.');
+    } finally {
+      setBulkSendingRoute(false);
+    }
   };
 
   const handleCancelarEnvio = (firebaseKey) => {
@@ -841,6 +902,40 @@ export default function ListaPedidos({ pedidos = [] }) {
         </div>
       </div>
 
+      {filtro === 'ruta_san_martin' && (
+        <section style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, padding: '16px 18px', marginBottom: 20, borderRadius: 16,
+          background: '#eaf2ff', border: '1px solid #bfd4f6', color: '#082e65'
+        }} aria-label="Envio de pedidos Ruta San Martin">
+          <div>
+            <strong style={{ display: 'block', fontSize: 17 }}>Salida Ruta San Martin</strong>
+            <span style={{ fontSize: 14 }}>
+              {selectedRouteOrders.length} seleccionados de {sendableRouteOrders.length} preparados. Los no seleccionados seguiran pendientes.
+            </span>
+            {!routeDriver && <div style={{ color: '#b91c1c', fontWeight: 700 }}>El repartidor Ruta San Martin no esta activo.</div>}
+            {bulkRouteError && <div role="alert" style={{ color: '#b91c1c', fontWeight: 700 }}>{bulkRouteError}</div>}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button type="button" onClick={() => setSelectedRouteOrderKeys(new Set(sendableRouteOrders.map((order) => order.firebaseKey)))}
+              disabled={bulkSendingRoute || sendableRouteOrders.length === 0}
+              style={{ minHeight: 44, padding: '10px 14px', borderRadius: 10, border: '1px solid #a8c2e6', background: '#fff', color: '#0044c5', fontWeight: 800, cursor: 'pointer' }}>
+              Seleccionar todos los listos
+            </button>
+            <button type="button" onClick={() => setSelectedRouteOrderKeys(new Set())}
+              disabled={bulkSendingRoute || selectedRouteOrders.length === 0}
+              style={{ minHeight: 44, padding: '10px 14px', borderRadius: 10, border: '1px solid #a8c2e6', background: '#fff', color: '#0044c5', fontWeight: 800, cursor: 'pointer' }}>
+              Limpiar
+            </button>
+            <button type="button" onClick={sendSelectedRouteOrders}
+              disabled={bulkSendingRoute || selectedRouteOrders.length === 0 || !routeDriver}
+              style={{ minHeight: 44, padding: '10px 16px', borderRadius: 10, border: 0, background: '#0044c5', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>
+              {bulkSendingRoute ? 'Enviando...' : `Enviar ${selectedRouteOrders.length} con Ruta`}
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Stats Bar */}
       <div className="admin-orders-stats" style={{
         display: 'grid',
@@ -1017,6 +1112,24 @@ export default function ListaPedidos({ pedidos = [] }) {
                         </div>
                       </div>
                     </div>
+
+                    {filtro === 'ruta_san_martin' && status === 'Preparado' && (
+                      <label style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 10, minHeight: 44,
+                        padding: '8px 12px', borderRadius: 10, background: '#eaf2ff',
+                        color: '#0044c5', fontWeight: 800, cursor: 'pointer'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRouteOrderKeys.has(pedido.firebaseKey)}
+                          onChange={() => toggleRouteOrder(pedido.firebaseKey)}
+                          disabled={bulkSendingRoute}
+                          aria-label={`Seleccionar pedido ${formatOrderNumber(pedido)} para Ruta San Martin`}
+                          style={{ width: 22, height: 22, accentColor: '#0044c5' }}
+                        />
+                        Incluir en salida
+                      </label>
+                    )}
 
                     {pedido.repartidor && (
                       <div style={{

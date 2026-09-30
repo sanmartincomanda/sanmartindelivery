@@ -2,6 +2,7 @@ import { getDistanceKm, normalizeLocation } from './geo.js';
 
 export const ROUTE_SAN_MARTIN_FULFILLMENT = 'ruta_san_martin';
 export const ROUTE_SAN_MARTIN_RADIUS_KM = 40;
+export const ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS = 1000;
 export const ROUTE_SAN_MARTIN_NOTICE_MS = 24 * 60 * 60 * 1000;
 export const ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID = 'granada';
 const MANAGUA_OFFSET = '-06:00';
@@ -14,6 +15,31 @@ const managuaDateKey = (date) => new Date(date.getTime() - 6 * 60 * 60 * 1000).t
 
 export const isRouteSanMartinOrder = (order = {}) =>
   String(order?.fulfillmentType || '').trim().toLowerCase() === ROUTE_SAN_MARTIN_FULFILLMENT;
+
+export const getSendableRouteSanMartinOrders = (orders = []) =>
+  orders.filter((order) => isRouteSanMartinOrder(order) && order.estado === 'Preparado' && order.firebaseKey);
+
+export const buildRouteSanMartinDispatchUpdates = (orders, driver, publicName, now) => {
+  const time = new Date(now).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return Object.fromEntries(orders.flatMap((order) => {
+    const path = order.firebaseKey;
+    return [
+      [`${path}/repartidor`, driver.name],
+      [`${path}/repartidorPublico`, publicName || driver.name],
+      [`${path}/repartidorCodigo`, driver.code],
+      [`${path}/estado`, 'Enviado'],
+      [`${path}/timestampEnviado`, time],
+      [`${path}/timestampAsignado`, time],
+      [`${path}/timestamp`, now],
+    ];
+  }));
+};
+
+export const getRouteSanMartinShortfall = (productTotal) => {
+  const amount = Number(productTotal);
+  const eligibleAmount = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+  return Math.max(0, Number((ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS - eligibleAmount).toFixed(2)));
+};
 
 export const getRouteSanMartinQuote = ({ branch, destination } = {}) => {
   const origin = normalizeLocation(branch?.storeLocation);

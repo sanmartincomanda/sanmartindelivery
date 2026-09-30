@@ -150,7 +150,13 @@ import {
   formatWeight,
   STORE_CHANNEL,
 } from '../services/orders';
-import { getRouteSanMartinQuote, getRouteSanMartinSchedule, getRouteSanMartinSlots } from '../services/routeSanMartin';
+import {
+  getRouteSanMartinQuote,
+  getRouteSanMartinSchedule,
+  getRouteSanMartinShortfall,
+  getRouteSanMartinSlots,
+  ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
+} from '../services/routeSanMartin';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
 import StoreRewardsSheet, { StoreRewardsSummaryCard } from './StoreRewardsSheet';
@@ -4422,6 +4428,10 @@ export default function TiendaVirtualView({
       alert('Selecciona una franja de Ruta San Martin disponible con al menos 24 horas de anticipacion.');
       return;
     }
+    if (routeSanMartinFlow && getRouteSanMartinShortfall(discountedProductTotal) > 0) {
+      alert(`Ruta San Martin requiere ${formatCurrency(ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS)} en productos despues de descuentos.`);
+      return;
+    }
 
     let checkoutFirstOrderEligibility = firstOrderEligibility;
     if (firstOrderCampaign) {
@@ -4514,6 +4524,10 @@ export default function TiendaVirtualView({
     const checkoutSubtotal = checkoutDiscountBenefit.checkoutSubtotal;
     const checkoutOrderDiscount = checkoutDiscountBenefit.orderLevelDiscount;
     const checkoutProductTotal = checkoutDiscountBenefit.finalSubtotal;
+    if (routeSanMartinFlow && getRouteSanMartinShortfall(checkoutProductTotal) > 0) {
+      alert(`Ruta San Martin requiere ${formatCurrency(ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS)} en productos despues de descuentos.`);
+      return;
+    }
     const checkoutTotal = Number((checkoutProductTotal + deliveryFeeAmount).toFixed(2));
     const winningCoupon =
       checkoutDiscountBenefit.source === STORE_DISCOUNT_SOURCE.COUPON
@@ -12975,12 +12989,20 @@ function StoreCheckoutIcon({ name }) {
   return <span className="store-checkout-icon">{icons[name] || icons.wallet}</span>;
 }
 
-function RouteSanMartinSlotPicker({ slots, selectedId, onSelect }) {
+function RouteSanMartinSlotPicker({ slots, selectedId, shortfall, onSelect }) {
   return (
     <section className="store-status-card" style={{ marginTop: 0 }} aria-label="Franja de entrega de Ruta San Martin">
       <div className="store-status-pill active">Ruta San Martin</div>
       <h3 style={{ margin: '10px 0 4px' }}>Elegí cuándo recibirlo</h3>
-      <p style={{ margin: '0 0 12px' }}>Desde Granada, envío gratis. Cada franja respeta 24 horas de anticipación.</p>
+      <p style={{ margin: '0 0 12px' }}>
+        Desde Granada, envío gratis para pedidos desde {formatCurrency(ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS)} en productos.
+        Cada franja respeta 24 horas de anticipación.
+      </p>
+      {shortfall > 0 && (
+        <div className="store-location-feedback error" role="status" style={{ marginBottom: 12 }}>
+          Agregá {formatCurrency(shortfall)} más en productos para usar Ruta San Martín.
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
         {slots.map((slot) => (
           <button
@@ -13069,10 +13091,12 @@ function CheckoutSheet({
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const routeSanMartinFlow = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
   const selectedRouteSlot = routeSlots.find((slot) => slot.id === routeSlotId);
+  const routeMinimumShortfall = routeSanMartinFlow ? getRouteSanMartinShortfall(discountedProductTotal) : 0;
   const paymentValue = normalizeCheckoutPayment(customer.metodoPago);
   const [checkoutStep, setCheckoutStep] = useState('cart');
   const isCartStep = checkoutStep === 'cart';
-  const canSubmitDelivery = pickupFlow || (deliveryQuote?.available && (!routeSanMartinFlow || Boolean(selectedRouteSlot)));
+  const canSubmitDelivery = pickupFlow || (deliveryQuote?.available &&
+    (!routeSanMartinFlow || (Boolean(selectedRouteSlot) && routeMinimumShortfall === 0)));
   const storeClosed = storeOperationStatus?.open === false && !routeSanMartinFlow;
   const deliveryFreeActive = Boolean(deliveryQuote?.available && deliveryQuote?.deliveryFree) && !pickupFlow;
   const rewardProgramName = `Miembro Gold San Martin ${selectedBranch?.shortName || 'Granada'}`;
@@ -13297,7 +13321,12 @@ function CheckoutSheet({
             </div>
 
             {routeSanMartinFlow && (
-              <RouteSanMartinSlotPicker slots={routeSlots} selectedId={routeSlotId} onSelect={onRouteSlotChange} />
+              <RouteSanMartinSlotPicker
+                slots={routeSlots}
+                selectedId={routeSlotId}
+                shortfall={routeMinimumShortfall}
+                onSelect={onRouteSlotChange}
+              />
             )}
 
             {storeClosed && (
@@ -13468,9 +13497,9 @@ function CheckoutSheet({
               type="button"
               className="store-button store-checkout-primary-action"
               onClick={handleContinueCheckout}
-              disabled={submitting || storeClosed}
+              disabled={submitting || storeClosed || routeMinimumShortfall > 0}
             >
-              {submitting ? 'Enviando...' : storeClosed ? 'Tienda cerrada' : 'Pedir en linea'}
+              {submitting ? 'Enviando...' : storeClosed ? 'Tienda cerrada' : routeMinimumShortfall > 0 ? 'Agregá productos para Ruta' : 'Pedir en linea'}
             </button>
           </div>
         ) : (
@@ -13480,7 +13509,12 @@ function CheckoutSheet({
               <strong>{formatCurrency(approximateTotalAmount)}</strong>
             </div>
             {routeSanMartinFlow && (
-              <RouteSanMartinSlotPicker slots={routeSlots} selectedId={routeSlotId} onSelect={onRouteSlotChange} />
+              <RouteSanMartinSlotPicker
+                slots={routeSlots}
+                selectedId={routeSlotId}
+                shortfall={routeMinimumShortfall}
+                onSelect={onRouteSlotChange}
+              />
             )}
             <FirstOrderRewardCheckoutCard
               eligible={firstOrderRewardEnabled}

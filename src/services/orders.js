@@ -2,7 +2,11 @@ import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, ru
 import { database } from '../firebase.js';
 import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
-import { getRouteSanMartinQuote, getRouteSanMartinSchedule } from './routeSanMartin.js';
+import {
+  getRouteSanMartinQuote,
+  getRouteSanMartinSchedule,
+  getRouteSanMartinShortfall,
+} from './routeSanMartin.js';
 import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards.js';
 import {
   buildFirstOrderRewardTextLines,
@@ -550,6 +554,20 @@ export async function createOrder(payload, options = {}) {
   if (routeSanMartinOrder && (!payload.routeSlotId || !routeSchedule?.slotId)) {
     throw new Error('Selecciona una franja disponible para Ruta San Martin.');
   }
+  const normalizedItems = normalizeStoreItems(payload.items || []);
+  const subtotal =
+    normalizedItems.length > 0
+      ? Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2))
+      : Number(payload.total || 0) || null;
+  const couponDiscount = Math.max(
+    0,
+    Math.min(Number(payload.descuentoCupon || 0), Number(subtotal || 0))
+  );
+  if (routeSanMartinOrder && (
+    normalizedItems.length === 0 || getRouteSanMartinShortfall(Number(subtotal || 0) - couponDiscount) > 0
+  )) {
+    throw new Error('Ruta San Martin requiere un minimo de C$1,000 en productos despues de descuentos.');
+  }
   const counterRef = ref(database, getOrderCounterPath(fecha, storeBranchId));
 
   const transactionResult = await runTransaction(counterRef, (currentValue) => {
@@ -570,19 +588,10 @@ export async function createOrder(payload, options = {}) {
     throw createLimitError();
   }
 
-  const normalizedItems = normalizeStoreItems(payload.items || []);
   const orderPrefix = getOrderBranchPrefix(storeBranchId);
   const orderNumber = formatOrderNumber(id, storeBranchId);
   const shouldQueueSicarQuote =
     channel === STORE_CHANNEL || (channel === MANUAL_CHANNEL && normalizedItems.length > 0);
-  const subtotal =
-    normalizedItems.length > 0
-      ? Number(normalizedItems.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2))
-      : Number(payload.total || 0) || null;
-  const couponDiscount = Math.max(
-    0,
-    Math.min(Number(payload.descuentoCupon || 0), Number(subtotal || 0))
-  );
   const deliveryFee = pickupOrder || routeSanMartinOrder ? 0 : Math.max(0, Number(payload.deliveryFee || 0));
   const deliveryFeeOriginal = pickupOrder || routeSanMartinOrder
     ? 0
