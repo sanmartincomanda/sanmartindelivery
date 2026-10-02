@@ -2,18 +2,22 @@ import assert from 'node:assert/strict';
 import {
   buildRouteSanMartinDispatchUpdates,
   formatRouteSanMartinOrderNumber,
+  getCarryoverRouteSanMartinOrders,
+  getRouteSanMartinCompletedDate,
   getRouteSanMartinDispatchDate,
   getRouteSanMartinQuote,
   getRouteSanMartinSchedule,
   getRouteSanMartinShortfall,
   getRouteSanMartinSlots,
   getSendableRouteSanMartinOrders,
+  isOpenRouteSanMartinOrder,
   isRouteSanMartinOrder,
   partitionRouteSanMartinOrders,
   ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
   ROUTE_SAN_MARTIN_COUNTER_PATH,
   ROUTE_SAN_MARTIN_NOTICE_MS,
 } from '../src/services/routeSanMartin.js';
+import { shouldArchiveRealtimeOrder } from '../src/services/orderArchive.js';
 
 const branch = { id: 'granada', active: true, storeLocation: { lat: 11.9299, lng: -85.956 } };
 const destination = (lat) => ({ lat, lng: -85.956 });
@@ -71,7 +75,15 @@ assert.equal(getRouteSanMartinSlots(morningOrder)[0].id, '2026-10-01:morning');
 const middayOrder = new Date('2026-09-30T11:00:00-06:00');
 assert.equal(getRouteSanMartinSlots(middayOrder)[0].id, '2026-10-01:afternoon');
 const afternoonOrder = new Date('2026-09-30T14:00:00-06:00');
-assert.equal(getRouteSanMartinSlots(afternoonOrder)[0].id, '2026-10-02:morning');
+assert.equal(getRouteSanMartinSlots(afternoonOrder)[0].id, '2026-10-01:afternoon');
+const beforeCutoff = new Date('2026-09-30T21:59:59-06:00');
+const nextDayAfternoon = getRouteSanMartinSlots(beforeCutoff)[0];
+assert.equal(nextDayAfternoon.id, '2026-10-01:afternoon');
+assert.ok(nextDayAfternoon.startAt - beforeCutoff.getTime() < ROUTE_SAN_MARTIN_NOTICE_MS);
+assert.equal(getRouteSanMartinSchedule(beforeCutoff, nextDayAfternoon.id)?.windowLabel, nextDayAfternoon.label);
+const atCutoff = new Date('2026-09-30T22:00:00-06:00');
+assert.equal(getRouteSanMartinSlots(atCutoff)[0].id, '2026-10-02:morning');
+assert.equal(getRouteSanMartinSchedule(atCutoff, nextDayAfternoon.id), null);
 assert.equal(getRouteSanMartinDispatchDate({ fulfillmentType: 'ruta_san_martin', scheduledDeliveryDate: scheduled.deliveryDate }), '2026-10-01');
 assert.equal(getRouteSanMartinDispatchDate({ fecha: '2026-09-30' }), '2026-09-30');
 assert.equal(isRouteSanMartinOrder({ fulfillmentType: 'delivery' }), false);
@@ -87,5 +99,29 @@ const separatedOrders = partitionRouteSanMartinOrders([
 ]);
 assert.deepEqual(separatedOrders.delivery.map((order) => order.firebaseKey), ['delivery', 'pickup']);
 assert.deepEqual(separatedOrders.route.map((order) => order.firebaseKey), ['route', 'legacy-route']);
+
+const routeOrder = { fecha: '2026-09-27', fulfillmentType: 'ruta_san_martin', scheduledDeliveryDate: '2026-09-30' };
+assert.equal(isOpenRouteSanMartinOrder({ ...routeOrder, estado: 'Pendiente' }), true);
+assert.equal(isOpenRouteSanMartinOrder({ ...routeOrder, estado: 'Enviado' }), true);
+assert.equal(isOpenRouteSanMartinOrder({ ...routeOrder, estado: 'Entregado' }), false);
+assert.deepEqual(
+  getCarryoverRouteSanMartinOrders([
+    { ...routeOrder, firebaseKey: 'pending', estado: 'Pendiente' },
+    { ...routeOrder, firebaseKey: 'sent', estado: 'Enviado' },
+    { ...routeOrder, firebaseKey: 'delivered', estado: 'Entregado' },
+    { ...routeOrder, firebaseKey: 'today', fecha: '2026-10-01', estado: 'Pendiente' },
+    { firebaseKey: 'delivery', fecha: '2026-09-27', fulfillmentType: 'delivery', estado: 'Pendiente' },
+  ], '2026-10-01').map((order) => order.firebaseKey),
+  ['pending', 'sent']
+);
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Pendiente' }, '2026-10-01'), false);
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Preparado' }, '2026-10-01'), false);
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Enviado' }, '2026-10-01'), false);
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Entregado', timestampEntregadoMs: Date.parse('2026-10-01T09:00:00-06:00') }, '2026-10-01'), false);
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Entregado', timestampEntregadoMs: Date.parse('2026-09-30T16:00:00-06:00') }, '2026-10-01'), true);
+assert.equal(getRouteSanMartinCompletedDate({ timestampEntregadoMs: Date.parse('2026-10-01T00:30:00-06:00') }), '2026-10-01');
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Cancelado', timestampCanceladoMs: Date.parse('2026-09-30T16:00:00-06:00') }, '2026-10-01'), true);
+assert.equal(shouldArchiveRealtimeOrder({ ...routeOrder, estado: 'Entregado' }, '2026-10-01'), false);
+assert.equal(shouldArchiveRealtimeOrder({ fecha: '2026-09-30', fulfillmentType: 'delivery', estado: 'Pendiente' }, '2026-10-01'), true);
 
 console.log('Ruta San Martin: cobertura, costo y fecha verificados.');

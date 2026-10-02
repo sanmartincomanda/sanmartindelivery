@@ -13,7 +13,7 @@ import {
 } from '../services/geo';
 import { fetchDriverByCode, getDriverPublicName } from '../services/drivers';
 import { formatOrderNumber, subscribeOrdersForDriverCode } from '../services/orders';
-import { getRouteSanMartinDispatchDate, isRouteSanMartinOrder } from '../services/routeSanMartin';
+import { getRouteSanMartinCompletedDate, getRouteSanMartinDispatchDate, isRouteSanMartinOrder } from '../services/routeSanMartin';
 import {
   assertRole,
   AUTH_ROLES,
@@ -473,7 +473,8 @@ export default function DriverView() {
   const currentAssignedOrders = useMemo(
     () =>
       activeAssignedOrders
-        .filter((order) => getRouteSanMartinDispatchDate(order) === todayKey)
+        .filter((order) => getRouteSanMartinDispatchDate(order) === todayKey ||
+          (isRouteSanMartinOrder(order) && getRouteSanMartinDispatchDate(order) < todayKey))
         .sort(compareDriverActiveOrders),
     [activeAssignedOrders, todayKey]
   );
@@ -488,7 +489,7 @@ export default function DriverView() {
   const hiddenLegacyAssignedOrders = useMemo(
     () =>
       activeAssignedOrders
-        .filter((order) => getRouteSanMartinDispatchDate(order) < todayKey)
+        .filter((order) => !isRouteSanMartinOrder(order) && getRouteSanMartinDispatchDate(order) < todayKey)
         .sort(compareDriverActiveOrders),
     [activeAssignedOrders, todayKey]
   );
@@ -503,13 +504,17 @@ export default function DriverView() {
 
   const deliveredTodayOrders = useMemo(
     () =>
-      deliveredOrders.filter((order) => getRouteSanMartinDispatchDate(order) === todayKey),
+      deliveredOrders.filter((order) => (isRouteSanMartinOrder(order)
+        ? getRouteSanMartinCompletedDate(order)
+        : getRouteSanMartinDispatchDate(order)) === todayKey),
     [deliveredOrders, todayKey]
   );
 
   const previousOrders = useMemo(
     () =>
-      [...hiddenLegacyAssignedOrders, ...deliveredOrders.filter((order) => getRouteSanMartinDispatchDate(order) !== todayKey)]
+      [...hiddenLegacyAssignedOrders, ...deliveredOrders.filter((order) => (isRouteSanMartinOrder(order)
+        ? getRouteSanMartinCompletedDate(order)
+        : getRouteSanMartinDispatchDate(order)) !== todayKey)]
         .sort(compareDriverPreviousOrders),
     [deliveredOrders, hiddenLegacyAssignedOrders, todayKey]
   );

@@ -1,4 +1,5 @@
 import { isStoreRewardCreditReadyOrder } from './storeRewards.js';
+import { getRouteSanMartinCompletedDate, isRouteSanMartinOrder } from './routeSanMartin.js';
 
 export const STORE_COUPON_ARCHIVE_USAGE_PATH = 'storeCouponUsageArchive';
 export const ORDER_HISTORY_CLOUD_PATH = 'orderHistory';
@@ -81,6 +82,12 @@ export const shouldArchiveRealtimeOrder = (order = {}, todayKey = '') => {
 
   if (!orderDate || !cleanToday) {
     return false;
+  }
+
+  if (isRouteSanMartinOrder(order)) {
+    if (!isFinalOrderStatus(order?.estado)) return false;
+    const finishedDate = getRouteSanMartinCompletedDate(order);
+    return Boolean(finishedDate && finishedDate < cleanToday);
   }
 
   return orderDate < cleanToday;

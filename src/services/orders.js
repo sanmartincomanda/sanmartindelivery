@@ -4,6 +4,7 @@ import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
 import {
   formatRouteSanMartinOrderNumber,
+  getCarryoverRouteSanMartinOrders,
   getRouteSanMartinQuote,
   getRouteSanMartinSchedule,
   getRouteSanMartinShortfall,
@@ -442,6 +443,15 @@ export const subscribeOrdersForDate = (date, onData, onError) =>
     query(ref(database, 'orders'), orderByChild('fecha'), equalTo(String(date || '').trim())),
     (snapshot) => {
       onData(sortOrdersByDateAndNumber(mapOrdersSnapshot(snapshot)));
+    },
+    onError
+  );
+
+export const subscribeRouteSanMartinCarryover = (todayKey, onData, onError) =>
+  onValue(
+    query(ref(database, 'orders'), orderByChild('fecha'), endAt(String(todayKey || '').trim())),
+    (snapshot) => {
+      onData(sortOrdersByDateAndNumber(getCarryoverRouteSanMartinOrders(mapOrdersSnapshot(snapshot), todayKey)));
     },
     onError
   );

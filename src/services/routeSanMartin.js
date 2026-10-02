@@ -26,6 +26,15 @@ export const isRouteSanMartinOrder = (order = {}) => {
   }) || Boolean(order?.routeSlotId && order?.scheduledDeliveryDate);
 };
 
+export const isOpenRouteSanMartinOrder = (order = {}) => {
+  if (!isRouteSanMartinOrder(order)) return false;
+  const status = normalizeRouteMarker(order?.estado);
+  return !status.includes('entregado') && !status.includes('cancel') && !status.includes('anulad');
+};
+
+export const getCarryoverRouteSanMartinOrders = (orders = [], todayKey = '') =>
+  orders.filter((order) => String(order?.fecha || '') < todayKey && isOpenRouteSanMartinOrder(order));
+
 export const partitionRouteSanMartinOrders = (orders = []) =>
   orders.reduce((groups, order) => {
     groups[isRouteSanMartinOrder(order) ? 'route' : 'delivery'].push(order);
@@ -85,6 +94,7 @@ export const getRouteSanMartinSlots = (now = new Date(), days = 3) => {
   const orderedAt = now instanceof Date ? now : new Date(now);
   const firstDay = managuaDateKey(orderedAt);
   const minimumStart = orderedAt.getTime() + ROUTE_SAN_MARTIN_NOTICE_MS;
+  const beforeNextDayAfternoonCutoff = orderedAt.getTime() < Date.parse(`${firstDay}T22:00:00${MANAGUA_OFFSET}`);
   const options = [];
 
   for (let offset = 1; offset <= days; offset += 1) {
@@ -97,7 +107,7 @@ export const getRouteSanMartinSlots = (now = new Date(), days = 3) => {
 
     ROUTE_SLOTS.forEach((slot) => {
       const startAt = Date.parse(`${deliveryDate}T${slot.start}:00${MANAGUA_OFFSET}`);
-      if (startAt < minimumStart) return;
+      if (startAt < minimumStart && !(offset === 1 && slot.key === 'afternoon' && beforeNextDayAfternoonCutoff)) return;
       options.push({
         id: `${deliveryDate}:${slot.key}`,
         deliveryDate,
@@ -137,3 +147,11 @@ export const getRouteSanMartinDispatchDate = (order = {}) =>
   isRouteSanMartinOrder(order)
     ? String(order?.scheduledDeliveryDate || '').trim()
     : String(order?.fecha || '').trim();
+
+export const getRouteSanMartinCompletedDate = (order = {}) => {
+  const finishedAt = Number(order?.timestampEntregadoMs || order?.timestampFinalizado ||
+    order?.timestampCanceladoMs || order?.timestampAnuladoMs || 0);
+  return Number.isFinite(finishedAt) && finishedAt > 0
+    ? managuaDateKey(new Date(finishedAt))
+    : '';
+};

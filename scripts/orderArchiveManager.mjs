@@ -291,8 +291,11 @@ export function createOrderArchiveManager({ repoRoot }) {
 
             const bucket = monthBuckets.get(monthKey);
             if (bucket.data[orderKey]) {
-              rootUpdates[`${ORDER_HISTORY_CLOUD_PATH}/${order.fecha}/${orderKey}`] = bucket.data[orderKey];
+              const archivedOrder = buildArchivedOrderRecord(orderKey, order, sourcePath);
+              bucket.data[orderKey] = archivedOrder;
+              rootUpdates[`${ORDER_HISTORY_CLOUD_PATH}/${order.fecha}/${orderKey}`] = archivedOrder;
               rootUpdates[`${sourcePath}/${orderKey}`] = null;
+              archivedCount += 1;
               return;
             }
 

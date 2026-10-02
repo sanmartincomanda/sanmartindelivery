@@ -6,7 +6,7 @@ import './App.css';
 import { SAN_MARTIN_THEME } from './styles/sanMartinTheme';
 
 import { hoyISO } from './components/Utils';
-import { createOrder, subscribeOrderCounter, subscribeOrdersForBranch, subscribeOrdersForDate } from './services/orders';
+import { createOrder, subscribeOrderCounter, subscribeOrdersForBranch, subscribeOrdersForDate, subscribeRouteSanMartinCarryover } from './services/orders';
 import {
   assertRole,
   AUTH_ROLES,
@@ -28,7 +28,7 @@ import { CLIENT_DIRECTORY_PATH } from './services/clientDirectory';
 import OrderForm from './components/OrderForm';
 import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
-import { isRouteSanMartinOrder } from './services/routeSanMartin';
+import { getCarryoverRouteSanMartinOrders } from './services/routeSanMartin';
 import TiendaVirtualView from './components/TiendaVirtualView';
 import TiendaVirtualAdminView from './components/TiendaVirtualAdminView';
 import ConfiguracionView from './components/ConfiguracionView';
@@ -370,26 +370,17 @@ function App() {
     const subscribe = ordersBranchId
       ? (onData, onError) => subscribeOrdersForBranch(ordersBranchId, onData, onError)
       : (onData, onError) => subscribeOrdersForDate(todayKey, onData, onError);
-    const routeOrdersByDate = new Map();
-    const routeUnsubscribers = ordersBranchId ? [] : [1, 2, 3].map((daysAgo) => {
-      const previousDay = new Date(`${todayKey}T12:00:00`);
-      previousDay.setDate(previousDay.getDate() - daysAgo);
-      const dateKey = `${previousDay.getFullYear()}-${String(previousDay.getMonth() + 1).padStart(2, '0')}-${String(previousDay.getDate()).padStart(2, '0')}`;
-      return subscribeOrdersForDate(dateKey, (previousOrders) => {
-        routeOrdersByDate.set(dateKey, previousOrders.filter((order) =>
-          isRouteSanMartinOrder(order) && order.scheduledDeliveryDate >= todayKey
-        ));
-        setCarryoverRouteOrders([...routeOrdersByDate.values()].flat());
-      }, console.error);
-    });
+    const unsubscribeRoute = ordersBranchId ? null : subscribeRouteSanMartinCarryover(
+      todayKey,
+      setCarryoverRouteOrders,
+      (error) => console.error('Error cargando pedidos pendientes de Ruta San Martin:', error)
+    );
     const unsubscribe = subscribe(
       (receivedOrders) => {
         finishedFirstLoad = true;
         window.clearTimeout(safeUnlockTimer);
         if (ordersBranchId) {
-          setCarryoverRouteOrders(receivedOrders.filter((order) =>
-            order.fecha < todayKey && isRouteSanMartinOrder(order) && order.scheduledDeliveryDate >= todayKey
-          ));
+          setCarryoverRouteOrders(getCarryoverRouteSanMartinOrders(receivedOrders, todayKey));
         }
         const todayOrders = ordersBranchId
           ? receivedOrders.filter((order) => order.fecha === todayKey)
@@ -433,7 +424,7 @@ function App() {
       finishedFirstLoad = true;
       window.clearTimeout(safeUnlockTimer);
       unsubscribe();
-      routeUnsubscribers.forEach((unsubscribeRoute) => unsubscribeRoute());
+      unsubscribeRoute?.();
     };
   }, [isAuthenticated, isDriverRoute, isPublicStoreRoute, isKitchenRoute, kitchenAuth, ordersBranchId, route, todayKey, view]);
 

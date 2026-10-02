@@ -3068,7 +3068,7 @@ export default function TiendaVirtualView({
       ? {
           title: 'Ruta San Martin',
           message: routeSanMartinQuote.available
-            ? 'Envio gratis. Tu pedido se entregara con al menos 24 horas de anticipacion.'
+            ? 'Envio gratis con entrega programada. Si pedis antes de las 10 p. m., podes elegir manana por la tarde.'
             : 'Esta direccion queda fuera de los 40 km de Ruta San Martin o no tiene un pin valido.',
           tone: routeSanMartinQuote.available ? 'active' : 'error',
         }
@@ -4425,7 +4425,7 @@ export default function TiendaVirtualView({
 
     const routeSchedule = routeSanMartinFlow ? getRouteSanMartinSchedule(new Date(), routeSlotId) : null;
     if (routeSanMartinFlow && !routeSchedule?.slotId) {
-      alert('Selecciona una franja de Ruta San Martin disponible con al menos 24 horas de anticipacion.');
+      alert('Selecciona una franja disponible de Ruta San Martin. La tarde de manana se habilita si pedis antes de las 10 p. m.');
       return;
     }
     if (routeSanMartinFlow && getRouteSanMartinShortfall(discountedProductTotal) > 0) {
@@ -9750,7 +9750,7 @@ export default function TiendaVirtualView({
                 <div className="store-coverage-alert-copy">
                   <span className="store-coverage-alert-dot" aria-hidden="true" />
                   <span>{granadaSavedAddressRouteQuote.available
-                    ? 'Tu direccion tiene cobertura de Ruta San Martin desde Granada, con envio gratis y al menos 24 horas de anticipacion.'
+                    ? 'Tu direccion tiene cobertura de Ruta San Martin desde Granada, con envio gratis y entrega programada.'
                     : 'Tu dirección no permite entregar desde esta tienda.'}</span>
                 </div>
                 <div className="store-coverage-alert-actions">
@@ -9775,7 +9775,7 @@ export default function TiendaVirtualView({
               <div className="store-coverage-alert" role="status">
                 <div className="store-coverage-alert-copy">
                   <span className="store-coverage-alert-dot" aria-hidden="true" />
-                  <span>Tu direccion tiene cobertura de Ruta San Martin: entrega con 24 horas de anticipacion y envio gratis.</span>
+                  <span>Tu direccion tiene cobertura de Ruta San Martin: entrega programada y envio gratis.</span>
                 </div>
               </div>
             )}
@@ -9809,7 +9809,7 @@ export default function TiendaVirtualView({
             </span>
             <span className="store-closed-inline-copy">
               <strong>Cerrado ahora</strong>
-              <span>Ruta San Martin sigue disponible para pedir con 24 horas de anticipacion.</span>
+              <span>Ruta San Martin sigue disponible para pedidos programados.</span>
             </span>
             <button type="button" onClick={() => setStoreClosedNoticeOpen(true)}>
               Ver horario
@@ -13015,7 +13015,7 @@ function RouteSanMartinSlotPicker({ slots, selectedId, shortfall, onSelect }) {
       <h3 style={{ margin: '10px 0 4px' }}>Elegí cuándo recibirlo</h3>
       <p style={{ margin: '0 0 12px' }}>
         Desde Granada, envío gratis para pedidos desde {formatCurrency(ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS)} en productos.
-        Cada franja respeta 24 horas de anticipación.
+        La tarde de mañana se habilita si pedís antes de las 10 p. m.; las demás franjas requieren 24 horas de anticipación.
       </p>
       {shortfall > 0 && (
         <div className="store-location-feedback error" role="status" style={{ marginBottom: 12 }}>
@@ -14047,7 +14047,7 @@ function RegisterOutOfCoverageModal({ branch, suggestedBranch, routeAvailable = 
           </h2>
           <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.6 }}>
             {routeAvailable
-              ? 'Puedes pedir desde Granada con al menos 24 horas de anticipacion y elegir una franja. El servicio a domicilio es gratis.'
+              ? 'Puedes pedir desde Granada y elegir una franja. Si pides antes de las 10 p. m., puedes recibir manana por la tarde. El envio es gratis.'
               : hasSuggestedBranch
                 ? `Tu direccion esta dentro del area de ${suggestedBranch.name}. Tu cuenta y tu sesion continuaran abiertas.`
                 : `${branch?.name || 'La tienda seleccionada'} cubre un radio de ${Number(
