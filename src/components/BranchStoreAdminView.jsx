@@ -29,6 +29,7 @@ import {
   subscribeStoreBranches,
 } from '../services/storeBranches';
 import StoreOperationHoursEditor from './StoreOperationHoursEditor';
+import { NINDIRI_SHARED_PRICE_BRANCH_ID } from '../services/storePricing';
 
 const money = (value) => `C$ ${Number(value || 0).toFixed(2)}`;
 const CATALOG_PAGE_SIZE = 24;
@@ -62,6 +63,7 @@ const getCategoryPriority = (categoryId = '') => {
 };
 
 export default function BranchStoreAdminView({ branchId, branchName, username = '' }) {
+  const sharesGranadaPrices = branchId === NINDIRI_SHARED_PRICE_BRANCH_ID;
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -174,7 +176,7 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
     setVisibleCount(CATALOG_PAGE_SIZE);
   }, [deferredSearch, selectedCategory]);
   const activeCount = scopedProducts.filter((product) => product.active !== false).length;
-  const customPriceCount = scopedProducts.filter(
+  const customPriceCount = sharesGranadaPrices ? 0 : scopedProducts.filter(
     (product) => Number(product?.branchSettings?.[branchId]?.price || 0) > 0
   ).length;
 
@@ -183,7 +185,7 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
     setSelectedProduct(product);
     setForm({
       active: product.active !== false,
-      price: Number(branchSettings.price || product.price || 0).toFixed(2),
+      price: Number(product.price || 0).toFixed(2),
       inventory:
         branchSettings.inventory === null || branchSettings.inventory === undefined
           ? ''
@@ -338,12 +340,16 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
         <div>
           <div className="branch-admin__tag">Administrador de sucursal</div>
           <h1>{branchName}</h1>
-          <p>Configura disponibilidad, inventario y precios propios sin alterar otras tiendas.</p>
+          <p>{sharesGranadaPrices
+            ? 'Precios compartidos con Granada. Disponibilidad e inventario propios de Nindirí.'
+            : 'Configura disponibilidad, inventario y precios propios sin alterar otras tiendas.'}</p>
         </div>
         <div className="branch-admin__hero-actions">
-          <button className="branch-admin__sync" type="button" onClick={updatePrices} disabled={syncing || checkingActivity}>
-            {syncing ? 'Actualizando...' : 'Actualizar precios SICAR'}
-          </button>
+          {!sharesGranadaPrices && (
+            <button className="branch-admin__sync" type="button" onClick={updatePrices} disabled={syncing || checkingActivity}>
+              {syncing ? 'Actualizando...' : 'Actualizar precios SICAR'}
+            </button>
+          )}
           <button
             className="branch-admin__sync branch-admin__sync--warning"
             type="button"
@@ -358,7 +364,7 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
       <section className="branch-admin__stats">
         <div className="branch-admin__stat"><small>Catalogo maestro</small><strong>{scopedProducts.length}</strong></div>
         <div className="branch-admin__stat"><small>Activos en sucursal</small><strong>{activeCount}</strong></div>
-        <div className="branch-admin__stat"><small>Precios propios</small><strong>{customPriceCount}</strong></div>
+        <div className="branch-admin__stat"><small>{sharesGranadaPrices ? 'Precios compartidos' : 'Precios propios'}</small><strong>{sharesGranadaPrices ? scopedProducts.length : customPriceCount}</strong></div>
       </section>
 
       {message && <div className="branch-admin__message">{message}</div>}
@@ -456,8 +462,8 @@ export default function BranchStoreAdminView({ branchId, branchName, username = 
               <h2>{selectedProduct.name}</h2>
             </div>
             <label>
-              <span>Precio en {branchName}</span>
-              <input type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} required />
+              <span>{sharesGranadaPrices ? 'Precio de Granada (compartido)' : `Precio en ${branchName}`}</span>
+              <input type="number" min="0.01" step="0.01" value={form.price} onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} readOnly={sharesGranadaPrices} required />
             </label>
             <label>
               <span>Inventario opcional</span>

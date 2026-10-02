@@ -3,6 +3,7 @@ import { database } from '../firebase';
 import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
 import { normalizeStoreCategoryId, normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
 import { isDataUrlImage, uploadCatalogImage } from './storeMedia';
+import { getStoreProductPriceForBranch, NINDIRI_SHARED_PRICE_BRANCH_ID } from './storePricing';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 export const STORE_CATALOG_META_PATH = 'storeCatalogMeta';
@@ -211,12 +212,11 @@ export const resolveCatalogProductForBranch = (product = {}, branchId = 'granada
   const normalized = normalizeCatalogProduct(product);
   const cleanBranchId = String(branchId || 'granada').trim().toLowerCase() || 'granada';
   const branchSettings = normalized.branchSettings?.[cleanBranchId] || null;
-  const hasBranchPrice = Number(branchSettings?.price || 0) > 0;
 
   return {
     ...normalized,
     active: branchSettings?.active !== undefined ? branchSettings.active !== false : normalized.active !== false,
-    price: hasBranchPrice ? roundPrice(branchSettings.price) : normalized.price,
+    price: roundPrice(getStoreProductPriceForBranch(normalized, cleanBranchId)),
     inventory:
       branchSettings && Object.prototype.hasOwnProperty.call(branchSettings, 'inventory')
         ? normalizeOptionalInventory(branchSettings.inventory)
@@ -422,7 +422,7 @@ export async function saveCatalogProductBranchSettings(code, branchId, settings 
     updatedBy: String(updatedBy || '').trim(),
   };
   const price = Number(settings.price);
-  if (Number.isFinite(price) && price > 0) {
+  if (cleanBranchId !== NINDIRI_SHARED_PRICE_BRANCH_ID && Number.isFinite(price) && price > 0) {
     payload.price = roundPrice(price);
   }
   const inventory = normalizeOptionalInventory(settings.inventory);
@@ -442,6 +442,9 @@ export async function applySicarBranchPriceUpdates(priceProducts = [], branchId,
   const cleanBranchId = String(branchId || '').trim().toLowerCase();
   if (!cleanBranchId) {
     throw new Error('Sucursal invalida');
+  }
+  if (cleanBranchId === NINDIRI_SHARED_PRICE_BRANCH_ID) {
+    throw new Error('Nindirí comparte los precios de Granada. Actualiza el catálogo maestro en lugar de importar precios propios.');
   }
 
   const currentMap = await getCurrentCatalogMap();
