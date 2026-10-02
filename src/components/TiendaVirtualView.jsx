@@ -7118,6 +7118,22 @@ export default function TiendaVirtualView({
           text-align: center;
           pointer-events: none;
         }
+        .store-map-attribution {
+          position: absolute;
+          z-index: 6;
+          left: 10px;
+          top: 8px;
+          padding: 2px 5px;
+          border-radius: 3px;
+          background: rgba(255, 255, 255, 0.9);
+          color: #26394b;
+          font-size: 10px;
+          line-height: 1.3;
+        }
+        .store-map-attribution a {
+          color: inherit;
+          text-decoration: underline;
+        }
         .store-google-map-shell,
         .store-google-map-canvas {
           position: absolute;
@@ -11696,11 +11712,14 @@ function MapPointPicker({
                   src={tile.src}
                   alt=""
                   loading="lazy"
-                  referrerPolicy="no-referrer"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   style={{ left: tile.left, top: tile.top }}
                 />
               ))}
               <span className="store-map-pin" style={{ left: selectedPoint.left, top: selectedPoint.top }} />
+              <span className="store-map-attribution">
+                &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
+              </span>
               <div className="store-map-hint">Arrastra el mapa o toca para mover el pin</div>
             </div>
           )}
