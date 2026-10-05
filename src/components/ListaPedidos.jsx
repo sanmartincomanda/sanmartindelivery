@@ -10,6 +10,17 @@ import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { reconcileFirstOrderRewards } from '../services/storeIncentives';
 import { buildRouteSanMartinDispatchUpdates, getSendableRouteSanMartinOrders, isRouteSanMartinOrder, partitionRouteSanMartinOrders } from '../services/routeSanMartin';
+import {
+  buildStoreActualQuantitiesPatch,
+  formatStoreQuantityInputValue,
+  getActualStoreQuantity,
+  getStoreDisplayItems,
+  getStoreProductItems,
+  getStoreRewardItems,
+  parseStoreQuantityInputValue,
+  roundStoreQuantity,
+} from '../services/storeOrderEditor';
+import StoreOrderDetails from './StoreOrderDetails';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -195,6 +206,10 @@ export default function ListaPedidos({ pedidos = [] }) {
   const [animatingCards, setAnimatingCards] = useState(new Set());
   const [repartidores, setRepartidores] = useState(() => mergeDrivers().filter((driver) => driver.active !== false));
   const [quoteActions, setQuoteActions] = useState({});
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [storeItemDrafts, setStoreItemDrafts] = useState({});
+  const [storeSyncState, setStoreSyncState] = useState({});
   const [selectedRouteOrderKeys, setSelectedRouteOrderKeys] = useState(() => new Set());
   const [bulkSendingRoute, setBulkSendingRoute] = useState(false);
   const [bulkRouteError, setBulkRouteError] = useState('');
@@ -271,6 +286,85 @@ export default function ListaPedidos({ pedidos = [] }) {
 
   const updateCampo = (firebaseKey, campo, valor) => {
     update(ref(database, `${getBasePath()}/${firebaseKey}`), { [campo]: valor });
+  };
+
+  const setStoreSyncEntry = (orderKey, nextEntry) => {
+    setStoreSyncState((current) => ({
+      ...current,
+      [orderKey]: { ...(current[orderKey] || {}), ...nextEntry },
+    }));
+  };
+
+  const getStoreDraftValue = (pedido, item, index) => {
+    const orderDraft = storeItemDrafts[pedido.firebaseKey];
+    if (orderDraft && Object.prototype.hasOwnProperty.call(orderDraft, index)) {
+      return orderDraft[index];
+    }
+    return formatStoreQuantityInputValue(getActualStoreQuantity(item));
+  };
+
+  const handleStoreDraftChange = (pedido, index, value) => {
+    setStoreItemDrafts((current) => ({
+      ...current,
+      [pedido.firebaseKey]: { ...(current[pedido.firebaseKey] || {}), [index]: value },
+    }));
+  };
+
+  const handleApplyStoreActualQuantities = async (pedido) => {
+    if (!pedido?.firebaseKey || orderScope !== 'delivery') return;
+    const productItems = getStoreProductItems(pedido);
+    if (productItems.length === 0) return;
+
+    const originalPatch = {
+      items: Array.isArray(pedido.items) ? pedido.items : [],
+      pedido: String(pedido.pedido || '').trim(),
+      subtotalEstimado: Number(pedido.subtotalEstimado || 0),
+      total: Number(pedido.total || 0),
+      totalAproximado: pedido.totalAproximado !== false,
+      totalActualizadoAt: pedido.totalActualizadoAt || null,
+      sicarQuote: pedido.sicarQuote || null,
+    };
+    let wroteOrder = false;
+
+    try {
+      const nextItems = productItems.map((item, index) => {
+        const parsedQuantity = parseStoreQuantityInputValue(getStoreDraftValue(pedido, item, index));
+        if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+          throw new Error(`Ingresa una cantidad real valida para ${item?.nombre || 'este producto'}.`);
+        }
+        return { ...item, cantidadReal: roundStoreQuantity(parsedQuantity) };
+      });
+      const patch = buildStoreActualQuantitiesPatch(pedido, nextItems);
+      setStoreSyncEntry(pedido.firebaseKey, { busy: true, error: '', success: '' });
+
+      await update(ref(database, `orders/${pedido.firebaseKey}`), patch);
+      wroteOrder = true;
+      await syncSicarQuoteForOrder(pedido.firebaseKey, { applyToFirebase: true });
+
+      setStoreItemDrafts((current) => {
+        if (!Object.prototype.hasOwnProperty.call(current, pedido.firebaseKey)) return current;
+        const next = { ...current };
+        delete next[pedido.firebaseKey];
+        return next;
+      });
+      setStoreSyncEntry(pedido.firebaseKey, {
+        busy: false,
+        error: '',
+        success: 'Cantidades actualizadas y cotizacion sincronizada.',
+      });
+    } catch (error) {
+      if (wroteOrder) {
+        try {
+          await update(ref(database, `orders/${pedido.firebaseKey}`), originalPatch);
+        } catch (revertError) {
+          console.error('No se pudo revertir el pedido tras fallar la cotizacion SICAR:', revertError);
+        }
+      }
+      console.error('Error actualizando cantidades reales desde lista de pedidos:', error);
+      const message = error?.message || 'No se pudieron actualizar las cantidades. Verifica que el puente local SICAR este activo.';
+      setStoreSyncEntry(pedido.firebaseKey, { busy: false, error: message, success: '' });
+      window.alert(message);
+    }
   };
 
   const handleEnviarPedido = (firebaseKey, repartidor) => {
@@ -1042,6 +1136,11 @@ export default function ListaPedidos({ pedidos = [] }) {
             const metodoPagoColor = getMetodoPagoColor(pedido.metodoPago);
             const pickupOrder = isPickupOrder(pedido);
             const cancellationSource = status === 'Cancelado' ? getCancellationSource(pedido) : null;
+            const storeProductItems = getStoreProductItems(pedido);
+            const isStructuredStoreOrder = pedido.canal === 'tienda_virtual' &&
+              (getStoreDisplayItems(pedido).length > 0 || getStoreRewardItems(pedido).length > 0);
+            const canEditOrder = orderScope === 'delivery' && isPorEnviar(pedido);
+            const storeSyncEntry = storeSyncState[pedido.firebaseKey] || {};
             
             return (
               <div
@@ -1203,7 +1302,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                   )}
 
                   {/* Contenido */}
-                  <div style={{ padding: '28px' }}>
+                  <div className="store-order-card-body" style={{ padding: '28px' }}>
                     {/* Info Cliente + Método de Pago */}
                     <div style={{ 
                       marginBottom: '24px',
@@ -1482,7 +1581,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                       </div>
                     )}
 
-                    <div style={{
+                    <div className="store-order-detail-panel" style={{
                       background: 'white',
                       borderRadius: '20px',
                       padding: '28px',
@@ -1505,19 +1604,82 @@ export default function ListaPedidos({ pedidos = [] }) {
                         Detalle del Pedido
                       </div>
                       
-                      <pre style={{
-                        margin: 0,
-                        fontFamily: "'Segoe UI', system-ui, sans-serif",
-                        fontSize: '22px',
-                        lineHeight: '1.7',
-                        color: status === 'Cancelado' ? '#9ca3af' : '#0f172a',
-                        fontWeight: 700,
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        textDecoration: status === 'Cancelado' ? 'line-through' : 'none'
-                      }}>
-                        {getPedidoDetalle(pedido)}
-                      </pre>
+                      {isStructuredStoreOrder ? (
+                        <>
+                          <StoreOrderDetails
+                            pedido={pedido}
+                            editable={canEditOrder && storeProductItems.length > 0}
+                            busy={storeSyncEntry.busy}
+                            getDraftValue={getStoreDraftValue}
+                            onDraftChange={handleStoreDraftChange}
+                          />
+                          {canEditOrder && storeProductItems.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleApplyStoreActualQuantities(pedido)}
+                              disabled={storeSyncEntry.busy}
+                              className="btn-hover"
+                              style={{
+                                width: '100%', minHeight: '48px', marginTop: '16px', padding: '12px 16px',
+                                borderRadius: '12px', border: 'none', background: '#0044c5', color: '#fff',
+                                fontWeight: 800, fontSize: '15px', cursor: storeSyncEntry.busy ? 'wait' : 'pointer',
+                                opacity: storeSyncEntry.busy ? 0.7 : 1,
+                              }}
+                            >
+                              {storeSyncEntry.busy ? 'Sincronizando cotización...' : 'Guardar cantidades y sincronizar SICAR'}
+                            </button>
+                          )}
+                          {storeSyncEntry.error && <p role="alert" style={{ color: '#b91c1c', fontWeight: 700 }}>{storeSyncEntry.error}</p>}
+                          {storeSyncEntry.success && <p role="status" style={{ color: '#047857', fontWeight: 700 }}>{storeSyncEntry.success}</p>}
+                        </>
+                      ) : editingId === pedido.firebaseKey && canEditOrder ? (
+                        <div>
+                          <textarea
+                            value={editText}
+                            onChange={(event) => setEditText(event.target.value)}
+                            aria-label="Editar detalle del pedido"
+                            style={{
+                              boxSizing: 'border-box', width: '100%', minHeight: '160px', resize: 'vertical',
+                              border: '2px solid #a6bee2', borderRadius: '12px', padding: '14px',
+                              color: '#0f172a', background: '#fff', fontSize: '16px', lineHeight: 1.5,
+                            }}
+                          />
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '12px' }}>
+                            <button type="button" onClick={() => {
+                              updateCampo(pedido.firebaseKey, 'pedido', editText);
+                              setEditingId(null);
+                            }} style={{ minHeight: '44px', flex: '1 1 140px', border: 0, borderRadius: '10px', background: '#0044c5', color: '#fff', fontWeight: 800 }}>
+                              Guardar cambios
+                            </button>
+                            <button type="button" onClick={() => setEditingId(null)} style={{ minHeight: '44px', flex: '1 1 100px', border: '1px solid #cbd5e1', borderRadius: '10px', background: '#fff', color: '#334155', fontWeight: 700 }}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <pre style={{
+                            margin: 0,
+                            fontFamily: "'Segoe UI', system-ui, sans-serif",
+                            fontSize: '17px',
+                            lineHeight: 1.55,
+                            color: status === 'Cancelado' ? '#64748b' : '#0f172a',
+                            fontWeight: 700,
+                            whiteSpace: 'pre-wrap',
+                            overflowWrap: 'anywhere',
+                          }}>
+                            {getPedidoDetalle(pedido) || 'Sin detalle'}
+                          </pre>
+                          {canEditOrder && pedido.canal !== 'tienda_virtual' && (
+                            <button type="button" onClick={() => {
+                              setEditingId(pedido.firebaseKey);
+                              setEditText(String(pedido.pedido || '').trim());
+                            }} style={{ minHeight: '44px', marginTop: '14px', padding: '10px 16px', border: '1px solid #a6bee2', borderRadius: '10px', background: '#f2f7ff', color: '#0044c5', fontWeight: 800, cursor: 'pointer' }}>
+                              Editar pedido
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {pedido.canal === 'tienda_virtual' && status !== 'Cancelado' && (

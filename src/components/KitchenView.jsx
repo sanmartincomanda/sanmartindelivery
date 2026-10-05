@@ -3,12 +3,13 @@ import { equalTo, onValue, orderByChild, query, ref, update } from 'firebase/dat
 import { database } from '../firebase';
 import pedidoSound from '../pedido.mp3';
 import { hoyISO } from './Utils';
-import { buildStoreKitchenOrderText, formatOrderNumber, formatWeight, isPickupOrder } from '../services/orders';
-import { syncSicarQuoteForOrder } from '../services/sicarCatalog';
+import { buildStoreKitchenOrderText, formatOrderNumber, isPickupOrder } from '../services/orders';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
 import PoketPaymentBadge from './PoketPaymentBadge';
 import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { isRouteSanMartinOrder, partitionRouteSanMartinOrders } from '../services/routeSanMartin';
+import { getStoreProductItems, getStoreRewardItems } from '../services/storeOrderEditor';
+import StoreOrderDetails from './StoreOrderDetails';
 
 const KITCHEN_THEME = SAN_MARTIN_THEME;
 
@@ -116,179 +117,6 @@ const buildKitchenWhatsappLink = (pedido = {}) => {
   )}`;
 };
 
-const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248', '00249']);
-
-const normalizeKitchenItemCode = (item = {}) =>
-  String(item?.codigo ?? item?.code ?? '').trim().toUpperCase();
-
-const getStoreProductItems = (pedido = {}) => {
-  return (Array.isArray(pedido.items) ? pedido.items : []).filter((item) => {
-    const code = normalizeKitchenItemCode(item);
-    const sourceType = String(item?.sourceType || '').trim().toLowerCase();
-
-    if (!code) {
-      return false;
-    }
-
-    if (DELIVERY_SERVICE_ITEM_CODES.has(code)) {
-      return false;
-    }
-
-    if (sourceType === 'delivery' || sourceType === 'reward') {
-      return false;
-    }
-
-    return true;
-  });
-};
-
-const getKitchenRewardItems = (pedido = {}) => {
-  const redemption = pedido?.rewardRedemption;
-  const rewardName = String(redemption?.rewardName || 'Premio Miembro Gold').trim();
-
-  const memberRewardItems = (Array.isArray(redemption?.items) ? redemption.items : [])
-    .map((item, index) => ({
-      id: String(item?.id || `${item?.productCode || 'premio'}-${index}`).trim(),
-      codigo: String(item?.productCode || '').trim(),
-      nombre: String(item?.productName || item?.choiceLabel || item?.productCode || 'Producto premio').trim(),
-      cantidad: Math.max(1, Number(item?.quantity || 1)),
-      unidad: String(item?.productUnit || 'unidad').trim() || 'unidad',
-      rewardName,
-    }))
-    .filter((item) => item.codigo && item.nombre);
-  const firstOrderReward = pedido?.firstOrderReward;
-  const welcomeRewardItem = firstOrderReward?.sku && firstOrderReward?.itemName
-    ? [{
-        id: String(firstOrderReward.itemId || firstOrderReward.sku),
-        codigo: String(firstOrderReward.sku),
-        nombre: String(firstOrderReward.itemName),
-        cantidad: 1,
-        unidad: 'unidad',
-        rewardName: 'Regalia de primera compra',
-      }]
-    : [];
-
-  return [...memberRewardItems, ...welcomeRewardItem];
-};
-
-const getRequestedStoreQuantity = (item = {}) =>
-  Number(item?.cantidadSolicitada ?? item?.requestedQuantity ?? item?.cantidad ?? item?.quantity ?? 0);
-
-const getActualStoreQuantity = (item = {}) =>
-  Number(item?.cantidadReal ?? item?.realQuantity ?? item?.cantidad ?? item?.quantity ?? 0);
-
-const roundKitchenQuantity = (value) => Number(Number(value || 0).toFixed(3));
-
-const formatKitchenQuantityInputValue = (value) => {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric) || numeric <= 0) {
-    return '';
-  }
-
-  return formatWeight(roundKitchenQuantity(numeric));
-};
-
-const parseKitchenQuantityInputValue = (value) => {
-  const normalized = String(value || '').trim().replace(',', '.');
-  if (!normalized) {
-    return NaN;
-  }
-
-  return Number(normalized);
-};
-
-const getKitchenQuantityStep = (item = {}) => {
-  const explicitStep = Number(item?.quantityStep ?? item?.step ?? 0);
-  if (Number.isFinite(explicitStep) && explicitStep > 0) {
-    return explicitStep;
-  }
-
-  return String(item?.unidad ?? item?.unit ?? '').trim().toLowerCase() === 'unidad' ? 1 : 0.1;
-};
-
-const buildKitchenCustomerUpdateSignature = (source = {}) =>
-  JSON.stringify({
-    subtotal: Number(source?.subtotalEstimado ?? source?.subtotal ?? 0).toFixed(2),
-    discount: Number(source?.descuentoCupon ?? source?.discount ?? 0).toFixed(2),
-    deliveryFee: Number(source?.deliveryFee ?? 0).toFixed(2),
-    total: Number(source?.total ?? 0).toFixed(2),
-    items: (Array.isArray(source?.items) ? source.items : []).map((item) => ({
-      code: String(item?.codigo ?? item?.code ?? item?.nombre ?? '').trim(),
-      qty: Number(item?.cantidadReal ?? item?.cantidad ?? item?.quantity ?? 0).toFixed(3),
-      price: Number(item?.precioUnitario ?? item?.price ?? 0).toFixed(2),
-      subtotal: Number(item?.subtotal ?? 0).toFixed(2),
-    })),
-  });
-
-const buildStoreKitchenItemsPatch = (pedido = {}, productItems = []) => {
-  const updatedItems = productItems.map((item) => {
-    const actualQuantity = roundKitchenQuantity(getActualStoreQuantity(item));
-    const requestedQuantity = roundKitchenQuantity(getRequestedStoreQuantity(item) || actualQuantity);
-    const unitPrice = Number(item?.precioUnitario ?? item?.price ?? 0);
-
-    return {
-      ...item,
-      sourceType: 'order',
-      cantidadSolicitada: requestedQuantity,
-      cantidadReal: actualQuantity,
-      cantidad: actualQuantity,
-      subtotal: Number((actualQuantity * unitPrice).toFixed(2)),
-    };
-  });
-
-  const subtotal = Number(
-    updatedItems.reduce((sum, item) => sum + Number(item?.subtotal || 0), 0).toFixed(2)
-  );
-  const discount = Math.max(0, Number(pedido?.descuentoCupon || 0));
-  const deliveryFee = Math.max(0, Number(pedido?.deliveryFee || 0));
-  const total = Number(Math.max(subtotal - discount + deliveryFee, 0).toFixed(2));
-  const nowIso = new Date().toISOString();
-  const nextCustomerSignature = buildKitchenCustomerUpdateSignature({
-    items: updatedItems,
-    subtotalEstimado: subtotal,
-    descuentoCupon: discount,
-    deliveryFee,
-    total,
-  });
-  const currentCustomerSignature = buildKitchenCustomerUpdateSignature(pedido);
-  const customerVisibleChange = nextCustomerSignature !== currentCustomerSignature;
-  const currentCustomerUpdateRevision = String(pedido?.sicarQuote?.customerUpdateRevision || '').trim();
-  const customerUpdateRevision = customerVisibleChange ? nowIso : currentCustomerUpdateRevision;
-
-  return {
-    items: updatedItems,
-    pedido: buildStoreKitchenOrderText(updatedItems, {
-      subtotal,
-      discount,
-      deliveryFee,
-      deliveryFeeOriginal: pedido?.deliveryFeeOriginal,
-      deliveryFree: pedido?.deliveryFree,
-      deliveryDistanceKm: pedido?.deliveryDistanceKm,
-      total,
-      metodoPago: pedido?.metodoPago,
-      totalLabel: 'Total actualizado de pedido',
-      subtotalLabel: 'Subtotal actualizado',
-      observaciones: pedido?.observaciones,
-      rewardRedemption: pedido?.rewardRedemption,
-      firstOrderReward: pedido?.firstOrderReward,
-    }),
-    subtotalEstimado: subtotal,
-    total,
-    totalAproximado: false,
-    totalActualizadoAt: nowIso,
-    sicarQuote: {
-      ...(pedido?.sicarQuote || {}),
-      status: 'pending',
-      requestedAt: nowIso,
-      requestedBy: 'kitchen',
-      lastRequestedByKitchenAt: nowIso,
-      customerUpdateRevision,
-      customerUpdatePending:
-        customerVisibleChange || Boolean(pedido?.sicarQuote?.customerUpdatePending),
-    },
-  };
-};
-
 const getKitchenOrderText = (pedido = {}) => {
   if (Array.isArray(pedido.items) && pedido.items.length > 0) {
     return buildStoreKitchenOrderText(pedido.items, {
@@ -330,16 +158,12 @@ const getKitchenStatusConfig = (pedido = {}) => {
 };
 
 export default function KitchenView({ orders, carryoverRouteOrders = [], allowRuta = true }) {
-  const [editingId, setEditingId] = useState(null);
-  const [editText, setEditText] = useState('');
   const audioRef = useRef(null);
   const [kitchenTab, setKitchenTab] = useState('delivery');
   const [rutaOrders, setRutaOrders] = useState([]);
   const [animatingCards, setAnimatingCards] = useState(new Set());
   const [modalCocinero, setModalCocinero] = useState(null);
   const [cocineroSeleccionado, setCocineroSeleccionado] = useState(null);
-  const [storeItemDrafts, setStoreItemDrafts] = useState({});
-  const [storeSyncState, setStoreSyncState] = useState({});
 
   useEffect(() => {
     if (!allowRuta) {
@@ -389,126 +213,6 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
     }
 
     update(ref(database, `${basePath}/${firebaseKey}`), payload);
-  };
-
-  const setStoreSyncEntry = (orderKey, nextEntry) => {
-    setStoreSyncState((current) => ({
-      ...current,
-      [orderKey]: {
-        ...(current[orderKey] || {}),
-        ...nextEntry,
-      },
-    }));
-  };
-
-  const clearStoreDraft = (orderKey) => {
-    setStoreItemDrafts((current) => {
-      if (!Object.prototype.hasOwnProperty.call(current, orderKey)) {
-        return current;
-      }
-
-      const next = { ...current };
-      delete next[orderKey];
-      return next;
-    });
-  };
-
-  const getStoreDraftValue = (pedido, item, index) => {
-    const orderDraft = storeItemDrafts[pedido.firebaseKey];
-    if (orderDraft && Object.prototype.hasOwnProperty.call(orderDraft, index)) {
-      return orderDraft[index];
-    }
-
-    return formatKitchenQuantityInputValue(getActualStoreQuantity(item));
-  };
-
-  const handleStoreDraftChange = (pedido, index, value) => {
-    setStoreItemDrafts((current) => ({
-      ...current,
-      [pedido.firebaseKey]: {
-        ...(current[pedido.firebaseKey] || {}),
-        [index]: value,
-      },
-    }));
-  };
-
-  const handleApplyStoreActualQuantities = async (pedido) => {
-    if (!pedido?.firebaseKey || kitchenTab !== 'delivery') {
-      return;
-    }
-
-    const productItems = getStoreProductItems(pedido);
-    if (productItems.length === 0) {
-      return;
-    }
-
-    const originalPatch = {
-      items: Array.isArray(pedido.items) ? pedido.items : [],
-      pedido: String(pedido.pedido || '').trim(),
-      subtotalEstimado: Number(pedido.subtotalEstimado || 0),
-      total: Number(pedido.total || 0),
-      totalAproximado: pedido.totalAproximado !== false,
-      totalActualizadoAt: pedido.totalActualizadoAt || null,
-      sicarQuote: pedido.sicarQuote || null,
-    };
-
-    let wroteOrder = false;
-
-    try {
-      const nextItems = productItems.map((item, index) => {
-        const rawValue = getStoreDraftValue(pedido, item, index);
-        const parsedQuantity = parseKitchenQuantityInputValue(rawValue);
-
-        if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-          throw new Error(`Ingresa una cantidad real valida para ${item?.nombre || 'este producto'}.`);
-        }
-
-        return {
-          ...item,
-          cantidadReal: roundKitchenQuantity(parsedQuantity),
-        };
-      });
-
-      const patch = buildStoreKitchenItemsPatch(pedido, nextItems);
-      setStoreSyncEntry(pedido.firebaseKey, {
-        busy: true,
-        error: '',
-        success: '',
-      });
-
-      await update(ref(database, `orders/${pedido.firebaseKey}`), patch);
-      wroteOrder = true;
-
-      await syncSicarQuoteForOrder(pedido.firebaseKey, {
-        applyToFirebase: true,
-      });
-
-      clearStoreDraft(pedido.firebaseKey);
-      setStoreSyncEntry(pedido.firebaseKey, {
-        busy: false,
-        error: '',
-        success: 'Pesos actualizados y cotizacion sincronizada.',
-      });
-    } catch (error) {
-      if (wroteOrder) {
-        try {
-          await update(ref(database, `orders/${pedido.firebaseKey}`), originalPatch);
-        } catch (revertError) {
-          console.error('No se pudo revertir el pedido tras fallar la cotizacion SICAR:', revertError);
-        }
-      }
-
-      console.error('Error actualizando pesos reales desde cocina:', error);
-      const message =
-        error?.message ||
-        'No se pudieron actualizar los pesos desde cocina. Verifica que el puente local SICAR este activo.';
-      setStoreSyncEntry(pedido.firebaseKey, {
-        busy: false,
-        error: message,
-        success: '',
-      });
-      window.alert(message);
-    }
   };
 
   const handleSelectCocinero = (firebaseKey, nombreReal, tab = kitchenTab) => {
@@ -668,28 +372,6 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
         }
         .modal-content {
           animation: modalIn 0.3s ease;
-        }
-        .kitchen-item-grid {
-          display: grid;
-          grid-template-columns: 92px 62px minmax(0, 1fr) 108px;
-          gap: 10px;
-          align-items: center;
-        }
-        .kitchen-quantity-input {
-          box-sizing: border-box;
-          width: 100%;
-          max-width: 108px;
-          height: 42px;
-        }
-        @media (max-width: 760px) {
-          .kitchen-item-grid {
-            grid-template-columns: 70px 48px minmax(0, 1fr) 84px;
-            gap: 6px;
-          }
-          .kitchen-quantity-input {
-            max-width: 84px;
-            height: 38px;
-          }
         }
         @keyframes fadeIn {
           from { opacity: 0; }
@@ -1009,16 +691,14 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
           {pedidosFiltrados.map((pedido, index) => {
             const status = pedido.estado || 'Pendiente';
             const config = getKitchenStatusConfig(pedido);
-            const isEditing = editingId === pedido.firebaseKey;
             const isAnimating = animatingCards.has(pedido.firebaseKey);
             const customerWhatsappLink = buildKitchenWhatsappLink(pedido);
             const storeProductItems = getStoreProductItems(pedido);
-            const kitchenRewardItems = getKitchenRewardItems(pedido);
+            const kitchenRewardItems = getStoreRewardItems(pedido);
             const isStructuredStoreOrder =
               kitchenTab !== 'ruta' &&
               String(pedido?.canal || '').trim() === 'tienda_virtual' &&
               (storeProductItems.length > 0 || kitchenRewardItems.length > 0);
-            const storeSyncEntry = storeSyncState[pedido.firebaseKey] || {};
             
             return (
               <div
@@ -1164,7 +844,7 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                   )}
 
                   {/* Contenido del Pedido */}
-                  <div style={{ padding: '28px' }}>
+                  <div className="store-order-card-body" style={{ padding: '28px' }}>
                     {/* Info Cliente */}
                     <div style={{ 
                       marginBottom: '24px',
@@ -1311,7 +991,7 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                     </div>
 
                     {/* Pedido - Destacado */}
-                    <div style={{
+                    <div className="store-order-detail-panel" style={{
                       background: 'white',
                       borderRadius: '20px',
                       padding: '28px',
@@ -1335,405 +1015,20 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                       </div>
                       
                       {isStructuredStoreOrder ? (
-                        <div>
-                          <div
-                            className="kitchen-item-grid"
-                            style={{
-                              marginBottom: '14px',
-                              paddingBottom: '10px',
-                              borderBottom: '2px solid #e2e8f0',
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                              color: '#64748b'
-                            }}
-                          >
-                            <div>Cantidad solicitada</div>
-                            <div>Unidad</div>
-                            <div>Producto</div>
-                            <div>Cantidad real</div>
-                          </div>
-
-                          <div style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px'
-                          }}>
-                            {kitchenRewardItems.map((item, itemIndex) => (
-                              <div
-                                key={`${pedido.firebaseKey}-reward-${item.id || itemIndex}`}
-                                className="kitchen-item-grid"
-                                style={{
-                                  padding: '12px 14px',
-                                  borderRadius: '14px',
-                                  background: 'linear-gradient(135deg, #fff7d6 0%, #fffbeb 100%)',
-                                  border: '2px solid #f2c94c',
-                                  boxShadow: '0 6px 16px rgba(180, 128, 0, 0.12)'
-                                }}
-                              >
-                                <div style={{
-                                  fontSize: '21px',
-                                  fontWeight: 900,
-                                  color: '#7c5200'
-                                }}>
-                                  {formatWeight(item.cantidad)}
-                                </div>
-                                <div style={{
-                                  fontSize: '14px',
-                                  fontWeight: 800,
-                                  color: '#8a6200',
-                                  textTransform: 'lowercase'
-                                }}>
-                                  {item.unidad}
-                                </div>
-                                <div style={{ minWidth: 0 }}>
-                                  <div style={{
-                                    display: 'inline-flex',
-                                    marginBottom: '5px',
-                                    padding: '4px 8px',
-                                    borderRadius: '999px',
-                                    background: '#b8860b',
-                                    color: 'white',
-                                    fontSize: '10px',
-                                    fontWeight: 900,
-                                    letterSpacing: '0.06em'
-                                  }}>
-                                    CANJE MIEMBRO GOLD
-                                  </div>
-                                  <div style={{
-                                    fontSize: '17px',
-                                    fontWeight: 900,
-                                    color: '#3f2c00',
-                                    lineHeight: 1.2
-                                  }}>
-                                    {item.nombre}
-                                  </div>
-                                  <div style={{
-                                    marginTop: '3px',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    color: '#8a6200'
-                                  }}>
-                                    {item.codigo} | {item.rewardName}
-                                  </div>
-                                </div>
-                                <div style={{
-                                  width: '100%',
-                                  minHeight: '38px',
-                                  borderRadius: '11px',
-                                  background: '#fff',
-                                  border: '1px solid #e5bd45',
-                                  display: 'grid',
-                                  placeItems: 'center',
-                                  padding: '5px',
-                                  color: '#7c5200',
-                                  fontSize: '12px',
-                                  fontWeight: 900,
-                                  textAlign: 'center'
-                                }}>
-                                  PREPARAR {formatWeight(item.cantidad)}
-                                </div>
-                              </div>
-                            ))}
-
-                            {storeProductItems.map((item, itemIndex) => (
-                              <div
-                                key={`${pedido.firebaseKey}-${normalizeKitchenItemCode(item) || itemIndex}-${itemIndex}`}
-                                className="kitchen-item-grid"
-                                style={{
-                                  padding: '12px 14px',
-                                  borderRadius: '14px',
-                                  background: '#f8fafc',
-                                  border: '1px solid #dbe4f0'
-                                }}
-                              >
-                                <div style={{
-                                  fontSize: '24px',
-                                  fontWeight: 800,
-                                  color: '#0f172a'
-                                }}>
-                                  {formatWeight(getRequestedStoreQuantity(item))}
-                                </div>
-                                <div style={{
-                                  fontSize: '16px',
-                                  fontWeight: 800,
-                                  color: '#475569',
-                                  textTransform: 'lowercase'
-                                }}>
-                                  {String(item?.unidad || 'lb').trim() || 'lb'}
-                                </div>
-                                <div style={{ minWidth: 0 }}>
-                                  <div style={{
-                                    fontSize: '18px',
-                                    fontWeight: 800,
-                                    color: '#0f172a',
-                                    lineHeight: 1.25
-                                  }}>
-                                    {item?.nombre || 'Producto sin nombre'}
-                                  </div>
-                                  <div style={{
-                                    marginTop: '4px',
-                                    fontSize: '13px',
-                                    fontWeight: 700,
-                                    color: '#64748b'
-                                  }}>
-                                    {normalizeKitchenItemCode(item) || 'Sin codigo'}
-                                  </div>
-                                </div>
-                                <input
-                                  type="number"
-                                  inputMode="decimal"
-                                  step={getKitchenQuantityStep(item)}
-                                  min={String(item?.unidad || '').trim().toLowerCase() === 'unidad' ? '1' : '0.1'}
-                                  value={getStoreDraftValue(pedido, item, itemIndex)}
-                                  onChange={(event) =>
-                                    handleStoreDraftChange(pedido, itemIndex, event.target.value)
-                                  }
-                                  onFocus={(event) => event.target.select()}
-                                  className="kitchen-quantity-input"
-                                  style={{
-                                    borderRadius: '11px',
-                                    border: '2px solid #cbd5e1',
-                                    background: 'white',
-                                    padding: '0 8px',
-                                    fontSize: '18px',
-                                    fontWeight: 800,
-                                    color: '#0f172a',
-                                    outline: 'none'
-                                  }}
-                                />
-                              </div>
-                            ))}
-                          </div>
-
-                          {(pedido.observaciones || pedido.total || pedido.deliveryFee || pedido.deliveryFree || pedido.descuentoCupon) && (
-                            <div style={{
-                              marginTop: '18px',
-                              padding: '18px',
-                              borderRadius: '16px',
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe'
-                            }}>
-                              {pedido.observaciones && (
-                                <div style={{ marginBottom: '12px' }}>
-                                  <div style={{
-                                    fontSize: '12px',
-                                    fontWeight: 800,
-                                    letterSpacing: '0.08em',
-                                    textTransform: 'uppercase',
-                                    color: '#1d4ed8',
-                                    marginBottom: '6px'
-                                  }}>
-                                    Notas del cliente
-                                  </div>
-                                  <div style={{
-                                    fontSize: '15px',
-                                    fontWeight: 600,
-                                    color: '#1e293b',
-                                    lineHeight: 1.5,
-                                    whiteSpace: 'pre-wrap'
-                                  }}>
-                                    {pedido.observaciones}
-                                  </div>
-                                </div>
-                              )}
-
-                              <div style={{
-                                display: 'grid',
-                                gap: '8px',
-                                fontSize: '15px',
-                                fontWeight: 700,
-                                color: '#1e3a8a'
-                              }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                                  <span>{pedido?.totalAproximado === false ? 'Subtotal actualizado' : 'Subtotal estimado'}</span>
-                                  <span>C${Number(pedido.subtotalEstimado || 0).toFixed(2)}</span>
-                                </div>
-                                {Number(pedido.descuentoCupon || 0) > 0 && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                                    <span>Cupon aplicado</span>
-                                    <span>-C${Number(pedido.descuentoCupon || 0).toFixed(2)}</span>
-                                  </div>
-                                )}
-                                {Boolean(pedido.deliveryFree) && Number(pedido.deliveryFeeOriginal || 0) > 0 ? (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                                    <span>Servicio a domicilio</span>
-                                    <span>DELIVERY GRATIS</span>
-                                  </div>
-                                ) : Number(pedido.deliveryFee || 0) > 0 && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-                                    <span>Servicio a domicilio</span>
-                                    <span>C${Number(pedido.deliveryFee || 0).toFixed(2)}</span>
-                                  </div>
-                                )}
-                                <div style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  gap: '16px',
-                                  paddingTop: '8px',
-                                  borderTop: '1px solid rgba(29, 78, 216, 0.18)',
-                                  fontSize: '17px',
-                                  fontWeight: 800,
-                                  color: '#0f172a'
-                                }}>
-                                  <span>{pedido?.totalAproximado === false ? 'Total actualizado de pedido' : 'Total aproximado de pedido'}</span>
-                                  <span>C${Number(pedido.total || 0).toFixed(2)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          <div style={{ display: 'flex', gap: '12px', marginTop: '20px', flexWrap: 'wrap' }}>
-                            <button
-                              onClick={() => handleApplyStoreActualQuantities(pedido)}
-                              disabled={storeSyncEntry.busy}
-                              className="btn-hover"
-                              style={{
-                                flex: '1 1 280px',
-                                padding: '16px 20px',
-                                borderRadius: '14px',
-                                border: 'none',
-                                background: storeSyncEntry.busy ? '#94a3b8' : config.color,
-                                color: 'white',
-                                fontWeight: 800,
-                                fontSize: '15px',
-                                cursor: storeSyncEntry.busy ? 'not-allowed' : 'pointer',
-                                boxShadow: storeSyncEntry.busy ? 'none' : `0 12px 30px ${config.color}33`
-                              }}
-                            >
-                              {storeSyncEntry.busy ? 'Actualizando pesos...' : 'Actualizar pesos y cotizacion'}
-                            </button>
-                          </div>
-
-                          {storeSyncEntry.error && (
-                            <div style={{
-                              marginTop: '12px',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
-                              background: 'rgba(239, 68, 68, 0.12)',
-                              color: '#b91c1c',
-                              fontSize: '14px',
-                              fontWeight: 700
-                            }}>
-                              {storeSyncEntry.error}
-                            </div>
-                          )}
-
-                          {storeSyncEntry.success && (
-                            <div style={{
-                              marginTop: '12px',
-                              padding: '12px 14px',
-                              borderRadius: '12px',
-                              background: 'rgba(16, 185, 129, 0.12)',
-                              color: '#047857',
-                              fontSize: '14px',
-                              fontWeight: 700
-                            }}>
-                              {storeSyncEntry.success}
-                            </div>
-                          )}
-                        </div>
-                      ) : isEditing ? (
-                        <div>
-                          <textarea
-                            value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
-                            style={{
-                              width: '100%',
-                              minHeight: '150px',
-                              border: '3px solid #e2e8f0',
-                              borderRadius: '12px',
-                              padding: '16px',
-                              fontSize: '18px',
-                              fontFamily: 'inherit',
-                              resize: 'vertical',
-                              marginBottom: '16px',
-                              outline: 'none',
-                              fontWeight: '600',
-                              lineHeight: '1.6'
-                            }}
-                          />
-                          <div style={{ display: 'flex', gap: '12px' }}>
-                            <button
-                              onClick={() => {
-                                updateCampo(pedido.firebaseKey, 'pedido', editText);
-                                setEditingId(null);
-                              }}
-                              className="btn-hover"
-                              style={{
-                                flex: 1,
-                                padding: '14px',
-                                borderRadius: '12px',
-                                border: 'none',
-                                background: config.color,
-                                color: 'white',
-                                fontWeight: 800,
-                                fontSize: '15px',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              ✅ Guardar Cambios
-                            </button>
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="btn-hover"
-                              style={{
-                                padding: '14px 24px',
-                                borderRadius: '12px',
-                                border: 'none',
-                                background: '#e2e8f0',
-                                color: '#475569',
-                                fontWeight: 700,
-                                fontSize: '15px',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
+                        <StoreOrderDetails pedido={pedido} />
                       ) : (
-                        <div>
-                          <pre style={{
-                            margin: 0,
-                            fontFamily: "'Segoe UI', system-ui, sans-serif",
-                            fontSize: '22px',
-                            lineHeight: '1.7',
-                            color: '#0f172a',
-                            fontWeight: 700,
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word'
-                          }}>
-                            {getKitchenOrderText(pedido) || 'Sin detalle'}
-                          </pre>
-                          {String(pedido?.canal || '').trim() !== 'tienda_virtual' && (
-                            <button
-                              onClick={() => {
-                                setEditingId(pedido.firebaseKey);
-                                setEditText(getKitchenOrderText(pedido) || '');
-                              }}
-                              className="btn-hover"
-                              style={{
-                                marginTop: '20px',
-                                padding: '12px 20px',
-                                borderRadius: '10px',
-                                border: '2px solid #e2e8f0',
-                                background: 'white',
-                                color: '#64748b',
-                                fontSize: '14px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                              }}
-                            >
-                              {Icons.edit}
-                              Editar Pedido
-                            </button>
-                          )}
-                        </div>
+                        <pre style={{
+                          margin: 0,
+                          fontFamily: "'Segoe UI', system-ui, sans-serif",
+                          fontSize: '18px',
+                          lineHeight: 1.55,
+                          color: '#0f172a',
+                          fontWeight: 700,
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere'
+                        }}>
+                          {getKitchenOrderText(pedido) || 'Sin detalle'}
+                        </pre>
                       )}
                     </div>
 
