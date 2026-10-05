@@ -1543,6 +1543,8 @@ export default function TiendaVirtualView({
   const deferredQuery = useDeferredValue(query);
   const isDashboard = mode === 'dashboard';
   const usePublicStorefrontDesign = !isDashboard && surface === 'web';
+  const showAppDownloadLinks = !isDashboard &&
+    !(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const showMobileBottomNav = isPhoneLayout && !isDashboard;
   const selectedBranch = useMemo(
@@ -5860,6 +5862,78 @@ export default function TiendaVirtualView({
           display: grid;
           gap: 20px;
         }
+        .store-app-downloads {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin: 14px 0;
+          padding: 10px 14px;
+          border: 1px solid rgba(12, 77, 136, 0.14);
+          border-radius: 18px;
+          background: #ffffff;
+        }
+        .store-app-downloads-title {
+          color: var(--sm-blue-deep);
+          font-size: 14px;
+          font-weight: 900;
+        }
+        .store-app-downloads-actions {
+          display: flex;
+          gap: 8px;
+          min-width: 0;
+        }
+        .store-app-download-link {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 52px;
+          min-width: 150px;
+          margin: 0;
+          padding: 0 14px;
+          border: 1px solid var(--sm-blue-deep);
+          border-radius: 12px;
+          background: var(--sm-blue-deep);
+          color: #ffffff;
+          font: inherit;
+          font-size: 13px;
+          font-weight: 900;
+          text-align: center;
+          text-decoration: none;
+          transition: background 180ms ease, transform 180ms ease;
+        }
+        .store-app-download-link:hover {
+          background: #063c70;
+        }
+        .store-app-download-link:active {
+          transform: translateY(1px);
+        }
+        .store-app-download-link:focus-visible {
+          outline: 3px solid var(--sm-red);
+          outline-offset: 3px;
+        }
+        .store-app-download-link--upcoming {
+          overflow: hidden;
+          justify-content: flex-start;
+          border-color: rgba(12, 77, 136, 0.18);
+          background: #f1f5f9;
+          color: #64748b;
+          cursor: not-allowed;
+        }
+        .store-app-download-link--upcoming::after {
+          content: 'PRÓXIMAMENTE';
+          position: absolute;
+          right: 6px;
+          bottom: 5px;
+          padding: 2px 3px;
+          background: rgba(241, 245, 249, 0.95);
+          color: #a11d2a;
+          font-size: 9px;
+          font-weight: 950;
+          letter-spacing: 0.04em;
+          transform: rotate(-8deg);
+        }
         .store-product-group {
           padding: 16px 16px 18px;
           border-radius: 28px;
@@ -9313,6 +9387,22 @@ export default function TiendaVirtualView({
             width: 100%;
             min-width: 0;
           }
+          .store-app-downloads {
+            padding: 8px;
+            gap: 8px;
+          }
+          .store-app-downloads-title {
+            display: none;
+          }
+          .store-app-downloads-actions {
+            width: 100%;
+          }
+          .store-app-download-link {
+            flex: 1;
+            min-width: 0;
+            padding: 0 8px;
+            font-size: 12px;
+          }
           .store-add {
             top: 10px;
             right: 4px;
@@ -9967,6 +10057,31 @@ export default function TiendaVirtualView({
               </nav>
             )}
           </section>
+
+          {showAppDownloadLinks && activeCategory === 'todos' && !deferredQuery && (
+            <section className="store-app-downloads" aria-label="Descargar la aplicación Carnes San Martín">
+              <span className="store-app-downloads-title">Llevá San Martín en tu teléfono</span>
+              <div className="store-app-downloads-actions">
+                <a
+                  className="store-app-download-link"
+                  href="https://play.google.com/store/apps/details?id=com.sanmartinsr.app&pli=1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Descargar Carnes San Martín en Play Store"
+                >
+                  Descargar en Play Store
+                </a>
+                <button
+                  type="button"
+                  className="store-app-download-link store-app-download-link--upcoming"
+                  aria-label="App Store, próximamente"
+                  disabled
+                >
+                  App Store
+                </button>
+              </div>
+            </section>
+          )}
 
           {(showCatalogSkeleton || deferredQuery || activeCategory !== 'todos') && (
             <div className="store-product-head" aria-live="polite">
