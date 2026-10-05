@@ -5879,9 +5879,11 @@ export default function TiendaVirtualView({
           font-weight: 900;
         }
         .store-app-downloads-actions {
-          display: flex;
-          gap: 8px;
-          min-width: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+          align-items: center;
+          width: min(100%, 310px);
+          flex: 0 0 auto;
         }
         .store-app-download-link {
           position: relative;
@@ -5889,22 +5891,22 @@ export default function TiendaVirtualView({
           align-items: center;
           justify-content: center;
           min-height: 52px;
-          min-width: 150px;
+          min-width: 0;
+          width: 100%;
           margin: 0;
-          padding: 0 14px;
-          border: 1px solid var(--sm-blue-deep);
-          border-radius: 12px;
-          background: var(--sm-blue-deep);
-          color: #ffffff;
-          font: inherit;
-          font-size: 13px;
-          font-weight: 900;
-          text-align: center;
+          padding: 0;
+          border: 0;
+          background: transparent;
           text-decoration: none;
-          transition: background 180ms ease, transform 180ms ease;
+          transition: transform 180ms ease;
         }
-        .store-app-download-link:hover {
-          background: #063c70;
+        .store-app-download-link img {
+          display: block;
+          width: 100%;
+          height: auto;
+        }
+        .store-app-download-link:not(:disabled):hover {
+          transform: translateY(-2px);
         }
         .store-app-download-link:active {
           transform: translateY(1px);
@@ -5914,25 +5916,23 @@ export default function TiendaVirtualView({
           outline-offset: 3px;
         }
         .store-app-download-link--upcoming {
-          overflow: hidden;
-          justify-content: flex-start;
-          border-color: rgba(12, 77, 136, 0.18);
-          background: #f1f5f9;
-          color: #64748b;
+          padding: 0 4px;
           cursor: not-allowed;
         }
         .store-app-download-link--upcoming::after {
           content: 'PRÓXIMAMENTE';
           position: absolute;
-          right: 6px;
-          bottom: 5px;
-          padding: 2px 3px;
-          background: rgba(241, 245, 249, 0.95);
-          color: #a11d2a;
+          left: 50%;
+          top: 50%;
+          padding: 4px 6px;
+          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.95);
+          color: var(--sm-blue-deep);
           font-size: 9px;
-          font-weight: 950;
-          letter-spacing: 0.04em;
-          transform: rotate(-8deg);
+          font-weight: 900;
+          letter-spacing: 0.06em;
+          white-space: nowrap;
+          transform: translate(-50%, -50%) rotate(-7deg);
         }
         .store-product-group {
           padding: 16px 16px 18px;
@@ -9396,12 +9396,8 @@ export default function TiendaVirtualView({
           }
           .store-app-downloads-actions {
             width: 100%;
-          }
-          .store-app-download-link {
-            flex: 1;
-            min-width: 0;
-            padding: 0 8px;
-            font-size: 12px;
+            max-width: 310px;
+            margin: 0 auto;
           }
           .store-add {
             top: 10px;
@@ -10069,7 +10065,7 @@ export default function TiendaVirtualView({
                   rel="noopener noreferrer"
                   aria-label="Descargar Carnes San Martín en Play Store"
                 >
-                  Descargar en Play Store
+                  <img src="/tienda/branding/google-play-badge.png" alt="" width="646" height="250" loading="lazy" />
                 </a>
                 <button
                   type="button"
@@ -10077,7 +10073,7 @@ export default function TiendaVirtualView({
                   aria-label="App Store, próximamente"
                   disabled
                 >
-                  App Store
+                  <img src="/tienda/branding/app-store-badge.svg" alt="" width="120" height="40" loading="lazy" />
                 </button>
               </div>
             </section>
