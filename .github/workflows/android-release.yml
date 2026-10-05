@@ -54,19 +54,24 @@ jobs:
             printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
           } > android/keystore.properties
 
-      - name: Build signed app bundle
+      - name: Build signed app bundle and APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+          ./gradlew bundleRelease assembleRelease --no-daemon
 
       - name: Verify bundle signature
         run: jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
 
-      - name: Upload Play Console bundle
+      - name: Verify APK signature
+        run: $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)/apksigner verify android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Carnes-San-Martin-v1.2.7-release
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: Carnes-San-Martin-v1.2.8-release
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 3
