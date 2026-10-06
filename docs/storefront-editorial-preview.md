@@ -67,3 +67,83 @@ Selected approved screenshots are retained in `docs/screenshots/editorial-2026/`
 No real customer order was submitted. Authenticated payment/order/Gold flows
 were not re-executed for this visual release; they are unchanged from the prior
 retail audit in `docs/storefront-retail-qa.md`.
+
+## Follow-up: specific destinations and Play download
+
+Requested on 2026-10-06: a compact Google Play badge under the header actions;
+cuts -> Linea Gold; burgers -> actual beef patties across their existing Res
+subcategories; a third Parrillada banner immediately before the Linea Gold group
+and linked to Linea Parrillera. If Gold is absent from the capped home groups,
+the grill banner follows the last displayed group instead of disappearing.
+
+QA inventory: verify all three destinations and Back; patties exclude cubos,
+fajitas, bread, chicken and fish; changing search clears the burger intent;
+cart survives navigation; badge URL opens the correct package in a new tab;
+badge hidden in the native app; order of banners/Gold; 360/390/430/820/1440 widths;
+keyboard access; web/native builds and existing catalog/promotion regressions.
+No image caption is reintroduced. Existing products and catalog categories are
+not edited. Final validation results are below.
+
+## Follow-up: Preciazos promotion identity
+
+Own red/blue "Preciazos en Carnes San Martin, si" seal on discounted catalog
+photos and product detail. Real campaign titles and previous prices remain;
+regular products are never labeled as offers. No competitor logos or new raster
+assets, dependencies, price calculations, campaign dates or eligibility rules.
+
+QA inventory: verify every discounted card has a readable seal and red current
+price, normal cards do not; details and search share the same identity; open,
+add, adjust and remove a promotional product without changing the price engine;
+inspect photo coverage, clipping and touch controls at all target widths; reduced
+motion, keyboard focus, failed images, and large text. No real order submission.
+
+## Follow-up validation results (2026-10-06)
+
+- Used the Playwright Interactive skill with persistent Chromium and WebKit
+  sessions. No image-generation skill: the seal is code-native and the third
+  banner uses a licensed stock photograph with source recorded in SOURCES.md.
+- Chromium and WebKit: cuts -> Linea Gold (21 products), burgers -> six actual
+  beef patties, grill -> Linea Parrillera (13 products), each followed by Back.
+  Counts describe the live catalog at test time, not hardcoded limits.
+- The third banner directly precedes Res / Linea Gold. No public photo captions
+  were reintroduced. Changing the burger search to "pollo" shows the normal
+  23-product results; hamburger filtering does not apply to the dashboard.
+- Header Google Play link opened the correct public package in a new tab using
+  Enter. It has a 3px visible keyboard focus ring. With the native-platform flag
+  emulated, both download areas disappear, then return when the flag is restored.
+  This is a guard check, not physical Android device certification.
+- All five displayed promotional home cards have the seal and previous price;
+  normal cards do not. A mixed "bistec" search has five results, one discounted,
+  and exactly one seal. Promotional details have the larger seal; regular product
+  details have no seal. Add/quantity controls remain separate from the stamp.
+- Purchase path without submission: add a C$60 hamburger item, navigate home and
+  grill and back, add the discounted C$164.68 cut in its detail screen. The cart
+  shows C$239.00 before the existing C$14.32 promotion, subtotal C$224.68.
+  Increase and decrease the cut quantity, continue to delivery and address, go
+  back twice: the C$224.68 subtotal and both items remain. Removing the cut leaves
+  C$60; removing the last item returns the empty cart/normal shop behavior.
+- Screenshots reviewed at 360x800, 390x844, 430x932, 820x1180, 1440x1000.
+  No horizontal document overflow. The first promotional photos and prices fit
+  above the bottom navigation; 360px needs a short scroll to reach Add buttons.
+  Fixed a pre-existing tablet grid placement conflict discovered during this
+  pass: brand/actions now precede location and Play badge. Also checked 700px and
+  1180px header bounds, with no header/search intersection.
+- Blocked editorial photo requests: the patterned fallback retains banner
+  dimensions, copy and working navigation. At 150% product/banner text on 360px,
+  text wraps without horizontal overflow. Reduced-motion animations/transitions
+  are effectively disabled. No JavaScript page errors in the main Chromium flow.
+- Local Granada, Nindiri and Masaya: three banners, download link and consistent
+  offer/regular-product distinction. Real orders, customer accounts, payments,
+  promotion data and prices were not written or altered.
+- Passed `test:store-editorial`, `test:store-product-promotions`,
+  `test:store-categories`, `test:first-order-rewards`, `build`, and
+  `build:android:web`. No dependencies added. Existing >500kB Vite chunk warnings
+  remain; the seal makes no network requests, and the new 93,084-byte WebP loads
+  lazily. An Android web build is not a new APK/AAB or Play Console release.
+- Evidence: `docs/screenshots/editorial-2026/preciazos-home-*.png`,
+  `preciazos-detail-390.png` and `parrillada-390.png`.
+
+Limits: no physical-device QA or real purchase; authenticated checkout, points
+and order fulfillment are unchanged and were not re-certified. Windows WebKit
+renders the existing variable font lighter than Chromium; this release does not
+change the font assets. Publication must be confirmed separately after CI.

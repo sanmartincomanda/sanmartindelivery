@@ -27,6 +27,44 @@ html body .store-shell.storefront-brand-v3.storefront-retail .retail-card-add:ho
 html body .store-shell.storefront-brand-v3.storefront-retail .store-mobile-bottom-nav { background: var(--retail-paper) !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail :is(.retail-catalog-all,.store-app-downloads) { background: transparent !important; }
 
+html body .store-shell.storefront-brand-v3.storefront-retail .store-branch-coverage-row.has-app-download {
+  display: grid !important; grid-template-columns: minmax(0,1fr) auto; gap: 0 10px !important;
+}
+.storefront-retail .has-app-download .store-branch-pill { grid-column: 1; grid-row: 1; justify-self: start; }
+.storefront-retail .has-app-download .retail-header-delivery { grid-column: 1; grid-row: 2; padding: 0; border: 0; margin-top: -6px; font-size: 11px; }
+.storefront-retail .retail-header-play { grid-column: 2; grid-row: 1 / 3; display: flex; align-items: center; width: 138px; min-height: 48px; border-radius: 6px; }
+.storefront-retail .retail-header-play img { display: block; width: 100%; height: auto; }
+.storefront-retail .has-app-download .store-coverage-alert { grid-column: 1 / -1; }
+
+/* The seal is presentation only; eligibility uses the existing promotion price. */
+.retail-promo-seal { display: none; }
+.storefront-retail .retail-promo-seal {
+  position: absolute; top: 7px; right: 7px; z-index: 1; display: block;
+  width: 76px; padding: 5px 0 7px; border: 2px solid #0044c5; border-bottom-width: 3px;
+  border-radius: 5px 5px 22px 22px; background: #fffdf8; color: #0044c5;
+  text-align: center; line-height: 1; pointer-events: none;
+}
+.storefront-retail .retail-promo-seal-title {
+  display: block; margin: 0 -5px 4px; padding: 4px 2px;
+  background: #d60917; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: -.05em;
+}
+.storefront-retail .retail-promo-seal-brand { display: block; font-size: 9px; line-height: 1.15; font-weight: 700; letter-spacing: -.02em; }
+.storefront-retail .retail-promo-seal-brand small { font-size: 8px; font-weight: 400; }
+.storefront-retail .retail-promo-seal-brand b { color: #d60917; font-size: 12px; }
+.storefront-retail .has-preciazo .retail-product-price { color: #c20816; }
+.storefront-retail .has-preciazo .retail-product-price small { color: var(--retail-muted); }
+html body .store-shell.storefront-brand-v3.storefront-retail .has-preciazo .retail-card-add { color: #bd0b19; background: #fff2ef; border-color: #f0c9c9; }
+html body .store-shell.storefront-brand-v3.storefront-retail .has-preciazo .retail-card-add:hover { background: #ffe4df; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-promotion-group .store-product-group-title { color: #c20816 !important; }
+.storefront-retail .retail-promotion-signature { margin: 2px 0 0; font-size: 11px; line-height: 1.35; color: #063969; }
+.storefront-retail .retail-promotion-signature strong { color: #c20816; }
+.storefront-retail .store-detail-image { position: relative; }
+.storefront-retail .store-detail-image .retail-promo-seal { width: 102px; top: 12px; right: 12px; padding-block: 7px 10px; }
+.storefront-retail .store-detail-image .retail-promo-seal-title { font-size: 16px; padding-block: 6px; }
+.storefront-retail .store-detail-image .retail-promo-seal-brand { font-size: 12px; }
+.storefront-retail .store-detail-image .retail-promo-seal-brand small { font-size: 10px; }
+.storefront-retail .store-detail-image .retail-promo-seal-brand b { font-size: 16px; }
+
 html body .storefront-retail.store-shell .retail-food-story {
   display: grid; grid-template-columns: 54% 46%; position: relative; isolation: isolate;
   width: 100%; min-width: 0; min-height: 112px; margin: 0 0 12px; padding: 0;
@@ -49,13 +87,23 @@ html body .storefront-retail.store-shell .retail-food-story--burgers { margin: 0
 .storefront-retail .retail-food-story--burgers .retail-food-story-media img { object-position: 52% 77%; }
 .storefront-retail .retail-food-story--burgers .retail-food-story-action { color: #0044c5; }
 .storefront-retail .retail-food-story--burgers::after { background: #0044c5; width: 20%; }
+html body .storefront-retail.store-shell .retail-food-story--grill { margin: 0; min-height: 164px; color: #063969; background: #f9dfc8 url('/tienda/branding/butcher-line-pattern.svg') left 20px / 500px; }
+.storefront-retail .retail-food-story--grill .retail-food-story-copy { padding-block: 22px; }
+.storefront-retail .retail-food-story--grill .retail-food-story-media img { object-position: center; }
+.storefront-retail .retail-food-story--grill .retail-food-story-action { color: #0044c5; }
+.storefront-retail .retail-food-story--grill::after { background: #f45e22; }
 @media (min-width: 700px) {
+  html body .store-shell.storefront-brand-v3.storefront-retail .store-brand-row { grid-column: 1 !important; grid-row: 1 !important; }
+  .storefront-retail .retail-product .retail-promo-seal { width: 88px; top: 10px; right: 10px; padding-block: 6px 9px; }
+  .storefront-retail .retail-product .retail-promo-seal-title { font-size: 14px; }
+  .storefront-retail .retail-product .retail-promo-seal-brand { font-size: 10px; }
+  .storefront-retail .retail-promotion-signature { font-size: 12px; }
   html body .storefront-retail.store-shell .retail-food-story { grid-template-columns: 46% 54%; min-height: 212px; margin-bottom: 20px; }
   .storefront-retail .retail-food-story-copy { padding: 26px 32px; }
   .storefront-retail .retail-food-story-eyebrow { font-size: 11px; margin-bottom: 10px; }
   .storefront-retail .retail-food-story-copy strong { max-width: 340px; font-size: 40px; }
   .storefront-retail .retail-food-story-action { margin-top: 18px; font-size: 14px; }
-  html body .storefront-retail.store-shell .retail-food-story--burgers { margin-bottom: 0; min-height: 228px; }
+  html body .storefront-retail.store-shell :is(.retail-food-story--burgers,.retail-food-story--grill) { margin-bottom: 0; min-height: 228px; }
   .storefront-retail .retail-food-story--burgers .retail-food-story-copy strong { max-width: 390px; }
   .storefront-retail .retail-food-story--burgers .retail-food-story-media img { object-position: 50% 73%; }
 }

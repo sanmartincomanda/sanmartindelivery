@@ -1,6 +1,8 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
+import RetailPromoSeal from './storefront/RetailPromoSeal';
+import { GOOGLE_PLAY_STORE_URL, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
 import RetailCheckout from './storefront/RetailCheckout';
 import { useOnlineStatus, useRetailNavigation, useRetailFocusLayers } from './storefront/useRetailNavigation';
 import { createPortal } from 'react-dom';
@@ -2380,6 +2382,7 @@ export default function TiendaVirtualView({
   const filteredProducts = useMemo(() => {
     const normalizedQuery = normalizeStorePriorityText(deferredQuery);
     const hasActiveSearch = normalizedQuery.length > 0;
+    const burgerSearch = !isDashboard && isRetailBurgerSearch(deferredQuery);
 
     const matchingProducts = activeProducts.filter((product) => {
       const matchesCategory =
@@ -2394,7 +2397,7 @@ export default function TiendaVirtualView({
 
       const matchesSearch =
         !hasActiveSearch ||
-        normalizeStorePriorityText(
+        (burgerSearch ? isRetailBurgerProduct(product) : normalizeStorePriorityText(
           [
             product.code,
             product.name,
@@ -2403,7 +2406,7 @@ export default function TiendaVirtualView({
             product.categoryLabel,
             product.subcategory,
           ].join(' ')
-        ).includes(normalizedQuery);
+        ).includes(normalizedQuery));
 
       return matchesCategory && matchesSubcategory && matchesSearch;
     });
@@ -2438,7 +2441,7 @@ export default function TiendaVirtualView({
 
       return compareCatalogProducts(left, right);
     });
-  }, [activeCategory, activeProducts, activeSubcategory, deferredQuery]);
+  }, [activeCategory, activeProducts, activeSubcategory, deferredQuery, isDashboard]);
 
   const hasActiveStoreSearch = deferredQuery.trim().length > 0;
   const showSearchResultsAsFlatList = activeCategory === 'todos' && hasActiveStoreSearch;
@@ -2551,6 +2554,9 @@ export default function TiendaVirtualView({
 
     return [...productPromotionSections, ...(comboSection ? [comboSection] : []), ...regularSections];
   }, [activeCategory, activeProductPromotions, filteredProducts]);
+
+  const visibleHomeSections = isDashboard ? groupedAllProductsSections : groupedAllProductsSections.slice(0, 4);
+  const homeHasGoldSection = visibleHomeSections.some(isRetailGoldSection);
 
   useEffect(() => {
     if (activeCategory !== 'todos') {
@@ -3403,6 +3409,10 @@ export default function TiendaVirtualView({
   ]);
 
   const showCatalogSkeleton = catalogLoading && catalog.length === 0;
+  const retailCatalogTitle = mobileNavSection === 'search'
+    ? (isRetailBurgerSearch(deferredQuery) ? 'Hamburguesas' : 'Resultados')
+    : activeSubcategory === 'todas' ? activeFilterSummary.title
+      : orderedSubcategoryOptions.find((subcategory) => normalizeStorePriorityText(subcategory) === normalizeStorePriorityText(activeSubcategory)) || activeSubcategory;
 
   useEffect(() => {
     if (cartItems.length === 0) {
@@ -4119,6 +4129,7 @@ export default function TiendaVirtualView({
     }
 
     setMobileNavSection('catalog');
+    setQuery('');
     setActiveCategory(targetCategory);
     setActiveSubcategory(targetCategory === 'todos' ? 'todas' : targetSubcategory || 'todas');
 
@@ -9910,13 +9921,19 @@ export default function TiendaVirtualView({
             </div>
           </div>
 
-          <div className="store-branch-coverage-row">
+          <div className={`store-branch-coverage-row ${showAppDownloadLinks ? 'has-app-download' : ''}`}>
             <StoreBranchButton
               branch={selectedBranch}
               locating={branchLocating}
               onClick={openBranchSelector}
             />
             {!isDashboard && <span className="retail-header-delivery">{fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Retiro en tienda' : fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN ? 'Ruta San Martín' : 'Entrega a domicilio'}</span>}
+            {showAppDownloadLinks && (
+              <a className="retail-header-play" href={GOOGLE_PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
+                aria-label="Descargar Carnes San Martín en Google Play">
+                <img src="/tienda/branding/google-play-badge.png" alt="Get it on Google Play" width="646" height="250" />
+              </a>
+            )}
             {showSavedAddressCoverageWarning && !savedAddressRouteQuote.available && (
               <div className="store-coverage-alert" role="status">
                 <div className="store-coverage-alert-copy">
@@ -10062,9 +10079,9 @@ export default function TiendaVirtualView({
         )}
 
         <main>
-          {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" /><div><h1>{mobileNavSection === 'search' ? 'Resultados' : activeFilterSummary.title}</h1><span>{filteredProducts.length} productos</span></div></div>}
+          {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" /><div><h1>{retailCatalogTitle}</h1><span>{filteredProducts.length} productos</span></div></div>}
           {!isDashboard && mobileNavSection === 'home' && !deferredQuery && categoryOptions.some((category) => category.id === 'res') && (
-            <RetailFoodStory onBrowse={() => handleMobileCategorySelect({ id: 'res' })} />
+            <RetailFoodStory onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.cuts)} />
           )}
           <section ref={filtersPanelRef} className="store-filters-panel">
             <div className="store-filter-strip">
@@ -10137,7 +10154,7 @@ export default function TiendaVirtualView({
               <div className="store-app-downloads-actions">
                 <a
                   className="store-app-download-link"
-                  href="https://play.google.com/store/apps/details?id=com.sanmartinsr.app&pli=1"
+                  href={GOOGLE_PLAY_STORE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Descargar Carnes San Martín en Play Store"
@@ -10206,21 +10223,26 @@ export default function TiendaVirtualView({
             </div>
           ) : activeCategory === 'todos' && !showSearchResultsAsFlatList && (isDashboard || mobileNavSection === 'home') ? (
             <div className="store-grouped-sections">
-              {(isDashboard ? groupedAllProductsSections : groupedAllProductsSections.slice(0, 4)).map((section, sectionIndex) => {
+              {visibleHomeSections.map((section, sectionIndex) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = section.products.slice(0, visibleCount);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
                 const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
                 const actionLabel = getStoreGroupActionLabel(section);
                 const canOpenSection = Boolean(section.targetCategory || section.category);
+                const isPromotionSection = !isDashboard && section.id.startsWith('promo-') && section.products.some(hasDiscountedStorePrice);
 
                 return (
                   <React.Fragment key={section.id}>
-                  <section className="store-product-group">
+                  {!isDashboard && isRetailGoldSection(section) && (
+                    <RetailFoodStory variant="grill" onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.grill)} />
+                  )}
+                  <section className={`store-product-group${isPromotionSection ? ' retail-promotion-group' : ''}`}>
                     <div className="store-product-group-head">
                       <div>
                         <span className="store-product-group-kicker">{section.kicker}</span>
                         <h3 className="store-product-group-title">{section.title}</h3>
+                        {isPromotionSection && <p className="retail-promotion-signature">Preciazos en Carnes San Martín, <strong>sí</strong></p>}
                       </div>
                       <div className="store-product-group-actions">
                         <span className="store-product-group-meta">
@@ -10260,8 +10282,11 @@ export default function TiendaVirtualView({
                       </div>
                     )}
                   </section>
-                  {!isDashboard && sectionIndex === 0 && activeProducts.some((product) => /tortas/i.test(product.name)) && (
-                    <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('tortas')} />
+                  {!isDashboard && sectionIndex === 0 && activeProducts.some(isRetailBurgerProduct) && (
+                    <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('Hamburguesas')} />
+                  )}
+                  {!isDashboard && !homeHasGoldSection && sectionIndex === visibleHomeSections.length - 1 && (
+                    <RetailFoodStory variant="grill" onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.grill)} />
                   )}
                   </React.Fragment>
                 );
@@ -12788,6 +12813,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                 event.currentTarget.classList.add('store-product-image-fallback');
               }}
             />
+            {discountedPrice && <RetailPromoSeal />}
           </div>
           <div className="store-product-sheet-copy">
             <div className="store-product-sheet-info">

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+import RetailPromoSeal from './RetailPromoSeal';
 
 export default function RetailProductCard({ product, quantity, image, fallback, money, formatQuantity, step, minimum, discounted = false, onOpen, onQuantityChange }) {
   const [loaded, setLoaded] = useState(false);
   return (
-    <article className="retail-product">
-      <button type="button" className="retail-product-link" onClick={onOpen} aria-label={`Ver ${product.name}`}>
+    <article className={`retail-product${discounted ? ' has-preciazo' : ''}`}>
+      <button type="button" className="retail-product-link" onClick={onOpen} aria-label={`Ver ${product.name}${discounted ? ', en promoción' : ''}`}>
         <span className={`retail-product-photo ${loaded ? 'is-loaded' : ''}`}>
           <img src={image} alt={product.name} loading="lazy" decoding="async" width="320" height="320"
             onLoad={() => setLoaded(true)} onError={(event) => { fallback(event); setLoaded(true); }} />
-          {discounted && <span className="retail-offer">Oferta</span>}
+          {discounted && <RetailPromoSeal />}
         </span>
         <span className="retail-product-name">{product.name}</span>
         <span className="retail-product-unit">Por {product.unit} <span aria-hidden="true">·</span> {product.code}</span>

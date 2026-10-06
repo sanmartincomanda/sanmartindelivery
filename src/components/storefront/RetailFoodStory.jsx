@@ -6,7 +6,7 @@ const STORIES = {
     title: 'Hoy se come bien.',
     action: 'Elegí tu corte',
     image: '/tienda/editorial/parrilla-marina-utrabo.webp',
-    label: 'Elegí tu corte. Ver productos de res',
+    label: 'Hoy se come bien. Ver Línea Gold',
   },
   burgers: {
     eyebrow: 'HECHAS EN CASA',
@@ -14,6 +14,14 @@ const STORIES = {
     action: 'Ver tortas de carne',
     image: '/tienda/editorial/burger-mary-nikitina.webp',
     label: 'Noche de hamburguesas. Ver tortas de carne',
+  },
+  grill: {
+    eyebrow: 'PARA COMPARTIR',
+    title: 'Se armó la parrillada.',
+    action: 'Ver Línea Parrillera',
+    image: '/tienda/editorial/parrillada-maor-attias.webp',
+    imageHeight: 667,
+    label: 'Parrillada. Ver Línea Parrillera',
   },
 };
 
@@ -30,7 +38,7 @@ export default function RetailFoodStory({ variant = 'cuts', onBrowse }) {
         <span className="retail-food-story-action">{story.action}<span aria-hidden="true">→</span></span>
       </span>
       <span className="retail-food-story-media" aria-hidden="true">
-        {!imageUnavailable && <img src={story.image} alt="" width="1000" height="1500"
+        {!imageUnavailable && <img src={story.image} alt="" width="1000" height={story.imageHeight || 1500}
           loading={variant === 'cuts' ? 'eager' : 'lazy'} decoding="async"
           onError={() => setImageUnavailable(true)} />}
       </span>
