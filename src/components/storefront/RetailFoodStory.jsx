@@ -33,7 +33,6 @@ export default function RetailFoodStory({ variant = 'cuts', onBrowse }) {
         {!imageUnavailable && <img src={story.image} alt="" width="1000" height="1500"
           loading={variant === 'cuts' ? 'eager' : 'lazy'} decoding="async"
           onError={() => setImageUnavailable(true)} />}
-        <span>Inspiración para cocinar</span>
       </span>
     </button>
   );

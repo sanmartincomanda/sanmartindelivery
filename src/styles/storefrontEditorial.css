@@ -41,7 +41,6 @@ html body .storefront-retail.store-shell .retail-food-story {
 .storefront-retail .retail-food-story:hover .retail-food-story-action > span { transform: translateX(3px); }
 .storefront-retail .retail-food-story-media { position: relative; align-self: stretch; min-width: 0; overflow: hidden; background: #c9dee5 url('/tienda/branding/butcher-line-pattern.svg') center / 340px; clip-path: polygon(10% 0,100% 0,100% 100%,0 100%); }
 .storefront-retail .retail-food-story-media img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 74%; }
-.storefront-retail .retail-food-story-media > span { position: absolute; bottom: 5px; right: 5px; padding: 2px 4px; border-radius: 2px; background: #142c3cba; color: #fff; font-size: 7px; line-height: 1.3; }
 .storefront-retail .retail-food-story::after { content: ''; position: absolute; bottom: 0; left: 0; height: 3px; width: 26%; background: #ff000c; }
 html body .storefront-retail.store-shell .retail-food-story--burgers { margin: 0; min-height: 164px; color: #063969; background: #d9e9ed url('/tienda/branding/butcher-line-pattern.svg') left 20px / 500px; }
 .storefront-retail .retail-food-story--burgers .retail-food-story-copy { padding-block: 22px; }
@@ -56,7 +55,6 @@ html body .storefront-retail.store-shell .retail-food-story--burgers { margin: 0
   .storefront-retail .retail-food-story-eyebrow { font-size: 11px; margin-bottom: 10px; }
   .storefront-retail .retail-food-story-copy strong { max-width: 340px; font-size: 40px; }
   .storefront-retail .retail-food-story-action { margin-top: 18px; font-size: 14px; }
-  .storefront-retail .retail-food-story-media > span { bottom: 8px; right: 8px; font-size: 9px; }
   html body .storefront-retail.store-shell .retail-food-story--burgers { margin-bottom: 0; min-height: 228px; }
   .storefront-retail .retail-food-story--burgers .retail-food-story-copy strong { max-width: 390px; }
   .storefront-retail .retail-food-story--burgers .retail-food-story-media img { object-position: 50% 73%; }

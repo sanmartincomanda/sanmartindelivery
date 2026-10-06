@@ -4,7 +4,7 @@ Editorial design approved by the user on 2026-10-06 for GitHub and production.
 
 These photographs illustrate meal ideas. They do not replace catalog photographs,
 describe a specific SKU, advertise prepared-food delivery, or imply a discount.
-The visible caption is "Inspiracion para cocinar".
+The image caption was removed at the user's request on 2026-10-06.
 
 ## Licenses and sources
 
