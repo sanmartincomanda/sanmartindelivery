@@ -1,5 +1,6 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import RetailProductCard from './storefront/RetailProductCard';
+import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailCheckout from './storefront/RetailCheckout';
 import { useOnlineStatus, useRetailNavigation, useRetailFocusLayers } from './storefront/useRetailNavigation';
 import { createPortal } from 'react-dom';
@@ -205,6 +206,7 @@ import '../styles/storefrontBrand2026.css';
 import '../styles/storefrontCategoryIcons.css';
 import '../styles/storefrontRefinement2026.css';
 import '../styles/storefrontRetail.css';
+import '../styles/storefrontEditorial.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
@@ -2310,6 +2312,9 @@ export default function TiendaVirtualView({
       return;
     }
 
+    // Public "Todos" is a real filter; forcing a subcategory also traps history back.
+    if (!isDashboard && activeSubcategory === 'todas') return;
+
     if (orderedSubcategoryOptions.length === 0) {
       if (activeSubcategory !== 'todas') {
         setActiveSubcategory('todas');
@@ -2325,7 +2330,7 @@ export default function TiendaVirtualView({
     if (!hasActiveSubcategory || activeSubcategory === 'todas') {
       setActiveSubcategory(orderedSubcategoryOptions[0]);
     }
-  }, [activeCategory, activeSubcategory, orderedSubcategoryOptions]);
+  }, [activeCategory, activeSubcategory, isDashboard, orderedSubcategoryOptions]);
 
   const categoryProductCounts = useMemo(() => {
     const counts = {};
@@ -4405,6 +4410,15 @@ export default function TiendaVirtualView({
     setActiveSubcategory('todas');
     setQuery('');
     openMobileFilteredCatalog();
+  };
+
+  const handleStoreSearch = (value) => {
+    setQuery(value);
+    if (!isDashboard) {
+      setActiveCategory('todos');
+      setActiveSubcategory('todas');
+      setMobileNavSection('search');
+    }
   };
 
   const handleMobileSubcategorySelect = (subcategory) => {
@@ -9949,7 +9963,7 @@ export default function TiendaVirtualView({
             <input
               className="store-search"
               value={query}
-              onChange={(event) => { setQuery(event.target.value); if (!isDashboard) { setActiveCategory('todos'); setActiveSubcategory('todas'); setMobileNavSection('search'); } }}
+              onChange={(event) => handleStoreSearch(event.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
               placeholder="Buscar carnes, cortes y productos"
@@ -10049,6 +10063,9 @@ export default function TiendaVirtualView({
 
         <main>
           {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" /><div><h1>{mobileNavSection === 'search' ? 'Resultados' : activeFilterSummary.title}</h1><span>{filteredProducts.length} productos</span></div></div>}
+          {!isDashboard && mobileNavSection === 'home' && !deferredQuery && categoryOptions.some((category) => category.id === 'res') && (
+            <RetailFoodStory onBrowse={() => handleMobileCategorySelect({ id: 'res' })} />
+          )}
           <section ref={filtersPanelRef} className="store-filters-panel">
             <div className="store-filter-strip">
               <div>
@@ -10189,7 +10206,7 @@ export default function TiendaVirtualView({
             </div>
           ) : activeCategory === 'todos' && !showSearchResultsAsFlatList && (isDashboard || mobileNavSection === 'home') ? (
             <div className="store-grouped-sections">
-              {(isDashboard ? groupedAllProductsSections : groupedAllProductsSections.slice(0, 4)).map((section) => {
+              {(isDashboard ? groupedAllProductsSections : groupedAllProductsSections.slice(0, 4)).map((section, sectionIndex) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = section.products.slice(0, visibleCount);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
@@ -10198,7 +10215,8 @@ export default function TiendaVirtualView({
                 const canOpenSection = Boolean(section.targetCategory || section.category);
 
                 return (
-                  <section key={section.id} className="store-product-group">
+                  <React.Fragment key={section.id}>
+                  <section className="store-product-group">
                     <div className="store-product-group-head">
                       <div>
                         <span className="store-product-group-kicker">{section.kicker}</span>
@@ -10242,6 +10260,10 @@ export default function TiendaVirtualView({
                       </div>
                     )}
                   </section>
+                  {!isDashboard && sectionIndex === 0 && activeProducts.some((product) => /tortas/i.test(product.name)) && (
+                    <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('tortas')} />
+                  )}
+                  </React.Fragment>
                 );
               })}
             </div>

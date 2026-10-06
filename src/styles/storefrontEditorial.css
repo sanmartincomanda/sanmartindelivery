@@ -1,0 +1,72 @@
+/* Approved editorial layer. Decorative art never sits above buying controls. */
+html body .store-shell.storefront-public-v2.storefront-brand-v3.storefront-retail {
+  --retail-canvas: #f7f4ec;
+  --retail-paper: #fffdf8;
+  background: var(--retail-canvas) url('/tienda/branding/butcher-line-pattern.svg') repeat !important;
+  background-size: 560px 440px !important;
+  background-position: center 120px !important;
+}
+html body .store-shell.storefront-brand-v3.storefront-retail .store-top {
+  background: var(--retail-paper) !important;
+  border-bottom-color: #dce3e7 !important;
+}
+html body .store-shell.storefront-brand-v3.storefront-retail .store-search-wrap { background: #edf3f7 !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-closed-inline { background: var(--retail-paper) !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-page main { padding-top: 12px !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-filters-panel { margin-bottom: 6px !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-category-icon { background: #e1ebf4 !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-category-card.active .store-category-icon { background: #cddfff !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-category-card { min-height: 70px !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group-head { margin-bottom: 8px !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group-title { color: #063969 !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group-link { color: var(--retail-blue) !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-product { padding: 7px; border-radius: 11px; background: #fff; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-product-photo { border-radius: 7px; aspect-ratio: 1.08; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-card-add { background: #eef4ff; border-color: #cfdbef; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-card-add:hover { background: #dfeaff; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-mobile-bottom-nav { background: var(--retail-paper) !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail :is(.retail-catalog-all,.store-app-downloads) { background: transparent !important; }
+
+html body .storefront-retail.store-shell .retail-food-story {
+  display: grid; grid-template-columns: 54% 46%; position: relative; isolation: isolate;
+  width: 100%; min-width: 0; min-height: 112px; margin: 0 0 12px; padding: 0;
+  overflow: hidden; border: 0; border-radius: 12px; box-shadow: none;
+  background: #0044c5; color: #fff; text-align: left;
+}
+.storefront-retail .retail-food-story-copy { align-self: center; min-width: 0; padding: 12px 6px 12px 16px; z-index: 1; }
+.storefront-retail .retail-food-story-eyebrow { display: block; margin-bottom: 5px; font-size: 9px; line-height: 1.3; font-weight: 600; letter-spacing: .12em; }
+.storefront-retail .retail-food-story-copy strong { display: block; max-width: 160px; font-size: 22px; line-height: 1.06; font-weight: 700; letter-spacing: -.045em; overflow-wrap: anywhere; }
+.storefront-retail .retail-food-story-action { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; line-height: 1.25; font-weight: 600; }
+.storefront-retail .retail-food-story-action > span { transition: transform 150ms ease; font-size: 18px; line-height: 1; }
+.storefront-retail .retail-food-story:hover .retail-food-story-action > span { transform: translateX(3px); }
+.storefront-retail .retail-food-story-media { position: relative; align-self: stretch; min-width: 0; overflow: hidden; background: #c9dee5 url('/tienda/branding/butcher-line-pattern.svg') center / 340px; clip-path: polygon(10% 0,100% 0,100% 100%,0 100%); }
+.storefront-retail .retail-food-story-media img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; object-fit: cover; object-position: 50% 74%; }
+.storefront-retail .retail-food-story-media > span { position: absolute; bottom: 5px; right: 5px; padding: 2px 4px; border-radius: 2px; background: #142c3cba; color: #fff; font-size: 7px; line-height: 1.3; }
+.storefront-retail .retail-food-story::after { content: ''; position: absolute; bottom: 0; left: 0; height: 3px; width: 26%; background: #ff000c; }
+html body .storefront-retail.store-shell .retail-food-story--burgers { margin: 0; min-height: 164px; color: #063969; background: #d9e9ed url('/tienda/branding/butcher-line-pattern.svg') left 20px / 500px; }
+.storefront-retail .retail-food-story--burgers .retail-food-story-copy { padding-block: 22px; }
+.storefront-retail .retail-food-story--burgers .retail-food-story-copy strong { max-width: 190px; }
+.storefront-retail .retail-food-story--burgers .retail-food-story-media { background-color: #d7b89a; }
+.storefront-retail .retail-food-story--burgers .retail-food-story-media img { object-position: 52% 77%; }
+.storefront-retail .retail-food-story--burgers .retail-food-story-action { color: #0044c5; }
+.storefront-retail .retail-food-story--burgers::after { background: #0044c5; width: 20%; }
+@media (min-width: 700px) {
+  html body .storefront-retail.store-shell .retail-food-story { grid-template-columns: 46% 54%; min-height: 212px; margin-bottom: 20px; }
+  .storefront-retail .retail-food-story-copy { padding: 26px 32px; }
+  .storefront-retail .retail-food-story-eyebrow { font-size: 11px; margin-bottom: 10px; }
+  .storefront-retail .retail-food-story-copy strong { max-width: 340px; font-size: 40px; }
+  .storefront-retail .retail-food-story-action { margin-top: 18px; font-size: 14px; }
+  .storefront-retail .retail-food-story-media > span { bottom: 8px; right: 8px; font-size: 9px; }
+  html body .storefront-retail.store-shell .retail-food-story--burgers { margin-bottom: 0; min-height: 228px; }
+  .storefront-retail .retail-food-story--burgers .retail-food-story-copy strong { max-width: 390px; }
+  .storefront-retail .retail-food-story--burgers .retail-food-story-media img { object-position: 50% 73%; }
+}
+@media (min-width: 1181px) {
+  html body .storefront-retail.store-shell .retail-food-story { min-height: 212px; }
+  .storefront-retail .retail-food-story-copy strong { max-width: 460px; font-size: 48px; }
+  .storefront-retail .retail-food-story-copy { padding-left: 40px; }
+  .storefront-retail .retail-food-story-media img { object-position: 50% 72%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .storefront-retail .retail-food-story-action > span { transition: none; }
+}
