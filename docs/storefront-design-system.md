@@ -1,53 +1,85 @@
 # Sistema visual de tienda publica
 
-Alcance: experiencia del cliente en `tienda.sanmartinsr.com`. Administracion, cocina y driver no usan estas reglas.
+Revision retail: 2026-10-06. Aplicable a web/PWA y al frontend del contenedor
+Android. No sustituye los estilos de administracion, cocina o driver.
 
-## Principios
+## Direccion
 
-- El producto, precio, unidad y accion de compra tienen prioridad.
-- Una superficie solo se encierra cuando expresa seleccion, entrada de datos o una accion independiente.
-- El azul comunica navegacion y confianza; el rojo se reserva para compra, promociones y alertas.
-- Los movimientos duran entre 90 y 160 ms y nunca bloquean un toque.
-- Toda accion interactiva tiene foco visible y un objetivo tactil minimo de 40 px.
+Producto, nombre completo, unidad, precio y accion antes que publicidad.
+Fondo blanco, superficies neutras, azul corporativo para navegacion y rojo
+para compra. Sin madera, vidrio, sombras grandes ni confetti. No crear datos
+de producto, recomendaciones personalizadas o tracking que la API no provee.
 
 ## Tokens
 
+Implementados en `src/styles/storefrontRetail.css`, cargado despues de las
+capas anteriores para migrar sin alterar el dashboard.
+
 | Grupo | Valores |
 | --- | --- |
-| Marca | Navy `#0b2f53`, azul `#0c4b85`, rojo `#e51f37` |
-| Texto | Principal `#142235`, secundario `#617083` |
-| Superficie | Canvas `#f5f6f7`, superficie `#ffffff`, borde `#dfe4e8` |
-| Estado | Exito `#117a4b`, advertencia `#a45b08`, error `#b42332` |
-| Radios | 8 px, 12 px y 18 px |
-| Espaciado | Base de 4 px; usos frecuentes 8, 12, 16, 24 y 32 px |
-| Elevacion | Borde o sombra baja; sombra alta solo en overlays |
-| Movimiento | 90 ms para presion, 120-160 ms para cambios de estado |
+| Marca | Azul `#0044c5`, rojo `#ff000c` |
+| CTA rojo | `#d60917`, variante oscura para texto blanco legible |
+| Texto | Principal `#142c3c`, secundario `#586875` |
+| Superficies | Blanco `#ffffff`, suave `#f5f7f8`, borde `#e1e6e9` |
+| Gold | Superficie `#f8f3e7`, texto `#614916`, boton `#73581e` |
+| Radios | 8-10 px controles, 12 px fotos, 16-18 px sheets |
+| Espacios | Base 4 px; 8, 12, 16, 24 y 28 px |
+| Motion | 140-150 ms controles/fotos, 160 ms tabs, 210-220 ms pantallas |
 
-## Tipografia
+## Tipografia e imagen
 
-- Familia: `Avenir Next`, con respaldo en `Trebuchet MS` y `Segoe UI`.
-- Titulos de seccion: 18-21 px, peso 850-900.
-- Producto: 12-13 px, maximo dos lineas.
-- Precio: 16-17 px, peso 900.
-- Metadatos: 8-11 px, color secundario.
-- Campos moviles: 16 px para evitar zoom automatico.
+- Se conserva Space Grotesk, archivo local ya presente en el proyecto.
+- Titulos 20-26 px, producto 14 px sin truncar el nombre, precio 17 px.
+- Texto auxiliar 11-14 px; campos 16 px para evitar zoom automatico en iOS.
+- Fotos cuadradas en listado, `object-fit: contain`, dimensiones reservadas.
+- Detalle con imagen amplia, sin recorte agresivo ni deformacion.
+- Skeleton de imagen limitado a tres ciclos; fallback existente si falla la foto.
 
-## Patrones
+## Arquitectura de pantallas
 
-- Encabezado: marca, cuenta, carrito, sucursal y busqueda; compacto y fijo.
-- Categorias: carril horizontal; estado activo azul solido, sin degradado.
-- Producto: fotografia real sobre superficie neutra, nombre, precio, unidad y boton de agregar.
-- Carrito movil: barra de accion sobre la navegacion inferior solo cuando contiene productos.
-- Navegacion movil: fija al borde inferior, sin efecto flotante ni vidrio.
-- Modal de producto: pantalla completa en movil y dialogo centrado en escritorio.
-- Loading: estructura de producto con skeleton discreto.
-- Vacio: mensaje especifico, sugerencia y accion para limpiar filtros.
-- Imagen fallida: marca neutral como fallback, sin icono roto del navegador.
+Inicio / Categorias / Actividad / Perfil son destinos principales.
+Categoria -> subcategoria -> producto conserva contexto al volver.
+Carrito -> Entrega -> Direccion/Sucursal -> Horario (Ruta) -> Pago ->
+Beneficios -> Revision -> Confirmacion -> Seguimiento.
 
-## Accesibilidad
+`useRetailNavigation` registra estado de interfaz en History API: pantalla,
+filtros, identificador de producto/pedido y cantidad en edicion. No guarda
+credenciales, direccion, cupones ni datos de pago en el historial.
+El estado comercial permanece en TiendaVirtualView y sus servicios existentes.
+Los mapas y editores anidados consumen primero la accion Volver.
 
-- Contraste AA en textos y acciones principales.
-- Foco visible de 3 px.
-- Respeto de `prefers-reduced-motion`.
-- Safe areas en navegacion, carrito y overlays moviles.
-- Nombres accesibles existentes se conservan para botones y productos.
+## Componentes
+
+- `RetailProductCard`: foto, nombre, unidad/SKU, precio, oferta y Agregar/stepper.
+- `RetailCheckout`: presentacion progresiva; recibe modelo y callbacks del
+  CheckoutSheet existente, no calcula nuevas reglas ni crea pedidos por su cuenta.
+- Perfil: menu antes de formularios, con informacion, direcciones, Gold y ayuda.
+- Actividad: En curso / Anteriores; detalle independiente con estados reales.
+- Gold: pantalla blanca y acento dorado sobrio; movimientos y canjes existentes.
+- Confirmacion: pantalla simple con acceso al seguimiento, sin prometer pago cobrado.
+- Tareas breves: horario, sucursal y premios conservan sus sheets y controles.
+
+## Responsive
+
+- 360/390/430 px: dos columnas de catalogo; carriles horizontales en inicio.
+- Desde 700 px: tres columnas, categorias en dos columnas, detalle dividido.
+- Desde 1181 px: cuatro columnas y carrito lateral; ancho util hasta 1400 px.
+- Navegacion inferior blanca de cuatro destinos; acceso al carrito sobre ella.
+- Pantallas internas completas en movil; panel amplio hasta 880 px en escritorio.
+- Mapa portallado: pantalla completa en movil y hasta 920 px en escritorio.
+- Safe areas en encabezados de pantallas, footer, carrito, mapa y navegacion.
+
+## Accesibilidad y estados
+
+Foco visible de 3 px, etiquetas de botones/campos, `aria-pressed`, regiones
+de estado, foco contenido en dialogs e interfaz de fondo `inert`.
+Controles principales de al menos 44 px. No se impide el zoom del navegador.
+`prefers-reduced-motion` desactiva motion y skeleton animado.
+Offline conserva la vista montada y bloquea confirmar, sin simular exito.
+
+## Limites de esta migracion
+
+Se conservan las capas antiguas para proteger las superficies administrativas.
+Queda deuda de CSS y un chunk web grande; no es una reescritura completa ni
+una certificacion WCAG. Los ensayos y limites concretos estan en
+[la auditoria](storefront-retail-qa.md).

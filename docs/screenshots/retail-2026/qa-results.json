@@ -1,0 +1,119 @@
+{
+  "at": "2026-10-06T15:14:26.056Z",
+  "origin": "http://127.0.0.1:5178",
+  "results": [
+    {
+      "name": "Inicio: cuatro selecciones, fotografía temprana, nombres, navegación y sin overflow",
+      "result": "PASS"
+    },
+    {
+      "name": "Categorías: todas abren productos sin pantalla intermedia y vuelven",
+      "result": "PASS"
+    },
+    {
+      "name": "Categoría, producto, cantidad, regreso, scroll y carrito persistente",
+      "result": "PASS"
+    },
+    {
+      "name": "Buscar, resultado vacío, limpiar y volver del producto conserva consulta",
+      "result": "PASS"
+    },
+    {
+      "name": "Registro y mapa: abrir, permiso denegado, pin manual y regresar sin registrarse",
+      "result": "PASS"
+    },
+    {
+      "name": "Offline: aviso, catálogo conservado y recuperación",
+      "result": "PASS"
+    },
+    {
+      "name": "Checkout Delivery: dirección, pago, cupón inválido/válido, Gold, revisión y confirmación simulada",
+      "result": "PASS"
+    },
+    {
+      "name": "Retiro: pasa por dirección de sucursal, pago y revisión, sin enviar desde carrito",
+      "result": "PASS"
+    },
+    {
+      "name": "Ruta: franja vigente, envío gratis y conservación de horario",
+      "result": "PASS"
+    },
+    {
+      "name": "Tienda cerrada: navegar checkout permitido, Delivery no confirma y Ruta sí",
+      "result": "PASS"
+    },
+    {
+      "name": "Cobertura y offline impiden confirmar; carrito vacío no puede continuar",
+      "result": "PASS"
+    },
+    {
+      "name": "Regalía: selector, elegir, regresar, precio cero y agotados",
+      "result": "PASS"
+    },
+    {
+      "name": "Perfil: menú, información, direcciones guardadas, editar y persistir al callback",
+      "result": "PASS"
+    },
+    {
+      "name": "Actividad y tracking: recibido, preparando, listo, enviado, entregado y cancelado",
+      "result": "PASS"
+    },
+    {
+      "name": "Gold: historial, volver y premio agotado no canjeable",
+      "result": "PASS"
+    },
+    {
+      "name": "Historial navegador: atrás/adelante mantiene categoría, búsqueda, cantidad de producto y carrito",
+      "result": "PASS"
+    },
+    {
+      "name": "Ruta: menos de C$1000 bloquea horario y cupón bajo el mínimo bloquea confirmación",
+      "result": "PASS"
+    },
+    {
+      "name": "Pago: efectivo, tarjeta y link conservados al volver; sin abrir pasarela ni cobrar",
+      "result": "PASS"
+    },
+    {
+      "name": "Imagen fallida: fallback visible; carga diferida y dimensiones reservadas",
+      "result": "PASS"
+    },
+    {
+      "name": "Catálogo paginado: cargar más, volver del producto y conservar lista",
+      "result": "PASS"
+    },
+    {
+      "name": "Desktop: carrito lateral, detalle ancho y targets principales accesibles",
+      "result": "PASS"
+    },
+    {
+      "name": "Teclado/zoom texto: checkout a 360x500 y texto 200%, sin desbordamiento",
+      "result": "PASS"
+    },
+    {
+      "name": "Responsive 360/390/430, tablet y desktop: inicio y CTA checkout",
+      "result": "PASS"
+    },
+    {
+      "name": "Accesibilidad: foco contenido, Tab atrapado, Escape y movimiento reducido",
+      "result": "PASS"
+    },
+    {
+      "name": "Sucursales Granada/Nindiri/Masaya conservan identidad y catálogo",
+      "result": "PASS"
+    },
+    {
+      "name": "Contenedor Android: catálogo, agregar, carrito y entrega sin choque de estilos nativos",
+      "result": "PASS"
+    },
+    {
+      "name": "Sin errores JavaScript en recorridos frescos",
+      "result": "PASS"
+    }
+  ],
+  "errors": [],
+  "limits": [
+    "No real accounts, orders, payments or stock reservations were created.",
+    "Authenticated screens use local callback fixtures, not backend integration tests."
+  ]
+}

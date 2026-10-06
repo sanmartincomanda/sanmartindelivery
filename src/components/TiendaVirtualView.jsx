@@ -1,4 +1,7 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import RetailProductCard from './storefront/RetailProductCard';
+import RetailCheckout from './storefront/RetailCheckout';
+import { useOnlineStatus, useRetailNavigation, useRetailFocusLayers } from './storefront/useRetailNavigation';
 import { createPortal } from 'react-dom';
 import { equalTo, get, onValue, orderByChild, query as databaseQuery, ref, update } from 'firebase/database';
 import { database } from '../firebase';
@@ -201,6 +204,7 @@ import '../styles/storefrontCustomerApp.css';
 import '../styles/storefrontBrand2026.css';
 import '../styles/storefrontCategoryIcons.css';
 import '../styles/storefrontRefinement2026.css';
+import '../styles/storefrontRetail.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
@@ -1529,6 +1533,12 @@ export default function TiendaVirtualView({
   const [registerCoverageNotice, setRegisterCoverageNotice] = useState(null);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
+  const [retailCheckoutStep, setRetailCheckoutStep] = useState('cart');
+  const [profileView, setProfileView] = useState('information');
+  const [retailOrderId, setRetailOrderId] = useState('');
+  const [goldView, setGoldView] = useState('rewards');
+  const [catalogLimits, setCatalogLimits] = useState({});
+  const [retailActivityFilter, setRetailActivityFilter] = useState('active');
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
   const [routeSlotId, setRouteSlotId] = useState('');
   const quantityNoticeTimeoutRef = useRef(null);
@@ -1541,12 +1551,52 @@ export default function TiendaVirtualView({
   const filtersPanelRef = useRef(null);
 
   const deferredQuery = useDeferredValue(query);
+  const catalogFilterKey = JSON.stringify([activeCategory, activeSubcategory, deferredQuery]);
+  const catalogVisibleCount = catalogLimits[catalogFilterKey] || 24;
   const isDashboard = mode === 'dashboard';
-  const usePublicStorefrontDesign = !isDashboard && surface === 'web';
+  const usePublicStorefrontDesign = !isDashboard;
   const showAppDownloadLinks = !isDashboard &&
     !(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
-  const showMobileBottomNav = isPhoneLayout && !isDashboard;
+  const showMobileBottomNav = !isDashboard;
+  const online = useOnlineStatus();
+  useRetailFocusLayers(!isDashboard);
+  const retailBack = useRetailNavigation({
+    enabled: !isDashboard,
+    snapshot: {
+      tab: mobileNavSection, category: activeCategory, subcategory: activeSubcategory, search: query,
+      product: selectedProduct?.code || '', productQuantity: selectedProductQuantity,
+      checkout: checkoutOpen, checkoutStep: retailCheckoutStep,
+      profile: profileOpen, profileView, rewards: rewardsOpen, auth: authSheetOpen, authMode,
+      orders: ordersOpen, order: retailOrderId, goldView, hours: storeClosedNoticeOpen, branch: branchSelectorOpen,
+      success: orderSuccessOpen, gift: firstOrderGiftOpen, welcome: welcomeCouponOpen, popup: popupAdOpen,
+    },
+    restore: (view) => {
+      setMobileNavSection(view.tab || 'home');
+      setActiveCategory(view.category || 'todos');
+      setActiveSubcategory(view.subcategory || 'todas');
+      setQuery(view.search || '');
+      setSelectedProduct(view.product ? activeProducts.find((item) => item.code === view.product) || null : null);
+      if (view.product) setSelectedProductQuantity(Number(view.productQuantity || 0));
+      setCheckoutOpen(Boolean(view.checkout));
+      setRetailCheckoutStep(view.checkoutStep || 'cart');
+      setProfileOpen(Boolean(view.profile));
+      setProfileView(view.profileView || 'information');
+      setRewardsOpen(Boolean(view.rewards));
+      setAuthSheetOpen(Boolean(view.auth));
+      if (view.authMode) setAuthMode(view.authMode);
+      setOrdersOpen(Boolean(view.orders));
+      setRetailOrderId(view.order || '');
+      setGoldView(view.goldView || 'rewards');
+      setStoreClosedNoticeOpen(Boolean(view.hours));
+      setBranchSelectorOpen(Boolean(view.branch));
+      setOrderSuccessOpen(Boolean(view.success));
+      setFirstOrderGiftOpen(Boolean(view.gift));
+      setWelcomeCouponOpen(Boolean(view.welcome));
+      setPopupAdOpen(Boolean(view.popup));
+    },
+  });
+
   const selectedBranch = useMemo(
     () => getStoreBranchById(storeBranches, selectedBranchId, allowsDirectGuestCatalog),
     [allowsDirectGuestCatalog, selectedBranchId, storeBranches]
@@ -1955,7 +2005,7 @@ export default function TiendaVirtualView({
 
     const updateMobileNavSection = () => {
       setMobileNavSection((current) => {
-        return ['categories', 'activity', 'profile'].includes(current) ? current : 'home';
+        return ['categories', 'catalog', 'search', 'activity', 'profile'].includes(current) ? current : 'home';
       });
     };
 
@@ -4022,7 +4072,7 @@ export default function TiendaVirtualView({
 
   const openProduct = (product, options = {}) => {
     const currentQuantity = Number(cart[product.code] || 0);
-    const shouldStartWithMinimum = options.prefillMinimum && currentQuantity <= 0;
+    const shouldStartWithMinimum = (options.prefillMinimum || !isDashboard) && currentQuantity <= 0;
     setSelectedProduct(product);
     setSelectedProductQuantity(shouldStartWithMinimum ? getMinQuantity(product) : currentQuantity);
   };
@@ -4063,7 +4113,7 @@ export default function TiendaVirtualView({
       return;
     }
 
-    setMobileNavSection('categories');
+    setMobileNavSection('catalog');
     setActiveCategory(targetCategory);
     setActiveSubcategory(targetCategory === 'todos' ? 'todas' : targetSubcategory || 'todas');
 
@@ -4088,7 +4138,7 @@ export default function TiendaVirtualView({
     setQuery('');
     setActiveCategory(targetCategory);
     setActiveSubcategory(targetSubcategory || 'todas');
-    setMobileNavSection('home');
+    setMobileNavSection('catalog');
 
     if (typeof window !== 'undefined') {
       window.setTimeout(() => {
@@ -4115,8 +4165,9 @@ export default function TiendaVirtualView({
     setOrdersOpen(true);
   };
 
-  const openProfilePanel = () => {
+  const openProfilePanel = (view = 'information') => {
     if (currentUser) {
+      setProfileView(typeof view === 'string' ? view : 'information');
       setProfileOpen(true);
       return;
     }
@@ -4192,7 +4243,12 @@ export default function TiendaVirtualView({
   const dismissOrderSuccess = () => {
     setOrderSuccessOpen(false);
     if (createdOrder) {
-      setOrdersOpen(true);
+      if (isDashboard) setOrdersOpen(true);
+      else {
+        setOrdersOpen(false);
+        setMobileNavSection('activity');
+        setRetailOrderId(String(createdOrder.firebaseKey || createdOrder.id));
+      }
     }
   };
 
@@ -4274,6 +4330,7 @@ export default function TiendaVirtualView({
     }
 
     const shouldCloseCheckout = options.closeCheckout === true;
+    setGoldView('rewards');
     const nextReturnTarget = shouldCloseCheckout ? 'checkout' : '';
     setRewardsReturnTarget(nextReturnTarget);
     if (shouldCloseCheckout) {
@@ -4300,6 +4357,9 @@ export default function TiendaVirtualView({
 
     if (target === 'home') {
       closeMobilePanels();
+      setQuery('');
+      setActiveCategory('todos');
+      setActiveSubcategory('todas');
       setMobileNavSection('home');
       scrollToStoreRef(pageTopRef);
       return;
@@ -4330,7 +4390,7 @@ export default function TiendaVirtualView({
   };
 
   const openMobileFilteredCatalog = () => {
-    setMobileNavSection('home');
+    setMobileNavSection('catalog');
 
     if (typeof window !== 'undefined') {
       window.setTimeout(() => {
@@ -4343,10 +4403,8 @@ export default function TiendaVirtualView({
     const nextCategory = String(category.id || 'todos').trim() || 'todos';
     setActiveCategory(nextCategory);
     setActiveSubcategory('todas');
-
-    if (nextCategory === 'todos') {
-      openMobileFilteredCatalog();
-    }
+    setQuery('');
+    openMobileFilteredCatalog();
   };
 
   const handleMobileSubcategorySelect = (subcategory) => {
@@ -4742,6 +4800,16 @@ export default function TiendaVirtualView({
     const quantity = Number(cart[product.code] || 0);
     const discountedPrice = hasDiscountedStorePrice(product);
 
+    if (!isDashboard) return (
+      <RetailProductCard key={product.code} product={product} quantity={quantity} discounted={discountedPrice}
+        image={getStoreImageUrl(product.image || PRODUCT_PLACEHOLDER_PATH)}
+        fallback={(event) => applyStoreImageFallback(event, product.image, PRODUCT_PLACEHOLDER_PATH)}
+        money={formatCurrency} formatQuantity={formatStoreQuantity}
+        step={getQuantityStep(product)} minimum={getMinQuantity(product)}
+        onOpen={() => openProduct(product)}
+        onQuantityChange={(value) => { updateQuantity(product.code, value); }} />
+    );
+
     return (
       <article key={product.code} className="store-product">
         <button
@@ -4811,6 +4879,7 @@ export default function TiendaVirtualView({
     welcomeCouponOpen ||
     firstOrderGiftOpen ||
     popupAdOpen ||
+    storeClosedNoticeOpen ||
     branchSelectorOpen;
 
   useEffect(() => {
@@ -4832,8 +4901,9 @@ export default function TiendaVirtualView({
   return (
     <div
       className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''} ${
-        usePublicStorefrontDesign ? 'storefront-public-v2 storefront-brand-v3' : ''
+        usePublicStorefrontDesign ? 'storefront-public-v2 storefront-brand-v3 storefront-retail' : ''
       }`}
+      data-retail-tab={mobileNavSection}
     >
       <style>{`
         .store-shell {
@@ -9772,8 +9842,8 @@ export default function TiendaVirtualView({
           <div className="store-brand-main">
             <img className="store-logo" src={LOGO_PATH} alt="Carnes San Martin" />
             <div className="store-brand-copy">
-              <span className="store-brand-kicker">Tu carne favorita, a un toque de distancia</span>
-              <div className="store-title">{storeBrandTitle}</div>
+              <span className="store-brand-kicker">Carnes San Martín</span>
+              <div className="store-title">{isDashboard ? storeBrandTitle : 'Carnes San Martín'}</div>
             </div>
           </div>
           <div className="store-brand-actions">
@@ -9817,7 +9887,8 @@ export default function TiendaVirtualView({
                 type="button"
                 className="store-icon-button store-cart-button"
                 title="Carrito"
-                onClick={() => setCheckoutOpen(true)}
+                aria-label={`Carrito, ${cartItems.length} productos`}
+                onClick={() => { setRetailCheckoutStep('cart'); setCheckoutOpen(true); }}
               >
                 <StoreCheckoutIcon name="cart" />
                 {cartItems.length > 0 && <span className="store-cart-button-count">{cartItems.length}</span>}
@@ -9831,6 +9902,7 @@ export default function TiendaVirtualView({
               locating={branchLocating}
               onClick={openBranchSelector}
             />
+            {!isDashboard && <span className="retail-header-delivery">{fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Retiro en tienda' : fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN ? 'Ruta San Martín' : 'Entrega a domicilio'}</span>}
             {showSavedAddressCoverageWarning && !savedAddressRouteQuote.available && (
               <div className="store-coverage-alert" role="status">
                 <div className="store-coverage-alert-copy">
@@ -9877,13 +9949,17 @@ export default function TiendaVirtualView({
             <input
               className="store-search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => { setQuery(event.target.value); if (!isDashboard) { setActiveCategory('todos'); setActiveSubcategory('todas'); setMobileNavSection('search'); } }}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              placeholder={`Buscar en Carnes San Martin ${selectedBranch.shortName}`}
+              placeholder="Buscar carnes, cortes y productos"
+              aria-label="Buscar carnes, cortes y productos"
+              type="search"
             />
           </label>
         </header>
+
+        {!online && <div className="retail-offline" role="status">Sin conexión. Podés revisar el catálogo guardado; conectate para confirmar tu pedido.</div>}
 
         {deliverySettingsReady && storeOperationStatus?.open === false && (
           <section className="store-closed-inline" role="status" aria-label="Estado de la tienda">
@@ -9926,6 +10002,11 @@ export default function TiendaVirtualView({
             orders={customerOrdersLastThreeMonths}
             createdOrder={createdOrder}
             onCancelOrder={cancelCustomerOrder}
+            selectedOrderId={retailOrderId}
+            filter={retailActivityFilter}
+            onFilterChange={setRetailActivityFilter}
+            onSelectOrder={setRetailOrderId}
+            onOrderBack={retailBack}
             onBack={() => {
               setMobileNavSection('home');
               scrollToStoreRef(pageTopRef);
@@ -9950,31 +10031,7 @@ export default function TiendaVirtualView({
           />
         ) : (
           <>
-        {!currentUser && !isDashboard && (
-          <section className="store-guest-invite" aria-label="Beneficios de iniciar sesion">
-            <div className="store-guest-invite-copy">
-              <span className="store-guest-invite-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 3v18" />
-                  <path d="M7 8.5C7 6.6 8.8 5 11 5h2c2.2 0 4 1.4 4 3.2S15.2 11 13 11h-2c-2.2 0-4 1.6-4 3.5S8.8 18 11 18h2c2.2 0 4-1.6 4-3.5" />
-                </svg>
-              </span>
-              <span className="store-guest-invite-message">
-                <strong>Pide en linea y gana puntos</strong>
-                <span>Inicia sesion para comprar, seguir tu pedido y disfrutar Miembro Gold.</span>
-              </span>
-            </div>
-            <button
-              type="button"
-              className="store-guest-invite-button"
-              onClick={() => openAuthSheet('login', 'guest')}
-            >
-              Iniciar sesion
-            </button>
-          </section>
-        )}
-
-        {rewardSettings.enabled !== false && (
+        {isDashboard && rewardSettings.enabled !== false && (
           <section className="store-rewards-entry">
             <StoreRewardsSummaryCard
               currentUser={currentUser}
@@ -9991,6 +10048,7 @@ export default function TiendaVirtualView({
         )}
 
         <main>
+          {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" /><div><h1>{mobileNavSection === 'search' ? 'Resultados' : activeFilterSummary.title}</h1><span>{filteredProducts.length} productos</span></div></div>}
           <section ref={filtersPanelRef} className="store-filters-panel">
             <div className="store-filter-strip">
               <div>
@@ -10013,8 +10071,8 @@ export default function TiendaVirtualView({
                     aria-label={`${category.label}, ${categoryProductCount} productos`}
                     aria-pressed={categoryIsActive}
                     onClick={() => {
-                      setActiveCategory(category.id);
-                      setActiveSubcategory('todas');
+                      if (isDashboard) { setActiveCategory(category.id); setActiveSubcategory('todas'); }
+                      else handleMobileCategorySelect(category);
                     }}
                   >
                     <span className="store-category-icon" aria-hidden="true">
@@ -10034,7 +10092,8 @@ export default function TiendaVirtualView({
             </nav>
 
             {orderedSubcategoryOptions.length > 0 && (
-              <nav className="store-subtabs">
+              <nav className="store-subtabs" aria-label="Subcategorias">
+                {!isDashboard && <button type="button" className={`store-chip ${activeSubcategory === 'todas' ? 'active' : ''}`} aria-pressed={activeSubcategory === 'todas'} onClick={() => setActiveSubcategory('todas')}>Todos</button>}
                 {orderedSubcategoryOptions.map((subcategory) => (
                   <button
                     key={subcategory}
@@ -10042,6 +10101,7 @@ export default function TiendaVirtualView({
                     className={`store-chip store-filter-chip compact ${
                       activeSubcategory === subcategory ? 'active' : ''
                     }`}
+                    aria-pressed={activeSubcategory === subcategory}
                     onClick={() => setActiveSubcategory(subcategory)}
                   >
                     <span className="store-filter-pill-label">{subcategory}</span>
@@ -10054,7 +10114,7 @@ export default function TiendaVirtualView({
             )}
           </section>
 
-          {showAppDownloadLinks && activeCategory === 'todos' && !deferredQuery && (
+          {showAppDownloadLinks && mobileNavSection === 'home' && activeCategory === 'todos' && !deferredQuery && (
             <section className="store-app-downloads" aria-label="Descargar la aplicación Carnes San Martín">
               <span className="store-app-downloads-title">Llevá San Martín en tu teléfono</span>
               <div className="store-app-downloads-actions">
@@ -10127,9 +10187,9 @@ export default function TiendaVirtualView({
                 Ver todo el catalogo
               </button>
             </div>
-          ) : activeCategory === 'todos' && !showSearchResultsAsFlatList ? (
+          ) : activeCategory === 'todos' && !showSearchResultsAsFlatList && (isDashboard || mobileNavSection === 'home') ? (
             <div className="store-grouped-sections">
-              {groupedAllProductsSections.map((section) => {
+              {(isDashboard ? groupedAllProductsSections : groupedAllProductsSections.slice(0, 4)).map((section) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = section.products.slice(0, visibleCount);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
@@ -10162,7 +10222,7 @@ export default function TiendaVirtualView({
                     <div className="store-grid">
                       {visibleProducts.map((product) => renderStoreProductTile(product))}
                     </div>
-                    {remainingCount > 0 && (
+                    {isDashboard && remainingCount > 0 && (
                       <div className="store-product-group-footer">
                         <button
                           type="button"
@@ -10186,10 +10246,14 @@ export default function TiendaVirtualView({
               })}
             </div>
           ) : (
-            <div className="store-grid">
-              {filteredProducts.map((product) => renderStoreProductTile(product))}
-            </div>
+            <><div className="store-grid">
+              {(isDashboard ? filteredProducts : filteredProducts.slice(0, catalogVisibleCount)).map((product) => renderStoreProductTile(product))}
+            </div>{!isDashboard && filteredProducts.length > catalogVisibleCount && <button type="button" className="store-button secondary retail-load-more" onClick={() => setCatalogLimits((limits) => ({ ...limits, [catalogFilterKey]: catalogVisibleCount + 24 }))}>Ver más productos ({filteredProducts.length - catalogVisibleCount})</button>}</>
           )}
+          {!isDashboard && mobileNavSection === 'home' && <>
+            <button className="retail-catalog-all" type="button" onClick={() => handleMobileCategorySelect({ id: 'todos' })}>Ver todo el catálogo <span aria-hidden="true">→</span></button>
+            {currentUser && rewardSettings.enabled !== false && <section className="retail-home-gold"><StoreCheckoutIcon name="reward" /><div><strong>Miembro Gold</strong><span>{Number(rewardAccount?.pointsBalance || 0)} puntos disponibles</span></div><button type="button" className="retail-text-button" onClick={openRewardsPanel}>Ver premios</button></section>}
+          </>}
         </main>
           </>
         )}
@@ -10197,7 +10261,7 @@ export default function TiendaVirtualView({
 
       {showMobileBottomNav && !mobileOverlayOpen && (
         <StoreMobileBottomNav
-          activeKey={mobileNavSection}
+          activeKey={['catalog', 'search'].includes(mobileNavSection) ? 'categories' : mobileNavSection}
           currentUser={currentUser}
           rewardPoints={Number(rewardAccount?.pointsBalance || 0)}
           hasTrackedOrder={hasTrackedOrder}
@@ -10206,7 +10270,7 @@ export default function TiendaVirtualView({
       )}
 
       {cartItems.length > 0 &&
-        !mobileStandalonePageActive &&
+        !mobileOverlayOpen &&
         !selectedProduct &&
         !checkoutOpen &&
         !ordersOpen &&
@@ -10216,7 +10280,7 @@ export default function TiendaVirtualView({
             cartCount={cartCount}
             approximateTotalAmount={approximateTotalAmount}
             hidden={searchFocused}
-            onOpen={() => setCheckoutOpen(true)}
+            onOpen={() => { setRetailCheckoutStep('cart'); setCheckoutOpen(true); }}
           />
         ) : (
           <FloatingCart
@@ -10224,16 +10288,17 @@ export default function TiendaVirtualView({
             cartCount={cartCount}
             discountBenefit={discountBenefit}
             approximateTotalAmount={approximateTotalAmount}
-            onCheckout={() => setCheckoutOpen(true)}
+            onCheckout={() => { setRetailCheckoutStep('cart'); setCheckoutOpen(true); }}
             onQuantityChange={updateQuantity}
           />
         )
       )}
 
-      {quantityNotice && <div className="store-quantity-notice">{quantityNotice}</div>}
+      {quantityNotice && <div className="store-quantity-notice" role="status">{quantityNotice}</div>}
 
       {isMobileLayout &&
         hasTrackedOrder &&
+        !mobileOverlayOpen &&
         mobileNavSection === 'home' &&
         !ordersOpen &&
         !profileOpen &&
@@ -10251,10 +10316,10 @@ export default function TiendaVirtualView({
           product={selectedProduct}
           cartQuantity={Number(cart[selectedProduct.code] || 0)}
           quantity={selectedProductQuantity}
-          onClose={() => setSelectedProduct(null)}
+          onClose={isDashboard ? () => setSelectedProduct(null) : retailBack}
           onConfirm={() => {
             updateQuantity(selectedProduct.code, selectedProductQuantity);
-            setSelectedProduct(null);
+            if (isDashboard) setSelectedProduct(null); else retailBack();
           }}
           onQuantityChange={(nextQuantity) => {
             if (!isValidQuantityStep(nextQuantity, selectedProduct)) {
@@ -10268,6 +10333,10 @@ export default function TiendaVirtualView({
 
       {checkoutOpen && (
         <CheckoutSheet
+          retail={!isDashboard}
+          checkoutStep={retailCheckoutStep}
+          onCheckoutStepChange={setRetailCheckoutStep}
+          onNavigateBack={retailBack}
           cartItems={checkoutCartItems}
           currentUser={currentUser}
           customer={customer}
@@ -10306,7 +10375,7 @@ export default function TiendaVirtualView({
           welcomeCouponActionBusy={welcomeCouponActionBusy}
           defaultLocation={selectedBranch.storeLocation}
           selectedBranch={selectedBranch}
-          onClose={() => setCheckoutOpen(false)}
+          onClose={() => { setCheckoutOpen(false); setRetailCheckoutStep('cart'); }}
           onCustomerChange={updateCustomer}
           onFulfillmentTypeChange={(value) => {
             if (value === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN && selectedBranch?.id !== 'granada') {
@@ -10328,7 +10397,7 @@ export default function TiendaVirtualView({
           onApplyCoupon={applyCoupon}
           onApplySpecificCoupon={applyResolvedCoupon}
           onCouponInputChange={setCouponInput}
-          onEditProfile={() => setProfileOpen(true)}
+          onEditProfile={() => openProfilePanel('addresses')}
           onNotesChange={setNotes}
           onOpenLogin={() => openAuthSheet('login', 'checkout')}
           onOpenRegister={() => openAuthSheet('register', 'checkout')}
@@ -10401,9 +10470,10 @@ export default function TiendaVirtualView({
       {profileOpen && currentUser && (
         <ProfileSheet
           user={currentUser}
+          view={profileView}
           defaultLocation={selectedBranch.storeLocation}
           saving={submitting}
-          onClose={() => setProfileOpen(false)}
+          onClose={isDashboard ? () => setProfileOpen(false) : retailBack}
           onSignOut={clearStoreSession}
           onSave={handleProfileSave}
           onRequestDeletion={handleAccountDeletionRequest}
@@ -10412,6 +10482,8 @@ export default function TiendaVirtualView({
 
       <StoreRewardsSheet
         open={rewardsOpen}
+        view={goldView}
+        onViewChange={setGoldView}
         currentUser={currentUser}
         settings={rewardSettings}
         rewards={storeRewards}
@@ -10433,7 +10505,7 @@ export default function TiendaVirtualView({
         selectedItem={selectedFirstOrderGift}
         premium={Boolean(firstOrderProgress.premium)}
         notice={firstOrderGiftNotice}
-        celebrate={firstOrderGiftCelebrate}
+        celebrate={isDashboard && firstOrderGiftCelebrate}
         onSelect={selectFirstOrderGift}
         onClose={() => {
           setFirstOrderGiftOpen(false);
@@ -10527,7 +10599,7 @@ export default function TiendaVirtualView({
         }}
       />
 
-      {orderSuccessOpen && <OrderSuccessSheet onClose={dismissOrderSuccess} />}
+      {orderSuccessOpen && <OrderSuccessSheet retail={!isDashboard} onClose={dismissOrderSuccess} />}
     </div>
   );
 }
@@ -11051,12 +11123,10 @@ function StoreProfileGlyph({ active = false }) {
   );
 }
 
-function StoreBackButton({ onClick, label = 'Volver' }) {
+function StoreBackButton({ onClick, label = 'Volver', local = false }) {
   return (
-    <button type="button" className="store-back" onClick={onClick}>
-      <span className="store-back-icon" aria-hidden="true">
-        ←
-      </span>
+    <button type="button" className="store-back" onClick={onClick} aria-label={label} data-retail-back data-retail-local-back={local || undefined}>
+        <span className="store-back-icon" aria-hidden="true">←</span>
       <span className="store-back-label">{label}</span>
     </button>
   );
@@ -11784,14 +11854,14 @@ function MapPointPicker({
   };
 
   const pickerContent = (
-    <div className="store-sheet-overlay">
-      <div className="store-map-picker">
+    <div className="store-sheet-overlay retail-map-overlay">
+      <div className="store-map-picker" role="dialog" aria-modal="true" aria-label="Ubica el punto exacto">
         <div className="store-map-picker-head">
           <div>
             <strong>Ubica el punto exacto</strong>
             <span>Mueve el mapa y deja el pin sobre la entrada.</span>
           </div>
-          <StoreBackButton onClick={onClose} />
+          <StoreBackButton onClick={onClose} local />
         </div>
 
         <div className="store-map-picker-search">
@@ -11915,6 +11985,7 @@ function MapPointPicker({
 
 function ProfileSheet({
   user,
+  view = 'all',
   defaultLocation = MAP_PICKER_DEFAULT_LOCATION,
   saving,
   onClose,
@@ -12071,10 +12142,10 @@ function ProfileSheet({
 
   return (
     <div className="store-sheet-overlay">
-      <div className="store-sheet store-profile-address-sheet">
+      <div className={`store-sheet store-profile-address-sheet view-${view}`}>
         <div className="store-sheet-head">
-          <StoreBackButton onClick={addressDraft ? () => setAddressDraft(null) : onClose} />
-          <strong>{addressDraft ? (addresses.some((address) => address.id === addressDraft.id) ? 'Editar direccion' : 'Nueva direccion') : 'Mi perfil'}</strong>
+          <StoreBackButton onClick={addressDraft ? () => setAddressDraft(null) : onClose} local={Boolean(addressDraft)} />
+          <strong>{addressDraft ? (addresses.some((address) => address.id === addressDraft.id) ? 'Editar dirección' : 'Nueva dirección') : view === 'addresses' ? 'Direcciones' : view === 'help' ? 'Ayuda y privacidad' : 'Mi información'}</strong>
         </div>
 
         {addressDraft ? (
@@ -12196,13 +12267,11 @@ function ProfileSheet({
               </div>
             </section>
 
-            <button type="button" className="store-button" disabled={saving} onClick={handleSubmit}>
+            <button type="button" className="store-button retail-profile-save" disabled={saving} onClick={handleSubmit}>
               {saving ? 'Guardando...' : 'Guardar cambios'}
             </button>
-            <button type="button" className="store-button secondary" onClick={onSignOut}>
-              Cerrar sesion
-            </button>
-            <div style={{ borderTop: '1px solid #dbe5ef', marginTop: 8, paddingTop: 16 }}>
+            {view === 'all' && <button type="button" className="store-button secondary" onClick={onSignOut}>Cerrar sesión</button>}
+            <div className="retail-help-content" style={{ borderTop: '1px solid #dbe5ef', marginTop: 8, paddingTop: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <a
                 className="store-button secondary"
@@ -12562,7 +12631,7 @@ function StoreMobileBottomNav({
 }) {
   const items = [
     { key: 'home', label: 'Inicio', icon: 'home' },
-    { key: 'categories', label: 'Categoria', icon: 'categories' },
+    { key: 'categories', label: 'Categorías', icon: 'categories' },
     { key: 'activity', label: 'Actividad', icon: 'activity', badge: hasTrackedOrder ? 'dot' : '' },
     { key: 'profile', label: 'Perfil', icon: 'profile', badge: currentUser && Number(rewardPoints || 0) > 0 ? 'dot' : '' },
   ];
@@ -12594,268 +12663,74 @@ function StoreMobileBottomNav({
   );
 }
 
-function StoreMobileCategoriesPage({
-  categories,
-  counts,
-  activeCategory,
-  activeSubcategory,
-  subcategories,
-  subcategoryCounts,
-  onBack,
-  onSelectCategory,
-  onSelectSubcategory,
-  onOpenProducts,
-}) {
-  const [drilldownCategoryId, setDrilldownCategoryId] = useState('');
-  const selectedCategory = drilldownCategoryId
-    ? categories.find((category) => category.id === drilldownCategoryId)
-    : null;
-  const selectedCategoryCount = Number(counts?.[selectedCategory?.id] || 0);
-  const isDrilldownOpen = Boolean(selectedCategory);
-
-  const handleCategoryClick = (category) => {
-    onSelectCategory?.(category);
-
-    if (category.id === 'todos') {
-      onOpenProducts?.();
-      return;
-    }
-
-    setDrilldownCategoryId(category.id);
-  };
-
-  if (isDrilldownOpen) {
-    return (
-      <section className="store-mobile-app-page store-mobile-categories-page">
-        <div className="store-mobile-page-head">
-          <StoreBackButton onClick={() => setDrilldownCategoryId('')} label="Categorias" />
-          <div className="store-mobile-page-title">
-            <span>{selectedCategoryCount} productos</span>
-            <h2>{selectedCategory.label}</h2>
-          </div>
-        </div>
-
-        <div className="store-mobile-page-card store-mobile-subcategory-panel">
-          <div className="store-mobile-subcategory-head">
-            <div>
-              <span>Elige una subcategoria</span>
-              <h3>{selectedCategory.label}</h3>
-            </div>
-          </div>
-
-          {subcategories.length === 0 ? (
-            <button
-              type="button"
-              className="store-mobile-subcategory-button active"
-              onClick={onOpenProducts}
-            >
-              <span>Ver productos</span>
-              <em>{selectedCategoryCount}</em>
-            </button>
-          ) : (
-            <div className="store-mobile-subcategory-list">
-              {subcategories.map((subcategory) => {
-                const active =
-                  normalizeStorePriorityText(activeSubcategory) === normalizeStorePriorityText(subcategory);
-
-                return (
-                  <button
-                    key={subcategory}
-                    type="button"
-                    className={`store-mobile-subcategory-button ${active ? 'active' : ''}`}
-                    onClick={() => onSelectSubcategory?.(subcategory)}
-                  >
-                    <span>{subcategory}</span>
-                    <em>{Number(subcategoryCounts?.[subcategory] || 0)}</em>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-    );
-  }
-
+function StoreMobileCategoriesPage({ categories, counts, activeCategory, onSelectCategory }) {
   return (
-    <section className="store-mobile-app-page store-mobile-categories-page">
-      <div className="store-mobile-page-head">
-        <StoreBackButton onClick={onBack} label="Tienda" />
-        <div className="store-mobile-page-title">
-          <h2>Categorias</h2>
-        </div>
-      </div>
-
-      <div className="store-mobile-category-grid">
-        {categories.map((category) => {
-          const active = category.id === activeCategory;
-
-          return (
-            <button
-              key={category.id}
-              type="button"
-              className={`store-mobile-category-tile ${active ? 'active' : ''}`}
-              onClick={() => handleCategoryClick(category)}
-            >
-              <span className="store-mobile-category-icon" aria-hidden="true">
-                <StoreCategoryIcon category={category} />
-              </span>
-              <span className="store-mobile-category-tile-copy">
-                <strong>{category.label}</strong>
-              </span>
-            </button>
-          );
-        })}
+    <section className="store-mobile-app-page retail-categories">
+      <h1>Categorías</h1>
+      <div className="retail-category-grid">
+        {categories.map((category) => (
+          <button key={category.id} type="button" onClick={() => onSelectCategory(category)}>
+            <span className="retail-category-icon" aria-hidden="true"><StoreCategoryIcon category={category} /></span>
+            <span><strong>{category.label}</strong><small>{Number(counts?.[category.id] || 0)} productos</small></span>
+            <span className="retail-chevron" aria-hidden="true">›</span>
+          </button>
+        ))}
       </div>
     </section>
   );
 }
 
-function StoreMobileActivityPage({ currentUser, orders, createdOrder, onCancelOrder, onBack }) {
-  const listedOrders = Array.isArray(orders) ? orders : [];
-  const activeOrder = resolveActiveStoreCustomerOrder(listedOrders, createdOrder);
-  const previousOrders = (activeOrder
-    ? listedOrders.filter((order) => !isSameStoreCustomerOrder(order, activeOrder))
-    : listedOrders
-  ).sort((left, right) => getStoreOrderTimestampMs(right) - getStoreOrderTimestampMs(left));
-
+function StoreMobileActivityPage({ currentUser, orders, createdOrder, onCancelOrder, selectedOrderId, onSelectOrder, onOrderBack, filter: controlledFilter, onFilterChange }) {
+  const [localFilter, setLocalFilter] = useState('active');
+  const filter = controlledFilter || localFilter;
+  const setFilter = onFilterChange || setLocalFilter;
+  const listedOrders = Array.isArray(orders) ? [...orders] : [];
+  if (createdOrder && !listedOrders.some((order) => isSameStoreCustomerOrder(order, createdOrder))) listedOrders.unshift(createdOrder);
+  const selectedOrder = listedOrders.find((order) => String(order.firebaseKey || order.id) === selectedOrderId);
+  const completed = (order) => ['entregado', 'cancelado'].includes(normalizeCustomerOrderStatus(order.estado));
+  const active = listedOrders.filter((order) => !completed(order));
+  const previous = listedOrders.filter(completed).sort((a, b) => getStoreOrderTimestampMs(b) - getStoreOrderTimestampMs(a));
+  if (selectedOrder) return (
+    <section className="store-mobile-app-page retail-order-screen">
+      <div className="retail-catalog-heading"><StoreBackButton onClick={onOrderBack} label="Actividad" /><h1>Tu pedido</h1></div>
+      <OrderStatusCard order={selectedOrder} currentUser={currentUser} onCancelOrder={onCancelOrder} highlight />
+    </section>
+  );
+  const visible = filter === 'active' ? active : previous;
   return (
-    <section className="store-mobile-app-page store-mobile-activity-page">
-      <div className="store-mobile-page-head">
-        <StoreBackButton onClick={onBack} label="Tienda" />
-        <div className="store-mobile-page-title">
-          <span>Pedidos y seguimiento</span>
-          <h2>Actividad</h2>
-        </div>
+    <section className="store-mobile-app-page retail-activity">
+      <h1>Actividad</h1>
+      <div className="retail-segmented" aria-label="Historial de pedidos">
+        <button type="button" aria-pressed={filter === 'active'} onClick={() => setFilter('active')}>En curso {active.length > 0 ? `· ${active.length}` : ''}</button>
+        <button type="button" aria-pressed={filter === 'previous'} onClick={() => setFilter('previous')}>Anteriores</button>
       </div>
-
-      <div className="store-mobile-activity-hero">
-        <span>{currentUser ? 'Cuenta activa' : 'Invitado'}</span>
-        <h3>{currentUser?.nombre || 'Inicia sesion'}</h3>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,.78)', fontWeight: 850 }}>
-          Pedido actual y pedidos de los ultimos 3 meses.
-        </p>
-      </div>
-
-      <div className="store-mobile-activity-section">
-        <h3 className="store-mobile-section-title">Pedido actual</h3>
-        {activeOrder ? (
-          <OrderStatusCard
-            order={activeOrder}
-            currentUser={currentUser}
-            highlight
-            onCancelOrder={onCancelOrder}
-          />
-        ) : (
-          <div className="store-empty">
-            <strong>No tienes un pedido activo</strong>
-            <span>Cuando realices un pedido, lo veras aqui.</span>
-          </div>
-        )}
-      </div>
-
-      <div className="store-mobile-activity-section">
-        <h3 className="store-mobile-section-title">
-          Pedidos anteriores <span>{previousOrders.length}</span>
-        </h3>
-        {previousOrders.length > 0 ? (
-          <div className="store-mobile-order-list">
-            {previousOrders.map((order) => {
-              const orderNumber = formatOrderNumber(order);
-              const statusLabel = String(order.estado || 'Pendiente');
-              const total = Number(order.total || order.totalFinal || order.totalActualizado || order.totalAproximado || 0);
-
-              return (
-                <details key={order.firebaseKey || order.id || orderNumber} className="store-mobile-order-expander">
-                  <summary>
-                    <span className="store-mobile-order-summary-copy">
-                      <strong>Pedido #{orderNumber}</strong>
-                      <span>{formatStoreOrderActivityDate(order)}</span>
-                    </span>
-                    <span className="store-mobile-order-summary-total">
-                      {formatCurrency(total)}
-                      <span className="store-mobile-order-status-pill">{statusLabel}</span>
-                    </span>
-                  </summary>
-                  <div className="store-mobile-order-expanded-body">
-                    <OrderStatusCard order={order} currentUser={currentUser} />
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="store-empty">
-            <strong>Sin pedidos anteriores</strong>
-            <span>Aqui se mostraran los pedidos de los ultimos 3 meses.</span>
-          </div>
-        )}
-      </div>
+      {filter === 'previous' && <p className="retail-muted">Últimos 3 meses</p>}
+      {visible.length ? <div className="retail-order-list">{visible.map((order) => {
+        const meta = getCustomerStatusMetaV2(order);
+        return <button key={order.firebaseKey || order.id} type="button" className="retail-order-row" onClick={() => onSelectOrder(String(order.firebaseKey || order.id))}>
+          <StoreCheckoutIcon name={completed(order) ? 'activity' : 'delivery'} />
+          <span><strong>Pedido #{formatOrderNumber(order)}</strong><small>{formatStoreOrderActivityDate(order)}</small><span className="retail-order-state">{meta.label}</span></span>
+          <span><strong>{formatCurrency(order.total || order.totalFinal || order.totalActualizado || order.totalAproximado || 0)}</strong><small>Ver pedido →</small></span>
+        </button>;
+      })}</div> : <div className="retail-empty"><StoreCheckoutIcon name="activity" /><h2>{filter === 'active' ? 'Sin pedidos en curso' : 'Sin pedidos anteriores'}</h2><p>Los pedidos de tu cuenta aparecerán aquí.</p></div>}
     </section>
   );
 }
 
-function StoreMobileProfilePage({
-  currentUser,
-  rewardPoints,
-  selectedBranch,
-  onBack,
-  onEditProfile,
-  onOpenRewards,
-  onOpenActivity,
-  onSignOut,
-}) {
+function StoreMobileProfilePage({ currentUser, rewardPoints, selectedBranch, onEditProfile, onOpenRewards, onOpenActivity, onSignOut }) {
+  const entries = [
+    { icon: 'account', title: 'Mi información', detail: currentUser?.telefono, action: () => onEditProfile('information') },
+    { icon: 'pin', title: 'Direcciones', detail: 'Tus lugares de entrega', action: () => onEditProfile('addresses') },
+    { icon: 'reward', title: 'Miembro Gold', detail: `${Number(rewardPoints || 0)} puntos`, action: () => onOpenRewards() },
+    { icon: 'activity', title: 'Mis pedidos', detail: 'Historial y seguimiento', action: onOpenActivity },
+    { icon: 'orders', title: 'Ayuda y privacidad', detail: 'Información de tu cuenta', action: () => onEditProfile('help') },
+  ];
   return (
-    <section className="store-mobile-app-page store-mobile-profile-page">
-      <div className="store-mobile-page-head">
-        <StoreBackButton onClick={onBack} label="Tienda" />
-        <div className="store-mobile-page-title">
-          <span>Cuenta</span>
-          <h2>Perfil</h2>
-        </div>
-      </div>
-
-      <div className="store-mobile-profile-hero">
-        <span>Cliente</span>
-        <h3>{currentUser?.nombre || 'Mi cuenta'}</h3>
-        <p style={{ margin: 0, color: 'rgba(255,255,255,.78)', fontWeight: 850 }}>
-          {currentUser?.telefono || 'Telefono no registrado'}
-        </p>
-      </div>
-
-      <div className="store-mobile-profile-grid">
-        <div className="store-mobile-profile-stat">
-          <span>Tienda</span>
-          <strong>{selectedBranch?.name || selectedBranch?.label || selectedBranch?.shortName || 'Granada'}</strong>
-        </div>
-        <div className="store-mobile-profile-stat">
-          <span>Miembro Gold</span>
-          <strong>{Number(rewardPoints || 0)} pts</strong>
-        </div>
-        <div className="store-mobile-profile-stat">
-          <span>Codigo cliente</span>
-          <strong>{currentUser?.codigoCliente || currentUser?.clientCode || 'Pendiente'}</strong>
-        </div>
-        <div className="store-mobile-profile-stat">
-          <span>Direccion</span>
-          <strong>{currentUser?.direccion || 'Sin direccion'}</strong>
-        </div>
-      </div>
-
-      <div className="store-mobile-profile-actions">
-        <button type="button" className="store-button" onClick={onEditProfile}>
-          Editar perfil
-        </button>
-        <button type="button" className="store-button secondary" onClick={onOpenRewards}>
-          Miembro Gold
-        </button>
-        <button type="button" className="store-button secondary" onClick={onOpenActivity}>
-          Ver actividad
-        </button>
-        <button type="button" className="store-button secondary" onClick={onSignOut}>
-          Cerrar sesion
-        </button>
-      </div>
+    <section className="store-mobile-app-page retail-profile">
+      <h1>Perfil</h1>
+      <div className="retail-profile-identity"><span aria-hidden="true">{String(currentUser?.nombre || 'C').charAt(0)}</span><div><h2>{currentUser?.nombre || 'Mi cuenta'}</h2><p>{selectedBranch?.name}</p></div></div>
+      <div className="retail-profile-menu">{entries.map((entry) => <button key={entry.title} type="button" onClick={entry.action}><StoreCheckoutIcon name={entry.icon} /><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><span aria-hidden="true">›</span></button>)}</div>
+      <button type="button" className="retail-signout" onClick={onSignOut}>Cerrar sesión</button>
     </section>
   );
 }
@@ -12939,6 +12814,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
             <div className="store-stepper">
               <button
                 type="button"
+                aria-label={`Reducir cantidad de ${product.name}`}
                 onClick={() => onQuantityChange(quantity <= minQuantity + QUANTITY_EPSILON ? 0 : quantity - step)}
               >
                 -
@@ -12950,7 +12826,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                 ariaLabel={`Cantidad de ${product.name}`}
                 onChange={onQuantityChange}
               />
-              <button type="button" onClick={() => onQuantityChange(quantity > 0 ? quantity + step : minQuantity)}>
+              <button type="button" aria-label={`Aumentar cantidad de ${product.name}`} onClick={() => onQuantityChange(quantity > 0 ? quantity + step : minQuantity)}>
                 +
               </button>
             </div>
@@ -12971,7 +12847,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
               onClick={onConfirm}
             >
               {quantity > 0
-                ? `Guardar ${formatCurrency(subtotal)}`
+                ? `${cartQuantity > 0 ? 'Actualizar carrito' : 'Agregar al carrito'} · ${formatCurrency(subtotal)}`
                 : cartQuantity > 0
                   ? 'Quitar del carrito'
                   : 'Selecciona cantidad para agregar'}
@@ -13154,7 +13030,8 @@ function RouteSanMartinSlotPicker({ slots, selectedId, shortfall, onSelect }) {
   );
 }
 
-function CheckoutSheet({
+function CheckoutSheet(props) {
+  const {
   cartItems,
   currentUser,
   customer,
@@ -13216,7 +13093,7 @@ function CheckoutSheet({
   onRemoveCoupon,
   onStoreClosed,
   onSubmit,
-}) {
+  } = props;
   const isGuestCheckout = !currentUser;
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const routeSanMartinFlow = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
@@ -13284,6 +13161,16 @@ function CheckoutSheet({
 
     setCheckoutStep('details');
   };
+
+  if (props.retail) return <RetailCheckout {...props}
+    model={{ pickupFlow, routeSanMartinFlow, selectedRouteSlot, routeMinimumShortfall, paymentValue,
+      canSubmitDelivery, storeClosed, rewardCartPreview, deliveryChoices, paymentChoices,
+      showWelcomeCouponCard, welcomeCouponCanApply, welcomeCouponIsApplied }}
+    ui={{ money: formatCurrency, formatQuantity: formatStoreQuantity, discountLabel: getStoreDiscountBenefitLabel,
+      hasLocation, autofillAddress: shouldAutofillAddress, Back: StoreBackButton, Icon: StoreCheckoutIcon,
+      QuantityInput, LocationCaptureBlock, SlotPicker: RouteSanMartinSlotPicker,
+      GiftProgress: FirstOrderRewardProgress, GiftCard: FirstOrderRewardCheckoutCard,
+      GiftLine: FirstOrderRewardLine, PoketLogo }} />;
 
   return (
     <div className="store-sheet-overlay">
@@ -14031,7 +13918,17 @@ function FloatingOrderBubble({ order, elevated = false, onOpen }) {
   );
 }
 
-function OrderSuccessSheet({ onClose }) {
+function OrderSuccessSheet({ onClose, retail = false }) {
+  if (retail) return (
+    <div className="store-sheet-overlay retail-screen-overlay">
+      <section className="store-sheet retail-success-screen" role="dialog" aria-modal="true" aria-label="Pedido recibido">
+        <div className="retail-success-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m5 12 4 4 10-10" /></svg></div>
+        <h1>Recibimos tu pedido</h1>
+        <p>Consultá su estado y los detalles de entrega.</p>
+        <button type="button" className="store-button" data-retail-back onClick={onClose}>Ver estado del pedido</button>
+      </section>
+    </div>
+  );
   return (
     <div className="store-success-overlay" onClick={onClose}>
       <div className="store-success-card" onClick={(event) => event.stopPropagation()}>
@@ -14737,65 +14634,25 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
         </p>
       )}
 
-      {enRoute ? (
-        <div className="store-delivery-route-card">
-          <div className="store-route-map" aria-hidden="true">
-            <span className="store-route-line" />
-            <span className="store-route-pin store-route-pin-origin">
-              <img src="/tienda/branding/logo-mark.svg" alt="" />
-            </span>
-            <span className="store-route-pin store-route-pin-driver">
-              <StoreOrderStatusVisual type="driver" compact />
-            </span>
-            <span className="store-route-pin store-route-pin-home">⌂</span>
-          </div>
-          <div className="store-route-copy">
-            <span className="store-order-eyebrow">Tu pedido va en camino</span>
-            <h3>{riderName} lleva tu pedido</h3>
-            <p>Te avisaremos cuando llegue a tu dirección.</p>
-          </div>
-          <div className="store-route-stops">
-            <div>
-              <span className="store-route-dot origin" />
-              <p><small>Sale de</small><strong>{branchName}</strong></p>
-            </div>
-            <div>
-              <span className="store-route-dot destination" />
-              <p><small>Lo recibes en</small><strong>{deliveryAddress}</strong></p>
-            </div>
-          </div>
-          <div className="store-rider-card">
-            <span className="store-rider-avatar">{riderName.charAt(0).toUpperCase()}</span>
-            <p><small>Entrega a cargo de</small><strong>{riderName}</strong></p>
-            <span className="store-rider-state">En camino</span>
-          </div>
+      <div className="store-preparation-card">
+        <div className="store-preparation-copy">
+          <span className="store-order-eyebrow">{branchName}</span>
+          <h3 aria-live="polite">{meta.label}</h3>
+          <p>{meta.message}</p>
         </div>
-      ) : (
-        <div className="store-preparation-card">
-          <div className="store-preparation-brand">
-            <img src="/tienda/branding/logo-full.svg" alt="Carnes San Martin" />
-          </div>
-          <div className="store-preparation-copy">
-            <span className="store-order-eyebrow">
-              {statusKey === 'preparado' ? 'Todo preparado' : branchName}
-            </span>
-            <h3>{meta.label}</h3>
-          </div>
-        </div>
-      )}
-
-      <div className="store-live-progress" aria-label="Progreso del pedido">
-        <div>
-          {getOrderProgressSteps(order).map((step, index) => (
-            <span
-              key={step.key}
-              className={meta.progress >= index + 1 ? 'done' : ''}
-              style={{ '--progress-color': meta.accent }}
-            />
-          ))}
-        </div>
-        <strong>{meta.message}</strong>
       </div>
+      {statusKey !== 'cancelado' && (
+        <ol className="retail-tracking" aria-label="Progreso del pedido">
+          <li className="done"><span aria-hidden="true">✓</span>Pedido recibido</li>
+          {getOrderProgressSteps(order).map((step, index) => {
+            const done = meta.progress >= index + 1 && statusKey !== 'pendiente';
+            return <li key={step.key} className={done ? 'done' : ''} aria-current={meta.progress === index + 1 ? 'step' : undefined}>
+              <span aria-hidden="true">{done ? '✓' : '·'}</span>{step.label}
+            </li>;
+          })}
+        </ol>
+      )}
+      {enRoute && <div className="retail-summary-line"><span>Entrega a cargo de</span><strong>{riderName}<small>{deliveryAddress}</small></strong></div>}
 
       {poketPaymentConfirmed && <PoketPaymentBadge order={order} />}
 
@@ -14813,7 +14670,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
         <div>
           <span>{pickupOrder ? 'Modalidad' : 'Entrega'}</span>
           <strong>
-            {pickupOrder ? 'Pickup en tienda' : 'Delivery a domicilio'}
+            {getFulfillmentTypeLabel(order.fulfillmentType)}
             {order.timestampPreparacion ? ` - ${order.timestampPreparacion}` : ''}
           </strong>
         </div>
@@ -14868,7 +14725,7 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
       <PoketPaymentAction order={order} />
 
       <a className="store-whatsapp-button" href={whatsappLink} target="_blank" rel="noreferrer">
-        💬 Escribir a WhatsApp de la tienda
+        Escribir a WhatsApp de la tienda
       </a>
 
       {canCancelOrder && (
@@ -14883,3 +14740,6 @@ function OrderStatusCard({ order, currentUser, highlight = false, onCancelOrder 
     </div>
   );
 }
+
+// Pure screen exports for isolated browser QA; tests never mount the store services.
+export { CheckoutSheet, ProfileSheet, StoreMobileActivityPage, StoreMobileProfilePage, OrderStatusCard, StoreClosedNoticeModal, ProductSheet, OrderSuccessSheet };

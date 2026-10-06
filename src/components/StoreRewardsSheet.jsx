@@ -950,12 +950,16 @@ export default function StoreRewardsSheet({
   selectedReward,
   displayName = CLUB_DISPLAY_NAME,
   rewardActionBusy = false,
+  view,
+  onViewChange,
   onSelectReward,
   onClearSelectedReward,
   onClose,
   onOpenAuth,
 }) {
-  const [activeView, setActiveView] = useState('rewards');
+  const [localView, setLocalView] = useState('rewards');
+  const activeView = view || localView;
+  const setActiveView = onViewChange || setLocalView;
   const screenScrollRef = useRef(null);
   const pointsBalance = Number(account?.pointsBalance || 0);
   const rewardSummary = useMemo(
@@ -976,7 +980,9 @@ export default function StoreRewardsSheet({
       ),
     [transactions]
   );
-  const nextReward = rewardSummary.closestReward;
+  const nextReward = rewardSummary.upcomingRewards.find(
+    (reward) => getRewardDisplayStatus(reward, pointsBalance, cartAmount, settings).status !== 'unavailable'
+  ) || rewardSummary.bestReward;
   const nextRewardPoints = Math.max(1, Number(nextReward?.pointsRequired || 1));
   const progressPct = Math.max(0, Math.min(100, (pointsBalance / nextRewardPoints) * 100));
 
@@ -985,7 +991,7 @@ export default function StoreRewardsSheet({
       return;
     }
 
-    setActiveView('rewards');
+    if (!onViewChange) setLocalView('rewards');
   }, [open]);
 
   useEffect(() => {
@@ -1020,6 +1026,7 @@ export default function StoreRewardsSheet({
         <button
           type="button"
           className="sm-gold-back-button"
+          aria-label={activeView === 'transactions' ? 'Premios' : 'Tienda'}
           onClick={activeView === 'transactions' ? () => setActiveView('rewards') : onClose}
         >
           <ClubBackIcon size={20} />
@@ -1043,19 +1050,19 @@ export default function StoreRewardsSheet({
                       <strong>{pointsBalance} pts</strong>
                     </div>
                   </div>
-                  <button type="button" className="sm-gold-history-button" onClick={() => setActiveView('transactions')}>
+                  <button type="button" className="sm-gold-history-button" aria-label="Movimientos" onClick={() => setActiveView('transactions')}>
                     <ClubTransactionsIcon size={18} color="#ffffff" />
                     <span>Movimientos</span>
                   </button>
                 </div>
 
-                <div className="sm-gold-progress-track" aria-label={`Progreso ${Math.round(progressPct)}%`}>
+                {nextReward && <><div className="sm-gold-progress-track" aria-label={`Progreso ${Math.round(progressPct)}%`}>
                   <span style={{ width: `${progressPct}%` }} />
                 </div>
                 <div className="sm-gold-progress-labels">
                   <span>{nextReward?.name || 'Todos los premios desbloqueados'}</span>
                   <strong>{nextReward ? `${nextRewardPoints} pts` : `${pointsBalance} pts`}</strong>
-                </div>
+                </div></>}
               </section>
 
               {activeView === 'rewards' ? (
