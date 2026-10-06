@@ -33,12 +33,33 @@ npm.cmd run android:sync
 
 ## Publicacion en Google Play
 
-El APK debug es solo para pruebas. Para Google Play se debe crear una llave de
-firma privada, configurar el build `release` y generar un Android App Bundle
-(`.aab`). Las llaves `*.jks` y `*.keystore` estan excluidas de Git.
+El APK debug es solo para pruebas. Google Play usa el Android App Bundle (`.aab`)
+de `release`. La app ya tiene una clave de carga: conservarla para las
+actualizaciones, no generar una nueva. `android/keystore.properties`, las llaves
+`*.jks` y `*.keystore` estan excluidos de Git; no publicar sus contrasenas.
 
 Identificador definitivo de la aplicacion:
 
 ```text
-com.sanmartinsr.tienda
+com.sanmartinsr.app
 ```
+
+Antes de compilar, revisar el mayor `versionCode` usado en Play Console e
+incrementarlo junto con `versionName` en `android/app/build.gradle`.
+
+```powershell
+npm.cmd run android:sync
+Push-Location android
+.\gradlew.bat :app:assembleRelease :app:bundleRelease :app:lintRelease --console=plain
+Pop-Location
+```
+
+Salidas: `android/app/build/outputs/apk/release/app-release.apk` y
+`android/app/build/outputs/bundle/release/app-release.aab`. Subir el AAB, no el
+APK debug. Verificar firma, ID, version y API minima antes de publicar.
+
+En este equipo el SDK esta en `D:\Android\Sdk`; las variables de entorno antiguas
+pueden apuntar a `C:\Android\Sdk`. Ajustar `ANDROID_HOME` y `ANDROID_SDK_ROOT`
+solo para el proceso de compilacion. Si Java falla al abrir su conexion local en
+Windows, usar una carpeta temporal local corta y existente para `TEMP`, `TMP`,
+`java.io.tmpdir` y `jdk.net.unixdomain.tmpdir`, sin desactivar protecciones de red.
