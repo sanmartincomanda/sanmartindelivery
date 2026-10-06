@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { RetailHomeButton } from './storefront/RetailHomeNavigation';
 import '../styles/firstOrderRewards.css';
 
 const formatCurrency = (value) =>
@@ -143,6 +144,7 @@ export function FirstOrderRewardSelector({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button type="button" className="first-reward-sheet__close" aria-label="Cerrar selector de regalos" onClick={onClose}>×</button>
+        <RetailHomeButton className="retail-sheet-home" />
         {celebrate && (
           <div className="first-reward-confetti" aria-hidden="true">
             {Array.from({ length: 8 }, (_, index) => <i key={index} />)}

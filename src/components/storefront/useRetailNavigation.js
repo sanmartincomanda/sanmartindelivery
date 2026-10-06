@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createRetailHomeView, retailViewKey } from './retailNavigationState';
 
 export function useOnlineStatus() {
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
@@ -18,8 +19,9 @@ export function useRetailNavigation({ enabled, snapshot, restore }) {
   const previous = useRef(null);
   const entries = useRef([]);
   const restoring = useRef(false);
-  const { search, productQuantity, ...identity } = snapshot;
-  const key = JSON.stringify(identity);
+  const homeRequested = useRef(false);
+  const { search, productQuantity } = snapshot;
+  const key = retailViewKey(snapshot);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -33,14 +35,18 @@ export function useRetailNavigation({ enabled, snapshot, restore }) {
       if (previous.current) previous.current.scroll = window.scrollY;
     };
     const onPop = (event) => {
-      const view = event.state?.csmView;
+      let view = event.state?.csmView;
       const localBack = [...document.querySelectorAll('[data-retail-local-back="true"]')].filter((node) => node.getClientRects().length && !node.closest('[inert]')).at(-1);
-      if (localBack && (!view || view.depth < previous.current?.depth)) {
+      if (!homeRequested.current && localBack && (!view || view.depth < previous.current?.depth)) {
         window.history.pushState({ ...window.history.state, csmView: previous.current }, '');
         localBack.click();
         return;
       }
       if (!view) return;
+      if (homeRequested.current) {
+        view = { ...view, scroll: 0, snapshot: createRetailHomeView(current.current.snapshot) };
+        homeRequested.current = false;
+      }
       document.documentElement.dataset.retailDirection = view.depth < previous.current?.depth ? 'back' : 'forward';
       restoring.current = true;
       previous.current = view;
@@ -76,6 +82,7 @@ export function useRetailNavigation({ enabled, snapshot, restore }) {
       return;
     }
     const view = { key, snapshot, scroll: 0, depth: (prev?.depth || 0) + 1 };
+    homeRequested.current = false;
     document.documentElement.dataset.retailDirection = 'forward';
     window.history.pushState({ ...window.history.state, csmView: view }, '');
     previous.current = view;
@@ -85,9 +92,17 @@ export function useRetailNavigation({ enabled, snapshot, restore }) {
     }
   }, [enabled, key, search, productQuantity]);
 
-  return () => {
-    if (window.history.state?.csmView?.depth > 0) window.history.back();
-    else current.current.restore({ tab: 'home', category: 'todos', subcategory: 'todas', checkoutStep: 'cart' });
+  return {
+    back: () => {
+      if (window.history.state?.csmView?.depth > 0) window.history.back();
+      else current.current.restore(createRetailHomeView(current.current.snapshot));
+    },
+    home: () => {
+      const next = createRetailHomeView(current.current.snapshot);
+      homeRequested.current = retailViewKey(next) !== previous.current?.key;
+      current.current.restore(next);
+      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    },
   };
 }
 

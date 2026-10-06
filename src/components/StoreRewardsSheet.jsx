@@ -8,6 +8,7 @@ import { useRef } from 'react';
 import SanMartinGoldIcon from './SanMartinGoldIcon';
 import '../App.css';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+import { RetailBackActions } from './storefront/RetailHomeNavigation';
 
 const CLUB_DISPLAY_NAME = 'Miembro Gold San Martin Granada';
 const CLUB_THEME = {
@@ -1023,6 +1024,7 @@ export default function StoreRewardsSheet({
   return (
     <div className="sm-gold-screen">
       <header className="sm-gold-screen-nav">
+        <RetailBackActions>
         <button
           type="button"
           className="sm-gold-back-button"
@@ -1032,6 +1034,7 @@ export default function StoreRewardsSheet({
           <ClubBackIcon size={20} />
           <span>{activeView === 'transactions' ? 'Premios' : 'Tienda'}</span>
         </button>
+        </RetailBackActions>
         <strong>{activeView === 'transactions' ? 'Movimientos' : 'Premios'}</strong>
       </header>
 

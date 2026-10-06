@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { RetailHomeButton } from './storefront/RetailHomeNavigation';
 import { getDistanceKm, normalizeLocation } from '../services/geo';
 
 const formatDistance = (value) => {
@@ -103,6 +104,7 @@ export default function StoreBranchSelector({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="store-branch-modal-handle" />
+        <RetailHomeButton className="retail-sheet-home" />
         <button type="button" className="store-branch-modal-close" onClick={onClose} aria-label="Cerrar">
           ×
         </button>

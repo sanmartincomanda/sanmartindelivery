@@ -2,6 +2,7 @@ import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, u
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
+import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
 import { GOOGLE_PLAY_STORE_URL, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
 import RetailCheckout from './storefront/RetailCheckout';
 import { useOnlineStatus, useRetailNavigation, useRetailFocusLayers } from './storefront/useRetailNavigation';
@@ -532,7 +533,7 @@ const getStoreCategoryDisplayLabel = (category = {}) => {
   const label = String(category?.label || '').trim();
 
   if (categoryId === STORE_COMBOS_CATEGORY_ID || normalizeStorePriorityText(label) === 'promociones') {
-    return 'COMBOS';
+    return 'Promociones';
   }
 
   return label;
@@ -1565,7 +1566,7 @@ export default function TiendaVirtualView({
   const showMobileBottomNav = !isDashboard;
   const online = useOnlineStatus();
   useRetailFocusLayers(!isDashboard);
-  const retailBack = useRetailNavigation({
+  const { back: retailBack, home: retailHome } = useRetailNavigation({
     enabled: !isDashboard,
     snapshot: {
       tab: mobileNavSection, category: activeCategory, subcategory: activeSubcategory, search: query,
@@ -2531,14 +2532,14 @@ export default function TiendaVirtualView({
       comboProducts.length > 0
         ? {
             id: 'store-home-combos',
-            title: 'COMBOS',
+            title: 'Promociones',
             kicker: 'Combos de tienda',
             subtitle: `${comboProducts.length} productos`,
             products: comboProducts,
             category: STORE_COMBOS_CATEGORY_ID,
             targetCategory: STORE_COMBOS_CATEGORY_ID,
             targetSubcategory: 'todas',
-            actionLabel: 'Ver combos',
+            actionLabel: 'Ver promociones',
           }
         : null;
 
@@ -4364,6 +4365,15 @@ export default function TiendaVirtualView({
     }
   };
 
+  const retailHomeBusy = submitting || authLoading || rewardActionBusy || welcomeCouponActionBusy;
+  const goToRetailHome = () => {
+    if (retailHomeBusy) return;
+    setRewardsReturnTarget('');
+    setRegisterCoverageNotice(null);
+    setNearestBranchCandidate(null);
+    retailHome();
+  };
+
   const handleMobileBottomNav = (target) => {
     const closeMobilePanels = () => {
       setOrdersOpen(false);
@@ -4372,12 +4382,7 @@ export default function TiendaVirtualView({
     };
 
     if (target === 'home') {
-      closeMobilePanels();
-      setQuery('');
-      setActiveCategory('todos');
-      setActiveSubcategory('todas');
-      setMobileNavSection('home');
-      scrollToStoreRef(pageTopRef);
+      goToRetailHome();
       return;
     }
 
@@ -4924,6 +4929,7 @@ export default function TiendaVirtualView({
   }, [Boolean(mobileOverlayOpen)]);
 
   return (
+    <RetailHomeContext.Provider value={isDashboard ? null : { onHome: goToRetailHome, busy: retailHomeBusy }}>
     <div
       className={`store-shell ${showMobileBottomNav ? 'store-shell-mobile-nav' : ''} ${
         usePublicStorefrontDesign ? 'storefront-public-v2 storefront-brand-v3 storefront-retail' : ''
@@ -9922,11 +9928,14 @@ export default function TiendaVirtualView({
           </div>
 
           <div className={`store-branch-coverage-row ${showAppDownloadLinks ? 'has-app-download' : ''}`}>
+            <div className="retail-header-location">
             <StoreBranchButton
               branch={selectedBranch}
               locating={branchLocating}
               onClick={openBranchSelector}
             />
+            <RetailHomeButton />
+            </div>
             {!isDashboard && <span className="retail-header-delivery">{fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Retiro en tienda' : fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN ? 'Ruta San Martín' : 'Entrega a domicilio'}</span>}
             {showAppDownloadLinks && (
               <a className="retail-header-play" href={GOOGLE_PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
@@ -10079,7 +10088,7 @@ export default function TiendaVirtualView({
         )}
 
         <main>
-          {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" /><div><h1>{retailCatalogTitle}</h1><span>{filteredProducts.length} productos</span></div></div>}
+          {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" withHome={false} /><div><h1>{retailCatalogTitle}</h1><span>{filteredProducts.length} productos</span></div></div>}
           {!isDashboard && mobileNavSection === 'home' && !deferredQuery && categoryOptions.some((category) => category.id === 'res') && (
             <RetailFoodStory onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.cuts)} />
           )}
@@ -10102,6 +10111,7 @@ export default function TiendaVirtualView({
                     key={category.id}
                     type="button"
                     className={`store-chip store-filter-chip store-category-card ${categoryIsActive ? 'active' : ''}`}
+                    data-category={category.id}
                     aria-label={`${category.label}, ${categoryProductCount} productos`}
                     aria-pressed={categoryIsActive}
                     onClick={() => {
@@ -10648,6 +10658,7 @@ export default function TiendaVirtualView({
 
       {orderSuccessOpen && <OrderSuccessSheet retail={!isDashboard} onClose={dismissOrderSuccess} />}
     </div>
+    </RetailHomeContext.Provider>
   );
 }
 
@@ -11170,13 +11181,14 @@ function StoreProfileGlyph({ active = false }) {
   );
 }
 
-function StoreBackButton({ onClick, label = 'Volver', local = false }) {
-  return (
+function StoreBackButton({ onClick, label = 'Volver', local = false, withHome = true }) {
+  const button = (
     <button type="button" className="store-back" onClick={onClick} aria-label={label} data-retail-back data-retail-local-back={local || undefined}>
         <span className="store-back-icon" aria-hidden="true">←</span>
       <span className="store-back-label">{label}</span>
     </button>
   );
+  return withHome ? <RetailBackActions>{button}</RetailBackActions> : button;
 }
 
 function StoreAuthSheet({ onClose, locked = false, ...props }) {
@@ -11184,7 +11196,7 @@ function StoreAuthSheet({ onClose, locked = false, ...props }) {
     <div className="store-sheet-overlay auth-overlay">
       <div className="store-auth-sheet">
         <div className="store-sheet-head">
-          {locked ? <span /> : <StoreBackButton onClick={onClose} />}
+          {locked ? <RetailHomeButton /> : <StoreBackButton onClick={onClose} />}
           <strong>{locked ? 'Ingresa a la tienda' : 'Inicia sesion'}</strong>
         </div>
         <StoreAuthView {...props} embedded />
@@ -12739,7 +12751,7 @@ function StoreMobileActivityPage({ currentUser, orders, createdOrder, onCancelOr
   const previous = listedOrders.filter(completed).sort((a, b) => getStoreOrderTimestampMs(b) - getStoreOrderTimestampMs(a));
   if (selectedOrder) return (
     <section className="store-mobile-app-page retail-order-screen">
-      <div className="retail-catalog-heading"><StoreBackButton onClick={onOrderBack} label="Actividad" /><h1>Tu pedido</h1></div>
+      <div className="retail-catalog-heading"><StoreBackButton onClick={onOrderBack} label="Actividad" withHome={false} /><h1>Tu pedido</h1></div>
       <OrderStatusCard order={selectedOrder} currentUser={currentUser} onCancelOrder={onCancelOrder} highlight />
     </section>
   );
@@ -13918,7 +13930,7 @@ function PromotionsStrip({ promotions, onOpen }) {
 
   return (
     <section className="store-promo">
-      <h2 className="store-section-title">COMBOS</h2>
+      <h2 className="store-section-title">Promociones</h2>
       <div className="store-stories">
         {promotions.map((promotion, index) => (
           <button
@@ -13974,6 +13986,7 @@ function OrderSuccessSheet({ onClose, retail = false }) {
         <h1>Recibimos tu pedido</h1>
         <p>Consultá su estado y los detalles de entrega.</p>
         <button type="button" className="store-button" data-retail-back onClick={onClose}>Ver estado del pedido</button>
+        <RetailHomeButton />
       </section>
     </div>
   );
@@ -14010,6 +14023,7 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
         aria-labelledby="store-closed-title"
       >
         <span className="store-closed-sheet-handle" aria-hidden="true" />
+        <RetailHomeButton className="retail-sheet-home" />
         <div className="store-closed-sheet-head">
           <div className="store-closed-sheet-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">

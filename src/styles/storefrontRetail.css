@@ -39,6 +39,25 @@ html body .storefront-retail.store-shell h1 { margin: 4px 0 18px; font-size: 26p
 html body .storefront-retail.store-shell h2 { font-size: 20px; line-height: 1.25; }
 
 /* Compact shell, shared by web/PWA and native WebView. */
+.retail-header-location { display: contents; }
+.storefront-retail .retail-header-location { display: flex; align-items: center; gap: 8px; min-width: 0; grid-column: 1; grid-row: 1; }
+html body .retail-home-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 44px; min-width: 62px; padding: 5px 7px; flex-shrink: 0;
+  border: 1px solid #d6e2f4; border-radius: 7px; background: #eef4ff;
+  color: #0044c5; font: 600 12px/1.2 "Space Grotesk", sans-serif !important;
+  text-decoration: none; cursor: pointer; touch-action: manipulation;
+}
+html body .retail-home-button svg { width: 15px; height: 15px; flex-shrink: 0; }
+html body .retail-home-button:hover { background: #dfeaff; }
+html body .retail-home-button:active:not(:disabled) { background: #d0e0fc; }
+html body .retail-home-button:focus-visible { outline: 3px solid #0044c5; outline-offset: 3px; }
+html body .retail-home-button:disabled { opacity: .48; cursor: wait; }
+.retail-back-actions { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.retail-sheet-home { margin: 0 44px 10px 0; }
+html body .storefront-retail .store-product-sheet-heading { min-width: 0; }
+html body:has(.storefront-retail) .retail-map-overlay .store-map-picker-head { flex-wrap: wrap; }
+html body:has(.storefront-retail) .retail-map-overlay .retail-home-button span { color: inherit !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-page {
   width: 100% !important; max-width: 1400px !important; margin: auto !important;
   padding: env(safe-area-inset-top, 0px) 16px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
@@ -95,6 +114,7 @@ html body .store-shell.storefront-brand-v3.storefront-retail .store-filters-pane
 html body .store-shell.storefront-brand-v3.storefront-retail .store-filter-strip { display: none !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-gallery { display: flex !important; margin: 0 -16px !important; padding: 0 16px 4px !important; gap: 12px !important; overflow-x: auto !important; scroll-snap-type: x proximity; scrollbar-width: none; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-card { flex: 0 0 64px !important; width: 64px !important; min-width: 64px !important; min-height: 76px !important; height: auto !important; padding: 0 !important; gap: 5px !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: transparent !important; color: var(--retail-ink) !important; scroll-snap-align: start; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-category-card[data-category="promociones"] { flex-basis: 80px !important; width: 80px !important; min-width: 80px !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-icon { width: 46px !important; height: 46px !important; padding: 11px !important; border-radius: 50% !important; background: #f0f4fb !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-icon :is(img,svg) { width: 24px !important; height: 24px !important; object-fit: contain; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-symbol { width: 24px !important; height: 24px !important; min-width: 24px !important; }
@@ -196,6 +216,7 @@ html body .store-shell.storefront-brand-v3.storefront-retail .retail-checkout-sc
 .storefront-retail .retail-screen-header { display: flex; flex-shrink: 0; align-items: center; gap: 8px; padding: calc(8px + env(safe-area-inset-top,0px)) 12px 8px; min-height: 60px; border-bottom: 1px solid var(--retail-line); background: #fff; }
 .storefront-retail .retail-screen-header > strong { flex: 1; text-align: center; font-size: 14px; }
 .storefront-retail .retail-screen-header > span { width: 50px; text-align: right; font-size: 12px; color: var(--retail-muted); }
+.storefront-retail .retail-screen-header > .retail-back-actions { width: auto; text-align: left; }
 .storefront-retail .retail-checkout-progress { height: 3px; background: #edf1f7; flex-shrink: 0; }
 .storefront-retail .retail-checkout-progress > span { display: block; height: 100%; background: var(--retail-blue); transition: width 180ms; }
 .storefront-retail .retail-checkout-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -345,7 +366,7 @@ html body .store-shell.storefront-brand-v3.storefront-retail .sm-gold-hero .san-
 html body .store-shell.storefront-brand-v3.storefront-retail .sm-gold-reward-choices button { background: #f5f7fa !important; color: var(--retail-ink) !important; border-color: var(--retail-line) !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .sm-gold-reward-choices button.is-active { background: #edf3ff !important; border-color: var(--retail-blue) !important; }
 html body .storefront-retail .sm-gold-screen { background: #fff !important; color: var(--retail-ink) !important; font-family: inherit !important; animation: retail-forward 220ms ease-out; }
-html body .storefront-retail .sm-gold-screen-nav { background: #fff !important; color: var(--retail-ink) !important; box-shadow: none !important; border-bottom: 1px solid var(--retail-line); }
+html body .storefront-retail .sm-gold-screen-nav { background: #fff !important; color: var(--retail-ink) !important; box-shadow: none !important; border-bottom: 1px solid var(--retail-line); grid-template-columns: auto minmax(0,1fr); }
 html body .storefront-retail .sm-gold-back-button { color: var(--retail-ink) !important; min-height: 44px; }
 html body .storefront-retail .sm-gold-screen-content { display: block !important; padding: 20px 16px !important; }
 html body .storefront-retail .sm-gold-hero { background: #f8f3e7 !important; color: #614916 !important; border: 1px solid #e5d7b8 !important; border-radius: 12px !important; box-shadow: none !important; padding: 20px !important; }
@@ -406,7 +427,7 @@ html[data-retail-direction="back"] .storefront-retail :is(.store-product-sheet,.
 @keyframes retail-shimmer { to { background-position: -200% 0; } }
 @media (min-width: 700px) {
   html body .store-shell.storefront-brand-v3.storefront-retail .store-page { padding-inline: 28px !important; }
-  html body .store-shell.storefront-brand-v3.storefront-retail .store-top { padding-inline: 28px !important; margin-inline: -28px !important; grid-template-columns: 1fr 1fr !important; gap: 8px 32px !important; align-items: center; }
+  html body .store-shell.storefront-brand-v3.storefront-retail .store-top { padding-inline: 28px !important; margin-inline: -28px !important; grid-template-columns: minmax(320px,1fr) minmax(0,1fr) !important; gap: 8px 32px !important; align-items: center; }
   html body .store-shell.storefront-brand-v3.storefront-retail .store-brand-row { grid-column: 1; }
   html body .store-shell.storefront-brand-v3.storefront-retail .store-branch-coverage-row { grid-column: 1; grid-row: 2; }
   html body .store-shell.storefront-brand-v3.storefront-retail .store-search-wrap { grid-column: 2; grid-row: 1 / 3; }
