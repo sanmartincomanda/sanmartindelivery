@@ -1301,6 +1301,103 @@
   box-shadow: none !important;
 }
 
+.admin-order-panel { min-width: 0; }
+
+.admin-manual-fulfillment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.admin-manual-fulfillment button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--merchant-border-strong);
+  border-radius: 8px;
+  background: var(--merchant-surface);
+  color: var(--merchant-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-manual-fulfillment button:last-child:nth-child(3) { grid-column: 1 / -1; }
+.admin-manual-fulfillment button[aria-pressed="true"] {
+  color: var(--merchant-blue);
+  border-color: var(--merchant-blue);
+  background: var(--merchant-blue-soft);
+}
+.admin-manual-fulfillment button:active { background: #dbe9ff; }
+
+.admin-manual-route,
+.admin-manual-route-contact {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.admin-manual-route-contact { margin: 20px 0 0; border-top: 1px solid var(--merchant-border); padding-top: 18px; }
+.admin-manual-route-contact h2 { margin: 0; font-size: 16px; }
+.admin-manual-route p,
+.admin-manual-route-contact p { margin: 0; color: var(--merchant-muted); }
+.admin-manual-route-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.admin-manual-route-heading span { color: #08724f; font-size: 12px; font-weight: 700; }
+.admin-manual-route label,
+.admin-manual-route legend,
+.admin-manual-route-contact label { font-weight: 700; }
+.admin-manual-route select,
+.admin-manual-route-contact input,
+.admin-manual-route-contact textarea {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--merchant-border-strong);
+  border-radius: 8px;
+  font-size: 16px;
+}
+.admin-manual-route-contact textarea { resize: vertical; }
+.admin-manual-route-slots { min-width: 0; display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.admin-manual-route-slots legend { padding: 0 0 8px; }
+.admin-manual-route-slots label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--merchant-border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.admin-manual-route-slots label.is-selected { border-color: var(--merchant-blue); background: var(--merchant-blue-soft); color: var(--merchant-blue); }
+.admin-manual-route-slots input { width: 18px; height: 18px; margin: 0; accent-color: var(--merchant-blue); flex-shrink: 0; }
+.admin-manual-route-hint { font-size: 12px; }
+.admin-manual-route-total,
+.admin-manual-route-coverage { display: grid; gap: 3px; border-left: 3px solid #08724f; background: #effaf5; color: #075b3f; padding: 10px 12px; border-radius: 4px; }
+.admin-manual-route-total span { font-size: 12px; }
+.admin-manual-route-total.is-pending,
+.admin-manual-route-coverage.is-pending { border-color: #a66300; background: #fff8ec; color: #7d4900; }
+.admin-manual-route-coordinates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.admin-manual-route-coordinates label { display: grid; gap: 6px; min-width: 0; }
+.admin-manual-route-contact a { color: var(--merchant-blue); font-weight: 700; padding: 10px 0; }
+.admin-manual-order-error,
+.admin-manual-route .admin-manual-warning { padding: 12px; background: #fff0f1; border-left: 3px solid var(--merchant-danger); border-radius: 4px; color: #a31924; }
+.admin-manual-product { grid-template-columns: minmax(0, 1fr) 85px 90px 44px !important; }
+.admin-manual-product > div { min-width: 0; overflow-wrap: anywhere; }
+.admin-manual-product > div > div:last-child { color: var(--merchant-muted) !important; }
+.admin-manual-product > strong,
+.admin-manual-products-total { color: var(--merchant-text) !important; }
+.admin-manual-product button { min-width: 44px; min-height: 44px; color: #a31924 !important; background: #fff0f1 !important; }
+.admin-manual-order-success { max-width: calc(100vw - 32px); width: 400px; padding: 24px !important; }
+
+@media (max-width: 600px) {
+  .admin-manual-product { grid-template-columns: 80px minmax(0, 1fr) 44px !important; }
+  .admin-manual-product > div { grid-column: 1 / -1; }
+  .admin-order-form button[type="submit"] { width: 100%; padding: 14px 12px !important; font-size: 16px !important; min-height: 48px; }
+}
+
 /* Clients module embedded in the unified shell */
 .admin-data-module.is-embedded .bd-layout > main {
   min-height: 0 !important;
