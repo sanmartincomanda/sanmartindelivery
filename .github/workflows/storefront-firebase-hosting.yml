@@ -31,6 +31,9 @@ jobs:
       - name: Build storefront
         run: npm run build
 
+      - name: Verify combined release
+        run: npm run test:web-release && npm run test:martin-flow && npm run test:retail-home && npm run test:store-editorial && npm run test:manual-route
+
       - name: Deploy live site
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:

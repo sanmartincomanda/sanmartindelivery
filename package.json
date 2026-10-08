@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/preserveLegacyChunkAliases.mjs",
+    "build": "vite build && node scripts/preserveLegacyChunkAliases.mjs && node scripts/writeWebRelease.mjs",
     "build:android:web": "vite build --mode android",
     "build:ios:web": "vite build --mode ios",
     "android:sync": "npm run build:android:web && npx cap sync android",
@@ -18,6 +18,8 @@
     "test:store-categories": "node scripts/testStoreCategoryStructure.mjs",
     "test:store-editorial": "node scripts/testStorefrontEditorial.mjs",
     "test:retail-home": "node scripts/testRetailHomeNavigation.mjs",
+    "test:martin-flow": "node --test scripts/testMartinFlowModel.mjs",
+    "test:web-release": "node --test scripts/testWebRelease.mjs",
     "test:manual-route": "node scripts/testManualRouteOrders.mjs && node scripts/testRouteSanMartin.mjs",
     "test:sicar-customer-fields": "node scripts/testSicarCustomerFields.mjs",
     "test:store-reward-status": "node scripts/testStoreRewardStatus.mjs",

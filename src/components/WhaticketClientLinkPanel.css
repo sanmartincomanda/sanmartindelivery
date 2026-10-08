@@ -1,0 +1,28 @@
+.whaticket-link-panel { margin-bottom: 24px; padding: 20px; border: 1px solid #cbdcd5; border-radius: 16px; background: #f5faf7; color: #20342b; }
+.whaticket-link-panel__title, .whaticket-link-card__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.whaticket-link-panel h2 { margin: 0; font-size: 1.2rem; }
+.whaticket-link-panel p { line-height: 1.5; }
+.whaticket-link-card { margin-top: 16px; padding: 18px; border: 1px solid #d2dcd7; border-radius: 12px; background: white; }
+.whaticket-link-card__heading > div { display: grid; gap: 4px; }
+.whaticket-link-card__heading span { font-size: .85rem; }
+.whaticket-link-badge { padding: 5px 9px; border-radius: 20px; background: #fff0ce; color: #76511b; }
+.whaticket-link-order { white-space: pre-wrap; background: #f3f5f4; padding: 12px; border-radius: 8px; }
+.whaticket-link-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.whaticket-link-panel button { font: inherit; padding: 10px 14px; border: 1px solid #9fb8ab; border-radius: 8px; background: white; color: #244333; cursor: pointer; }
+.whaticket-link-panel button:disabled { opacity: .55; cursor: not-allowed; }
+.whaticket-link-panel button:focus-visible, .whaticket-link-panel input:focus-visible, .whaticket-link-panel textarea:focus-visible, .whaticket-link-panel summary:focus-visible { outline: 3px solid #37a678; outline-offset: 2px; }
+.whaticket-link-panel .whaticket-link-primary { background: #246246; border-color: #246246; color: white; }
+.whaticket-link-choice, .whaticket-link-details { margin-top: 16px; border-top: 1px solid #e1e7e3; padding-top: 14px; }
+.whaticket-link-panel label { display: grid; gap: 7px; margin-bottom: 12px; font-size: .9rem; }
+.whaticket-link-panel input, .whaticket-link-panel textarea { box-sizing: border-box; width: 100%; padding: 11px; font: inherit; border: 1px solid #b3c4bb; border-radius: 8px; background: white; color: #20342b; }
+.whaticket-link-panel textarea { min-height: 80px; resize: vertical; }
+.whaticket-link-results { list-style: none; margin: 10px 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.whaticket-link-results li { margin-bottom: 6px; }
+.whaticket-link-results button { width: 100%; display: grid; gap: 5px; text-align: left; }
+.whaticket-link-results button[aria-pressed="true"] { border-color: #246246; background: #eaf5ee; }
+.whaticket-link-results span { font-size: .85rem; }
+.whaticket-link-selected { padding: 10px; margin: 10px 0; background: #eaf5ee; border-radius: 8px; }
+.whaticket-link-error { color: #a52b28; }
+.whaticket-link-notice { padding: 12px; background: #dff2e7; border-radius: 8px; }
+.whaticket-link-details summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 600px) { .whaticket-link-panel, .whaticket-link-card { padding: 14px; } .whaticket-link-actions button, .whaticket-link-primary { width: 100%; } }

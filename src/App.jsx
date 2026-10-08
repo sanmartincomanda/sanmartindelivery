@@ -26,6 +26,7 @@ import {
 import { CLIENT_DIRECTORY_PATH } from './services/clientDirectory';
 
 import OrderForm from './components/OrderForm';
+import WhaticketClientLinkPanel from './components/WhaticketClientLinkPanel';
 import KitchenView from './components/KitchenView';
 import ListaPedidos from './components/ListaPedidos';
 import { getCarryoverRouteSanMartinOrders } from './services/routeSanMartin';
@@ -40,6 +41,8 @@ import AccountDeletionView from './components/AccountDeletionView';
 import MerchantAdminShell from './components/admin/MerchantAdminShell';
 import MerchantAdminHome from './components/admin/MerchantAdminHome';
 import './styles/adminMerchant2026.css';
+
+const MartinFlowView = React.lazy(() => import('./components/admin/MartinFlowView'));
 
 const Icons = {
   plus: (
@@ -459,31 +462,11 @@ function App() {
       setClientes(nextClients);
     };
 
-    if (view === 'ingreso') {
-      let cancelled = false;
-
-      get(clientsRef)
-        .then((snapshot) => {
-          if (cancelled) {
-            return;
-          }
-
-          applyClientsSnapshot(snapshot.val());
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            console.error('Error cargando clientes:', error);
-            setClientes([]);
-          }
-        });
-
-      return () => {
-        cancelled = true;
-      };
-    }
-
     const unsubscribe = onValue(clientsRef, (snapshot) => {
       applyClientsSnapshot(snapshot.val());
+    }, (error) => {
+      console.error('Error cargando clientes:', error);
+      setClientes([]);
     });
 
     return () => unsubscribe();
@@ -629,6 +612,7 @@ function App() {
     { id: 'marketing', label: 'Marketing', mobileLabel: 'Marketing', icon: 'marketing', group: 'Crecimiento', description: 'Promociones y campañas' },
     { id: 'beneficios', label: 'Beneficios', mobileLabel: 'Beneficios', icon: 'benefits', group: 'Crecimiento', description: 'Fidelización y premios' },
     { id: 'reportes', label: 'Reportes', mobileLabel: 'Reportes', icon: 'reports', group: 'Análisis', description: 'Ventas e historial de pedidos' },
+    { id: 'martin_si', label: 'Martín SI', mobileLabel: 'Martín SI', icon: 'agent', group: 'Análisis', description: 'Mapa y estado del agente · solo lectura' },
     { id: 'configuracion', label: 'Configuración', mobileLabel: 'Config.', icon: 'settings', group: 'Sistema', description: 'Usuarios y permisos' },
   ];
 
@@ -884,6 +868,11 @@ function App() {
         )}
 
         {view === 'ingreso' && (
+          <>
+          {(isAdminDashboard || isOperatorDashboard) && <WhaticketClientLinkPanel
+            clientes={clientes}
+            branchScope={isAdminDashboard ? '' : 'granada'}
+          />}
           <OrderForm
             onAddOrder={addOrder}
             clientes={clientes}
@@ -891,6 +880,7 @@ function App() {
             nextOrderNumber={nextOrderNumber}
             branchId={ordersBranchId || 'granada'}
           />
+          </>
         )}
 
         {view === 'cocina' && <KitchenView orders={orders} carryoverRouteOrders={carryoverRouteOrders} allowRuta={isAdminDashboard} />}
@@ -922,6 +912,11 @@ function App() {
         )}
 
         {view === 'reportes' && isAdminDashboard && <CrmView />}
+        {view === 'martin_si' && isAdminDashboard && (
+          <React.Suspense fallback={<div role="status">Cargando centro de Martín SI…</div>}>
+            <MartinFlowView />
+          </React.Suspense>
+        )}
         {view === 'configuracion' && isAdminDashboard && (
           <ConfiguracionView mode="users" username={dashboardRoleRecord?.username || ''} />
         )}
