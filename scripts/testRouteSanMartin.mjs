@@ -53,7 +53,8 @@ const dispatchUpdates = buildRouteSanMartinDispatchUpdates(
   [{ firebaseKey: 'selected-route', estado: 'Preparado' }],
   { name: 'Ruta San Martin', code: 'E-RUTA' },
   'Ruta San Martin',
-  Date.parse('2026-09-30T10:00:00-06:00')
+  // Dispatch labels use the operator's local clock; scheduling below uses Nicaragua.
+  new Date(2026, 8, 30, 10, 0, 0).getTime()
 );
 assert.equal(dispatchUpdates['selected-route/estado'], 'Enviado');
 assert.equal(dispatchUpdates['selected-route/repartidorCodigo'], 'E-RUTA');
