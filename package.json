@@ -18,7 +18,6 @@
     "test:store-categories": "node scripts/testStoreCategoryStructure.mjs",
     "test:store-editorial": "node scripts/testStorefrontEditorial.mjs",
     "test:retail-home": "node scripts/testRetailHomeNavigation.mjs",
-    "test:martin-flow": "node --test scripts/testMartinFlowModel.mjs",
     "test:web-release": "node --test scripts/testWebRelease.mjs",
     "test:manual-route": "node scripts/testManualRouteOrders.mjs && node scripts/testRouteSanMartin.mjs",
     "test:sicar-customer-fields": "node scripts/testSicarCustomerFields.mjs",

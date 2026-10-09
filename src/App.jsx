@@ -42,8 +42,6 @@ import MerchantAdminShell from './components/admin/MerchantAdminShell';
 import MerchantAdminHome from './components/admin/MerchantAdminHome';
 import './styles/adminMerchant2026.css';
 
-const MartinFlowView = React.lazy(() => import('./components/admin/MartinFlowView'));
-
 const Icons = {
   plus: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -612,7 +610,6 @@ function App() {
     { id: 'marketing', label: 'Marketing', mobileLabel: 'Marketing', icon: 'marketing', group: 'Crecimiento', description: 'Promociones y campañas' },
     { id: 'beneficios', label: 'Beneficios', mobileLabel: 'Beneficios', icon: 'benefits', group: 'Crecimiento', description: 'Fidelización y premios' },
     { id: 'reportes', label: 'Reportes', mobileLabel: 'Reportes', icon: 'reports', group: 'Análisis', description: 'Ventas e historial de pedidos' },
-    { id: 'martin_si', label: 'Martín SI', mobileLabel: 'Martín SI', icon: 'agent', group: 'Análisis', description: 'Mapa y estado del agente · solo lectura' },
     { id: 'configuracion', label: 'Configuración', mobileLabel: 'Config.', icon: 'settings', group: 'Sistema', description: 'Usuarios y permisos' },
   ];
 
@@ -912,11 +909,6 @@ function App() {
         )}
 
         {view === 'reportes' && isAdminDashboard && <CrmView />}
-        {view === 'martin_si' && isAdminDashboard && (
-          <React.Suspense fallback={<div role="status">Cargando centro de Martín SI…</div>}>
-            <MartinFlowView />
-          </React.Suspense>
-        )}
         {view === 'configuracion' && isAdminDashboard && (
           <ConfiguracionView mode="users" username={dashboardRoleRecord?.username || ''} />
         )}
