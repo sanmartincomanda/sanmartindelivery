@@ -163,6 +163,8 @@ import {
   getRouteSanMartinShortfall,
   getRouteSanMartinSlots,
   ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
+  isRouteSanMartinEnabled,
+  ROUTE_SAN_MARTIN_PAUSED_MESSAGE,
 } from '../services/routeSanMartin';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
 import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
@@ -3104,7 +3106,18 @@ export default function TiendaVirtualView({
   }, [currentUser, fulfillmentType, savedAddressRouteQuote.available, showSavedAddressCoverageWarning]);
   const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
   const routeSanMartinFlow = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
-  const routeSlots = useMemo(() => getRouteSanMartinSlots(new Date(currentTimeMs)), [currentTimeMs]);
+  useEffect(() => {
+    if (storeBranchesReady && routeSanMartinFlow && !isRouteSanMartinEnabled(selectedBranch)) {
+      setFulfillmentType(ORDER_FULFILLMENT_DELIVERY);
+      setRouteSlotId('');
+    }
+  }, [storeBranchesReady, routeSanMartinFlow, selectedBranch]);
+  const routeSlots = useMemo(() => getRouteSanMartinSlots(new Date(currentTimeMs), 14, {
+    branch: selectedBranch, destination: activeDeliveryAddress?.ubicacion,
+  }), [currentTimeMs, selectedBranch, activeDeliveryAddress?.ubicacion]);
+  useEffect(() => {
+    if (routeSlotId && !routeSlots.some((slot) => slot.id === routeSlotId)) setRouteSlotId('');
+  }, [routeSlotId, routeSlots]);
   const routeSanMartinQuote = useMemo(
     () => getRouteSanMartinQuote({ branch: selectedBranch, destination: activeDeliveryAddress?.ubicacion }),
     [activeDeliveryAddress?.ubicacion, selectedBranch]
@@ -3133,11 +3146,12 @@ export default function TiendaVirtualView({
           title: 'Ruta San Martin',
           message: routeSanMartinQuote.available
             ? 'Envio gratis con entrega programada. Si pedis antes de las 10 p. m., podes elegir manana por la tarde.'
-            : 'Esta direccion queda fuera de los 40 km de Ruta San Martin o no tiene un pin valido.',
+            : !routeSanMartinQuote.serviceEnabled ? ROUTE_SAN_MARTIN_PAUSED_MESSAGE
+              : 'Esta direccion no pertenece a una zona activa de Ruta San Martin o no tiene un pin valido.',
           tone: routeSanMartinQuote.available ? 'active' : 'error',
         }
       : buildStoreDeliverySummary(deliveryQuote),
-    [deliveryQuote, routeSanMartinFlow, routeSanMartinQuote.available]
+    [deliveryQuote, routeSanMartinFlow, routeSanMartinQuote.available, routeSanMartinQuote.serviceEnabled]
   );
   const authRegistrationCoverageQuote = useMemo(
     () =>
@@ -4477,6 +4491,11 @@ export default function TiendaVirtualView({
   const submitOrder = async (event) => {
     event?.preventDefault?.();
 
+    if (routeSanMartinFlow && !isRouteSanMartinEnabled(selectedBranch)) {
+      alert(ROUTE_SAN_MARTIN_PAUSED_MESSAGE);
+      return;
+    }
+
     if (selectedBranch?.acceptingOrders === false) {
       alert(`${selectedBranch.name} tiene los pedidos pausados temporalmente. Elige otra tienda para continuar.`);
       openBranchSelector();
@@ -4513,7 +4532,9 @@ export default function TiendaVirtualView({
       return;
     }
 
-    const routeSchedule = routeSanMartinFlow ? getRouteSanMartinSchedule(new Date(), routeSlotId) : null;
+    const routeSchedule = routeSanMartinFlow ? getRouteSanMartinSchedule(new Date(), routeSlotId, {
+      branch: selectedBranch, destination: activeDeliveryAddress?.ubicacion,
+    }) : null;
     if (routeSanMartinFlow && !routeSchedule?.slotId) {
       alert('Selecciona una franja disponible de Ruta San Martin. La tarde de manana se habilita si pedis antes de las 10 p. m.');
       return;
@@ -10011,7 +10032,9 @@ export default function TiendaVirtualView({
             </span>
             <span className="store-closed-inline-copy">
               <strong>Cerrado ahora</strong>
-              <span>Ruta San Martin sigue disponible para pedidos programados.</span>
+              <span>{isRouteSanMartinEnabled(selectedBranch)
+                ? 'Ruta San Martin sigue disponible para pedidos programados.'
+                : 'Podés preparar tu carrito y pedir cuando abramos.'}</span>
             </span>
             <button type="button" onClick={() => setStoreClosedNoticeOpen(true)}>
               Ver horario
@@ -10435,6 +10458,10 @@ export default function TiendaVirtualView({
           onClose={() => { setCheckoutOpen(false); setRetailCheckoutStep('cart'); }}
           onCustomerChange={updateCustomer}
           onFulfillmentTypeChange={(value) => {
+            if (value === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN && !isRouteSanMartinEnabled(granadaRouteBranch)) {
+              alert(ROUTE_SAN_MARTIN_PAUSED_MESSAGE);
+              return;
+            }
             if (value === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN && selectedBranch?.id !== 'granada') {
               setCheckoutOpen(false);
               openBranchSelector();
@@ -10508,13 +10535,13 @@ export default function TiendaVirtualView({
         <RegisterOutOfCoverageModal
           branch={registerCoverageNotice.branch || selectedBranch}
           suggestedBranch={registerCoverageNotice.suggestedBranch}
-          routeAvailable={registerCoverageNotice.routeAvailable}
+          routeAvailable={registerCoverageNotice.routeAvailable && isRouteSanMartinEnabled(granadaRouteBranch)}
           onSwitch={() => {
             if (registerCoverageNotice.suggestedBranch) {
               selectStoreBranch(registerCoverageNotice.suggestedBranch, {
                 skipConfirmation: true,
               });
-              if (registerCoverageNotice.routeAvailable) {
+              if (registerCoverageNotice.routeAvailable && isRouteSanMartinEnabled(granadaRouteBranch)) {
                 setFulfillmentType(ORDER_FULFILLMENT_ROUTE_SAN_MARTIN);
               }
             }
@@ -13062,7 +13089,7 @@ function RouteSanMartinSlotPicker({ slots, selectedId, shortfall, onSelect }) {
       <h3 style={{ margin: '10px 0 4px' }}>Elegí cuándo recibirlo</h3>
       <p style={{ margin: '0 0 12px' }}>
         Desde Granada, envío gratis para pedidos desde {formatCurrency(ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS)} en productos.
-        La tarde de mañana se habilita si pedís antes de las 10 p. m.; las demás franjas requieren 24 horas de anticipación.
+        Mostramos los días de entrega de tu zona. Si mañana hay ruta y pedís antes de las 10 p. m., podés elegir la tarde; las demás franjas requieren 24 horas.
       </p>
       {shortfall > 0 && (
         <div className="store-location-feedback error" role="status" style={{ marginBottom: 12 }}>
@@ -13085,7 +13112,7 @@ function RouteSanMartinSlotPicker({ slots, selectedId, shortfall, onSelect }) {
         ))}
       </div>
       {!slots.some((slot) => slot.id === selectedId) &&
-        <p style={{ margin: '12px 0 0', fontWeight: 700 }}>Seleccioná una franja para continuar.</p>}
+        <p style={{ margin: '12px 0 0', fontWeight: 700 }}>{slots.length ? 'Seleccioná una franja para continuar.' : 'No hay franjas disponibles para esta dirección. Revisá la cobertura o elegí otra modalidad de entrega.'}</p>}
     </section>
   );
 }
@@ -13187,7 +13214,7 @@ function CheckoutSheet(props) {
       title: 'Ruta San Martin',
       detail: selectedBranch?.id === 'granada' ? 'Envío gratis · desde Granada' : 'Solo desde Granada',
     },
-  ];
+  ].filter((choice) => choice.value !== ORDER_FULFILLMENT_ROUTE_SAN_MARTIN || isRouteSanMartinEnabled(selectedBranch));
   const paymentChoices = STORE_PAYMENT_OPTIONS.map(getPaymentMeta);
   const showWelcomeCouponCard =
     welcomeCoupon &&
@@ -13391,8 +13418,8 @@ function CheckoutSheet(props) {
                   ? 'Al pedir en linea enviaremos tu pedido Pickup directamente.'
                   : routeSanMartinFlow
                     ? selectedRouteSlot
-                      ? `Entrega ${selectedRouteSlot.dateLabel}, ${selectedRouteSlot.label} · Servicio gratis dentro de 40 km.`
-                      : 'Elegí una franja disponible. Servicio gratis dentro de 40 km desde Granada.'
+                      ? `Entrega ${selectedRouteSlot.dateLabel}, ${selectedRouteSlot.label} · Servicio gratis en tu zona.`
+                      : 'Elegí una franja disponible para tu zona. Servicio a domicilio gratis.'
                     : 'Luego confirmaras tu direccion y metodo de pago.'}
               </p>
             </div>

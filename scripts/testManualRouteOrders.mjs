@@ -7,7 +7,7 @@ import {
 
 const branch = {
   id: 'granada', tenantId: 'sanmartinsr', name: 'Carnes San Martin Granada',
-  storeLocation: { lat: 11.9299, lng: -85.956 }, active: true, acceptingOrders: false,
+  storeLocation: { lat: 11.9299, lng: -85.956 }, active: true, acceptingOrders: false, routeSanMartinEnabled: true,
 };
 const destination = normalizeManualRouteLocation('11.95', '-85.956');
 const now = new Date('2026-10-06T15:00:00-06:00');
@@ -28,6 +28,8 @@ checks += 1;
 rejects({ branch: { ...branch, id: 'nindiri' } }, /Granada/);
 rejects({ branch: { ...branch, id: 'masaya' } }, /Granada/);
 rejects({ branch: { ...branch, active: false } }, /Granada/);
+rejects({ branch: { ...branch, routeSanMartinEnabled: false } }, /temporalmente/);
+rejects({ branch: { ...branch, routeSanMartinEnabled: undefined } }, /temporalmente/);
 rejects({ destination: null }, /pin/);
 rejects({ destination: { lat: 13, lng: -86 } }, /cobertura/);
 rejects({ subtotal: 999.99 }, /minimo/);
@@ -37,7 +39,7 @@ rejects({ itemCount: 0 }, /catalogo/);
 rejects({ slotId: '' }, /franja/);
 rejects({ slotId: '2026-10-06:afternoon' }, /franja/);
 rejects({ slotId: '2026-10-07:morning' }, /franja/);
-rejects({ slotId: '2026-10-12:afternoon' }, /franja/);
+rejects({ slotId: '2026-10-22:afternoon' }, /franja/);
 rejects({ now: new Date('2026-10-06T22:00:00-06:00') }, /franja/);
 
 const fields = prepareManualRouteOrder(input);

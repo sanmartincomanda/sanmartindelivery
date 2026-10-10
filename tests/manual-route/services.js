@@ -9,7 +9,7 @@ export const ORDER_FULFILLMENT_DELIVERY = 'delivery';
 export const ORDER_FULFILLMENT_PICKUP = 'pickup';
 export const ORDER_FULFILLMENT_ROUTE_SAN_MARTIN = 'ruta_san_martin';
 export const formatOrderNumber = (order, branch = 'granada') => order?.orderNumber || `${branch === 'granada' ? 'GR' : 'NI'}-${String(order).padStart(3, '0')}`;
-export const subscribeStoreBranches = (callback) => { callback(mergeStoreBranches()); return () => {}; };
+export const subscribeStoreBranches = (callback) => { callback(mergeStoreBranches({ granada: { routeSanMartinEnabled: true } })); return () => {}; };
 export const subscribeStoreDeliverySettings = (callback) => { callback(DEFAULT_STORE_DELIVERY_SETTINGS); return () => {}; };
 export const createManualClient = async (client) => ({ ...client, firebaseKey: 'qa-new-client' });
 export const getCurrentCatalogMap = async () => ({

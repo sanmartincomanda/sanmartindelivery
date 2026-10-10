@@ -20,6 +20,8 @@
     "test:retail-home": "node scripts/testRetailHomeNavigation.mjs",
     "test:web-release": "node --test scripts/testWebRelease.mjs",
     "test:manual-route": "node scripts/testManualRouteOrders.mjs && node scripts/testRouteSanMartin.mjs",
+    "test:route-zones": "node scripts/testRouteZones.mjs",
+    "test:route-rules": "node scripts/testRoutePauseRules.mjs && node scripts/testRouteSettingsApi.mjs",
     "test:sicar-customer-fields": "node scripts/testSicarCustomerFields.mjs",
     "test:store-reward-status": "node scripts/testStoreRewardStatus.mjs",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
@@ -49,6 +51,7 @@
     "@capacitor/ios": "8.4.2",
     "firebase": "^12.6.0",
     "firebase-admin": "^14.1.0",
+    "leaflet": "1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "xlsx": "^0.18.5"

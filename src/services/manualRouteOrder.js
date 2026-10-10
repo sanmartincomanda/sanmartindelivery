@@ -5,6 +5,8 @@ import {
   getRouteSanMartinQuote,
   getRouteSanMartinSchedule,
   getRouteSanMartinShortfall,
+  isRouteSanMartinEnabled,
+  ROUTE_SAN_MARTIN_PAUSED_MESSAGE,
 } from './routeSanMartin.js';
 
 export const normalizeManualRouteLocation = (latitude, longitude) => {
@@ -27,17 +29,18 @@ export const prepareManualRouteOrder = ({
   if (branch?.id !== ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID || branch?.active === false) {
     throw routeError('Ruta San Martin sale unicamente desde la sucursal Granada activa.');
   }
+  if (!isRouteSanMartinEnabled(branch)) throw routeError(ROUTE_SAN_MARTIN_PAUSED_MESSAGE);
   if (!normalizeLocation(destination)) {
     throw routeError('Agrega el pin de la direccion del cliente para validar la cobertura de Ruta.');
   }
   const quote = getRouteSanMartinQuote({ branch, destination });
   if (!quote.available) {
-    throw routeError(`La direccion esta fuera de la cobertura de Ruta San Martin (${quote.coverageRadiusKm} km desde Granada).`);
+    throw routeError('La direccion esta fuera de la cobertura de las zonas activas de Ruta San Martin.');
   }
   if (!itemCount || getRouteSanMartinShortfall(subtotal) > 0) {
     throw routeError('Ruta San Martin requiere un minimo de C$1,000 en productos del catalogo. Las notas no cuentan para el minimo.');
   }
-  const schedule = slotId ? getRouteSanMartinSchedule(now, slotId) : null;
+  const schedule = slotId ? getRouteSanMartinSchedule(now, slotId, { branch, destination }) : null;
   if (!schedule?.slotId) {
     throw routeError('Selecciona una franja disponible para Ruta San Martin. Los horarios se actualizan segun la hora de ingreso.');
   }

@@ -12,6 +12,7 @@ import {
   getSendableRouteSanMartinOrders,
   isOpenRouteSanMartinOrder,
   isRouteSanMartinOrder,
+  isRouteSanMartinEnabled,
   partitionRouteSanMartinOrders,
   ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS,
   ROUTE_SAN_MARTIN_COUNTER_PATH,
@@ -19,8 +20,13 @@ import {
 } from '../src/services/routeSanMartin.js';
 import { shouldArchiveRealtimeOrder } from '../src/services/orderArchive.js';
 
-const branch = { id: 'granada', active: true, storeLocation: { lat: 11.9299, lng: -85.956 } };
+const branch = { id: 'granada', active: true, routeSanMartinEnabled: true, storeLocation: { lat: 11.9299, lng: -85.956 } };
 const destination = (lat) => ({ lat, lng: -85.956 });
+assert.equal(isRouteSanMartinEnabled(branch), true);
+assert.equal(isRouteSanMartinEnabled({ ...branch, routeSanMartinEnabled: false }), false);
+assert.equal(isRouteSanMartinEnabled({ ...branch, routeSanMartinEnabled: undefined }), false);
+assert.equal(isRouteSanMartinEnabled({ ...branch, routeSanMartinEnabled: 'true' }), false);
+assert.equal(getRouteSanMartinQuote({ branch: { ...branch, routeSanMartinEnabled: false }, destination: destination(12) }).available, false);
 
 assert.equal(getRouteSanMartinQuote({ branch, destination: destination(12.28) }).available, true);
 assert.equal(getRouteSanMartinQuote({ branch, destination: destination(12.31) }).available, false);

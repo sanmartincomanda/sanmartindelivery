@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useOnlineStatus } from './useRetailNavigation';
+import { isRouteSanMartinEnabled } from '../../services/routeSanMartin';
 
 export const RETAIL_CHECKOUT_STEPS = ['cart', 'delivery', 'address', 'schedule', 'payment', 'benefits', 'review'];
 
@@ -108,9 +109,10 @@ export default function RetailCheckout(props) {
                 <div className="retail-segmented" aria-label="Modalidad de entrega">
                   {deliveryChoices.map((choice) => <button type="button" key={choice.value} aria-pressed={fulfillmentType === choice.value} onClick={() => onFulfillmentTypeChange(choice.value)}>{choice.icon === 'pickup' ? 'Retiro en tienda' : choice.icon === 'route' ? 'Ruta San Martín' : 'Delivery'}</button>)}
                 </div>
-                <section className="retail-fulfillment-info"><Icon name={pickupFlow ? 'pickup' : routeSanMartinFlow ? 'route' : 'delivery'} /><div><h2>{pickupFlow ? 'Pasá por tu pedido' : routeSanMartinFlow ? 'Entrega programada, envío gratis' : 'Hasta tu puerta'}</h2><p>{pickupFlow ? selectedBranch?.address : routeSanMartinFlow ? 'Desde Granada, hasta 40 km. Elegí una franja disponible en el siguiente paso.' : 'Confirmá tu dirección para consultar cobertura y costo de envío.'}</p></div></section>
+                <section className="retail-fulfillment-info"><Icon name={pickupFlow ? 'pickup' : routeSanMartinFlow ? 'route' : 'delivery'} /><div><h2>{pickupFlow ? 'Pasá por tu pedido' : routeSanMartinFlow ? 'Entrega programada, envío gratis' : 'Hasta tu puerta'}</h2><p>{pickupFlow ? selectedBranch?.address : routeSanMartinFlow ? 'Desde Granada. Confirmá tu dirección para ver los días y horarios disponibles en tu zona.' : 'Confirmá tu dirección para consultar cobertura y costo de envío.'}</p></div></section>
                 {routeSanMartinFlow && routeMinimumShortfall > 0 && <p className="retail-notice">Agregá {money(routeMinimumShortfall)} en productos para usar Ruta San Martín.</p>}
-                {storeClosed && <div className="retail-notice"><strong>Tienda cerrada</strong><p>{storeClosedMessage}</p><button type="button" className="retail-text-button" onClick={onStoreClosed}>Ver horario</button>{selectedBranch?.id === 'granada' && <p>Podés preparar tu carrito o elegir Ruta San Martín para una entrega programada.</p>}</div>}
+                {selectedBranch?.id === 'granada' && !isRouteSanMartinEnabled(selectedBranch) && <p className="retail-notice" role="status">Ruta San Martín: temporalmente no disponible. Elegí Delivery dentro de cobertura o retiro en tienda.</p>}
+                {storeClosed && <div className="retail-notice"><strong>Tienda cerrada</strong><p>{storeClosedMessage}</p><button type="button" className="retail-text-button" onClick={onStoreClosed}>Ver horario</button>{isRouteSanMartinEnabled(selectedBranch) && <p>Podés preparar tu carrito o elegir Ruta San Martín para una entrega programada.</p>}</div>}
                 <div className="retail-summary-line"><span>Tu tienda</span><strong>{selectedBranch?.name}</strong></div>
               </>}
               {step === 'address' && <>

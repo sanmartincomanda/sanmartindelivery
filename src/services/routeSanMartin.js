@@ -1,4 +1,5 @@
 import { getDistanceKm, normalizeLocation } from './geo.js';
+import { matchingRouteZones } from './routeSanMartinZones.js';
 
 export const ROUTE_SAN_MARTIN_FULFILLMENT = 'ruta_san_martin';
 export const ROUTE_SAN_MARTIN_COUNTER_PATH = 'orderCounters/rutaSanMartin';
@@ -7,6 +8,10 @@ export const ROUTE_SAN_MARTIN_RADIUS_KM = 40;
 export const ROUTE_SAN_MARTIN_MINIMUM_CORDOBAS = 1000;
 export const ROUTE_SAN_MARTIN_NOTICE_MS = 24 * 60 * 60 * 1000;
 export const ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID = 'granada';
+export const ROUTE_SAN_MARTIN_PAUSED_MESSAGE = 'Ruta San Martin esta temporalmente no disponible. Elegi Delivery dentro de cobertura o retiro en tienda.';
+export const isRouteSanMartinEnabled = (branch) =>
+  branch?.id === ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID &&
+  branch?.active !== false && branch?.routeSanMartinEnabled === true;
 const MANAGUA_OFFSET = '-06:00';
 const ROUTE_SLOTS = [
   { key: 'morning', label: '9:00 a.m. - 12:00 p.m.', start: '09:00', end: '12:00' },
@@ -80,27 +85,36 @@ export const getRouteSanMartinQuote = ({ branch, destination } = {}) => {
     ? Math.min(Number(branch.routeSanMartinRadiusKm), ROUTE_SAN_MARTIN_RADIUS_KM)
     : ROUTE_SAN_MARTIN_RADIUS_KM;
   const distanceKm = origin && target ? getDistanceKm(origin, target) : Number.POSITIVE_INFINITY;
+  const zones = isRouteSanMartinEnabled(branch) ? matchingRouteZones(branch, destination) : [];
 
   return {
-    available: branch?.id === ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID &&
-      branch?.active !== false && Number.isFinite(distanceKm) && distanceKm <= radiusKm,
+    available: zones.length > 0,
+    serviceEnabled: isRouteSanMartinEnabled(branch),
+    zones,
+    deliveryDays: [...new Set(zones.flatMap((zone) => zone.deliveryDays))],
     distanceKm: Number.isFinite(distanceKm) ? Number(distanceKm.toFixed(2)) : distanceKm,
-    coverageRadiusKm: radiusKm,
+    coverageRadiusKm: zones.some((zone) => zone.type === 'radius')
+      ? Math.max(...zones.filter((zone) => zone.type === 'radius').map((zone) => zone.radiusKm))
+      : branch?.routeSanMartin?.schemaVersion === 1 ? 0 : radiusKm,
     totalFee: 0,
   };
 };
 
-export const getRouteSanMartinSlots = (now = new Date(), days = 3) => {
+export const getRouteSanMartinSlots = (now = new Date(), days = 14, context) => {
   const orderedAt = now instanceof Date ? now : new Date(now);
   const firstDay = managuaDateKey(orderedAt);
   const minimumStart = orderedAt.getTime() + ROUTE_SAN_MARTIN_NOTICE_MS;
   const beforeNextDayAfternoonCutoff = orderedAt.getTime() < Date.parse(`${firstDay}T22:00:00${MANAGUA_OFFSET}`);
   const options = [];
+  const quote = context ? getRouteSanMartinQuote(context) : null;
+  if (quote && !quote.available) return options;
 
   for (let offset = 1; offset <= days; offset += 1) {
     const day = new Date(`${firstDay}T12:00:00${MANAGUA_OFFSET}`);
     day.setUTCDate(day.getUTCDate() + offset);
     const deliveryDate = managuaDateKey(day);
+    const weekday = new Date(`${deliveryDate}T12:00:00Z`).getUTCDay();
+    if (quote && !quote.deliveryDays.includes(weekday)) continue;
     const dateLabel = day.toLocaleDateString('es-NI', {
       timeZone: 'America/Managua', weekday: 'long', day: 'numeric', month: 'long',
     });
@@ -115,6 +129,8 @@ export const getRouteSanMartinSlots = (now = new Date(), days = 3) => {
         label: slot.label,
         startAt,
         endAt: Date.parse(`${deliveryDate}T${slot.end}:00${MANAGUA_OFFSET}`),
+        ...(quote ? { zoneId: quote.zones.find((zone) => zone.deliveryDays.includes(weekday)).id,
+          zoneName: quote.zones.find((zone) => zone.deliveryDays.includes(weekday)).name } : {}),
       });
     });
   }
@@ -122,9 +138,9 @@ export const getRouteSanMartinSlots = (now = new Date(), days = 3) => {
   return options;
 };
 
-export const getRouteSanMartinSchedule = (now = new Date(), slotId = '') => {
+export const getRouteSanMartinSchedule = (now = new Date(), slotId = '', context) => {
   const orderedAt = now instanceof Date ? now : new Date(now);
-  const selectedSlot = getRouteSanMartinSlots(orderedAt).find((slot) => slot.id === slotId);
+  const selectedSlot = getRouteSanMartinSlots(orderedAt, 14, context).find((slot) => slot.id === slotId);
   if (slotId && !selectedSlot) return null;
   const earliestAt = selectedSlot?.startAt || orderedAt.getTime() + ROUTE_SAN_MARTIN_NOTICE_MS;
 
@@ -140,6 +156,8 @@ export const getRouteSanMartinSchedule = (now = new Date(), slotId = '') => {
     slotId: selectedSlot?.id || '',
     windowEndAt: selectedSlot?.endAt || 0,
     windowLabel: selectedSlot?.label || '',
+    zoneId: selectedSlot?.zoneId || '',
+    zoneName: selectedSlot?.zoneName || '',
   };
 };
 

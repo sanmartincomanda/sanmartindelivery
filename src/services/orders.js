@@ -1,5 +1,6 @@
 import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, startAt, update } from 'firebase/database';
 import { database } from '../firebase.js';
+import { requestRouteAction } from './routeSanMartinApi.js';
 import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
 import {
@@ -10,6 +11,8 @@ import {
   getRouteSanMartinShortfall,
   ROUTE_SAN_MARTIN_COUNTER_PATH,
   ROUTE_SAN_MARTIN_ORDER_PREFIX,
+  isRouteSanMartinEnabled,
+  ROUTE_SAN_MARTIN_PAUSED_MESSAGE,
 } from './routeSanMartin.js';
 import { buildStoreRewardRedemptionTextLines, normalizeStoreRewardRedemption } from './storeRewards.js';
 import {
@@ -552,9 +555,16 @@ export async function createOrder(payload, options = {}) {
   ).trim();
   const storeBranchAddress = String(payload.storeBranchAddress || '').trim();
   const storeBranchLocation = normalizeLocation(payload.storeBranchLocation);
+  // Check live configuration before reserving an RS number, not the caller's snapshot.
+  const routeBranch = routeSanMartinOrder
+    ? { ...(await get(ref(database, `storeBranches/${storeBranchId}`))).val(), id: storeBranchId }
+    : null;
+  if (routeSanMartinOrder && !isRouteSanMartinEnabled(routeBranch)) {
+    throw Object.assign(new Error(ROUTE_SAN_MARTIN_PAUSED_MESSAGE), { code: 'ROUTE_SAN_MARTIN_PAUSED' });
+  }
   const routeQuote = routeSanMartinOrder
     ? getRouteSanMartinQuote({
-        branch: { id: storeBranchId, storeLocation: storeBranchLocation, active: true },
+        branch: routeBranch,
         destination: payload.ubicacion,
       })
     : null;
@@ -562,7 +572,7 @@ export async function createOrder(payload, options = {}) {
     throw new Error('La direccion no tiene cobertura de Ruta San Martin.');
   }
   const routeSchedule = routeSanMartinOrder
-    ? getRouteSanMartinSchedule(new Date(createdAt), String(payload.routeSlotId || ''))
+    ? getRouteSanMartinSchedule(new Date(createdAt), String(payload.routeSlotId || ''), { branch: routeBranch, destination: payload.ubicacion })
     : null;
   if (routeSanMartinOrder && (!payload.routeSlotId || !routeSchedule?.slotId)) {
     throw new Error('Selecciona una franja disponible para Ruta San Martin.');
@@ -784,6 +794,15 @@ export async function createOrder(payload, options = {}) {
   }
 
   const orderKey = buildOrderKey(fecha, orderNumber);
+  if (routeSanMartinOrder) {
+    const { authorization } = await requestRouteAction('authorize', {
+      orderKey, branchId: storeBranchId, location: orderRecord.ubicacion,
+      slotId: routeSchedule.slotId, eligibleSubtotal: Number(subtotal || 0) - couponDiscount,
+    });
+    orderRecord.routeZoneId = authorization.zoneId;
+    orderRecord.routeZoneName = authorization.zoneName;
+    orderRecord.routeConfigRevision = authorization.revision;
+  }
   const updates = {
     [`orders/${orderKey}`]: orderRecord,
     [`${ORDER_ORIGINALS_PATH}/${fecha}/${orderKey}`]: buildOriginalOrderRecord(

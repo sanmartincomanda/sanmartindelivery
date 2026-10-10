@@ -27,7 +27,7 @@ import {
   subscribeStoreBranches,
 } from '../services/storeBranches';
 import {
-  ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID,
+  isRouteSanMartinEnabled,
   getRouteSanMartinQuote,
   getRouteSanMartinShortfall,
   getRouteSanMartinSlots,
@@ -100,8 +100,11 @@ export default function OrderForm({
 
   const routeOrder = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
   const previewNumber = routeOrder ? 'RS' : formatOrderNumber(nextOrderNumber, branchId);
-  const routeAvailableAtBranch = branchId === ROUTE_SAN_MARTIN_ORIGIN_BRANCH_ID;
-  const routeSlots = useMemo(() => getRouteSanMartinSlots(new Date(routeClock)), [routeClock]);
+  const routeAvailableAtBranch = isRouteSanMartinEnabled(storeBranches.find((branch) => branch.id === branchId));
+  const routeSlots = useMemo(() => getRouteSanMartinSlots(new Date(routeClock), 14, {
+    branch: storeBranches.find((branch) => branch.id === branchId),
+    destination: normalizeManualRouteLocation(routeContact.lat, routeContact.lng),
+  }), [routeClock, storeBranches, branchId, routeContact.lat, routeContact.lng]);
   const routeDates = [...new Map(routeSlots.map((slot) => [slot.deliveryDate, slot.dateLabel]))];
   const activeRouteDate = routeDates.some(([date]) => date === routeDate)
     ? routeDate : routeDates[0]?.[0] || '';
@@ -1295,7 +1298,7 @@ export default function OrderForm({
                   {!routeLocation ? 'Agrega un pin valido para comprobar la cobertura.'
                     : !branchesReady || branchesError ? 'Cobertura pendiente de confirmar.'
                       : routeQuote.available ? `Dentro de cobertura: ${formatStoreDeliveryDistance(routeQuote.distanceKm)} desde Granada. Envio C$0.00.`
-                        : `Sin cobertura de Ruta. Radio de ${routeQuote.coverageRadiusKm} km desde Granada.`}
+                        : 'La direccion no pertenece a una zona activa de Ruta.'}
                 </div>
                 {routeLocation && <a href={buildGoogleMapsPlaceUrl(routeLocation)} target="_blank" rel="noreferrer">Verificar pin en Google Maps</a>}
               </section>

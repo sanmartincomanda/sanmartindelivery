@@ -146,6 +146,7 @@ import StoreRewardsAdminSection from './StoreRewardsAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import StoreCustomerDiscountsAdminSection from './StoreCustomerDiscountsAdminSection';
 import StoreBranchesAdminSection from './StoreBranchesAdminSection';
+const RouteSanMartinAdminSection = React.lazy(() => import('./RouteSanMartinAdminSection'));
 import FirstOrderRewardAdminSection from './FirstOrderRewardAdminSection';
 import '../styles/storeAdmin2026.css';
 import {
@@ -170,6 +171,7 @@ const STORE_ADMIN_GROUPS = [
     sections: [
       { id: 'resumen', label: 'Resumen' },
       { id: 'sucursales', label: 'Sucursales y entrega' },
+      { id: 'ruta_san_martin', label: 'Ruta San Martín' },
     ],
   },
   {
@@ -236,6 +238,7 @@ const STORE_ADMIN_SCOPES = {
     sections: [
       { id: 'resumen', label: 'Resumen' },
       { id: 'sucursales', label: 'Sucursales y entrega' },
+      { id: 'ruta_san_martin', label: 'Ruta San Martín' },
       { id: 'categorias', label: 'Presentacion de categorias' },
     ],
   },
@@ -3494,6 +3497,8 @@ export default function ConfiguracionView({
           />
         ) : isStoreMode && section === 'sucursales' ? (
           <StoreBranchesAdminSection />
+        ) : isStoreMode && section === 'ruta_san_martin' ? (
+          <React.Suspense fallback={<p role="status">Cargando Ruta San Martín…</p>}><RouteSanMartinAdminSection /></React.Suspense>
         ) : isStoreMode && section === 'pedidos' ? (
           <StoreOrdersAdminSection orders={storeOrders} loading={storeOrdersLoading} />
         ) : isStoreMode && section === 'promociones' ? (

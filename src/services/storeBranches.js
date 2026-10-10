@@ -143,6 +143,8 @@ export const normalizeStoreBranch = (branch = {}, fallback = {}) => {
       source.routeSanMartinRadiusKm,
       normalizePositiveNumber(backup.routeSanMartinRadiusKm, 40)
     ),
+    routeSanMartinEnabled: (source.routeSanMartinEnabled ?? backup.routeSanMartinEnabled) === true,
+    routeSanMartin: source.routeSanMartin || backup.routeSanMartin || null,
     switchPromptRadiusKm: normalizePositiveNumber(
       source.switchPromptRadiusKm,
       normalizePositiveNumber(backup.switchPromptRadiusKm, 12)
@@ -278,7 +280,9 @@ export const saveStoreBranch = async (branch = {}) => {
     fallback
   );
 
-  await set(ref(database, `${STORE_BRANCHES_PATH}/${cleanId}`), normalized);
+  // Ruta has its own versioned editor; a stale branch form must not reactivate it.
+  const { routeSanMartinEnabled, routeSanMartin, ...branchFields } = normalized;
+  await update(ref(database, `${STORE_BRANCHES_PATH}/${cleanId}`), branchFields);
   return normalized;
 };
 
