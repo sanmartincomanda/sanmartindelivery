@@ -89,7 +89,8 @@ coordinate editing and coverage validation still work. References:
 
 - `test:route-zones`: 61 checks for geometry, boundaries, invalid polygons,
   inactive/missing configuration, weekdays, overlap, cutoff, server validation.
-- `test:route-rules`: real RTDB emulator, production rule candidate and Netlify
+- `test:route-rules`: 31 rule checks and 26 handler checks in the real RTDB
+  emulator, including the production rule candidate and Netlify
   handler. Auth is stubbed only inside the handler test. Tests cover forbidden
   configuration access, stale revisions, save-without-activation, empty zones,
   invalid coordinates/days/minimum, proof tampering/expiry/account binding,
@@ -100,10 +101,18 @@ coordinate editing and coverage validation still work. References:
 - Real browser, isolated editor: radius change, weekday selection, save while
   disabled, new polygon, invalid empty polygon, four coordinate vertices, save,
   overlap coverage preview and 390x844 layout without horizontal overflow.
-- A browser-control failure blocked the final visual activation-dialog test.
-  The native confirm was replaced by an accessible in-page dialog; server-side
-  activation/deactivation is covered in the emulator. No production activation
-  or real customer order was used for QA.
+- An initial browser-control failure was isolated to an old native dialog. A
+  fresh local browser session completed activation confirmation, cancellation,
+  deactivation, keyboard focus trapping, Escape, and saving without activation.
+  The editor now uses an accessible in-page confirmation instead of native
+  confirm. An injected save error retained the draft; confirmed reload restored
+  the saved configuration. 1024px tablet and 1280px desktop were also inspected.
+- Netlify preview: version marker, CORS preflight and invalid-token rejection
+  passed. Production: both custom domains serve the new release, the endpoint
+  responds, Granada remains active/accepting regular orders, Ruta is false,
+  and the public catalog/cart load. Firebase Hosting workflow succeeded.
+- Production AdminTV reaches its login screen in this browser. The authenticated
+  editor was tested in an isolated fixture; no production activation, real
+  customer order, or live coverage edit was used for QA.
 
-Pending: verify the activation confirmation interactively when browser input is
-available, and publish/test an Android build before resuming Ruta on old APKs.
+Pending: publish/test an Android build before resuming Ruta on old APKs.
