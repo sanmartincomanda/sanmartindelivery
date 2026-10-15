@@ -1,5 +1,22 @@
 import assert from 'node:assert/strict';
 import { createRetailHomeView, retailViewKey } from '../src/components/storefront/retailNavigationState.js';
+import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from '../src/components/storefront/retailHomePromotions.js';
+
+const products = Array.from({ length: 13 }, (_, index) => ({ code: String(index) }));
+const sections = ['promo-a', 'res-gold', 'res-diaria', 'promo-b', 'promo-c', 'store-home-combos', 'otros-productos']
+  .map(id => ({ id, products }));
+const originalSections = structuredClone(sections);
+assert.deepEqual(getRetailHomeSections(sections, false).map(section => section.id), sections.slice(0, 6).map(section => section.id));
+assert.equal(getRetailHomeSections(sections, true), sections, 'Admin keeps every section');
+assert.deepEqual(getRetailHomeSections([], false), []);
+for (const section of sections) {
+  assert.deepEqual(getRetailHomeSectionProducts(section, false, 5), isRetailHomePromotion(section) ? products : products.slice(0, 5));
+  assert.deepEqual(getRetailHomeSectionProducts(section, true, 5), products.slice(0, 5), 'Admin pagination stays unchanged');
+  assert.deepEqual(getRetailHomeSectionProducts({ ...section, products: [] }, false, 5), []);
+}
+assert.deepEqual(getRetailHomeSectionProducts({ id: 'promo-single', products: products.slice(0, 1) }, false, 5), products.slice(0, 1));
+assert.deepEqual(sections, originalSections, 'Presentation must not alter products, prices or order');
+console.log('Home promotions: every campaign, combo and product is visible; regular rails and admin pagination are preserved.');
 
 const snapshot = {
   tab: 'search', category: 'res', subcategory: 'Linea Gold', search: 'bistec',

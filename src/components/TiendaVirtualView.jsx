@@ -2,6 +2,7 @@ import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, u
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
+import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from './storefront/retailHomePromotions';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
 import { GOOGLE_PLAY_STORE_URL, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
 import RetailCheckout from './storefront/RetailCheckout';
@@ -2558,7 +2559,7 @@ export default function TiendaVirtualView({
     return [...productPromotionSections, ...(comboSection ? [comboSection] : []), ...regularSections];
   }, [activeCategory, activeProductPromotions, filteredProducts]);
 
-  const visibleHomeSections = isDashboard ? groupedAllProductsSections : groupedAllProductsSections.slice(0, 4);
+  const visibleHomeSections = getRetailHomeSections(groupedAllProductsSections, isDashboard);
   const homeHasGoldSection = visibleHomeSections.some(isRetailGoldSection);
 
   useEffect(() => {
@@ -10258,7 +10259,8 @@ export default function TiendaVirtualView({
             <div className="store-grouped-sections">
               {visibleHomeSections.map((section, sectionIndex) => {
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
-                const visibleProducts = section.products.slice(0, visibleCount);
+                const visibleProducts = getRetailHomeSectionProducts(section, isDashboard, visibleCount);
+                const showAllPromotionProducts = !isDashboard && isRetailHomePromotion(section);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
                 const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
                 const actionLabel = getStoreGroupActionLabel(section);
@@ -10292,7 +10294,7 @@ export default function TiendaVirtualView({
                         )}
                       </div>
                     </div>
-                    <div className="store-grid">
+                    <div className={`store-grid${showAllPromotionProducts ? ' retail-promotion-grid' : ''}`}>
                       {visibleProducts.map((product) => renderStoreProductTile(product))}
                     </div>
                     {isDashboard && remainingCount > 0 && (
