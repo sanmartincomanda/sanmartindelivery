@@ -69,7 +69,7 @@ jobs:
       - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Carnes-San-Martin-v1.2.8-release
+          name: Carnes-San-Martin-v1.2.10-release
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/apk/release/app-release.apk
