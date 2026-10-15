@@ -8,6 +8,27 @@
         ".write": "auth != null && ((auth.uid == $uid && (!data.exists() || data.child('role').val() == 'client') && newData.child('role').val() == 'client') || root.child('userRoles').child(auth.uid).child('role').val() == 'admin')"
       }
     },
+    "kitchenStaff": {
+      ".read": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen' || root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin')",
+      ".write": "auth != null && root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && newData.exists()",
+      ".validate": "newData.hasChildren(['schemaVersion'])",
+      "schemaVersion": { ".validate": "newData.val() == 1" },
+      "members": {
+        "$staffId": {
+          ".validate": "newData.hasChildren(['name', 'alias', 'active', 'sortOrder', 'revision', 'createdAt', 'updatedAt', 'updatedBy'])",
+          "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80 && newData.val().matches(/.*[^ \\t\\r\\n].*/)" },
+          "alias": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40 && newData.val().matches(/.*[^ \\t\\r\\n].*/)" },
+          "active": { ".validate": "newData.isBoolean()" },
+          "sortOrder": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "revision": { ".validate": "newData.isNumber() && newData.val() >= 1" },
+          "createdAt": { ".validate": "newData.isNumber() && newData.val() > 0 && (!data.exists() || newData.val() == data.val())" },
+          "updatedAt": { ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('createdAt').val()" },
+          "updatedBy": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128" },
+          "$other": { ".validate": false }
+        }
+      },
+      "$other": { ".validate": false }
+    },
     "orders": {
       ".read": "auth != null && ((root.child('userRoles').child(auth.uid).child('role').val() == 'admin' && query.orderByChild == 'fecha') || ((root.child('userRoles').child(auth.uid).child('role').val() == 'branch_admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'service') && query.orderByChild == 'storeBranchId' && query.equalTo == root.child('userRoles').child(auth.uid).child('branchId').val()) || ((root.child('userRoles').child(auth.uid).child('role').val() == 'operator' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen') && query.orderByChild == 'storeBranchId' && query.equalTo == 'granada') || (root.child('userRoles').child(auth.uid).child('role').val() == 'client' && query.orderByChild == 'storeUserKey' && query.equalTo == auth.uid) || (root.child('userRoles').child(auth.uid).child('role').val() == 'driver' && query.orderByChild == 'repartidorCodigo' && query.equalTo == root.child('userRoles').child(auth.uid).child('driverCode').val()))",
       ".indexOn": [
@@ -25,6 +46,9 @@
         ".validate": "data.exists() || (newData.child('fulfillmentType').val() != 'ruta_san_martin' && newData.child('deliveryPromotionType').val() != 'ruta_san_martin' && newData.child('fulfillmentLabel').val() != 'Ruta San Martin' && newData.child('fulfillmentLabel').val() != 'Ruta San Martín' && !newData.child('routeSlotId').exists()) || (root.child('storeBranches').child('granada').child('routeSanMartinEnabled').val() == true && newData.child('storeBranchId').val() == 'granada' && root.child('routeSanMartinAuthorizations').child($orderId).child('uid').val() == auth.uid && root.child('routeSanMartinAuthorizations').child($orderId).child('expiresAt').val() > now && root.child('routeSanMartinAuthorizations').child($orderId).child('revision').val() == root.child('storeBranches').child('granada').child('routeSanMartin').child('revision').val() && newData.child('routeConfigRevision').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('revision').val() && newData.child('ubicacion').child('lat').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('location').child('lat').val() && newData.child('ubicacion').child('lng').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('location').child('lng').val() && newData.child('routeSlotId').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('slotId').val() && newData.child('scheduledDeliveryDate').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('deliveryDate').val() && newData.child('scheduledEarliestAt').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('earliestAt').val() && newData.child('scheduledWindowEndAt').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('windowEndAt').val() && newData.child('routeZoneId').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('zoneId').val() && newData.child('subtotalEstimado').isNumber() && newData.child('descuentoCupon').isNumber() && newData.child('subtotalEstimado').val() - newData.child('descuentoCupon').val() == root.child('routeSanMartinAuthorizations').child($orderId).child('eligibleSubtotal').val() && root.child('routeSanMartinAuthorizations').child($orderId).child('eligibleSubtotal').val() >= 1000)",
         "firstOrderReward": {
           ".validate": "data.exists() || !newData.exists() || root.child('storeIncentives').child('reservations').child(newData.child('reservationId').val()).child('expiresAt').val() > now"
+        },
+        "cocineroId": {
+          ".validate": "newData.isString() && newData.val().length <= 128 && ((data.val() == newData.val() && data.parent().child('cocinero').val() == newData.parent().child('cocinero').val() && data.parent().child('cocineroAlias').val() == newData.parent().child('cocineroAlias').val() && (newData.parent().child('estado').val() != 'En preparación' || data.parent().child('estado').val() == 'En preparación')) || (data.parent().exists() && (data.parent().child('estado').val() == 'Pendiente' || !data.parent().child('estado').exists()) && (!root.child('kitchenStaff').exists() || (root.child('kitchenStaff').child('members').child(newData.val()).child('active').val() == true && root.child('kitchenStaff').child('members').child(newData.val()).child('name').val() == newData.parent().child('cocinero').val() && root.child('kitchenStaff').child('members').child(newData.val()).child('alias').val() == newData.parent().child('cocineroAlias').val()))))"
         }
       }
     },
@@ -46,7 +70,12 @@
       ".write": "auth != null && (root.child('userRoles').child(auth.uid).child('role').val() == 'admin' || root.child('userRoles').child(auth.uid).child('role').val() == 'kitchen')",
       ".indexOn": [
         "fecha"
-      ]
+      ],
+      "$orderId": {
+        "cocineroId": {
+          ".validate": "newData.isString() && newData.val().length <= 128 && ((data.val() == newData.val() && data.parent().child('cocinero').val() == newData.parent().child('cocinero').val() && data.parent().child('cocineroAlias').val() == newData.parent().child('cocineroAlias').val() && (newData.parent().child('estado').val() != 'En preparación' || data.parent().child('estado').val() == 'En preparación')) || (data.parent().exists() && (data.parent().child('estado').val() == 'Pendiente' || !data.parent().child('estado').exists()) && (!root.child('kitchenStaff').exists() || (root.child('kitchenStaff').child('members').child(newData.val()).child('active').val() == true && root.child('kitchenStaff').child('members').child(newData.val()).child('name').val() == newData.parent().child('cocinero').val() && root.child('kitchenStaff').child('members').child(newData.val()).child('alias').val() == newData.parent().child('cocineroAlias').val()))))"
+        }
+      }
     },
     "routeSanMartinAuthorizations": {
       ".read": false,

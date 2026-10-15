@@ -1,0 +1,55 @@
+.kitchen-staff, .kitchen-staff-dialog { color: #102846; font: inherit; }
+.kitchen-staff *, .kitchen-staff-dialog * { box-sizing: border-box; }
+.kitchen-staff { margin-top: 24px; }
+.kitchen-staff__header, .kitchen-staff__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.kitchen-staff__header h3, .kitchen-staff-dialog h3 { font-size: 20px; margin: 0; }
+.kitchen-staff__header p { color: #52647a; line-height: 1.5; margin: 6px 0 0; }
+.kitchen-staff__toolbar { margin: 22px 0 12px; }
+.kitchen-staff__filters { display: flex; gap: 4px; flex-wrap: wrap; }
+.kitchen-staff__filters button { border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 10px 12px; min-height: 44px; font: inherit; font-weight: 700; color: #52647a; cursor: pointer; }
+.kitchen-staff__filters button[aria-pressed="true"] { border-bottom-color: #0044c5; color: #0044c5; }
+.kitchen-staff__filters span { margin-left: 6px; font-size: 12px; }
+.kitchen-staff__search { display: grid; gap: 4px; font-size: 12px; font-weight: 700; width: min(100%, 280px); }
+.kitchen-staff input, .kitchen-staff-dialog input { width: 100%; min-height: 46px; border: 1px solid #cbd9e8; border-radius: 8px; background: white; color: #102846; padding: 10px 12px; font: inherit; font-size: 16px; }
+.ks-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border: 1px solid #0044c5; border-radius: 8px; font: inherit; font-weight: 700; color: #fff; background: #0044c5; cursor: pointer; transition: background 140ms, transform 140ms; }
+.ks-button.secondary { color: #0044c5; background: #fff; border-color: #cbd9e8; }
+.ks-button.danger-text { background: transparent; color: #ae1824; border-color: transparent; }
+.ks-button.danger { background: #c81423; border-color: #c81423; }
+.ks-button:active:not(:disabled) { transform: translateY(1px); }
+.ks-button:disabled { opacity: .55; cursor: not-allowed; }
+.kitchen-staff :focus-visible, .kitchen-staff-dialog :focus-visible { outline: 3px solid #5997f4; outline-offset: 3px; }
+.kitchen-staff__list { padding: 0; margin: 0; list-style: none; border-top: 1px solid #e2e8f0; }
+.kitchen-staff__list li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid #e2e8f0; }
+.kitchen-staff__avatar { display: grid; place-items: center; height: 40px; width: 40px; border-radius: 8px; color: #0044c5; background: #edf4ff; font-size: 14px; font-weight: 800; }
+.kitchen-staff__person { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.kitchen-staff__person strong { font-size: 15px; }
+.kitchen-staff__person span { font-size: 13px; color: #52647a; }
+.kitchen-staff__status { font-size: 12px; font-weight: 700; color: #12643f; }
+.kitchen-staff__status.is-inactive { color: #6c5660; }
+.kitchen-staff__actions { display: flex; gap: 6px; }
+.kitchen-staff__notice { background: #edf4ff; color: #123f7b; padding: 12px 14px; border-radius: 8px; line-height: 1.5; overflow-wrap: anywhere; }
+.kitchen-staff__notice.is-error { background: #fff0f1; color: #a11824; }
+.kitchen-staff__notice p { margin-top: 0; }
+.kitchen-staff__empty { padding: 36px 12px; color: #52647a; text-align: center; border-block: 1px solid #e2e8f0; }
+.kitchen-staff__empty p { margin-bottom: 0; }
+.kitchen-staff__footnote { font-size: 13px; line-height: 1.6; color: #52647a; margin: 14px 0 0; }
+.kitchen-staff-dialog { background: rgb(9 30 60 / 60%); font-family: "Segoe UI Variable", "Aptos", "Segoe UI", sans-serif; }
+.kitchen-staff-dialog__panel { width: min(520px, 100%); background: #fff; padding: 24px; border-radius: 12px; }
+.kitchen-staff-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 24px; }
+.kitchen-staff-dialog form { display: grid; gap: 18px; }
+.kitchen-staff-dialog label { display: grid; gap: 8px; font-weight: 700; font-size: 14px; }
+.kitchen-staff-dialog .kitchen-staff__footnote { margin-top: -8px; }
+.kitchen-staff-dialog__description { overflow-wrap: anywhere; line-height: 1.6; }
+.kitchen-staff-dialog__description p { margin-bottom: 0; }
+.kitchen-staff-dialog footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; padding-bottom: env(safe-area-inset-bottom); }
+@media (max-width: 600px) {
+  .kitchen-staff__header > .ks-button, .kitchen-staff__search { width: 100%; }
+  .kitchen-staff__list li { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; }
+  .kitchen-staff__avatar { width: 36px; height: 36px; }
+  .kitchen-staff__actions { grid-column: 2 / -1; }
+  .kitchen-staff__actions .ks-button { flex: 1; }
+  .kitchen-staff-dialog__panel { padding: 18px; }
+  .kitchen-staff-dialog footer { flex-wrap: wrap; }
+  .kitchen-staff-dialog footer .ks-button { flex: 1 1 130px; }
+}
+@media (prefers-reduced-motion: reduce) { .ks-button { transition: none; } }

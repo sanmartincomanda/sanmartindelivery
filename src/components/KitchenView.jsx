@@ -10,6 +10,8 @@ import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { isRouteSanMartinOrder, partitionRouteSanMartinOrders } from '../services/routeSanMartin';
 import { getStoreProductItems, getStoreRewardItems } from '../services/storeOrderEditor';
 import StoreOrderDetails from './StoreOrderDetails';
+import useKitchenStaff, { kitchenStaffService } from '../hooks/useKitchenStaff';
+import { getOrderPreparerName, kitchenStaffError } from '../services/kitchenStaff';
 
 const KITCHEN_THEME = SAN_MARTIN_THEME;
 
@@ -67,20 +69,6 @@ const STATUS_CONFIG = {
     shadow: '0 20px 40px -10px rgba(239, 68, 68, 0.3)'
   }
 };
-
-// ✅ ALIAS para cocineros - Noel Hernandez se muestra como CHIMI
-const COCINEROS = [
-  { nombre: 'Noel Hernandez', alias: 'CHIMI', icono: '👨‍🍳' },
-  { nombre: 'Julio Amador', alias: 'Julio', icono: '👨‍🍳' },
-  { nombre: 'Roberto Centeno', alias: 'Roberto', icono: '👨‍🍳' },
-  { nombre: 'Michael Perez', alias: 'Michael', icono: '👨‍🍳' },
-  { nombre: 'Maria Gomez', alias: 'Maria', icono: '👩‍🍳' },
-  { nombre: 'Daniel Cruz', alias: 'Daniel', icono: '👨‍🍳' },
-  { nombre: 'Noel Bendaña', alias: 'Noel B.', icono: '👨‍🍳' },
-  { nombre: 'Harvey Mora', alias: 'Harvey', icono: '👨‍🍳' },
-  { nombre: 'Encargado Logistica', alias: 'Logística', icono: '📦' },
-  { nombre: 'Otro', alias: 'Otro', icono: '👤' }
-];
 
 const cleanWhatsappPhone = (phone) => String(phone || '').replace(/\D/g, '');
 
@@ -164,6 +152,45 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
   const [animatingCards, setAnimatingCards] = useState(new Set());
   const [modalCocinero, setModalCocinero] = useState(null);
   const [cocineroSeleccionado, setCocineroSeleccionado] = useState(null);
+  const [savingPreparer, setSavingPreparer] = useState(false);
+  const [preparerError, setPreparerError] = useState('');
+  const preparerSaveLock = useRef(false);
+  const preparerDialogRef = useRef(null);
+  const staff = useKitchenStaff({ enabled: !!modalCocinero });
+  const activePreparers = staff.members.filter((member) => member.active);
+  const selectedPreparer = activePreparers.find((member) => member.id === cocineroSeleccionado);
+
+  useEffect(() => {
+    if (cocineroSeleccionado && !staff.loading && !staff.error && !selectedPreparer) {
+      setCocineroSeleccionado(null);
+      setPreparerError('Este preparador ya no está activo. Elegí otra persona.');
+    }
+  }, [cocineroSeleccionado, selectedPreparer, staff.loading, staff.error]);
+
+  const closePreparerPicker = () => {
+    if (preparerSaveLock.current) return;
+    setModalCocinero(null); setCocineroSeleccionado(null); setPreparerError('');
+  };
+
+  useEffect(() => {
+    if (!modalCocinero) return undefined;
+    const previousFocus = document.activeElement;
+    const panel = preparerDialogRef.current;
+    panel?.querySelector('button')?.focus();
+    const handleKey = (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); closePreparerPicker(); }
+      if (event.key !== 'Tab' || !panel) return;
+      const buttons = [...panel.querySelectorAll('button:not(:disabled)')];
+      if (!buttons.length) { event.preventDefault(); return; }
+      if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1).focus(); }
+      else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0].focus(); }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [modalCocinero]);
 
   useEffect(() => {
     if (!allowRuta) {
@@ -215,27 +242,24 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
     update(ref(database, `${basePath}/${firebaseKey}`), payload);
   };
 
-  const handleSelectCocinero = (firebaseKey, nombreReal, tab = kitchenTab) => {
-    if (!nombreReal) return;
-    const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    const basePath = getBasePath(tab);
-    
-    setAnimatingCards(prev => new Set([...prev, firebaseKey]));
-    setTimeout(() => setAnimatingCards(prev => {
-      const next = new Set(prev);
-      next.delete(firebaseKey);
-      return next;
-    }), 300);
-
-    update(ref(database, `${basePath}/${firebaseKey}`), {
-      cocinero: nombreReal,
-      estado: 'En preparación',
-      timestampPreparacion: now,
-      timestamp: Date.now()
-    });
-    
-    setModalCocinero(null);
-    setCocineroSeleccionado(null);
+  const handleSelectCocinero = async (firebaseKey, staffId, tab = kitchenTab) => {
+    if (!staffId || preparerSaveLock.current || !staff.connected) return;
+    preparerSaveLock.current = true; setSavingPreparer(true); setPreparerError('');
+    try {
+      const assignment = await kitchenStaffService.assignment(staffId);
+      await update(ref(database, `${getBasePath(tab)}/${firebaseKey}`), {
+        ...assignment,
+        estado: 'En preparación',
+        timestampPreparacion: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: Date.now(),
+      });
+      setModalCocinero(null); setCocineroSeleccionado(null);
+      setAnimatingCards(prev => new Set([...prev, firebaseKey]));
+      setTimeout(() => setAnimatingCards(prev => {
+        const next = new Set(prev); next.delete(firebaseKey); return next;
+      }), 300);
+    } catch (failure) { setPreparerError(kitchenStaffError(failure)); }
+    finally { preparerSaveLock.current = false; setSavingPreparer(false); }
   };
 
   const marcarPreparado = (firebaseKey, tab = kitchenTab) => {
@@ -305,11 +329,6 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
     if (diff < 1) return 'Ahora';
     if (diff < 60) return `${diff}m`;
     return `${Math.floor(diff / 60)}h ${diff % 60}m`;
-  };
-
-  const mostrarNombreCocinero = (nombre) => {
-    const cocinero = COCINEROS.find(c => c.nombre === nombre);
-    return cocinero ? cocinero.alias : nombre;
   };
 
   return (
@@ -388,12 +407,12 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
           role="presentation"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setModalCocinero(null);
-              setCocineroSeleccionado(null);
+              closePreparerPicker();
             }
           }}
         >
           <div
+            ref={preparerDialogRef}
             className="modal-content admin-viewport-dialog__panel"
             role="dialog"
             aria-modal="true"
@@ -428,13 +447,12 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                 </p>
               </div>
               <button
-                onClick={() => {
-                  setModalCocinero(null);
-                  setCocineroSeleccionado(null);
-                }}
+                aria-label="Cerrar selector de preparador"
+                disabled={savingPreparer}
+                onClick={closePreparerPicker}
                 style={{
-                  width: '40px',
-                  height: '40px',
+                  width: '44px',
+                  height: '44px',
                   borderRadius: '50%',
                   border: 'none',
                   background: '#f1f5f9',
@@ -458,28 +476,36 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
               </button>
             </div>
 
+            {(preparerError || staff.error) && <p role="alert" style={{ color: '#a11824', lineHeight: 1.5 }}>{preparerError || staff.error}</p>}
+            {staff.error && <button type="button" onClick={staff.retry}>Reintentar</button>}
+            {staff.loading && <p role="status" style={{ color: '#475569' }}>Cargando preparadores...</p>}
+            {!staff.loading && !staff.error && !activePreparers.length && <p role="status" style={{ color: '#475569', lineHeight: 1.5 }}>No hay preparadores activos. Pedí al administrador que agregue o reactive uno en Configuración → Preparadores.</p>}
+            {!staff.connected && !staff.loading && <p role="status" style={{ color: '#475569' }}>Sin conexión. Reconectá para asignar el pedido.</p>}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
               gap: '12px',
               marginBottom: '24px'
             }}>
-              {COCINEROS.map((cocinero) => (
+              {activePreparers.map((cocinero) => (
                 <button
-                  key={cocinero.nombre}
+                  key={cocinero.id}
                   type="button"
-                  onClick={() => setCocineroSeleccionado(cocinero.nombre)}
-                  className={`cocinero-card ${cocineroSeleccionado === cocinero.nombre ? 'selected' : ''}`}
+                  disabled={savingPreparer || !staff.connected}
+                  aria-pressed={cocineroSeleccionado === cocinero.id}
+                  title={cocinero.name}
+                  onClick={() => { setCocineroSeleccionado(cocinero.id); setPreparerError(''); }}
+                  className={`cocinero-card ${cocineroSeleccionado === cocinero.id ? 'selected' : ''}`}
                   style={{
                     padding: '20px 12px',
                     borderRadius: '16px',
                     border: '2px solid',
-                    borderColor: cocineroSeleccionado === cocinero.nombre ? '#f59e0b' : '#e2e8f0',
-                    background: cocineroSeleccionado === cocinero.nombre 
+                    borderColor: cocineroSeleccionado === cocinero.id ? '#f59e0b' : '#e2e8f0',
+                    background: cocineroSeleccionado === cocinero.id
                       ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
                       : '#f8fafc',
-                    color: cocineroSeleccionado === cocinero.nombre ? 'white' : '#475569',
-                    fontWeight: cocineroSeleccionado === cocinero.nombre ? 800 : 700,
+                    color: cocineroSeleccionado === cocinero.id ? 'white' : '#475569',
+                    fontWeight: cocineroSeleccionado === cocinero.id ? 800 : 700,
                     fontSize: '14px',
                     cursor: 'pointer',
                     textAlign: 'center',
@@ -491,18 +517,16 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                     justifyContent: 'center'
                   }}
                 >
-                  <span style={{ fontSize: '32px' }}>{cocinero.icono}</span>
-                  <span style={{ lineHeight: '1.3' }}>{cocinero.alias}</span>
+                  <span aria-hidden="true">{Icons.user}</span>
+                  <span style={{ lineHeight: '1.3', overflowWrap: 'anywhere' }}>{cocinero.alias}</span>
                 </button>
               ))}
             </div>
 
             <div className="admin-dialog-actions" style={{ display: 'flex', gap: '12px' }}>
               <button
-                onClick={() => {
-                  setModalCocinero(null);
-                  setCocineroSeleccionado(null);
-                }}
+                disabled={savingPreparer}
+                onClick={closePreparerPicker}
                 style={{
                   flex: 1,
                   padding: '16px',
@@ -524,7 +548,7 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                     handleSelectCocinero(modalCocinero, cocineroSeleccionado);
                   }
                 }}
-                disabled={!cocineroSeleccionado}
+                disabled={!selectedPreparer || savingPreparer || !staff.connected || !!staff.error}
                 style={{
                   flex: 2,
                   padding: '16px',
@@ -541,7 +565,7 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                   boxShadow: cocineroSeleccionado ? '0 8px 25px rgba(245, 158, 11, 0.4)' : 'none'
                 }}
               >
-                {cocineroSeleccionado ? `Asignar a ${COCINEROS.find(c => c.nombre === cocineroSeleccionado)?.alias}` : 'Selecciona un carnicero'}
+                {savingPreparer ? 'Asignando...' : selectedPreparer ? `Asignar a ${selectedPreparer.alias}` : 'Selecciona un carnicero'}
               </button>
             </div>
           </div>
@@ -823,14 +847,14 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                           justifyContent: 'center',
                           fontSize: '20px'
                         }}>
-                          {COCINEROS.find(c => c.nombre === pedido.cocinero)?.icono || '👨‍🍳'}
+                          {Icons.user}
                         </div>
                         <div>
                           <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
                             Preparando
                           </div>
                           <div style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b' }}>
-                            {mostrarNombreCocinero(pedido.cocinero)}
+                            {getOrderPreparerName(pedido)}
                           </div>
                         </div>
                       </div>
@@ -1039,6 +1063,7 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                           onClick={() => {
                             setModalCocinero(pedido.firebaseKey);
                             setCocineroSeleccionado(null);
+                            setPreparerError('');
                           }}
                           className="btn-hover"
                           style={{

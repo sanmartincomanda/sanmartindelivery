@@ -1,6 +1,7 @@
 import React, { startTransition, useEffect, useMemo, useState } from 'react';
 import { get, onValue, orderByChild, query, ref, startAt } from 'firebase/database';
 import { database } from '../firebase';
+import KitchenStaffAdminSection from './KitchenStaffAdminSection';
 import {
   applySicarPriceUpdatesWithOptions,
   applySicarCatalogProductsWithOptions,
@@ -2687,8 +2688,8 @@ export default function ConfiguracionView({
       }
     : {
         usuarios: {
-          path: 'Admintv / Configuracion / Usuarios',
-          title: 'Usuarios',
+          path: 'Admintv / Configuración',
+          title: 'Configuración',
         },
       }[section] || {
         path: 'Admintv / Configuracion',
@@ -7113,9 +7114,9 @@ function UsersManager({
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22 }}>Gestion de usuarios</h2>
+          <h2 style={{ margin: 0, fontSize: 22 }}>Equipo y accesos</h2>
           <p style={{ margin: '4px 0 0', color: '#64748b', fontWeight: 700 }}>
-            Separa usuarios internos administrativos de usuarios clientes de la tienda virtual.
+            Administrá preparadores, entregadores y accesos del equipo.
           </p>
         </div>
         <div className="cfg-tabs" style={{ marginTop: 0 }}>
@@ -7131,7 +7132,14 @@ function UsersManager({
             className={`cfg-tab ${usersTab === 'cocina' ? 'active' : ''}`}
             onClick={() => setUsersTab('cocina')}
           >
-            Cocina
+            Acceso Cocina
+          </button>
+          <button
+            type="button"
+            className={`cfg-tab ${usersTab === 'preparadores' ? 'active' : ''}`}
+            onClick={() => setUsersTab('preparadores')}
+          >
+            Preparadores
           </button>
           <button
             type="button"
@@ -7184,6 +7192,8 @@ function UsersManager({
             administrativos siguen siendo validados por la autoridad actual del backend.
           </div>
         </div>
+      ) : usersTab === 'preparadores' ? (
+        <KitchenStaffAdminSection currentUsername={currentUsername} />
       ) : usersTab === 'cocina' ? (
         <div
           style={{

@@ -21,6 +21,7 @@ import {
   roundStoreQuantity,
 } from '../services/storeOrderEditor';
 import StoreOrderDetails from './StoreOrderDetails';
+import { getOrderPreparerName } from '../services/kitchenStaff';
 
 const LIST_THEME = SAN_MARTIN_THEME;
 
@@ -163,19 +164,6 @@ const getCancellationSource = (pedido = {}) => {
 };
 
 const formatCurrency = (value) => `C$${Number(value || 0).toFixed(2)}`;
-
-// Alias para cocineros
-const COCINEROS_ALIAS = {
-  'Noel Hernandez': 'CHIMI',
-  'Julio Amador': 'Julio',
-  'Roberto Centeno': 'Roberto',
-  'Michael Perez': 'Michael',
-  'Maria Gomez': 'Maria',
-  'Daniel Cruz': 'Daniel',
-  'Noel Bendaña': 'Noel B.',
-  'Harvey Mora': 'Harvey',
-  'Encargado Logistica': 'Logística'
-};
 
 const getListStatusConfig = (pedido = {}) => {
   const status = pedido.estado || 'Pendiente';
@@ -526,10 +514,6 @@ export default function ListaPedidos({ pedidos = [] }) {
         console.warn('La devolución de la regalía quedó pendiente de conciliación:', error);
       });
     }
-  };
-
-  const mostrarNombreCocinero = (nombre) => {
-    return COCINEROS_ALIAS[nombre] || nombre;
   };
 
   const handleActualizarTotalWhatsapp = async (pedido) => {
@@ -1575,7 +1559,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                             Preparado por
                           </div>
                           <div style={{ fontSize: '18px', fontWeight: 800, color: '#92400e' }}>
-                            {mostrarNombreCocinero(pedido.cocinero)}
+                            {getOrderPreparerName(pedido)}
                           </div>
                         </div>
                       </div>
