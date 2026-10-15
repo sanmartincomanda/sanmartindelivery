@@ -66,6 +66,7 @@ const DEFAULT_REWARD_ACCOUNT = {
   pendingReservationId: '',
   earnedOrderPoints: {},
   settledReservationIds: {},
+  releasedReservationIds: {},
   updatedAt: 0,
   createdAt: 0,
 };
@@ -258,6 +259,10 @@ export const normalizeStoreRewardAccount = (account = {}, customerId = '') => {
     settledReservationIds:
       source.settledReservationIds && typeof source.settledReservationIds === 'object'
         ? source.settledReservationIds
+        : {},
+    releasedReservationIds:
+      source.releasedReservationIds && typeof source.releasedReservationIds === 'object'
+        ? source.releasedReservationIds
         : {},
     updatedAt: normalizeRewardTimestamp(source.updatedAt),
     createdAt: normalizeRewardTimestamp(source.createdAt),
@@ -756,27 +761,60 @@ export async function releaseStoreRewardReservation({
   }
 
   const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
-  let releasedHold = null;
-  let alreadySettled = false;
+  const cleanOrderKey = String(orderKey || '').trim();
+  let receipt = null;
+  let reason = 'hold_missing';
 
   const transactionResult = await runTransaction(accountRef, (currentValue) => {
+    // Firebase can retry this callback after a concurrent delivery/cancellation.
+    receipt = null;
+    reason = 'hold_missing';
     const account = normalizeStoreRewardAccount(currentValue, cleanUserKey);
+    if (account.settledReservationIds?.[cleanReservationId]) {
+      reason = 'already_settled';
+      return currentValue;
+    }
+    const previousRelease = account.releasedReservationIds?.[cleanReservationId];
+    if (previousRelease) {
+      if (String(previousRelease.orderKey || '') !== cleanOrderKey) {
+        reason = 'order_mismatch';
+        return currentValue;
+      }
+      receipt = previousRelease;
+      reason = 'already_released';
+      return currentValue;
+    }
     const hold = account.holds?.[cleanReservationId] || null;
 
     if (!hold) {
-      alreadySettled = Boolean(account.settledReservationIds?.[cleanReservationId]);
-      return account;
+      return currentValue;
+    }
+    if (hold.orderKey && String(hold.orderKey) !== cleanOrderKey) {
+      reason = 'order_mismatch';
+      return currentValue;
     }
 
-    releasedHold = hold;
     const nextHolds = { ...(account.holds || {}) };
     delete nextHolds[cleanReservationId];
     const balanceBefore = account.pointsBalance;
+    receipt = {
+      points: roundPoints(hold.points || 0),
+      rewardId: String(hold.rewardId || ''),
+      rewardName: String(hold.rewardName || ''),
+      orderKey: cleanOrderKey,
+      balanceBefore,
+      balanceAfter: balanceBefore + roundPoints(hold.points || 0),
+      releasedAt: Date.now(),
+      note: String(note || '').trim(),
+    };
+    reason = 'released';
 
     return {
+      ...currentValue,
       ...account,
-      pointsBalance: Math.max(0, balanceBefore + roundPoints(hold.points || 0)),
+      pointsBalance: receipt.balanceAfter,
       holds: nextHolds,
+      releasedReservationIds: { ...account.releasedReservationIds, [cleanReservationId]: receipt },
       pendingReservationId:
         String(account.pendingReservationId || '').trim() === cleanReservationId
           ? ''
@@ -792,46 +830,44 @@ export async function releaseStoreRewardReservation({
     };
   }
 
-  if (!releasedHold) {
+  if (!receipt) {
     return {
       restored: false,
-      reason: alreadySettled ? 'already_settled' : 'hold_missing',
+      reason,
     };
   }
 
-  const nextAccount = normalizeStoreRewardAccount(transactionResult.snapshot.val(), cleanUserKey);
-  const refundPoints = roundPoints(releasedHold.points || 0);
-  const balanceAfter = nextAccount.pointsBalance;
-  const balanceBefore = Math.max(0, balanceAfter - refundPoints);
   const transactionKey = getStoreRewardTransactionKey(`reverse_${cleanReservationId}`);
-
-  await update(ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${getStoreRewardTransactionKey(cleanReservationId)}`), {
-    status: 'reversed',
-    orderKey: String(orderKey || '').trim(),
-    reversedAt: Date.now(),
-  }).catch(() => {});
-
-  await set(
-    ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${transactionKey}`),
-    createAccountTransactionRecord({
-      customerId: cleanUserKey,
-      orderKey,
-      rewardId: String(releasedHold.rewardId || '').trim(),
-      rewardName: String(releasedHold.rewardName || '').trim(),
-      type: STORE_REWARD_TRANSACTION_TYPES.REVERSED,
-      status: 'applied',
-      points: refundPoints,
-      signedPoints: refundPoints,
-      balanceBefore,
-      balanceAfter,
-      note,
-    })
-  );
+  const ledgerPath = `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}`;
+  const originalTransactionPath = `${ledgerPath}/${getStoreRewardTransactionKey(cleanReservationId)}`;
+  // The receipt makes a retry repair the ledger without crediting points twice.
+  await update(ref(databaseInstance), {
+    [`${originalTransactionPath}/status`]: 'reversed',
+    ...(receipt.orderKey ? { [`${originalTransactionPath}/orderKey`]: receipt.orderKey } : {}),
+    [`${originalTransactionPath}/reversedAt`]: receipt.releasedAt,
+    [`${ledgerPath}/${transactionKey}`]: {
+      ...createAccountTransactionRecord({
+        customerId: cleanUserKey,
+        orderKey: receipt.orderKey,
+        rewardId: receipt.rewardId,
+        rewardName: receipt.rewardName,
+        type: STORE_REWARD_TRANSACTION_TYPES.REVERSED,
+        status: 'applied',
+        points: receipt.points,
+        signedPoints: receipt.points,
+        balanceBefore: receipt.balanceBefore,
+        balanceAfter: receipt.balanceAfter,
+        note: receipt.note,
+      }),
+      createdAt: receipt.releasedAt,
+    },
+  });
 
   return {
-    restored: true,
-    refundedPoints: refundPoints,
-    balanceAfter,
+    restored: reason === 'released',
+    reason,
+    refundedPoints: receipt.points,
+    balanceAfter: receipt.balanceAfter,
   };
 }
 
@@ -853,25 +889,41 @@ export async function settleStoreRewardReservation({
   }
 
   const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
-  let settledHold = null;
+  const cleanOrderKey = String(orderKey || '').trim();
+  let receipt = null;
+  let reason = 'hold_missing';
 
   const transactionResult = await runTransaction(accountRef, (currentValue) => {
+    receipt = null;
+    reason = 'hold_missing';
     const account = normalizeStoreRewardAccount(currentValue, cleanUserKey);
-
-    if (account.settledReservationIds?.[cleanReservationId]) {
-      return account;
+    const previousSettlement = account.settledReservationIds?.[cleanReservationId];
+    if (previousSettlement) {
+      if (String(previousSettlement.orderKey || '') !== cleanOrderKey) {
+        reason = 'order_mismatch';
+        return currentValue;
+      }
+      receipt = previousSettlement;
+      reason = 'already_settled';
+      return currentValue;
     }
 
     const hold = account.holds?.[cleanReservationId] || null;
-    if (!hold) {
-      return account;
+    if (!hold || account.releasedReservationIds?.[cleanReservationId]) {
+      return currentValue;
+    }
+    if (hold.orderKey && String(hold.orderKey) !== cleanOrderKey) {
+      reason = 'order_mismatch';
+      return currentValue;
     }
 
-    settledHold = hold;
+    receipt = { points: roundPoints(hold.points || 0), orderKey: cleanOrderKey, settledAt: Date.now() };
+    reason = 'settled';
     const nextHolds = { ...(account.holds || {}) };
     delete nextHolds[cleanReservationId];
 
     return {
+      ...currentValue,
       ...account,
       holds: nextHolds,
       pendingReservationId:
@@ -884,33 +936,30 @@ export async function settleStoreRewardReservation({
       ),
       settledReservationIds: {
         ...(account.settledReservationIds || {}),
-        [cleanReservationId]: {
-          points: roundPoints(hold.points || 0),
-          orderKey: String(orderKey || '').trim(),
-          settledAt: Date.now(),
-        },
+        [cleanReservationId]: receipt,
       },
       updatedAt: Date.now(),
     };
   });
 
-  if (!transactionResult.committed || !settledHold) {
+  if (!transactionResult.committed || !receipt) {
     return {
       settled: false,
-      reason: settledHold ? 'not_committed' : 'hold_missing',
+      reason: transactionResult.committed ? reason : 'not_committed',
     };
   }
 
   await update(ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${getStoreRewardTransactionKey(cleanReservationId)}`), {
     status: 'settled',
-    orderKey: String(orderKey || '').trim(),
-    settledAt: Date.now(),
+    orderKey: receipt.orderKey,
+    settledAt: receipt.settledAt,
     note: String(note || '').trim(),
-  }).catch(() => {});
+  });
 
   return {
-    settled: true,
-    redeemedPoints: roundPoints(settledHold.points || 0),
+    settled: reason === 'settled',
+    reason,
+    redeemedPoints: receipt.points,
   };
 }
 
@@ -1025,11 +1074,14 @@ export async function reverseStoreRewardEarnedPoints({
   let balanceAfter = 0;
 
   const transactionResult = await runTransaction(accountRef, (currentValue) => {
+    reversedPoints = 0;
+    balanceBefore = 0;
+    balanceAfter = 0;
     const account = normalizeStoreRewardAccount(currentValue, cleanUserKey);
     const earnedRecord = account.earnedOrderPoints?.[cleanOrderKey];
 
     if (!earnedRecord) {
-      return account;
+      return currentValue;
     }
 
     reversedPoints = roundPoints(earnedRecord.points || 0);
@@ -1082,6 +1134,7 @@ export async function linkRewardReservationToOrder({
   reservationId,
   orderKey,
   orderNumber = 0,
+  orderDate = '',
   databaseInstance = database,
 }) {
   const cleanUserKey = String(userKey || '').trim();
@@ -1089,18 +1142,74 @@ export async function linkRewardReservationToOrder({
   const cleanOrderKey = String(orderKey || '').trim();
 
   if (!cleanUserKey || !cleanReservationId || !cleanOrderKey) {
-    return;
+    return { linked: false, reason: 'missing_input' };
   }
 
-  await update(
-    ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${getStoreRewardTransactionKey(cleanReservationId)}`),
-    {
-      orderKey: cleanOrderKey,
-      orderNumber: Number(orderNumber || 0),
-      status: 'linked',
-      linkedAt: Date.now(),
+  const ledgerRef = ref(databaseInstance, `${STORE_REWARD_TRANSACTIONS_PATH}/${cleanUserKey}/${getStoreRewardTransactionKey(cleanReservationId)}`);
+  const existingTransaction = (await get(ledgerRef)).val();
+  if (existingTransaction?.orderKey && existingTransaction.orderKey !== cleanOrderKey) {
+    return { linked: false, reason: 'order_mismatch' };
+  }
+  if (!existingTransaction) return { linked: false, reason: 'transaction_missing' };
+
+  const accountRef = ref(databaseInstance, `${STORE_REWARD_ACCOUNTS_PATH}/${cleanUserKey}`);
+  let linked = false;
+  let reason = 'hold_missing';
+  const result = await runTransaction(
+    accountRef,
+    (account) => {
+      linked = false;
+      reason = 'hold_missing';
+      const hold = account?.holds?.[cleanReservationId];
+      if (
+        !hold || account?.settledReservationIds?.[cleanReservationId] ||
+        account?.releasedReservationIds?.[cleanReservationId]
+      ) return account;
+      if (hold.orderKey && hold.orderKey !== cleanOrderKey) {
+        reason = 'order_mismatch';
+        return account;
+      }
+      linked = true;
+      reason = hold.orderKey ? 'already_linked' : 'linked';
+      if (hold.orderKey) return account;
+      return {
+        ...account,
+        holds: {
+          ...account.holds,
+          [cleanReservationId]: {
+            ...hold, orderKey: cleanOrderKey, orderDate: String(orderDate || ''),
+            linkedAt: hold.linkedAt || Date.now(),
+          },
+        },
+        updatedAt: Date.now(),
+      };
     }
-  ).catch(() => {});
+  );
+  if (!result.committed || !linked) return { linked: false, reason };
+
+  let ledgerMatches = false;
+  const ledgerResult = await runTransaction(
+    ledgerRef,
+    (transaction) => {
+      ledgerMatches = false;
+      if (!transaction) return transaction;
+      if (transaction.orderKey && transaction.orderKey !== cleanOrderKey) return transaction;
+      ledgerMatches = true;
+      if (['settled', 'reversed'].includes(transaction.status)) return transaction;
+      if (transaction.orderKey === cleanOrderKey && transaction.status === 'linked') return transaction;
+      return {
+        ...transaction, orderKey: cleanOrderKey, orderNumber: Number(orderNumber || 0),
+        orderDate: String(orderDate || ''), status: 'linked', linkedAt: transaction.linkedAt || Date.now(),
+      };
+    }
+  );
+  if (!ledgerResult.committed || !ledgerMatches) return { linked: false, reason: 'order_mismatch' };
+  // Do not unlock the next checkout until both records agree about this order.
+  await runTransaction(accountRef, (account) => {
+    if (account?.pendingReservationId !== cleanReservationId || account?.holds?.[cleanReservationId]?.orderKey !== cleanOrderKey) return account;
+    return { ...account, pendingReservationId: '', updatedAt: Date.now() };
+  });
+  return { linked: true, reason };
 }
 
 export const buildCustomerRewardSummary = (rewards = [], pointsBalance = 0, cartAmount = 0, settings = DEFAULT_STORE_REWARD_SETTINGS) => {

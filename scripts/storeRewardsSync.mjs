@@ -6,7 +6,6 @@ import {
   orderByChild,
   query,
   ref,
-  set,
   startAt,
   update,
 } from 'firebase/database';
@@ -14,6 +13,7 @@ import {
   applyStoreRewardEarnedPoints,
   calculateEarnedRewardPoints,
   isStoreRewardCreditReadyOrder,
+  linkRewardReservationToOrder,
   normalizeStoreRewardSettings,
   releaseStoreRewardReservation,
   resolveStoreRewardOrderFinalAmount,
@@ -32,14 +32,13 @@ import {
   ensureAuthenticatedFirebaseSession,
   getAuthenticatedFirebaseDatabase,
 } from './firebaseScriptAuth.mjs';
+import { auditStoreRewardReservations } from './storeRewardReservationAudit.mjs';
 
 const STORE_CHANNEL = 'tienda_virtual';
 const STORE_ORDERS_PATH = 'orders';
-const STORE_REWARD_ACCOUNTS_PATH = 'storeRewardAccounts';
 const ORDER_LOOKBACK_DAYS = 60;
 const DATE_WATCH_INTERVAL_MS = 60 * 1000;
 const HOLD_CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
-const STALE_HOLD_MS = 15 * 60 * 1000;
 const HISTORY_RECONCILE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const normalizeText = (value = '') =>
@@ -84,8 +83,12 @@ const buildRewardRedemptionRecord = (orderKey, order = {}) => ({
   updatedAt: Date.now(),
 });
 
-export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
-  const database = getAuthenticatedFirebaseDatabase();
+export function createStoreRewardsSyncManager({
+  onArchivedOrderUpdated,
+  databaseInstance = getAuthenticatedFirebaseDatabase(),
+  authenticate = ensureAuthenticatedFirebaseSession,
+} = {}) {
+  const database = databaseInstance;
   const state = {
     listening: false,
     currentStartDate: '',
@@ -98,6 +101,11 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
     lastSyncAt: '',
     lastHoldCleanupAt: '',
     lastReleasedHolds: 0,
+    reservationSafetyVersion: '2026-10-15-archive-safe',
+    orphanRefundPolicy: 'confirmed_cancellation_only',
+    lastProtectedHolds: 0,
+    lastHoldReviewCount: 0,
+    lastHoldReview: [],
     reconcilingHistory: false,
     lastHistoryReconcileAt: '',
     lastHistoryCandidateCount: 0,
@@ -111,6 +119,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
   let holdCleanupTimer = null;
   let historyReconcileTimer = null;
   const runningOrders = new Map();
+  const holdReviewCache = new Map();
 
   const handleSyncError = (error) => {
     state.lastError = String(error?.message || error || 'No se pudo sincronizar Club San Martin.');
@@ -134,7 +143,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
   };
 
   const syncOrderRewards = async (orderKey, order = {}, sourcePath = STORE_ORDERS_PATH) => {
-    await ensureAuthenticatedFirebaseSession();
+    await authenticate();
 
     if (!isStoreOrder(order) || !orderKey) {
       return;
@@ -151,6 +160,15 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
 
     if (order.rewardRedemption?.reservationId) {
       const reservationId = String(order.rewardRedemption.reservationId || '').trim();
+      if (!['redeemed', 'refunded'].includes(order.rewardRedemption.status)) {
+        const link = await linkRewardReservationToOrder({
+          userKey: cleanUserKey, reservationId, orderKey,
+          orderNumber: order.id, orderDate: order.fecha, databaseInstance: database,
+        });
+        if (link.reason === 'order_mismatch') {
+          throw new Error(`El canje del pedido ${orderKey} ya pertenece a otro pedido. Requiere revision.`);
+        }
+      }
 
       if (isCanceledStoreOrder(order) && order.rewardRedemption.status !== 'refunded') {
         const refundResult = await releaseStoreRewardReservation({
@@ -161,7 +179,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
           databaseInstance: database,
         });
 
-        if (refundResult.restored) {
+        if (refundResult.restored || refundResult.reason === 'already_released') {
           rootUpdates[`${sourcePath}/${orderKey}/rewardRedemption`] = {
             ...(order.rewardRedemption || {}),
             status: 'refunded',
@@ -190,7 +208,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
           databaseInstance: database,
         });
 
-        if (settleResult.settled) {
+        if (settleResult.settled || settleResult.reason === 'already_settled') {
           rootUpdates[`${sourcePath}/${orderKey}/rewardRedemption`] = {
             ...(order.rewardRedemption || {}),
             status: 'redeemed',
@@ -371,7 +389,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
       };
     }
 
-    await ensureAuthenticatedFirebaseSession();
+    await authenticate();
     state.reconcilingHistory = true;
 
     try {
@@ -460,62 +478,17 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
   };
 
   const cleanupOrphanedReservations = async () => {
-    await ensureAuthenticatedFirebaseSession();
-
-    const [ordersSnapshot, accountsSnapshot] = await Promise.all([
-      get(
-        query(
-          ref(database, STORE_ORDERS_PATH),
-          orderByChild('fecha'),
-          startAt(state.currentStartDate || getWatchStartDate())
-        )
-      ),
-      get(ref(database, STORE_REWARD_ACCOUNTS_PATH)),
-    ]);
-
-    const activeReservationIds = new Set();
-    Object.values(ordersSnapshot.val() || {}).forEach((order) => {
-      if (!isStoreOrder(order)) {
-        return;
-      }
-
-      const reservationId = String(order?.rewardRedemption?.reservationId || '').trim();
-      if (reservationId) {
-        activeReservationIds.add(reservationId);
-      }
+    await authenticate();
+    const audit = await auditStoreRewardReservations({
+      databaseInstance: database, startDate: state.currentStartDate || getWatchStartDate(),
+      reviewCache: holdReviewCache,
     });
-
-    const now = Date.now();
-    let releasedCount = 0;
-
-    for (const [userKey, account] of Object.entries(accountsSnapshot.val() || {})) {
-      const holds = account?.holds && typeof account.holds === 'object' ? account.holds : {};
-
-      for (const [reservationId, hold] of Object.entries(holds)) {
-        const requestedAt = Number(hold?.requestedAt || 0);
-        if (!requestedAt || now - requestedAt < STALE_HOLD_MS) {
-          continue;
-        }
-
-        if (activeReservationIds.has(reservationId)) {
-          continue;
-        }
-
-        const releaseResult = await releaseStoreRewardReservation({
-          userKey,
-          reservationId,
-          note: 'Reserva huérfana liberada automaticamente por el integrador.',
-          databaseInstance: database,
-        });
-
-        if (releaseResult.restored) {
-          releasedCount += 1;
-        }
-      }
-    }
-
-    state.lastHoldCleanupAt = new Date(now).toISOString();
-    state.lastReleasedHolds = releasedCount;
+    state.lastHoldCleanupAt = new Date().toISOString();
+    state.lastReleasedHolds = audit.released;
+    state.lastProtectedHolds = audit.protected;
+    state.lastHoldReviewCount = audit.reviewCount;
+    state.lastHoldReview = audit.review;
+    return audit;
   };
 
   const subscribeOrders = () => {
@@ -591,7 +564,7 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
       return;
     }
 
-    await ensureAuthenticatedFirebaseSession();
+    await authenticate();
     await seedDefaultStoreRewardsProgramIfEmpty({ databaseInstance: database });
     state.listening = true;
     subscribeOrders();
@@ -627,6 +600,8 @@ export function createStoreRewardsSyncManager({ onArchivedOrderUpdated } = {}) {
     state,
     initAutoSync,
     reconcileArchivedRewards,
+    syncOrderRewards,
+    auditReservations: cleanupOrphanedReservations,
     stopAutoSync,
   };
 }

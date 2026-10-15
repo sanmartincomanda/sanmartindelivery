@@ -24,6 +24,7 @@
     "test:route-rules": "node scripts/testRoutePauseRules.mjs && node scripts/testRouteSettingsApi.mjs",
     "test:sicar-customer-fields": "node scripts/testSicarCustomerFields.mjs",
     "test:store-reward-status": "node scripts/testStoreRewardStatus.mjs",
+    "test:store-reward-reservations": "node scripts/testStoreRewardReservations.mjs",
     "sicar:bridge": "node scripts/sicarBridgeServer.mjs",
     "sicar:publish:combos": "node scripts/publishSicarStoreCombos.mjs",
     "sicar:sync:all-sold-4m": "node scripts/syncSicarAllSold4m.mjs",
