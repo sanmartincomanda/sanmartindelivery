@@ -1,5 +1,6 @@
 import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, startAt, update } from 'firebase/database';
 import { database } from '../firebase.js';
+import { captureStoreOrderSource } from './storeOrderSource.js';
 import { requestRouteAction } from './routeSanMartinApi.js';
 import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
@@ -740,6 +741,7 @@ export async function createOrder(payload, options = {}) {
     orderPrefix,
     canal: channel,
     canalLabel: channel === STORE_CHANNEL ? 'Tienda Virtual' : 'Ingreso Manual',
+    ...captureStoreOrderSource(channel),
     deliveryMode: pickupOrder
       ? 'pickup'
       : deliveryManualWithoutPin

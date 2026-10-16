@@ -10,6 +10,7 @@ import { isPoketPaymentConfirmed } from '../services/poketPaylinks';
 import { isRouteSanMartinOrder, partitionRouteSanMartinOrders } from '../services/routeSanMartin';
 import { getStoreProductItems, getStoreRewardItems } from '../services/storeOrderEditor';
 import StoreOrderDetails from './StoreOrderDetails';
+import { getOrderTraceChannelLabel } from '../services/orderTraceability.js';
 import useKitchenStaff, { kitchenStaffService } from '../hooks/useKitchenStaff';
 import { getOrderPreparerName, kitchenStaffError } from '../services/kitchenStaff';
 
@@ -904,7 +905,7 @@ export default function KitchenView({ orders, carryoverRouteOrders = [], allowRu
                           color: '#f97316',
                           border: '1px solid rgba(249, 115, 22, 0.28)'
                         }}>
-                          TIENDA VIRTUAL
+                          {getOrderTraceChannelLabel(pedido)}
                         </div>
                       )}
                       {pedido.canal === 'tienda_virtual' && pedido.storeBranchName && (

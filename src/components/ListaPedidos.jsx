@@ -21,6 +21,7 @@ import {
   roundStoreQuantity,
 } from '../services/storeOrderEditor';
 import StoreOrderDetails from './StoreOrderDetails';
+import { getOrderTraceChannelLabel } from '../services/orderTraceability.js';
 import { getOrderPreparerName } from '../services/kitchenStaff';
 
 const LIST_THEME = SAN_MARTIN_THEME;
@@ -1324,7 +1325,7 @@ export default function ListaPedidos({ pedidos = [] }) {
                           fontSize: '14px',
                           fontWeight: 800
                         }}>
-                          TIENDA VIRTUAL
+                          {getOrderTraceChannelLabel(pedido)}
                         </div>
                       )}
                       {cancellationSource && (

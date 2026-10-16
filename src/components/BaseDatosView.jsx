@@ -29,6 +29,7 @@ import { sanitizeStoreUser, STORE_USERS_PATH } from '../services/storeUsers';
 import { hoyISO, normalizar } from './Utils';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import { SAN_MARTIN_THEME } from '../styles/sanMartinTheme';
+import { getOrderTraceChannelLabel } from '../services/orderTraceability.js';
 
 const Icons = {
   users: (
@@ -312,6 +313,7 @@ const orderMatchesSearch = (order, normalizedTerm) => {
     order.metodoPago,
     order.canal,
     order.canalLabel,
+    getOrderTraceChannelLabel(order),
     order.total,
     order.cocinero,
     order.repartidor,
@@ -351,7 +353,7 @@ const buildHistoryExportRows = (orders) =>
     Codigo: order.clienteCodigo || '-',
     Telefono: order.telefono || '-',
     Direccion: order.direccion || '-',
-    Canal: order.canalLabel || order.canal || 'Manual',
+    Canal: getOrderTraceChannelLabel(order),
     Total: order.total ?? '-',
     Envio: order.deliveryFee ?? 0,
     'Distancia km': order.deliveryDistanceKm ?? 0,
@@ -2356,7 +2358,7 @@ function HistoryCard({ order, onOpen }) {
         <MiniChip icon={Icons.clock} label={order.timestampIngreso || 'Sin hora'} tone={{ color: '#f8fafc', soft: 'rgba(255, 255, 255, 0.08)' }} />
         <MiniChip icon={Icons.creditCard} label={order.metodoPago || 'Efectivo'} tone={paymentTone} />
         {order.canalLabel && (
-          <MiniChip icon={Icons.box} label={order.canalLabel} tone={{ color: '#f97316', soft: 'rgba(249, 115, 22, 0.14)' }} />
+          <MiniChip icon={Icons.box} label={getOrderTraceChannelLabel(order)} tone={{ color: '#f97316', soft: 'rgba(249, 115, 22, 0.14)' }} />
         )}
         {order.telefono && (
           <MiniChip icon={Icons.phone} label={order.telefono} tone={{ color: '#34d399', soft: 'rgba(16, 185, 129, 0.12)' }} />
@@ -2537,7 +2539,7 @@ function HistoryDetailModal({ order, onClose }) {
                 <DetailStat label="Codigo" value={order.clienteCodigo || '-'} />
                 <DetailStat label="Telefono" value={order.telefono || 'Sin telefono'} />
                 <DetailStat label="Metodo de pago" value={order.metodoPago || 'Efectivo'} accent={paymentTone.color} />
-                <DetailStat label="Canal" value={order.canalLabel || order.canal || 'Manual'} accent="#f97316" />
+                <DetailStat label="Canal" value={getOrderTraceChannelLabel(order)} accent="#f97316" />
                 <DetailStat label="Direccion" value={order.direccion || 'Sin direccion'} />
                 <DetailStat label="Total" value={order.total ? `C$${Number(order.total).toFixed(2)}` : 'Sin total'} />
               </div>

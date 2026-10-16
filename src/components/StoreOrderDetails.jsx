@@ -10,6 +10,7 @@ import {
   normalizeStoreItemCode,
 } from '../services/storeOrderEditor';
 import './StoreOrderDetails.css';
+import { getStoreOrderSourceLabel } from '../services/storeOrderSource.js';
 
 export default function StoreOrderDetails({ pedido, editable = false, busy = false, getDraftValue, onDraftChange }) {
   const products = getStoreProductItems(pedido);
@@ -19,6 +20,7 @@ export default function StoreOrderDetails({ pedido, editable = false, busy = fal
 
   return (
     <div className="store-order-details">
+      <p className="store-order-origin">Origen del pedido: <strong>{getStoreOrderSourceLabel(pedido)}</strong></p>
       <div className="store-order-lines">
         {displayItems.map((item, index) => {
           const unit = String(item?.unidad || 'lb').trim() || 'lb';

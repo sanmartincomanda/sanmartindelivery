@@ -1,4 +1,6 @@
 .store-order-details { min-width: 0; color: #0d2340; }
+.store-order-origin { margin: 0 0 12px; color: #344f70; font-size: 13px; overflow-wrap: anywhere; }
+.store-order-origin strong { color: #0044c5; }
 .store-order-lines { display: grid; gap: 9px; }
 .store-order-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 12px; min-width: 0; padding: 14px; border: 1px solid #d8e3f0; border-radius: 14px; background: #f8fbff; }
 .store-order-line__name { display: grid; gap: 3px; min-width: 0; }

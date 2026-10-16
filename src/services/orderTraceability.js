@@ -1,3 +1,5 @@
+import { getStoreOrderSourceLabel } from './storeOrderSource.js';
+
 const STORE_CHANNEL = 'tienda_virtual';
 
 export const ORDER_TRACE_STATUS_OPTIONS = Object.freeze([
@@ -41,7 +43,7 @@ export const getOrderTraceChannel = (order = {}) => {
 
 export const getOrderTraceChannelLabel = (order = {}) =>
   getOrderTraceChannel(order) === 'store'
-    ? String(order?.canalLabel || 'Tienda Virtual').trim()
+    ? `Tienda Virtual · ${getStoreOrderSourceLabel(order)}`
     : String(order?.canalLabel || 'Ingreso manual').trim();
 
 export const getOrderTraceBranchId = (order = {}) =>
@@ -84,6 +86,7 @@ const getOrderSearchValues = (order = {}) => [
   order?.metodoPago,
   order?.canal,
   order?.canalLabel,
+  getOrderTraceChannelLabel(order),
   order?.cocinero,
   order?.repartidor,
   order?.repartidorPublico,

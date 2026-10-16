@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { onValue, ref, update } from 'firebase/database';
 import { database } from '../firebase';
 import { formatOrderNumber } from '../services/orders';
+import { getOrderTraceChannelLabel } from '../services/orderTraceability.js';
 import {
   adjustStoreRewardPoints,
   buildCustomerRewardSummary,
@@ -1057,7 +1058,7 @@ export default function StoreCustomersAdminSection({
                         {formatDateTime(order.timestampIngresoMs || order.timestamp)} | {order.metodoPago || 'Sin pago'}
                       </div>
                       <div style={{ color: '#475569', fontWeight: 700 }}>
-                        {order.direccion || 'Sin direccion'}
+                        {getOrderTraceChannelLabel(order)} · {order.direccion || 'Sin direccion'}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {order.currentRecordMissing && (
