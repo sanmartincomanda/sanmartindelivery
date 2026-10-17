@@ -12,6 +12,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { get, ref, set, update } from 'firebase/database';
 import { auth, database } from '../firebase';
+import { signInGoogle } from './googleSignIn.js';
 
 export const USER_ROLES_PATH = 'userRoles';
 
@@ -262,27 +263,13 @@ export async function createStoreCustomerAuth({ nombre, email, telefono, passwor
 }
 
 export async function signInStoreCustomerWithGoogle() {
-  if (Capacitor.isNativePlatform()) {
-    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-    const nativeResult = await FirebaseAuthentication.signInWithGoogle({
-      skipNativeAuth: true,
-    });
-    const idToken = nativeResult.credential?.idToken;
-    const accessToken = nativeResult.credential?.accessToken;
-
-    if (!idToken) {
-      const error = new Error('Google no devolvio una credencial valida');
-      error.code = 'auth/missing-google-id-token';
-      throw error;
-    }
-
-    const googleCredential = GoogleAuthProvider.credential(idToken, accessToken || null);
-    const credential = await signInWithCredential(auth, googleCredential);
-    return credential.user;
-  }
-
-  const credential = await signInWithPopup(auth, googleProvider);
-  return credential.user;
+  return signInGoogle({
+    runtime: Capacitor,
+    loadNative: async () => (await import('@capacitor-firebase/authentication')).FirebaseAuthentication,
+    signInPopup: () => signInWithPopup(auth, googleProvider),
+    credentialFromTokens: (idToken, accessToken) => GoogleAuthProvider.credential(idToken, accessToken),
+    signInCredential: (credential) => signInWithCredential(auth, credential),
+  });
 }
 
 export async function signInInternalUser({ username, password, scope = 'internal' }) {

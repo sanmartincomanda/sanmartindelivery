@@ -1,4 +1,5 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { getGoogleAuthErrorMessage } from '../services/googleSignIn.js';
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
@@ -327,26 +328,6 @@ const getPaymentMeta = (payment) => {
     value,
     ...(meta[value] || meta.EFECTIVO),
   };
-};
-
-const getGoogleAuthErrorMessage = (error = {}) => {
-  if (error.code === 'auth/unauthorized-domain') {
-    return 'Google no esta autorizado para este dominio. Agrega tienda.sanmartinsr.com en Firebase Authentication > Settings > Authorized domains.';
-  }
-
-  if (error.code === 'auth/operation-not-allowed') {
-    return 'Google no esta habilitado en Firebase Authentication > Sign-in method.';
-  }
-
-  if (error.code === 'auth/popup-blocked') {
-    return 'El navegador bloqueo la ventana de Google. Permite popups para esta pagina e intenta de nuevo.';
-  }
-
-  if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-    return 'Se cerro la ventana de Google antes de terminar el ingreso.';
-  }
-
-  return 'No se pudo entrar con Google. Revisa que Google este habilitado y el dominio autorizado en Firebase.';
 };
 
 const normalizeStorePriorityText = (value) =>
