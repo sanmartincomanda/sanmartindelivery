@@ -1,7 +1,18 @@
 # Android 1.2.11 (14): Google sign-in
 
-Prepared locally on 2026-10-16. Android submission to Play Console is pending.
+Prepared locally on 2026-10-16. Submitted to Google Play production on 2026-10-17.
 Publishing the web frontend does not update installed Android applications.
+
+## Publication
+
+- Play accepted versionCode 14 / 1.2.11, production release 6, with no errors.
+- Only warning: optional R8/ProGuard deobfuscation file, no release blocker.
+- No loss of supported devices compared with production 13 / 1.2.10.
+- Rollout 100%, Nicaragua only; managed publishing remains disabled (automatic
+  publication after approval). Version is submitted, NOT yet confirmed live.
+- Play shows production 14 under Changes in review, initially running quick
+  checks. The old Alpha 10 / 1.2.7 change was excluded and remains unsent.
+- Evidence: output/playwright/android-1.2.11-submitted.png (local, not tracked).
 
 ## Findings
 
@@ -16,10 +27,14 @@ Publishing the web frontend does not update installed Android applications.
   established as the cause of the reported failure.
 - Credential Manager previously had no alternate account-selection flow. The
   plugin defaulted to prerelease Credentials 1.2.0-rc01.
-- Firebase currently registers only the locally verified upload certificate
+- Before the 2026-10-17 publication audit, Firebase registered only the upload certificate
   (SHA-1 DA:45:01:1C:4E:8A:55:D1:8F:7F:22:66:70:69:DB:2B:FB:CE:4E:93).
-  The Play app-signing certificate must still be compared. Do not assume the
-  upload certificate equals the Play distribution certificate.
+  Play Console confirmed three different distribution SHA-1 certificates:
+  50:A5:8E:02:83:DB:D2:F3:E1:82:F3:5A:E2:1A:25:7E:1E:57:48:F8 (current),
+  E6:B5:AF:DE:03:64:2F:C7:EB:EC:E7:03:E6:1A:54:54:E9:67:BC:F2 and
+  63:8E:C6:1F:8A:A3:C9:45:91:6D:3E:64:62:BD:F9:05:B5:E5:BD:47.
+  None were registered. This is a confirmed OAuth configuration defect for
+  Play-signed installations, separate from the Credential Manager fallback.
 
 ## Changes
 
@@ -33,6 +48,12 @@ Publishing the web frontend does not update installed Android applications.
   replace Firebase administrator instructions.
 - No changes to account IDs, passwords, profiles, rewards, orders or DB rules.
 - Includes the previously published WEB/APP order attribution.
+- Registered the three Play distribution SHA-1 certificates and corresponding
+  SHA-256 certificates in the existing Firebase Android app on 2026-10-17.
+  Preserved the upload key and all existing certificates. No key rotation.
+- Downloaded the generated google-services.json: three new Android OAuth
+  clients, unchanged web client and project. Regression test now checks all
+  distribution and upload certificate entries.
 
 ## Verification
 
@@ -56,10 +77,13 @@ Local folder: ../android-release-1.2.11/
 - APK SHA-256: ECDA6AF2D13E9BBFABFB195FBB706AF5B4BC40C82B84AED9E8E0AC64B9217175
 - AAB SHA-256: D5090EB3020D7E0CAA7FF0BCF0BB3D0BDBC223C83B9ABD539DCEAE1963DF836A
 
-Before submission, compare the Play app-signing SHA-1 with Firebase, register
-the actual Play certificate if missing, and test Google sign-in on a real
-Play-installed Android device. Verify versionCode 14 is unused in Play Console.
-No certificate, provider setting or Android app release was changed in
-production during preparation. Web publication is independent of those gates.
+The Play certificate comparison and registration were completed on 2026-10-17.
+Google generated OAuth Android clients for all three certificates; the live
+Firebase API confirms eight SHA entries including the original upload pair.
+Google-auth tests and Gradle assembleRelease/bundleRelease/lintRelease passed
+again after refreshing the config. APK/AAB hashes remain identical because
+the generated Android resources use the unchanged web client ID.
+Real Play-installed Android Google login still needs device verification.
+Web publication is independent of the Android release.
 
 Reference: [plugin Google setup](https://github.com/capawesome-team/capacitor-firebase/blob/main/packages/authentication/docs/setup-google.md).

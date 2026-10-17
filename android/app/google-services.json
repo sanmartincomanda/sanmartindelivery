@@ -15,6 +15,30 @@
       },
       "oauth_client": [
         {
+          "client_id": "41323183250-35gmt61gmv5e2octdpsp6h6u2gucm30t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanmartinsr.app",
+            "certificate_hash": "e6b5afde03642fc7ebece703e61a5454e967bcf2"
+          }
+        },
+        {
+          "client_id": "41323183250-gul64pf0iqqqlgf6m6sqmjinkmvb5650.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanmartinsr.app",
+            "certificate_hash": "50a58e0283dbd2f3e182f35ae21a257e1e5748f8"
+          }
+        },
+        {
+          "client_id": "41323183250-jb4phv2k6uf1upkrp9ujfk6jv8oc6tv2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanmartinsr.app",
+            "certificate_hash": "638ec61f8aa3c945916d3e6462bdf905b5e5bd47"
+          }
+        },
+        {
           "client_id": "41323183250-qfujhm8jgs6dpv813lf5kjjn0ntefq6l.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

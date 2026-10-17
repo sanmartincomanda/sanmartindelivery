@@ -95,4 +95,15 @@ assert.equal(google.project_info.project_id, 'comanda-digital-ac1ec');
 const client = google.client.find(c => c.client_info.android_client_info.package_name === config.appId);
 assert.ok(client?.oauth_client.some(c => c.client_type === 3), 'Native build needs a web OAuth client');
 assert.ok(client?.oauth_client.some(c => c.client_type === 1), 'Native package needs an Android OAuth client');
+// Play uses distribution certificates, not the local upload key.
+for (const hash of [
+  '50a58e0283dbd2f3e182f35ae21a257e1e5748f8',
+  'e6b5afde03642fc7ebece703e61a5454e967bcf2',
+  '638ec61f8aa3c945916d3e6462bdf905b5e5bd47',
+  'da45011c4e8a55d18f7f22667069db2bfbce4e93',
+]) {
+  assert.ok(client.oauth_client.some(c => c.client_type === 1 &&
+    c.android_info?.package_name === config.appId && c.android_info?.certificate_hash === hash),
+  `Missing Play/upload OAuth certificate: ${hash}`);
+}
 console.log('Google auth: web/native routing, token exchange, restricted fallback, cancellation, errors and build config passed.');
