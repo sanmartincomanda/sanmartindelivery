@@ -12911,8 +12911,10 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
               </button>
             </div>
             </div>
+          </div>
+        </div>
 
-            <div className="store-product-sheet-footer">
+        <div className="store-product-sheet-footer">
             <p className="store-unit store-product-sheet-selection">
               {quantity > 0
                 ? `${formatStoreQuantity(quantity, product.unit)} ${product.unit} seleccionado`
@@ -12932,8 +12934,6 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                   ? 'Quitar del carrito'
                   : 'Selecciona cantidad para agregar'}
             </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

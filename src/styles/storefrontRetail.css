@@ -208,7 +208,31 @@ html body .store-shell.storefront-brand-v3.storefront-retail .store-detail-image
 html body .store-shell.storefront-brand-v3.storefront-retail .store-detail-image img { width: 100% !important; height: 100% !important; max-height: 100% !important; object-fit: contain !important; mix-blend-mode: multiply; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet-copy { padding: 0 !important; display: flex !important; flex-direction: column; gap: 20px; min-height: 0 !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet-title { font-size: 24px !important; line-height: 1.2 !important; font-weight: 700 !important; }
-html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet-footer { position: sticky !important; bottom: -16px !important; margin: 0 -16px !important; padding: 12px 16px calc(12px + env(safe-area-inset-bottom,0px)) !important; background: #fff !important; border-top: 1px solid var(--retail-line) !important; box-shadow: none !important; }
+/* The purchase action is a separate row, never part of the scrolling product. */
+html body .store-shell.storefront-brand-v3.storefront-retail .store-sheet.store-product-sheet {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0 !important;
+  padding: env(safe-area-inset-top, 0px) 0 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box;
+}
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet > .store-sheet-head {
+  position: relative !important;
+  margin: 0 !important;
+}
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet > .store-detail-grid {
+  min-height: 0 !important;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  align-content: start;
+  grid-auto-rows: max-content;
+  padding: 16px !important;
+  scroll-padding-block: 16px;
+}
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet .store-qty-input { font-size: 16px !important; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet-footer { position: relative !important; bottom: auto !important; margin: 0 !important; padding: 10px 16px calc(10px + env(safe-area-inset-bottom,0px)) !important; background: #fff !important; border-top: 1px solid var(--retail-line) !important; box-shadow: none !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-sheet-footer .store-button { background: var(--retail-action-red) !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-qty-row { flex-wrap: wrap; gap: 8px; margin: 16px 0 !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-qty-row .store-chip { min-height: 44px; border-radius: 8px !important; box-shadow: none !important; font-size: 13px !important; padding: 8px 12px !important; background: #f4f6f8 !important; color: var(--retail-ink) !important; border: 1px solid transparent !important; }
