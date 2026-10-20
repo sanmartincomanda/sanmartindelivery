@@ -16,6 +16,7 @@
     "test:order-traceability": "node scripts/testOrderTraceability.mjs",
     "test:store-order-source": "node scripts/testStoreOrderSource.mjs",
     "test:google-auth": "node scripts/testGoogleSignIn.mjs",
+    "test:promotion-share": "node scripts/testPromotionShare.mjs",
     "test:store-product-promotions": "node scripts/testStoreProductPromotions.mjs",
     "test:store-categories": "node scripts/testStoreCategoryStructure.mjs",
     "test:store-editorial": "node scripts/testStorefrontEditorial.mjs",

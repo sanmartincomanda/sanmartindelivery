@@ -3,6 +3,7 @@ import { getGoogleAuthErrorMessage } from '../services/googleSignIn.js';
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
+import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from './storefront/retailHomePromotions';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
 import { GOOGLE_PLAY_STORE_URL, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
@@ -2450,6 +2451,7 @@ export default function TiendaVirtualView({
         return {
           id: `promo-${promotion.id}`,
           title: promotion.title,
+          endsAt: promotion.endsAt,
           kicker: discountRange.varies
             ? 'Promocion especial - descuentos por producto'
             : `Promocion especial - ${formatPromotionPercent(discountRange.maximum)} OFF`,
@@ -4839,6 +4841,10 @@ export default function TiendaVirtualView({
         fallback={(event) => applyStoreImageFallback(event, product.image, PRODUCT_PLACEHOLDER_PATH)}
         money={formatCurrency} formatQuantity={formatStoreQuantity}
         step={getQuantityStep(product)} minimum={getMinQuantity(product)}
+        shareControl={(discountedPrice || product.promo || product.category === 'promociones') ? (
+          <PromotionShareButton compact title={product.name} products={[product]}
+            branchName={selectedBranch?.name} endsAt={product.specialPromotion?.endsAt} />
+        ) : null}
         onOpen={() => openProduct(product)}
         onQuantityChange={(value) => { updateQuantity(product.code, value); }} />
     );
@@ -10261,6 +10267,10 @@ export default function TiendaVirtualView({
                         {isPromotionSection && <p className="retail-promotion-signature">Preciazos en Carnes San Martín, <strong>sí</strong></p>}
                       </div>
                       <div className="store-product-group-actions">
+                        {showAllPromotionProducts && (
+                          <PromotionShareButton title={section.title} products={section.products}
+                            branchName={selectedBranch?.name} endsAt={section.endsAt} />
+                        )}
                         <span className="store-product-group-meta">
                           {visibleProducts.length} de {section.products.length} productos
                         </span>

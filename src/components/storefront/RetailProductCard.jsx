@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import RetailPromoSeal from './RetailPromoSeal';
 
-export default function RetailProductCard({ product, quantity, image, fallback, money, formatQuantity, step, minimum, discounted = false, onOpen, onQuantityChange }) {
+export default function RetailProductCard({ product, quantity, image, fallback, money, formatQuantity, step, minimum, discounted = false, onOpen, onQuantityChange, shareControl }) {
   const [loaded, setLoaded] = useState(false);
   return (
     <article className={`retail-product${discounted ? ' has-preciazo' : ''}`}>
@@ -25,6 +25,7 @@ export default function RetailProductCard({ product, quantity, image, fallback, 
       ) : (
         <button type="button" className="retail-card-add" aria-label={`Agregar ${product.name}`} onClick={() => onQuantityChange(minimum)}><span aria-hidden="true">+</span> Agregar</button>
       )}
+      {shareControl}
     </article>
   );
 }
