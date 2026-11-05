@@ -9,7 +9,7 @@ export default function RetailProductCard({ product, quantity, image, fallback, 
         <span className={`retail-product-photo ${loaded ? 'is-loaded' : ''}`}>
           <img src={image} alt={product.name} loading="lazy" decoding="async" width="320" height="320"
             onLoad={() => setLoaded(true)} onError={(event) => { fallback(event); setLoaded(true); }} />
-          {discounted && <RetailPromoSeal />}
+          {discounted && <RetailPromoSeal promotion={product.specialPromotion} />}
         </span>
         <span className="retail-product-name">{product.name}</span>
         <span className="retail-product-unit">Por {product.unit} <span aria-hidden="true">·</span> {product.code}</span>

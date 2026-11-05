@@ -1,6 +1,17 @@
 const clampDiscountPct = (value) =>
   Number(Math.min(100, Math.max(0, Number(value || 0) || 0)).toFixed(2));
 
+export const isStorePromotionForBranch = (promotion = {}, branchId = '') => {
+  const branches = normalizeStoreProductPromotionCodes(promotion.branchIds).map((id) => id.toLowerCase());
+  return branches.length === 0 || branches.includes(String(branchId || '').trim().toLowerCase());
+};
+
+export const normalizePromotionSealImage = (value = '') => {
+  const path = String(value || '').trim();
+  // Campaign artwork stays on our hosting; do not introduce third-party tracking.
+  return /^\/tienda\/promotions\/[a-zA-Z0-9_-]+\.(png|jpg|webp)$/.test(path) ? path : '';
+};
+
 export const normalizeStoreProductPromotionCodes = (value) => {
   const source = Array.isArray(value)
     ? value

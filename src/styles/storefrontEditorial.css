@@ -37,6 +37,17 @@ html body .store-shell.storefront-brand-v3.storefront-retail .store-branch-cover
 .storefront-retail .has-app-download .store-coverage-alert { grid-column: 1 / -1; }
 
 /* The seal is presentation only; eligibility uses the existing promotion price. */
+.retail-campaign-seal { display: none; }
+.storefront-retail .retail-campaign-seal {
+  display: block; position: absolute; top: 8px; right: 6px; z-index: 1;
+  width: min(68%, 150px); pointer-events: none;
+}
+html body .storefront-retail .retail-campaign-seal img {
+  display: block; width: 100% !important; height: auto !important;
+  aspect-ratio: 1280 / 435; object-fit: contain !important;
+  mix-blend-mode: normal !important; opacity: 1 !important;
+}
+.storefront-retail .store-detail-image .retail-campaign-seal { width: min(56%, 240px); top: 12px; right: 12px; }
 .retail-promo-seal { display: none; }
 .storefront-retail .retail-promo-seal {
   position: absolute; top: 7px; right: 7px; z-index: 1; display: block;

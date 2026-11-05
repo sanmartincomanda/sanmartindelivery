@@ -5,12 +5,15 @@ import {
   getStoreProductPromotionDiscountRange,
   normalizeStoreProductDiscountAssignments,
   normalizeStoreProductPromotionCodes,
+  isStorePromotionForBranch,
+  normalizePromotionSealImage,
 } from './storeProductPromotionCore';
 
 export {
   getStoreProductPromotionDiscountPct,
   getStoreProductPromotionDiscountRange,
   normalizeStoreProductDiscountAssignments,
+  isStorePromotionForBranch,
 } from './storeProductPromotionCore';
 
 export const STORE_PRODUCT_PROMOTIONS_PATH = 'storeProductPromotions';
@@ -114,6 +117,8 @@ export const normalizeStoreProductPromotion = (promotion = {}, fallback = {}, in
   return {
     id,
     title: title || id,
+    branchIds: normalizeStoreProductPromotionCodes(source.branchIds ?? backup.branchIds).map((id) => id.toLowerCase()),
+    sealImage: normalizePromotionSealImage(source.sealImage ?? backup.sealImage),
     productCodes,
     productDiscounts,
     discountPct: roundMoney(fallbackDiscountPct),
@@ -164,7 +169,7 @@ export const getStoreProductPromotionStatus = (promotion, now = Date.now()) => {
 export const isStoreProductPromotionActive = (promotion, now = Date.now()) =>
   getStoreProductPromotionStatus(promotion, now) === 'active';
 
-export const resolveStoreProductPromotionForCode = (code = '', promotions = [], now = Date.now()) => {
+export const resolveStoreProductPromotionForCode = (code = '', promotions = [], now = Date.now(), branchId = '') => {
   const cleanCode = String(code || '').trim();
   if (!cleanCode) {
     return null;
@@ -175,6 +180,7 @@ export const resolveStoreProductPromotionForCode = (code = '', promotions = [], 
     .filter(
       (promotion) =>
         isStoreProductPromotionActive(promotion, now) &&
+        isStorePromotionForBranch(promotion, branchId) &&
         promotion.productCodes.includes(cleanCode)
     )
     .map((promotion) => ({
@@ -195,7 +201,7 @@ export const resolveStoreProductPromotionForCode = (code = '', promotions = [], 
 
 export const applyStoreProductPromotionsToCatalog = (catalog = [], promotions = [], now = Date.now()) =>
   (Array.isArray(catalog) ? catalog : []).map((product) => {
-    const promotion = resolveStoreProductPromotionForCode(product?.code, promotions, now);
+    const promotion = resolveStoreProductPromotionForCode(product?.code, promotions, now, product?.branchId);
     const basePrice = roundMoney(product?.price || 0);
 
     if (!promotion || basePrice <= 0) {
@@ -216,6 +222,7 @@ export const applyStoreProductPromotionsToCatalog = (catalog = [], promotions = 
       specialPromotion: {
         id: promotion.id,
         title: promotion.title,
+        sealImage: promotion.sealImage,
         discountPct: Number(promotion.discountPct || 0),
         startsAt: promotion.startsAt,
         endsAt: promotion.endsAt,

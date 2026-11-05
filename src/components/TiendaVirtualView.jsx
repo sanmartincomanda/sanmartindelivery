@@ -42,6 +42,7 @@ import {
 } from '../services/storeCoupons';
 import {
   applyStoreProductPromotionsToCatalog,
+  isStorePromotionForBranch,
   getStoreProductPromotionDiscountRange,
   mergeStoreProductPromotions,
   isStoreProductPromotionActive,
@@ -2185,7 +2186,7 @@ export default function TiendaVirtualView({
   const activeProductPromotions = useMemo(
     () =>
       productPromotions
-        .filter((promotion) => isStoreProductPromotionActive(promotion, currentTimeMs))
+        .filter((promotion) => isStoreProductPromotionActive(promotion, currentTimeMs) && isStorePromotionForBranch(promotion, selectedBranch?.id))
         .sort((left, right) => {
           if (Number(left.sortOrder || 0) !== Number(right.sortOrder || 0)) {
             return Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
@@ -2196,7 +2197,7 @@ export default function TiendaVirtualView({
             getStoreProductPromotionDiscountRange(left).maximum
           );
         }),
-    [currentTimeMs, productPromotions]
+    [currentTimeMs, productPromotions, selectedBranch?.id]
   );
 
   const activeProducts = useMemo(
@@ -12845,7 +12846,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
                 event.currentTarget.classList.add('store-product-image-fallback');
               }}
             />
-            {discountedPrice && <RetailPromoSeal />}
+            {discountedPrice && <RetailPromoSeal promotion={product.specialPromotion} />}
           </div>
           <div className="store-product-sheet-copy">
             <div className="store-product-sheet-info">
