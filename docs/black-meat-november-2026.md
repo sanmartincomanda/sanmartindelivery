@@ -16,6 +16,26 @@ and availability of Filet Mignon Gold 00036 in Nindiri.
 Price override protects the approved 00198 price from SICAR synchronization.
 Product photos remain unchanged; the seal is a local image overlay.
 
+## Transparent seal update
+
+The approved white-background JPEG is retained for old caches. The campaign now
+uses `public/tienda/promotions/black-meat-november-2026-transparent.png` with a
+real alpha channel, checked at the outer corners. Generated using the built-in
+image editor, transparent background enabled, from the original JPEG.
+
+Edit prompt: "Remove ONLY the external white background, producing a genuine
+transparent alpha PNG cutout. Preserve the exact existing black and metallic
+gold badge, gold lettering BLACK MEAT and NOVEMBER, typography, tilted angle,
+proportions, highlights, black interior, and gold border; do not redesign or
+reword anything. Retain the entire badge without clipping any edge. Keep the
+same wide composition, trim outer transparent padding closely to the badge.
+No checkerboard baked into the image, no replacement background, no added
+shadows, no new text. This will be used as a small overlay on meat product photos."
+
+`node scripts/updateBlackMeatSeal.mjs` is read-only by default; `--apply` verifies
+the deployed PNG byte-for-byte, saves a local backup and conditionally updates
+only the campaign's `sealImage` field. No price or availability changes.
+
 Optional campaign fields: `branchIds` (empty = all branches for legacy data),
 `sealImage` (validated local /tienda/promotions image path).
 Existing admin edits preserve both fields. No database rules, orders, SICAR

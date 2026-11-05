@@ -8,7 +8,7 @@ const source = readFileSync(new URL('../src/services/storeProductPromotions.js',
   .replaceAll("'./storeProductPromotionCore'", JSON.stringify(new URL('../src/services/storeProductPromotionCore.js', import.meta.url).href));
 const { normalizeStoreProductPromotion, applyStoreProductPromotionsToCatalog, getStoreProductPromotionStatus } =
   await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
-const sealImage = '/tienda/promotions/black-meat-november-2026.jpg';
+const sealImage = '/tienda/promotions/black-meat-november-2026-transparent.png';
 const promotion = normalizeStoreProductPromotion({
   id: 'scope_test', title: 'BLACK MEAT NOVEMBER', branchIds: ['granada', 'nindiri'], sealImage,
   startsAt: '2026-11-01T00:00:00-06:00', endsAt: '2026-12-01T00:00:00-06:00',

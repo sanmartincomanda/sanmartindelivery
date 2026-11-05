@@ -128,7 +128,7 @@ let quantity = 0; let opened = 0;
 function CardHarness() {
   const [q,setQ] = useState(0);
   return h(RetailProductCard,{
-    product:{code:'T',name:'Bistec',unit:'lb',price:151.68,originalPrice:165,specialPromotion:{title:'BLACK MEAT NOVEMBER',sealImage:'/tienda/promotions/black-meat-november-2026.jpg'}},
+    product:{code:'T',name:'Bistec',unit:'lb',price:151.68,originalPrice:165,specialPromotion:{title:'BLACK MEAT NOVEMBER',sealImage:'/tienda/promotions/black-meat-november-2026-transparent.png'}},
     quantity:q,minimum:1,step:.5,discounted:true,image:'/photo.jpg',fallback:()=>{},money:String,formatQuantity:String,
     onOpen:()=>opened++, onQuantityChange:v=>{quantity=v;setQ(v);},
   });
@@ -146,7 +146,7 @@ await click('.retail-card-stepper button:first-child'); assert.equal(quantity,0)
 assert.equal(document.activeElement,node.querySelector('.retail-card-add'),'Keyboard focus survives removing');
 assert.ok(node.querySelector('.retail-card-add'));
 assert.equal(node.querySelector('.is-in-cart'),null);
-assert.equal(node.querySelector('.retail-campaign-seal img').getAttribute('src'),'/tienda/promotions/black-meat-november-2026.jpg');
+assert.equal(node.querySelector('.retail-campaign-seal img').getAttribute('src'),'/tienda/promotions/black-meat-november-2026-transparent.png');
 await act(async () => node.querySelector('.retail-campaign-seal img').dispatchEvent(new window.Event('error')));
 assert.ok(node.querySelector('.retail-promo-seal'), 'Broken campaign images fall back safely');
 await act(async () => root.unmount());

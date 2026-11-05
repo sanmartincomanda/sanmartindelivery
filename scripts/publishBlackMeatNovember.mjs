@@ -17,7 +17,7 @@ const campaign = {
   id: 'black_meat_november_2026',
   title: 'BLACK MEAT NOVEMBER \u{1F7E1}\u{1F969}\u26AB\uFE0F',
   branchIds: ['granada', 'nindiri'],
-  sealImage: '/tienda/promotions/black-meat-november-2026.jpg',
+  sealImage: '/tienda/promotions/black-meat-november-2026-transparent.png',
   productCodes: items.map(item => item.code),
   productDiscounts: items.map(({code, discountPct}) => ({code, discountPct})),
   discountPct: 0, active: true, deleted: false, sortOrder: 0,
