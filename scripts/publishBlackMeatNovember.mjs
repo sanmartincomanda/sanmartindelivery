@@ -51,6 +51,11 @@ try {
   updates[`${branchPath}/lastSalesCheckAt`] = 0;
   updates[`${branchPath}/updatedAt`] = Date.now();
   updates[`${branchPath}/updatedBy`] = 'admin:black-meat-november-approved';
+  // Clients compare this revision before downloading catalog changes. Publish
+  // the signal atomically with prices so a new discount cannot reuse old prices.
+  const catalogUpdatedAt = Date.now();
+  updates['storeCatalogMeta/updatedAt'] = catalogUpdatedAt;
+  updates['storeCatalogMeta/updatedAtIso'] = new Date(catalogUpdatedAt).toISOString();
   if (!process.argv.includes('--apply')) {
     console.log('DRY RUN: no writes. Campaign and approved changes validated.');
     process.exit(0);
@@ -66,6 +71,7 @@ try {
   await update(ref(db), updates);
   const saved = (await get(ref(db, path))).val();
   assert.deepEqual(saved, campaign);
+  assert.equal((await get(ref(db, 'storeCatalogMeta/updatedAt'))).val(), catalogUpdatedAt);
   for (const item of items) {
     const product = (await get(ref(db, `storeCatalog/${item.code}`))).val();
     for (const branch of campaign.branchIds) {

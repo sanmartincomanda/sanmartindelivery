@@ -50,3 +50,21 @@ web-release, retail-home, store-editorial, manual-route and production build.
 Browser visual QA unavailable while local browser access is disabled.
 Previously installed native bundles require an app update to support custom
 seals and branch scoping; web publication does not update their bundled code.
+
+## Catalog invalidation repair
+
+The original campaign script changed the regular price of 00198 from C$158 to
+C$165 but omitted `storeCatalogMeta`. The storefront reuses its cached catalog
+when that revision has not advanced, while loading the new promotion separately.
+This reproduces the reported C$145.25 exactly: 158 less 8.07%, instead of
+165 less 8.07% = C$151.68. This was not an additional discount.
+
+`repairBlackMeatCatalogCache.mjs --apply` verified all five prices in both
+branches, backed up the affected records, and advanced only the catalog metadata.
+It verified that products and campaign data were unchanged. Open clients must
+reload to run the existing metadata check. No APK or new storefront build is
+required for this data repair.
+
+The publication script now writes the catalog revision atomically with prices
+and campaign data. The campaign regression test reproduces the stale-price
+case and checks that this invalidation is present in the publication path.

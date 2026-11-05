@@ -41,4 +41,12 @@ assert.deepEqual(normalizeStoreProductPromotion({title:'Edited'}, promotion).bra
 assert.equal(normalizeStoreProductPromotion({...promotion,sealImage:'https://untrusted.example/tracker.jpg'}).sealImage,'');
 const [legacy] = applyStoreProductPromotionsToCatalog([{code:'X',price:100,branchId:'masaya'}], [{id:'legacy',productCodes:['X'],discountPct:10}],now);
 assert.equal(legacy.price,90);
+// Regression: a new 8.07% promotion over a cached C$158 catalog reproduces
+// the reported C$145.25. Price publication must invalidate that catalog cache.
+const [stalePaleta] = applyStoreProductPromotionsToCatalog([{code:'00198',price:158,branchId:'granada'}], [promotion], now);
+assert.equal(stalePaleta.price,145.25);
+const publication = readFileSync(new URL('./publishBlackMeatNovember.mjs', import.meta.url), 'utf8');
+assert.match(publication, /updates\['storeCatalogMeta\/updatedAt'\] = catalogUpdatedAt/);
+assert.match(publication, /updates\['storeCatalogMeta\/updatedAtIso'\] = new Date\(catalogUpdatedAt\)\.toISOString\(\)/);
+assert.match(publication, /await update\(ref\(db\), updates\)/, 'Catalog revision and campaign must be published in the same atomic update');
 console.log('Campaign scope, exact current-price discounts, local midnight expiry, seal and legacy compatibility passed.');
