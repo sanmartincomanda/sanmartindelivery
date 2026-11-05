@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:retail-interactions": "node scripts/testRetailInteractions.mjs",
     "dev": "vite",
     "build": "vite build && node scripts/preserveLegacyChunkAliases.mjs && node scripts/writeWebRelease.mjs",
     "build:android:web": "vite build --mode android",
@@ -65,6 +66,7 @@
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.2",
     "@vitejs/plugin-react": "^4.5.2",
+    "jsdom": "^26.1.0",
     "vite": "^5.4.19"
   }
 }

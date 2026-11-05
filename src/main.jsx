@@ -2,6 +2,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
+import StoreLaunch from './components/storefront/StoreLaunch';
 
 const CHUNK_RECOVERY_FLAG = "sanmartin_chunk_recovery_once";
 const INTERNAL_APP_HOSTS = new Set([
@@ -93,6 +94,12 @@ if (typeof window !== "undefined") {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
+const publicStore = shouldLoadPublicStore();
+
+function ApplicationFrame({ App, failed = false }) {
+  const content = App ? <App /> : <StartupScreen failed={failed} />;
+  return publicStore ? <StoreLaunch failed={failed}>{content}</StoreLaunch> : content;
+}
 
 function StartupScreen({ failed = false }) {
   return (
@@ -122,6 +129,7 @@ function StartupScreen({ failed = false }) {
         <span style={{ color: "#466e98", fontSize: 14, fontWeight: 700 }}>
           {failed ? "Recarga la pagina para intentarlo nuevamente." : "Un momento, ya casi esta lista."}
         </span>
+        {failed && <button type="button" onClick={() => window.location.reload()}>Volver a intentar</button>}
       </section>
     </main>
   );
@@ -129,11 +137,11 @@ function StartupScreen({ failed = false }) {
 
 root.render(
   <React.StrictMode>
-    <StartupScreen />
+    <ApplicationFrame />
   </React.StrictMode>
 );
 
-const applicationModule = shouldLoadPublicStore()
+const applicationModule = publicStore
   ? import("./PublicStoreApp.jsx")
   : import("@app-entry");
 
@@ -141,7 +149,7 @@ applicationModule
   .then(({ default: App }) => {
     root.render(
       <React.StrictMode>
-        <App />
+        <ApplicationFrame App={App} />
       </React.StrictMode>
     );
   })
@@ -153,7 +161,7 @@ applicationModule
 
     root.render(
       <React.StrictMode>
-        <StartupScreen failed />
+        <ApplicationFrame failed />
       </React.StrictMode>
     );
   });

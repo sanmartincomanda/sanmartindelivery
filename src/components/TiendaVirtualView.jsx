@@ -3,6 +3,8 @@ import { getGoogleAuthErrorMessage } from '../services/googleSignIn.js';
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
+import RetailSearchBox from './storefront/RetailSearchBox';
+import RetailQuickActions from './storefront/RetailQuickActions';
 import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from './storefront/retailHomePromotions';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
@@ -216,6 +218,7 @@ import '../styles/storefrontCategoryIcons.css';
 import '../styles/storefrontRefinement2026.css';
 import '../styles/storefrontRetail.css';
 import '../styles/storefrontEditorial.css';
+import '../styles/storefrontInteractions.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
@@ -1420,6 +1423,7 @@ export default function TiendaVirtualView({
   const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [quickTarget, setQuickTarget] = useState('');
   const [activeCategory, setActiveCategory] = useState('todos');
   const [activeSubcategory, setActiveSubcategory] = useState('todas');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -4372,6 +4376,19 @@ export default function TiendaVirtualView({
     setNearestBranchCandidate(null);
     retailHome();
   };
+
+  useEffect(() => {
+    if (quickTarget !== 'promotions' || mobileNavSection !== 'home') return undefined;
+    const frame = requestAnimationFrame(() => {
+      const section = pageTopRef.current?.querySelector('[data-retail-promotions="true"]');
+      if (section) {
+        section.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+        section.querySelector('h3')?.focus({ preventScroll: true });
+      }
+      setQuickTarget('');
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [quickTarget, mobileNavSection]);
 
   const handleMobileBottomNav = (target) => {
     const closeMobilePanels = () => {
@@ -9989,25 +10006,13 @@ export default function TiendaVirtualView({
             )}
           </div>
 
-          <label className="store-search-wrap">
-            <span className="store-search-tag" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="2" />
-                <path d="m16 16 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </span>
-            <input
-              className="store-search"
-              value={query}
-              onChange={(event) => handleStoreSearch(event.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              placeholder="Buscar carnes, cortes y productos"
-              aria-label="Buscar carnes, cortes y productos"
-              type="search"
-            />
-          </label>
+          <RetailSearchBox value={query} onChange={handleStoreSearch} onFocusChange={setSearchFocused} enhanced={!isDashboard} />
         </header>
+
+        {!isDashboard && mobileNavSection === 'home' && <RetailQuickActions
+          hasOffers={visibleHomeSections.some(isRetailHomePromotion)} goldEnabled={rewardSettings.enabled !== false}
+          onOffers={() => { if (!retailHomeBusy) { goToRetailHome(); setQuickTarget('promotions'); } }}
+          onOrders={openCustomerOrders} onGold={() => openRewardsPanel()} />}
 
         {!online && <div className="retail-offline" role="status">Sin conexión. Podés revisar el catálogo guardado; conectate para confirmar tu pedido.</div>}
 
@@ -10260,11 +10265,11 @@ export default function TiendaVirtualView({
                   {!isDashboard && isRetailGoldSection(section) && (
                     <RetailFoodStory variant="grill" onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.grill)} />
                   )}
-                  <section className={`store-product-group${isPromotionSection ? ' retail-promotion-group' : ''}`}>
+                  <section data-retail-promotions={showAllPromotionProducts ? 'true' : undefined} className={`store-product-group${isPromotionSection ? ' retail-promotion-group' : ''}`}>
                     <div className="store-product-group-head">
                       <div>
                         <span className="store-product-group-kicker">{section.kicker}</span>
-                        <h3 className="store-product-group-title">{section.title}</h3>
+                        <h3 className="store-product-group-title" tabIndex={-1}>{section.title}</h3>
                         {isPromotionSection && <p className="retail-promotion-signature">Preciazos en Carnes San Martín, <strong>sí</strong></p>}
                       </div>
                       <div className="store-product-group-actions">
@@ -12801,14 +12806,14 @@ function StoreMobileProfilePage({ currentUser, rewardPoints, selectedBranch, onE
   const entries = [
     { icon: 'account', title: 'Mi información', detail: currentUser?.telefono, action: () => onEditProfile('information') },
     { icon: 'pin', title: 'Direcciones', detail: 'Tus lugares de entrega', action: () => onEditProfile('addresses') },
-    { icon: 'reward', title: 'Miembro Gold', detail: `${Number(rewardPoints || 0)} puntos`, action: () => onOpenRewards() },
     { icon: 'activity', title: 'Mis pedidos', detail: 'Historial y seguimiento', action: onOpenActivity },
     { icon: 'orders', title: 'Ayuda y privacidad', detail: 'Información de tu cuenta', action: () => onEditProfile('help') },
   ];
   return (
     <section className="store-mobile-app-page retail-profile">
       <h1>Perfil</h1>
-      <div className="retail-profile-identity"><span aria-hidden="true">{String(currentUser?.nombre || 'C').charAt(0)}</span><div><h2>{currentUser?.nombre || 'Mi cuenta'}</h2><p>{selectedBranch?.name}</p></div></div>
+      <div className="retail-profile-identity"><span aria-hidden="true">{String(currentUser?.nombre || 'C').charAt(0).toUpperCase()}</span><div><span className="retail-profile-eyebrow">Tu cuenta San Martín</span><h2>{currentUser?.nombre || 'Mi cuenta'}</h2><p>{selectedBranch?.name}</p></div><button type="button" className="retail-profile-edit" onClick={() => onEditProfile('information')} aria-label="Editar mi información"><StoreCheckoutIcon name="account" /></button></div>
+      <button type="button" className="retail-profile-gold" onClick={() => onOpenRewards()}><StoreCheckoutIcon name="reward" /><span><strong>Miembro Gold</strong><small>Ver premios y beneficios</small></span><b>{Number(rewardPoints || 0).toLocaleString('es-NI')} <small>pts</small></b><span aria-hidden="true">›</span></button>
       <div className="retail-profile-menu">{entries.map((entry) => <button key={entry.title} type="button" onClick={entry.action}><StoreCheckoutIcon name={entry.icon} /><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><span aria-hidden="true">›</span></button>)}</div>
       <button type="button" className="retail-signout" onClick={onSignOut}>Cerrar sesión</button>
     </section>
