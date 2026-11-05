@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { JSDOM } from 'jsdom';
 import {
@@ -117,11 +117,35 @@ assert.equal(node.querySelector('.retail-recent-searches'),null,'Admin does not 
 await reset();
 
 const calls = [];
-await render(h(RetailQuickActions,{hasOffers:true,goldEnabled:true,onOffers:()=>calls.push('offers'),onOrders:()=>calls.push('orders'),onGold:()=>calls.push('gold')}));
-for (const id of ['offers','orders','gold']) await click(`.retail-quick-${id}`);
-assert.deepEqual(calls,['offers','orders','gold']);
-await render(h(RetailQuickActions,{hasOffers:false,goldEnabled:false}));
-assert.equal(node.querySelectorAll('button').length,1,'No unavailable promotions or disabled Gold shortcut');
+const actionHandlers = { onOffers:()=>calls.push('offers'), onOrders:()=>calls.push('orders'), onGold:()=>calls.push('gold') };
+const actionStyles = document.createElement('style');
+actionStyles.textContent = await readFile(new URL('../src/styles/storefrontInteractions.css', import.meta.url), 'utf8');
+document.head.append(actionStyles);
+node.classList.add('storefront-retail');
+for (const [hasOffers, goldEnabled, labels] of [
+  [true, true, ['Promos', 'Pedidos', 'Miembro Gold']],
+  [true, false, ['Promos', 'Pedidos']],
+  [false, true, ['Pedidos', 'Miembro Gold']],
+  [false, false, ['Pedidos']],
+]) {
+  await render(h(RetailQuickActions, {hasOffers, goldEnabled, ...actionHandlers}));
+  const buttons = [...node.querySelectorAll('nav[aria-label="Accesos rápidos"] button')];
+  assert.deepEqual(buttons.map(button => button.textContent), labels);
+  for (const button of buttons) {
+    const name = button.getAttribute('aria-label') || button.textContent;
+    assert.ok(name.toLowerCase().includes(button.textContent.toLowerCase()), 'Voice control can use the visible name');
+    assert.equal(button.querySelector('svg').getAttribute('aria-hidden'), 'true');
+    assert.equal(button.type, 'button');
+    assert.ok(parseFloat(window.getComputedStyle(button).minHeight) >= 44, 'Compact does not mean a smaller touch target');
+    assert.equal(window.getComputedStyle(button.querySelector('span')).whiteSpace, 'nowrap');
+    button.focus();
+    assert.equal(document.activeElement, button);
+    await act(async () => button.click());
+  }
+}
+assert.deepEqual(calls, ['offers','orders','gold', 'offers','orders', 'orders','gold', 'orders']);
+node.classList.remove('storefront-retail');
+actionStyles.remove();
 await reset();
 
 let quantity = 0; let opened = 0;

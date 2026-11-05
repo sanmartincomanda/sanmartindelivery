@@ -12,18 +12,43 @@ html body .storefront-retail .retail-search-clear { flex: 0 0 44px; min-height: 
 .storefront-retail .retail-recent-searches button { min-height: 44px; border: 0; background: transparent; color: #0044c5; font-size: 14px; text-align: left; }
 .storefront-retail .retail-recent-searches > button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 4px; border-top: 1px solid #e7ebee; overflow-wrap: anywhere; }
 .storefront-retail .retail-recent-searches > button > span { color: #64717b; }
-.storefront-retail .retail-quick-actions { display: flex; align-items: center; gap: 8px; padding: 10px 0 2px; }
-.storefront-retail .retail-quick-actions button { flex: 1; display: flex; justify-content: center; align-items: center; gap: 7px; min-height: 44px; padding: 7px 5px; border: 1px solid #d9e2ec; border-radius: 8px; color: #244665; background: #fffdf8; font-size: 12px; font-weight: 600; line-height: 1.2; }
-.storefront-retail .retail-quick-actions svg { width: 19px; height: 19px; flex-shrink: 0; }
-.storefront-retail .retail-quick-actions .retail-quick-offers { color: #b51622; border-color: #edcfcd; background: #fff5ef; }
-.storefront-retail .retail-quick-actions .retail-quick-gold { color: #775011; border-color: #e4d7b7; background: #fcf5e3; }
+.storefront-retail .retail-quick-actions {
+  position: relative; isolation: isolate; display: flex; flex-wrap: wrap;
+  width: fit-content; max-width: 100%; box-sizing: border-box; padding-inline: 2px;
+}
+/* The visible rail is slimmer than its touch targets. */
+.storefront-retail .retail-quick-actions::before {
+  content: ''; position: absolute; z-index: -1; inset: 6px 0; pointer-events: none;
+  border: 1px solid #d5dde2; border-radius: 10px; background: var(--retail-paper);
+}
+.storefront-retail .retail-quick-actions button {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; min-width: 44px; padding: 6px 0; margin: 0; box-sizing: border-box;
+  border: 0; border-radius: 8px; background: transparent; color: var(--retail-ink);
+  font-size: .8125rem; font-weight: 600; line-height: 1.25;
+}
+.storefront-retail .retail-quick-actions button + button::before {
+  content: ''; position: absolute; inset-inline-start: 0; top: calc(50% - 7px);
+  height: 14px; border-inline-start: 1px solid var(--retail-line);
+}
+.storefront-retail .retail-quick-content {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 4px clamp(5px, 1.65vw, 12px); border-radius: 6px; transition: background-color 140ms ease-out;
+}
+.storefront-retail .retail-quick-content svg { flex: none; width: 16px; height: 16px; color: var(--retail-blue); }
+.storefront-retail .retail-quick-offers svg { color: var(--retail-action-red); }
+.storefront-retail .retail-quick-gold svg { color: #805813; }
+@media (hover: hover) {
+  .storefront-retail .retail-quick-actions button:hover .retail-quick-content { background: #edf2f7; }
+}
+.storefront-retail .retail-quick-actions button:active .retail-quick-content { background: #e0ebfa; }
 .storefront-retail [data-retail-promotions="true"] { scroll-margin-top: 24px; }
 html body .storefront-retail .retail-product { transition: box-shadow 160ms ease-out; }
 html body .storefront-retail .retail-product.is-in-cart { box-shadow: inset 0 0 0 1.5px #0044c5; }
 .storefront-retail .retail-quantity-value { display: inline-block; animation: retail-quantity-enter 150ms ease-out; }
 .storefront-retail .retail-card-stepper { animation: retail-controls-enter 160ms ease-out; }
 html body .storefront-retail :is(.retail-card-add,.retail-card-stepper button,.retail-quick-actions button,.retail-profile-menu button,.store-mobile-nav-button) { transition: background-color 140ms ease-out, color 140ms ease-out, transform 140ms ease-out; }
-html body .storefront-retail :is(.retail-card-add,.retail-quick-actions button,.retail-profile-menu button):active:not(:disabled) { transform: translateY(1px); background-color: #e0ebfa; }
+html body .storefront-retail :is(.retail-card-add,.retail-profile-menu button):active:not(:disabled) { transform: translateY(1px); background-color: #e0ebfa; }
 html body .storefront-retail .store-mobile-nav-button.active .store-mobile-nav-icon { position: relative; }
 html body .storefront-retail .store-mobile-nav-button.active .store-mobile-nav-icon::after { content: ''; position: absolute; width: 5px; height: 3px; bottom: -4px; left: calc(50% - 2.5px); background: #0044c5; border-radius: 2px; }
 html body .storefront-retail .retail-profile-identity { margin: 12px 0; padding: 20px 16px; border: 1px solid #d4e0f0; border-radius: 12px; background: #edf3fc url('/tienda/branding/butcher-line-pattern.svg') center / 560px 440px; }
@@ -45,5 +70,4 @@ html body .storefront-retail .retail-profile-menu > button:last-child { border-b
 .storefront-retail .retail-profile-menu > button > svg { box-sizing: content-box; padding: 8px; background: #edf3fc; border-radius: 8px; color: #0044c5; }
 @keyframes retail-quantity-enter { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @keyframes retail-controls-enter { from { opacity: .4; } to { opacity: 1; } }
-@media (min-width:700px) { .storefront-retail .retail-quick-actions { justify-content: flex-start; } .storefront-retail .retail-quick-actions button { flex: 0 1 190px; } }
 @media (prefers-reduced-motion:reduce) { .storefront-retail .retail-quantity-value,.storefront-retail .retail-card-stepper { animation: none; } }
