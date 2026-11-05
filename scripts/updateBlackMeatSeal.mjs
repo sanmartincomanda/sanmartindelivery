@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { get, ref, runTransaction } from 'firebase/database';
+import { get, onValue, ref, runTransaction } from 'firebase/database';
 import { ensureAuthenticatedFirebaseSession, getAuthenticatedFirebaseDatabase } from './firebaseScriptAuth.mjs';
 
 // Asset-only migration. Deploy the PNG before applying; never rewrite the campaign.
@@ -23,9 +23,20 @@ try {
   await mkdir('output/promotion-backups', { recursive: true });
   await writeFile(`output/promotion-backups/black-meat-seal-before-${Date.now()}.json`, JSON.stringify(before, null, 2));
   if (before.sealImage !== newImage) {
-    const result = await runTransaction(ref(db, `${campaignPath}/sealImage`), current =>
-      current === oldImage ? newImage : undefined, { applyLocally: false });
-    assert.ok(result.committed, 'Seal changed concurrently: no overwrite performed');
+    const sealRef = ref(db, `${campaignPath}/sealImage`);
+    let unsubscribe;
+    try {
+      // Keep the scalar cached: a transaction can otherwise first receive null
+      // even after get(parent), causing a safe conditional update to abort.
+      await new Promise((resolve, reject) => {
+        unsubscribe = onValue(sealRef, () => resolve(), reject);
+      });
+      const result = await runTransaction(sealRef, current =>
+        current === oldImage ? newImage : undefined, { applyLocally: false });
+      assert.ok(result.committed, 'Seal changed concurrently: no overwrite performed');
+    } finally {
+      unsubscribe?.();
+    }
   }
   const after = (await get(ref(db, campaignPath))).val();
   assert.equal(after.sealImage, newImage);
