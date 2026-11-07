@@ -17,6 +17,15 @@ product detail, preserving its transparent image and other campaign seals.
 The shared sources apply to future native builds; an existing installed
 Android/iOS binary is not updated by a web deployment.
 
+Published source `d3d3d69` to the custom storefront domain via Netlify deploy
+`6aefb80607b9436c41f8a458`; `/release.json` confirms the revision. Verified the
+first box in Granada Home/category and the 0.4 seal size ratio in cards/detail.
+Nindiri currently hides the mixed box because component 00097 is inactive there;
+this existing availability was preserved. Local responsive checks: 360, 390 and
+1280 px. Passing: box-announcement, box-sales, box-sales-ui, retail-interactions,
+retail-home, store-editorial, manual-route, store-access, build and web-release.
+No real order, catalog write or new mobile binary was made for this change.
+
 ## Data and pricing
 
 - Each presentation is an independent storeCatalog/BOX_UUID record. This is a
