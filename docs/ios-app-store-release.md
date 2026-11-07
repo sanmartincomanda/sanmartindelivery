@@ -131,8 +131,15 @@ El ejemplo usa el siguiente numero libre, no vuelve a cargar el build 2.
 
 ## Ficha y privacidad
 
-- Privacidad publicada tras aprobacion expresa: 13 tipos de datos vinculados
-  al cliente, sin seguimiento publicitario entre empresas.
+- Privacidad publicada y corregida tras dos aprobaciones expresas: 17 tipos de
+  datos. La inspeccion de todos los `PrivacyInfo.xcprivacy` del IPA firmado
+  detecto cuatro tipos adicionales declarados por GoogleSignIn/Firebase:
+  ubicacion aproximada, ID de dispositivo, otros datos de uso y diagnosticos.
+  Tambien se declaro analisis para ID de usuario y otros tipos de datos.
+  Los diagnosticos no estan vinculados; los otros 16 tipos si. Ninguno se usa
+  para seguimiento publicitario entre empresas. Vista detallada verificada.
+- Repetir la inspeccion de los manifiestos del IPA en futuras actualizaciones
+  de SDK; no deducir las etiquetas solo de los formularios visibles de la tienda.
 - Politica: `https://tienda.sanmartinsr.com/privacidad`.
 - Solicitudes: `https://tienda.sanmartinsr.com/eliminar-cuenta`.
 - Clasificacion calculada 4+, no categoria infantil. Sin apuestas, contenido
@@ -163,8 +170,13 @@ El ejemplo usa el siguiente numero libre, no vuelve a cargar el build 2.
 - Run `42404528186` agoto seis minutos mientras inicializaba el simulador,
   antes de instalar la app. Se amplio el limite a 12 minutos. Run `42405416292`
   se cancelo para seleccionar el tamano de iPhone requerido por la ficha.
-- Run `42405742633`: validacion y capturas pendientes de comprobar. XCTest
-  recorre ingreso, catalogo, producto y carrito sin confirmar compras reales.
+- Run `42405742633`: arranque real de iPhone correcto, boton Apple negro
+  verificado en `tmp/ios-startup-build2/iphone-startup.png` (1206x2622).
+  El target de pruebas fallo al compilar porque faltaba `PRODUCT_NAME`;
+  corregido en `5bb38d4`. Ahora compila las pruebas antes de arrancar simuladores.
+- Run `42407245997`: recorrido XCTest pendiente. Recorre ingreso, catalogo,
+  producto y carrito sin confirmar compras reales, y conserva capturas incluso
+  si falla una asercion. No sustituye una prueba de autenticacion con Apple real.
 - El titular pospuso su prueba fisica. No estan comprobados de extremo a
   extremo el ingreso con Apple/Google, el mapa ni la revocacion de una cuenta
   Apple real. Los tests de tokens/revocacion usan dobles de prueba.
