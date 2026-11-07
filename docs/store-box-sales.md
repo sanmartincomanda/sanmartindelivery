@@ -68,3 +68,31 @@ The rules suite uses a local demo namespace, tests canonical writes and
 tampering, and verifies updates to previously placed orders after deactivation.
 Browser/phone and real SICAR quotation acceptance remain separate rollout QA;
 no synthetic production orders should be created.
+
+## Launch announcement and Home
+
+- Home places "Venta por caja" before promotion sections, without duplicating
+  the boxes in the general catalog rail or hiding previously visible sections.
+- "Disponible ahora: Ventas por caja" previews up to three active, available
+  box presentations from the selected branch, using their existing photos.
+  Closing is optional; "Ir a comprar" opens the existing box category.
+- The announcement appears only on an idle public Home, not over checkout,
+  authentication, search, another dialog, or while offline. No boxes means no ad.
+- Maximum 10 distinct calendar days in America/Managua, at most once per day.
+  Account history is a transaction on
+  storeUsers/UID/announcementViews/box_sales_launch_v1, with count and days.
+  The existing profile subscription carries this field; no extra live listener
+  or full-database scan is introduced. The transaction arbitrates devices.
+- Guests use localStorage; clearing browser data or switching browsers cannot
+  preserve an anonymous identity. Guest dates merge on sign-in without showing
+  the ad again, including when the ten-day cap is reached. A device-day guard prevents immediate repeats after login or a
+  branch change. If storage is restricted, memory protects the current visit.
+- Rules grant only the owner access to this non-commercial profile subfield
+  and validate its shape. Existing discounts, order permissions and commercial
+  data are untouched. Publish these rules before the web release.
+- Browser history does not replay a dismissed box announcement. Accessibility
+  uses the existing focus-layer manager, a labeled dialog, close button and
+  reduced-motion support; the CTA remains in a scrollable, safe-area sheet.
+
+    npm run test:box-announcement
+    firebase emulators:exec --only database --project demo-box-announcement --config firebase.box-sales-test.json "npm run test:box-announcement-rules"

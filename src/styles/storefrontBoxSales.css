@@ -1,0 +1,41 @@
+.retail-box-announcement-backdrop {
+  position: fixed; inset: 0; z-index: 88; display: grid; place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: #071d35a8; box-sizing: border-box;
+}
+.retail-box-announcement {
+  width: min(520px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
+  border-radius: 18px; background: #fffdf8; color: #142c3c;
+  font-family: inherit; box-shadow: 0 12px 36px #071d3526;
+  animation: retail-box-arrive 240ms ease-out;
+}
+.retail-box-announcement header { position: relative; padding: 28px 24px 18px; border-top: 5px solid #0044c5; background: #f0f5fc url('/tienda/branding/butcher-line-pattern.svg') center / 520px; }
+.retail-box-announcement-eyebrow { display: block; padding-right: 40px; font-size: 12px; font-weight: 700; color: #0044c5; letter-spacing: .06em; text-transform: uppercase; }
+.retail-box-announcement h2 { margin: 10px 0 6px; font-size: clamp(27px, 6vw, 36px); line-height: 1.1; letter-spacing: -.035em; font-weight: 800; }
+.retail-box-announcement p { margin: 0; font-size: 14px; line-height: 1.5; color: #435b70; }
+.retail-box-announcement-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 44px; height: 44px; padding: 11px; border: 0; border-radius: 8px; color: #142c3c; background: transparent; cursor: pointer; }
+.retail-box-announcement-close svg { width: 22px; height: 22px; }
+.retail-box-previews { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 0; padding: 22px 24px; list-style: none; }
+.retail-box-previews[data-count="1"] { grid-template-columns: minmax(0,1fr); max-width: 280px; margin: auto; }
+.retail-box-previews[data-count="2"] { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.retail-box-previews li { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.retail-box-preview-photo { aspect-ratio: 1.1; background: #f3f2ee; border-radius: 8px; overflow: hidden; }
+.retail-box-preview-photo img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.retail-box-previews strong { font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
+.retail-box-previews li > span { font-size: 12px; color: #536373; }
+.retail-box-announcement footer { position: sticky; bottom: 0; background: #fffdf8; padding: 8px 24px 22px; }
+.retail-box-announcement-cta { display: flex; justify-content: center; align-items: center; gap: 18px; width: 100%; min-height: 48px; padding: 12px; border: 0; border-radius: 9px; background: #0044c5; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: background-color 150ms; }
+.retail-box-announcement-cta:active { background: #003393; }
+.retail-box-announcement-close:active { background: #dae6f7; }
+.retail-box-announcement button:focus-visible { outline: 3px solid #ff000c; outline-offset: 2px; }
+.storefront-retail .retail-box-home-title { display: flex; align-items: center; gap: 10px; }
+.retail-box-home-title img { flex: none; width: 27px; height: 27px; }
+@keyframes retail-box-arrive { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@media(max-width:600px) {
+  .retail-box-announcement-backdrop { align-items: end; }
+  .retail-box-announcement header { padding: 24px 20px 16px; }
+  .retail-box-previews { padding: 20px; gap: 10px; }
+  .retail-box-announcement footer { padding: 8px 20px 20px; }
+}
+@media(prefers-reduced-motion:reduce) { .retail-box-announcement { animation: none; } .retail-box-announcement-cta { transition: none; } }

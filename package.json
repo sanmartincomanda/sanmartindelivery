@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:box-announcement": "node scripts/testBoxAnnouncement.mjs",
+    "test:box-announcement-rules": "node scripts/testBoxAnnouncementRules.mjs",
     "test:box-sales": "node scripts/testStoreBoxSales.mjs",
     "test:box-sales-rules": "node scripts/testStoreBoxSalesRules.mjs",
     "test:box-sales-ui": "node scripts/testStoreBoxSalesUI.mjs",

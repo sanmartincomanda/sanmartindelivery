@@ -5,7 +5,10 @@ import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
 import RetailSearchBox from './storefront/RetailSearchBox';
 import RetailQuickActions from './storefront/RetailQuickActions';
-import { resolveBoxAvailability } from '../services/storeBoxSales';
+import { BOX_CATEGORY_ID, resolveBoxAvailability } from '../services/storeBoxSales';
+import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnnouncementProducts } from '../services/storeBoxAnnouncement.js';
+import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
+import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
 import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from './storefront/retailHomePromotions';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
@@ -1591,7 +1594,7 @@ export default function TiendaVirtualView({
       setOrderSuccessOpen(Boolean(view.success));
       setFirstOrderGiftOpen(Boolean(view.gift));
       setWelcomeCouponOpen(Boolean(view.welcome));
-      setPopupAdOpen(Boolean(view.popup));
+      setPopupAdOpen(Boolean(view.popup && openedPopupAdId) && openedPopupAdId !== BOX_ANNOUNCEMENT_ID);
     },
   });
 
@@ -2443,6 +2446,12 @@ export default function TiendaVirtualView({
   const hasActiveStoreSearch = deferredQuery.trim().length > 0;
   const showSearchResultsAsFlatList = activeCategory === 'todos' && hasActiveStoreSearch;
 
+  const boxSalesEnabled = categories.find(category => category.id === BOX_CATEGORY_ID)?.active !== false;
+  const boxSalesProducts = useMemo(
+    () => boxSalesEnabled ? getBoxAnnouncementProducts(activeProducts) : [],
+    [activeProducts, boxSalesEnabled]
+  );
+
   const groupedAllProductsSections = useMemo(() => {
     if (activeCategory !== 'todos') {
       return [];
@@ -2471,6 +2480,13 @@ export default function TiendaVirtualView({
         };
       });
 
+    const boxProducts = boxSalesEnabled ? getBoxAnnouncementProducts(filteredProducts) : [];
+    const boxCodes = new Set(boxProducts.map(product => product.code));
+    const boxSection = boxProducts.length ? {
+      id: BOX_HOME_SECTION_ID, title: 'Venta por caja', kicker: 'Cajas completas',
+      products: boxProducts, category: BOX_CATEGORY_ID, targetCategory: BOX_CATEGORY_ID,
+      targetSubcategory: 'todas', actionLabel: 'Ir a comprar',
+    } : null;
     const promotedProductCodeSet = new Set(
       productPromotionSections.flatMap((section) =>
         section.products.map((product) => String(product.code || '').trim())
@@ -2490,7 +2506,7 @@ export default function TiendaVirtualView({
 
     filteredProducts.forEach((product) => {
       const productCode = String(product.code || '').trim();
-      if (promotedProductCodeSet.has(productCode) || comboProductCodeSet.has(productCode)) {
+      if (boxCodes.has(productCode) || promotedProductCodeSet.has(productCode) || comboProductCodeSet.has(productCode)) {
         return;
       }
 
@@ -2550,8 +2566,8 @@ export default function TiendaVirtualView({
       });
     }
 
-    return [...productPromotionSections, ...(comboSection ? [comboSection] : []), ...regularSections];
-  }, [activeCategory, activeProductPromotions, filteredProducts]);
+    return [...(boxSection ? [boxSection] : []), ...productPromotionSections, ...(comboSection ? [comboSection] : []), ...regularSections];
+  }, [activeCategory, activeProductPromotions, boxSalesEnabled, filteredProducts]);
 
   const visibleHomeSections = getRetailHomeSections(groupedAllProductsSections, isDashboard);
   const homeHasGoldSection = visibleHomeSections.some(isRetailGoldSection);
@@ -3033,8 +3049,23 @@ export default function TiendaVirtualView({
     [currentUser?.key]
   );
   const hasBlockingWelcomeCoupon = ['available', 'claimed'].includes(welcomeCouponStatus);
+  const storeAdsBlocked = isDashboard || catalogLoading || mobileNavSection !== 'home' ||
+    activeCategory !== 'todos' || Boolean(query.trim()) || searchFocused || selectedProduct ||
+    checkoutOpen || ordersOpen || profileOpen || rewardsOpen || authSheetOpen || authLoading ||
+    orderSuccessOpen || firstOrderGiftOpen || welcomeCouponOpen || storeClosedNoticeOpen ||
+    branchSelectorOpen || pendingOrderUpdateReview || !online;
+  const boxAnnouncementPending = useBoxSalesAnnouncement({
+    enabled: !storeAdsBlocked && !popupAdOpen && boxSalesProducts.length > 0 &&
+      !popupAdSessionRef.current.endsWith(`:${boxAnnouncementDay()}`),
+    user: currentUser,
+    onShow: () => {
+      popupAdSessionRef.current = `${popupViewerKey}:${BOX_ANNOUNCEMENT_ID}:${boxAnnouncementDay()}`;
+      setOpenedPopupAdId(BOX_ANNOUNCEMENT_ID);
+      setPopupAdOpen(true);
+    },
+  });
   const popupAdCandidate = useMemo(() => {
-    if (hasBlockingWelcomeCoupon) {
+    if (hasBlockingWelcomeCoupon || boxAnnouncementPending) {
       return null;
     }
 
@@ -3045,10 +3076,15 @@ export default function TiendaVirtualView({
           Math.max(1, Number(popupAd.maxViewsPerUser || 1))
       ) || null
     );
-  }, [activePopupAds, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey]);
+  }, [activePopupAds, boxAnnouncementPending, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey]);
   const openedPopupAd = useMemo(
-    () => popupAds.find((popupAd) => popupAd.id === openedPopupAdId) || null,
-    [openedPopupAdId, popupAds]
+    () => openedPopupAdId === BOX_ANNOUNCEMENT_ID
+      ? boxSalesProducts.length > 0 ? {
+          id: BOX_ANNOUNCEMENT_ID, title: 'Ventas por caja', image: boxSalesProducts[0].image,
+          targetCategory: BOX_CATEGORY_ID, ctaLabel: 'Ir a comprar', active: true,
+        } : null
+      : popupAds.find((popupAd) => popupAd.id === openedPopupAdId) || null,
+    [boxSalesProducts, openedPopupAdId, popupAds]
   );
   const welcomeCouponHeroImage = useMemo(
     () => findWelcomeCouponHeroImage(catalog),
@@ -3256,14 +3292,14 @@ export default function TiendaVirtualView({
       return;
     }
 
-    if (hasBlockingWelcomeCoupon || pendingOrderUpdateReview || orderSuccessOpen) {
+    if (welcomeCouponOpen || (hasBlockingWelcomeCoupon && openedPopupAdId !== BOX_ANNOUNCEMENT_ID) || pendingOrderUpdateReview || orderSuccessOpen) {
       setPopupAdOpen(false);
       setOpenedPopupAdId('');
     }
-  }, [hasBlockingWelcomeCoupon, orderSuccessOpen, pendingOrderUpdateReview, popupAdOpen]);
+  }, [hasBlockingWelcomeCoupon, welcomeCouponOpen, openedPopupAdId, orderSuccessOpen, pendingOrderUpdateReview, popupAdOpen]);
 
   useEffect(() => {
-    if (!popupAdCandidate?.id || popupAdOpen || hasBlockingWelcomeCoupon) {
+    if (!popupAdCandidate?.id || popupAdOpen || hasBlockingWelcomeCoupon || storeAdsBlocked || boxAnnouncementPending) {
       return;
     }
 
@@ -3271,8 +3307,8 @@ export default function TiendaVirtualView({
       return;
     }
 
-    const sessionKey = `${popupViewerKey}:${popupAdCandidate.id}`;
-    if (popupAdSessionRef.current === sessionKey) {
+    const sessionKey = `${popupViewerKey}:${popupAdCandidate.id}:${boxAnnouncementDay()}`;
+    if (popupAdSessionRef.current) {
       return;
     }
 
@@ -3291,6 +3327,8 @@ export default function TiendaVirtualView({
     popupAdCandidate?.id,
     popupAdOpen,
     popupViewerKey,
+    storeAdsBlocked,
+    boxAnnouncementPending,
   ]);
 
   useEffect(() => {
@@ -10266,17 +10304,21 @@ export default function TiendaVirtualView({
                 const actionLabel = getStoreGroupActionLabel(section);
                 const canOpenSection = Boolean(section.targetCategory || section.category);
                 const isPromotionSection = !isDashboard && section.id.startsWith('promo-') && section.products.some(hasDiscountedStorePrice);
+                const isBoxSection = section.id === BOX_HOME_SECTION_ID;
 
                 return (
                   <React.Fragment key={section.id}>
                   {!isDashboard && isRetailGoldSection(section) && (
                     <RetailFoodStory variant="grill" onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.grill)} />
                   )}
-                  <section data-retail-promotions={showAllPromotionProducts ? 'true' : undefined} className={`store-product-group${isPromotionSection ? ' retail-promotion-group' : ''}`}>
+                  <section data-retail-promotions={showAllPromotionProducts ? 'true' : undefined} data-retail-box-sales={isBoxSection ? 'true' : undefined} className={`store-product-group${isPromotionSection ? ' retail-promotion-group' : ''}${isBoxSection ? ' retail-box-home-group' : ''}`}>
                     <div className="store-product-group-head">
                       <div>
                         <span className="store-product-group-kicker">{section.kicker}</span>
-                        <h3 className="store-product-group-title" tabIndex={-1}>{section.title}</h3>
+                        <h3 className={`store-product-group-title${isBoxSection ? ' retail-box-home-title' : ''}`} tabIndex={-1}>
+                          {isBoxSection && <img src="/tienda/categorias/icons/cajas.svg" alt="" width="27" height="27" />}
+                          {section.title}
+                        </h3>
                         {isPromotionSection && <p className="retail-promotion-signature">Preciazos en Carnes San Martín, <strong>sí</strong></p>}
                       </div>
                       <div className="store-product-group-actions">
@@ -10321,7 +10363,7 @@ export default function TiendaVirtualView({
                       </div>
                     )}
                   </section>
-                  {!isDashboard && sectionIndex === 0 && activeProducts.some(isRetailBurgerProduct) && (
+                  {!isDashboard && sectionIndex === (visibleHomeSections[0]?.id === BOX_HOME_SECTION_ID ? 1 : 0) && activeProducts.some(isRetailBurgerProduct) && (
                     <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('Hamburguesas')} />
                   )}
                   {!isDashboard && !homeHasGoldSection && sectionIndex === visibleHomeSections.length - 1 && (
@@ -10663,7 +10705,11 @@ export default function TiendaVirtualView({
         />
       )}
 
-      {popupAdOpen && openedPopupAd && (
+      {popupAdOpen && openedPopupAdId === BOX_ANNOUNCEMENT_ID && openedPopupAd && (
+        <RetailBoxSalesAnnouncement products={boxSalesProducts} onAction={openPopupAdTarget}
+          onClose={() => { setPopupAdOpen(false); setOpenedPopupAdId(''); }} />
+      )}
+      {popupAdOpen && openedPopupAd && openedPopupAdId !== BOX_ANNOUNCEMENT_ID && (
         <StorePopupAdModal
           popupAd={openedPopupAd}
           onAction={openPopupAdTarget}
