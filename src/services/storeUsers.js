@@ -14,6 +14,7 @@ import {
   upsertOwnClientRole,
 } from './authRoles';
 import { normalizeBirthdayValue } from './customerBirthday';
+import { createStoreLoginRunner, withAuthDeadline, canTryLegacyStoreLogin } from './storeLoginAttempt.js';
 import { setClientDirectoryEntry } from './clientDirectory';
 import { ensureStoreWelcomeCouponForUser } from './storeWelcomeCoupon';
 import {
@@ -23,6 +24,7 @@ import {
 } from './storeAddresses';
 
 export const STORE_USERS_PATH = 'storeUsers';
+const runStoreLogin = createStoreLoginRunner();
 
 export const cleanStorePhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
 export const cleanStoreEmail = (email) => normalizeAuthEmail(email);
@@ -137,7 +139,7 @@ const getStoreUserRecordByAuthUid = async (authUid = '') => {
     return null;
   }
 
-  const snapshot = await get(ref(database, `${STORE_USERS_PATH}/${cleanAuthUid}`));
+  const snapshot = await withAuthDeadline(get(ref(database, `${STORE_USERS_PATH}/${cleanAuthUid}`)));
   if (!snapshot.exists()) {
     return null;
   }
@@ -154,7 +156,7 @@ const getStoreUserRecordByPhone = async (phone = '') => {
     return null;
   }
 
-  const snapshot = await get(query(ref(database, STORE_USERS_PATH), orderByChild('telefono'), equalTo(cleanPhone)));
+  const snapshot = await withAuthDeadline(get(query(ref(database, STORE_USERS_PATH), orderByChild('telefono'), equalTo(cleanPhone))));
   const [entry] = Object.entries(snapshot.val() || {});
   if (!entry) {
     return null;
@@ -170,7 +172,7 @@ const getStoreUserRecordByEmail = async (email = '') => {
     return null;
   }
 
-  const snapshot = await get(query(ref(database, STORE_USERS_PATH), orderByChild('email'), equalTo(cleanEmail)));
+  const snapshot = await withAuthDeadline(get(query(ref(database, STORE_USERS_PATH), orderByChild('email'), equalTo(cleanEmail))));
   const [entry] = Object.entries(snapshot.val() || {});
   if (!entry) {
     return null;
@@ -214,11 +216,11 @@ const upsertStoreUserAtAuthUid = async (authUid, sourceValue = {}) => {
 
 const resolveWelcomeCouponForStoreUser = async ({ userKey, phone, name }) => {
   try {
-    return await ensureStoreWelcomeCouponForUser({
+    return await withAuthDeadline(ensureStoreWelcomeCouponForUser({
       userKey,
       phone,
       name,
-    });
+    }), 8000);
   } catch (error) {
     console.warn('No se pudo resolver el cupon de bienvenida del cliente.', error);
     return null;
@@ -473,6 +475,10 @@ export async function requestStorePasswordReset({ email, telefono }) {
 }
 
 export async function loginStoreUserWithEmail({ email, telefono, password }) {
+  return runStoreLogin(checkActive => loginStoreUserEmailAttempt({ email, telefono, password }, checkActive));
+}
+
+async function loginStoreUserEmailAttempt({ email, telefono, password }, checkActive) {
   const cleanEmail = cleanStoreEmail(email);
   const cleanPhone = cleanStorePhone(telefono);
   const cleanPassword = String(password || '').trim();
@@ -495,7 +501,15 @@ export async function loginStoreUserWithEmail({ email, telefono, password }) {
   try {
     authUser = await signInStoreCustomer({ email: cleanEmail, telefono: cleanPhone, password: cleanPassword });
   } catch (primaryError) {
-    contactRecord = await getStoreUserRecordByContact({ email: cleanEmail, telefono: cleanPhone });
+    checkActive();
+    if (!canTryLegacyStoreLogin(primaryError)) throw primaryError;
+    try {
+      contactRecord = await getStoreUserRecordByContact({ email: cleanEmail, telefono: cleanPhone });
+    } catch {
+      // An unavailable legacy directory must not hide the original auth error.
+      throw primaryError;
+    }
+    checkActive();
 
     const fallbackPhone = cleanPhone || cleanStorePhone(contactRecord?.value?.telefono);
     const fallbackEmail = cleanEmail || cleanStoreEmail(contactRecord?.value?.email);
@@ -523,11 +537,13 @@ export async function loginStoreUserWithEmail({ email, telefono, password }) {
   }
 
   const authUserKey = authUser.uid;
-  await touchLastLogin(authUserKey);
+  checkActive();
 
   let authUserRecord = await getStoreUserRecordByAuthUid(authUserKey);
+  checkActive();
   if (!authUserRecord) {
     contactRecord = contactRecord || (await getStoreUserRecordByContact({ email: cleanEmail, telefono: cleanPhone }));
+    checkActive();
     if (contactRecord?.value) {
       authUserRecord = await upsertStoreUserAtAuthUid(authUserKey, contactRecord.value);
     }
@@ -545,45 +561,57 @@ export async function loginStoreUserWithEmail({ email, telefono, password }) {
     throw error;
   }
 
-  await update(ref(database, `${STORE_USERS_PATH}/${authUserKey}`), {
-    lastLoginAt: Date.now(),
-  });
-
-  const welcomeCoupon = await resolveWelcomeCouponForStoreUser({
-    userKey: authUserKey,
-    phone: authUserRecord.value?.telefono || cleanPhone,
-    name: authUserRecord.value?.nombre,
-  });
+  checkActive();
+  scheduleStoreLoginExtras(authUserKey, authUserRecord.value);
 
   return sanitizeStoreUser(
     {
       ...authUserRecord.value,
-      welcomeCoupon,
+      welcomeCoupon: authUserRecord.value.welcomeCoupon || null,
     },
     authUserKey
   );
 }
 
 export async function loginStoreUserWithGoogle() {
-  return completeSocialStoreLogin(await signInStoreCustomerWithGoogle(), 'google');
+  return runStoreLogin(async checkActive => {
+    const user = await signInStoreCustomerWithGoogle();
+    checkActive();
+    return completeSocialStoreLogin(user, 'google', checkActive);
+  }, { timeoutMs: 120000 });
 }
 
 export async function loginStoreUserWithApple() {
-  return completeSocialStoreLogin(await signInStoreCustomerWithApple(), 'apple');
+  return runStoreLogin(async checkActive => {
+    const user = await signInStoreCustomerWithApple();
+    checkActive();
+    return completeSocialStoreLogin(user, 'apple', checkActive);
+  }, { timeoutMs: 120000 });
 }
 
-async function completeSocialStoreLogin(authUser, provider) {
+function scheduleStoreLoginExtras(authUserKey, user) {
+  if (getCurrentAuthUser()?.uid !== authUserKey) return;
+  // These writes and coupons are not prerequisites for an authenticated profile.
+  // The existing profile subscription receives any welcome coupon afterwards.
+  void touchLastLogin(authUserKey);
+  void update(ref(database, `${STORE_USERS_PATH}/${authUserKey}`), { lastLoginAt: Date.now() }).catch(() => {});
+  void resolveWelcomeCouponForStoreUser({ userKey: authUserKey, phone: user.telefono, name: user.nombre });
+}
+
+async function completeSocialStoreLogin(authUser, provider, checkActive) {
   const authUserKey = authUser.uid;
   const userRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
-  const userSnapshot = await get(userRef);
+  const userSnapshot = await withAuthDeadline(get(userRef));
+  checkActive();
   const user = userSnapshot.val();
 
   if (!user) {
-    await upsertOwnClientRole(authUserKey, {
+    await withAuthDeadline(upsertOwnClientRole(authUserKey, {
       nombre: authUser.displayName,
       email: authUser.email,
       provider,
-    });
+    }));
+    checkActive();
 
     const error = new Error('Perfil incompleto');
     error.code = 'PROFILE_REQUIRED';
@@ -595,29 +623,24 @@ async function completeSocialStoreLogin(authUser, provider) {
     throw error;
   }
 
-  await upsertOwnClientRole(authUserKey, {
+  await withAuthDeadline(upsertOwnClientRole(authUserKey, {
     nombre: user.nombre || authUser.displayName,
     email: user.email || authUser.email,
     telefono: user.telefono,
     provider,
-  });
+  }));
+  checkActive();
 
-  await update(userRef, {
+  void update(userRef, {
     email: user.email || cleanStoreEmail(authUser.email),
-    lastLoginAt: Date.now(),
-  });
-
-  const welcomeCoupon = await resolveWelcomeCouponForStoreUser({
-    userKey: authUserKey,
-    phone: user.telefono,
-    name: user.nombre || authUser.displayName,
-  });
+  }).catch(() => {});
+  scheduleStoreLoginExtras(authUserKey, user);
 
   return sanitizeStoreUser(
     {
       ...user,
       email: user.email || cleanStoreEmail(authUser.email),
-      welcomeCoupon,
+      welcomeCoupon: user.welcomeCoupon || null,
     },
     authUserKey
   );

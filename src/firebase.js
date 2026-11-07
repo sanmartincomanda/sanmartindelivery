@@ -1,5 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence } from "firebase/auth";
+import { Capacitor } from '@capacitor/core';
+import { initializeRuntimeAuth } from './services/firebaseAuthRuntime.js';
 import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 
@@ -14,6 +16,8 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+export const auth = initializeRuntimeAuth(app, Capacitor, {
+  getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
+});
 export const database = getDatabase(app);
 export const storage = getStorage(app);

@@ -1,5 +1,7 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { getGoogleAuthErrorMessage } from '../services/googleSignIn.js';
+import { getStoreLoginErrorMessage } from '../services/storeLoginAttempt.js';
+import { cartCoverageNoticeKey, createCoverageNoticeGate } from '../services/storeCoverageNotice.js';
 import { Capacitor } from '@capacitor/core';
 import { canUseNativeAppleSignIn, getAppleAuthErrorMessage } from '../services/appleSignIn.js';
 import RetailProductCard from './storefront/RetailProductCard';
@@ -108,7 +110,6 @@ import {
 import {
   buildStoreBranchPath,
   DEFAULT_STORE_BRANCH_ID,
-  getNearestStoreBranch,
   getStoreBranchIdFromPathname,
   getStoreBranchById,
   getStoreBranchDeliverySettings,
@@ -180,7 +181,7 @@ import {
   ROUTE_SAN_MARTIN_PAUSED_MESSAGE,
 } from '../services/routeSanMartin';
 import { STORE_COUPON_ARCHIVE_USAGE_PATH } from '../services/orderArchive';
-import { onFirebaseAuthChange, signOutCurrentUser } from '../services/authRoles';
+import { onFirebaseAuthChange, signOutCurrentUser, getCurrentAuthUser } from '../services/authRoles';
 import StoreRewardsSheet, { StoreRewardsSummaryCard } from './StoreRewardsSheet';
 import {
   FirstOrderRewardCheckoutCard,
@@ -1534,7 +1535,6 @@ export default function TiendaVirtualView({
   const [firstOrderGiftNotice, setFirstOrderGiftNotice] = useState('');
   const [firstOrderGiftCelebrate, setFirstOrderGiftCelebrate] = useState(false);
   const [storeClosedNoticeOpen, setStoreClosedNoticeOpen] = useState(false);
-  const [registerCoverageNotice, setRegisterCoverageNotice] = useState(null);
   const [groupVisibleCounts, setGroupVisibleCounts] = useState({});
   const [mobileNavSection, setMobileNavSection] = useState('home');
   const [retailCheckoutStep, setRetailCheckoutStep] = useState('cart');
@@ -1549,7 +1549,10 @@ export default function TiendaVirtualView({
   const autoAppliedCouponRef = useRef('');
   const autoClaimingWelcomeCouponRef = useRef('');
   const popupAdSessionRef = useRef('');
-  const branchLocationRequestedRef = useRef(false);
+  const coverageNoticeGateRef = useRef(null);
+  if (!coverageNoticeGateRef.current) coverageNoticeGateRef.current = createCoverageNoticeGate();
+  const [cartCoverageNotice, setCartCoverageNotice] = useState(null);
+  const authAttemptRef = useRef(false);
   const firstOrderTierRef = useRef('');
   const pageTopRef = useRef(null);
   const filtersPanelRef = useRef(null);
@@ -1823,54 +1826,6 @@ export default function TiendaVirtualView({
       document.title = `Delivery Carnes San Martin ${selectedBranch.shortName}`;
     }
   }, [isDashboard, selectedBranch?.id, selectedBranch?.shortName]);
-
-  useEffect(() => {
-    if (
-      isDashboard ||
-      !storeBranchesReady ||
-      branchLocationRequestedRef.current ||
-      storeBranches.length === 0
-    ) {
-      return;
-    }
-
-    branchLocationRequestedRef.current = true;
-    let cancelled = false;
-    setBranchLocating(true);
-
-    getBrowserLocation()
-      .then((location) => {
-        if (cancelled || !location) {
-          return;
-        }
-
-        setBranchLocation(location);
-        const nearest = getNearestStoreBranch(location, storeBranches);
-        if (
-          nearest?.branch?.id &&
-          nearest.branch.id !== selectedBranch?.id &&
-          nearest.distanceKm <= Number(nearest.branch.switchPromptRadiusKm || 12)
-        ) {
-          setNearestBranchCandidate(nearest);
-          setBranchSelectorMode('nearby');
-          setBranchSelectorOpen(true);
-        }
-      })
-      .catch((error) => {
-        if (error?.code !== 1) {
-          console.warn('No se pudo detectar la tienda cercana:', error);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setBranchLocating(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isDashboard, selectedBranch?.id, storeBranches, storeBranchesReady]);
 
   useEffect(() => {
     const unsubscribe = subscribeStoreRewardSettings(
@@ -3056,7 +3011,7 @@ export default function TiendaVirtualView({
     activeCategory !== 'todos' || Boolean(query.trim()) || searchFocused || selectedProduct ||
     checkoutOpen || ordersOpen || profileOpen || rewardsOpen || authSheetOpen || authLoading ||
     orderSuccessOpen || firstOrderGiftOpen || welcomeCouponOpen || storeClosedNoticeOpen ||
-    branchSelectorOpen || pendingOrderUpdateReview || !online;
+    branchSelectorOpen || cartCoverageNotice || pendingOrderUpdateReview || !online;
   const boxAnnouncementPending = useBoxSalesAnnouncement({
     enabled: !storeAdsBlocked && !popupAdOpen && boxSalesProducts.length > 0 &&
       !popupAdSessionRef.current.endsWith(`:${boxAnnouncementDay()}`),
@@ -3129,10 +3084,6 @@ export default function TiendaVirtualView({
     () => storeBranches.find((branch) => branch.id === 'granada' && branch.active !== false) || null,
     [storeBranches]
   );
-  const granadaSavedAddressRouteQuote = useMemo(
-    () => getRouteSanMartinQuote({ branch: granadaRouteBranch, destination: savedDeliveryAddress?.ubicacion }),
-    [granadaRouteBranch, savedDeliveryAddress?.ubicacion]
-  );
   useEffect(() => {
     if (currentUser && showSavedAddressCoverageWarning && savedAddressRouteQuote.available &&
         fulfillmentType === ORDER_FULFILLMENT_DELIVERY) {
@@ -3140,6 +3091,9 @@ export default function TiendaVirtualView({
     }
   }, [currentUser, fulfillmentType, savedAddressRouteQuote.available, showSavedAddressCoverageWarning]);
   const activeDeliveryAddress = deliveryMode === 'otra' ? alternateDelivery : savedDeliveryAddress;
+  useEffect(() => {
+    setCartCoverageNotice(null);
+  }, [currentUser?.key, selectedBranch?.id, activeDeliveryAddress?.ubicacion?.lat, activeDeliveryAddress?.ubicacion?.lng, fulfillmentType]);
   const routeSanMartinFlow = fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN;
   useEffect(() => {
     if (storeBranchesReady && routeSanMartinFlow && !isRouteSanMartinEnabled(selectedBranch)) {
@@ -3188,39 +3142,6 @@ export default function TiendaVirtualView({
       : buildStoreDeliverySummary(deliveryQuote),
     [deliveryQuote, routeSanMartinFlow, routeSanMartinQuote.available, routeSanMartinQuote.serviceEnabled]
   );
-  const authRegistrationCoverageQuote = useMemo(
-    () =>
-      calculateStoreDeliveryQuote({
-        settings: activeDeliverySettings,
-        destination: authForm?.ubicacion,
-        fulfillmentType: ORDER_FULFILLMENT_DELIVERY,
-      }),
-    [activeDeliverySettings, authForm?.ubicacion]
-  );
-  const authRegistrationBranchCandidate = useMemo(() => {
-    if (!hasLocation(authForm?.ubicacion)) {
-      return null;
-    }
-
-    return storeBranches
-      .filter((branch) => branch.active !== false && branch.id !== selectedBranch?.id)
-      .map((branch) => {
-        const quote = calculateStoreDeliveryQuote({
-          settings: getStoreBranchDeliverySettings(branch, deliverySettings),
-          destination: authForm.ubicacion,
-          fulfillmentType: ORDER_FULFILLMENT_DELIVERY,
-        });
-        const parsedDistance = Number(quote?.distanceKm);
-
-        return {
-          branch,
-          quote,
-          distanceKm: Number.isFinite(parsedDistance) ? parsedDistance : Number.POSITIVE_INFINITY,
-        };
-      })
-      .filter((candidate) => candidate.quote?.available === true)
-      .sort((left, right) => left.distanceKm - right.distanceKm)[0] || null;
-  }, [authForm?.ubicacion, deliverySettings, selectedBranch?.id, storeBranches]);
   const storeOperationStatus = useMemo(
     () => getStoreOperationStatus(activeDeliverySettings),
     [activeDeliverySettings]
@@ -3551,9 +3472,26 @@ export default function TiendaVirtualView({
       showQuantityNotice(getQuantityRuleMessage(product));
     }
 
+    const nextQuantity = clampQuantity(numericValue, product);
+    const location = normalizeLocation(activeDeliveryAddress?.ubicacion);
+    const noticeKey = cartCoverageNoticeKey({
+      userKey: currentUser?.key, authUid: getCurrentAuthUser()?.uid,
+      branchId: selectedBranch?.id, location, reason: deliveryQuote?.reason,
+      fulfillmentType, previousQuantity: cart[code], nextQuantity,
+      ready: !isDashboard && storeBranchesReady && deliverySettingsReady,
+    });
+    if (coverageNoticeGateRef.current(noticeKey)) {
+      const candidates = storeBranches.filter(branch => branch.active !== false && branch.id !== selectedBranch?.id)
+        .map(branch => {
+          const quote = calculateStoreDeliveryQuote({ settings: getStoreBranchDeliverySettings(branch, deliverySettings), destination: location, fulfillmentType: ORDER_FULFILLMENT_DELIVERY });
+          return { branch, quote, distanceKm: Number(quote.distanceKm) };
+        }).filter(candidate => candidate.quote.available)
+        .sort((a, b) => a.distanceKm - b.distanceKm);
+      setCartCoverageNotice({ location, nearest: candidates[0] || null });
+    }
     setCart((current) => ({
       ...current,
-      [code]: clampQuantity(numericValue, product),
+      [code]: nextQuantity,
     }));
   };
 
@@ -3703,6 +3641,7 @@ export default function TiendaVirtualView({
   };
 
   const clearStoreSession = async () => {
+    setCartCoverageNotice(null);
     setCurrentUser(null);
     setCreatedOrder(null);
     setOrderSuccessOpen(false);
@@ -3889,6 +3828,8 @@ export default function TiendaVirtualView({
 
   const handleStoreLogin = async (event) => {
     event.preventDefault();
+    if (authAttemptRef.current) return;
+    authAttemptRef.current = true;
     setAuthLoading(true);
     setAuthError('');
     setAuthNotice('');
@@ -3913,7 +3854,7 @@ export default function TiendaVirtualView({
         confirmPassword: '',
       }));
     } catch (error) {
-      console.error('Error iniciando sesion de tienda:', error);
+      console.error('Error iniciando sesion de tienda:', error?.code || 'unknown');
       if (error.code === 'PROFILE_REQUIRED') {
         const authUser = error.authUser || {};
         setAuthProviderDraft({ provider: 'password', uid: authUser.uid });
@@ -3928,9 +3869,10 @@ export default function TiendaVirtualView({
         }));
         setAuthError('Tu cuenta ya existe, pero faltan datos de direccion y mapa. Completa el registro para terminarla.');
       } else {
-        setAuthError('Correo, telefono o contrasena incorrectos.');
+        setAuthError(getStoreLoginErrorMessage(error) || 'Correo, telefono o contrasena incorrectos.');
       }
     } finally {
+      authAttemptRef.current = false;
       setAuthLoading(false);
     }
   };
@@ -3965,6 +3907,8 @@ export default function TiendaVirtualView({
   };
 
   const handleStoreSocialLogin = async (provider) => {
+    if (authAttemptRef.current) return;
+    authAttemptRef.current = true;
     setAuthLoading(true);
     setAuthError('');
     setAuthNotice('');
@@ -3993,9 +3937,10 @@ export default function TiendaVirtualView({
         }));
         setAuthError('Completa telefono, direccion y punto del mapa para terminar tu cuenta.');
       } else {
-        setAuthError(provider === 'apple' ? getAppleAuthErrorMessage(error) : getGoogleAuthErrorMessage(error));
+        setAuthError(getStoreLoginErrorMessage(error) || (provider === 'apple' ? getAppleAuthErrorMessage(error) : getGoogleAuthErrorMessage(error)));
       }
     } finally {
+      authAttemptRef.current = false;
       setAuthLoading(false);
     }
   };
@@ -4031,21 +3976,6 @@ export default function TiendaVirtualView({
       return;
     }
 
-    const suggestedBranch = authRegistrationBranchCandidate?.branch || null;
-    const selectedBranchIsOutOfCoverage =
-      authRegistrationCoverageQuote?.reason === 'out_of_coverage';
-
-    const routeAvailable = granadaRouteBranch?.acceptingOrders !== false &&
-      getRouteSanMartinQuote({ branch: granadaRouteBranch, destination: authForm.ubicacion }).available;
-    if (selectedBranchIsOutOfCoverage && !suggestedBranch && !routeAvailable) {
-      setAuthLoading(false);
-      setRegisterCoverageNotice({
-        branch: selectedBranch,
-        suggestedBranch: null,
-      });
-      return;
-    }
-
     try {
       const user = isExistingAuthProfileCompletion
         ? await completeExistingStoreUserProfile({
@@ -4057,21 +3987,7 @@ export default function TiendaVirtualView({
       persistStoreSession(user);
       const nextIntent = pendingAuthIntent;
       closeAuthSheet({ force: true });
-      if (selectedBranchIsOutOfCoverage && suggestedBranch) {
-        setRegisterCoverageNotice({
-          branch: selectedBranch,
-          suggestedBranch,
-        });
-      } else if (selectedBranchIsOutOfCoverage && routeAvailable) {
-        if (selectedBranch?.id === 'granada') {
-          setFulfillmentType(ORDER_FULFILLMENT_ROUTE_SAN_MARTIN);
-        }
-        setRegisterCoverageNotice({
-          branch: selectedBranch,
-          suggestedBranch: selectedBranch?.id === 'granada' ? null : granadaRouteBranch,
-          routeAvailable: true,
-        });
-      } else if (nextIntent === 'orders') {
+      if (nextIntent === 'orders') {
         setOrdersOpen(true);
       }
       setAuthForm({ ...EMPTY_STORE_AUTH_FORM });
@@ -4419,8 +4335,8 @@ export default function TiendaVirtualView({
   const retailHomeBusy = submitting || authLoading || rewardActionBusy || welcomeCouponActionBusy;
   const goToRetailHome = () => {
     if (retailHomeBusy) return;
+    setCartCoverageNotice(null);
     setRewardsReturnTarget('');
-    setRegisterCoverageNotice(null);
     setNearestBranchCandidate(null);
     retailHome();
   };
@@ -10044,40 +9960,6 @@ export default function TiendaVirtualView({
                 <img src="/tienda/branding/google-play-badge.png" alt="Get it on Google Play" width="646" height="250" />
               </a>
             )}
-            {showSavedAddressCoverageWarning && !savedAddressRouteQuote.available && (
-              <div className="store-coverage-alert" role="status">
-                <div className="store-coverage-alert-copy">
-                  <span className="store-coverage-alert-dot" aria-hidden="true" />
-                  <span>{granadaSavedAddressRouteQuote.available
-                    ? 'Tu direccion tiene cobertura de Ruta San Martin desde Granada, con envio gratis y entrega programada.'
-                    : 'Tu dirección no permite entregar desde esta tienda.'}</span>
-                </div>
-                <div className="store-coverage-alert-actions">
-                  <button
-                    type="button"
-                    className="store-coverage-alert-button primary"
-                    onClick={openBranchSelector}
-                  >
-                    {granadaSavedAddressRouteQuote.available ? 'Elegir Granada' : 'Cambiar tienda'}
-                  </button>
-                  <button
-                    type="button"
-                    className="store-coverage-alert-button"
-                    onClick={openProfilePanel}
-                  >
-                    Cambiar dirección
-                  </button>
-                </div>
-              </div>
-            )}
-            {showSavedAddressCoverageWarning && savedAddressRouteQuote.available && (
-              <div className="store-coverage-alert" role="status">
-                <div className="store-coverage-alert-copy">
-                  <span className="store-coverage-alert-dot" aria-hidden="true" />
-                  <span>Tu direccion tiene cobertura de Ruta San Martin: entrega programada y envio gratis.</span>
-                </div>
-              </div>
-            )}
           </div>
 
           <RetailSearchBox value={query} onChange={handleStoreSearch} onFocusChange={setSearchFocused} enhanced={!isDashboard} />
@@ -10608,26 +10490,6 @@ export default function TiendaVirtualView({
         />
       )}
 
-      {registerCoverageNotice && (
-        <RegisterOutOfCoverageModal
-          branch={registerCoverageNotice.branch || selectedBranch}
-          suggestedBranch={registerCoverageNotice.suggestedBranch}
-          routeAvailable={registerCoverageNotice.routeAvailable && isRouteSanMartinEnabled(granadaRouteBranch)}
-          onSwitch={() => {
-            if (registerCoverageNotice.suggestedBranch) {
-              selectStoreBranch(registerCoverageNotice.suggestedBranch, {
-                skipConfirmation: true,
-              });
-              if (registerCoverageNotice.routeAvailable && isRouteSanMartinEnabled(granadaRouteBranch)) {
-                setFulfillmentType(ORDER_FULFILLMENT_ROUTE_SAN_MARTIN);
-              }
-            }
-            setRegisterCoverageNotice(null);
-          }}
-          onClose={() => setRegisterCoverageNotice(null)}
-        />
-      )}
-
       {profileOpen && currentUser && (
         <ProfileSheet
           user={currentUser}
@@ -10765,6 +10627,13 @@ export default function TiendaVirtualView({
         }}
       />
 
+      {cartCoverageNotice && <StoreBranchSelector
+        open mode="coverage" branches={storeBranches} selectedBranch={selectedBranch}
+        nearestCandidate={cartCoverageNotice.nearest} userLocation={cartCoverageNotice.location}
+        onSelect={branch => { selectStoreBranch(branch); setCartCoverageNotice(null); }}
+        onShowBranches={() => { setCartCoverageNotice(null); openBranchSelector(); }}
+        onClose={() => setCartCoverageNotice(null)}
+      />}
       {orderSuccessOpen && <OrderSuccessSheet retail={!isDashboard} onClose={dismissOrderSuccess} />}
     </div>
     </RetailHomeContext.Provider>
@@ -14183,90 +14052,6 @@ function StoreClosedNoticeModal({ scheduleRows = [], onClose }) {
   );
 }
 
-function RegisterOutOfCoverageModal({ branch, suggestedBranch, routeAvailable = false, onSwitch, onClose }) {
-  const hasSuggestedBranch = Boolean(suggestedBranch?.id);
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 260,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 18,
-        background: 'rgba(15, 23, 42, 0.56)',
-        backdropFilter: 'blur(8px)',
-      }}
-      onClick={hasSuggestedBranch ? undefined : onClose}
-    >
-      <div
-        style={{
-          width: 'min(430px, 100%)',
-          borderRadius: 28,
-          border: '1px solid rgba(15, 23, 42, 0.08)',
-          background: '#ffffff',
-          boxShadow: '0 32px 90px rgba(15, 23, 42, 0.28)',
-          padding: '24px 22px 20px',
-          display: 'grid',
-          gap: 16,
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div style={{ display: 'grid', gap: 8 }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 54,
-              height: 54,
-              borderRadius: 20,
-              background: 'linear-gradient(135deg, rgba(190, 24, 93, 0.12) 0%, rgba(239, 68, 68, 0.22) 100%)',
-              color: '#b91c1c',
-              fontSize: 28,
-              fontWeight: 900,
-            }}
-          >
-            !
-          </div>
-          <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.05, color: '#0f172a' }}>
-            {routeAvailable
-              ? 'Tu cuenta tiene cobertura de Ruta San Martin'
-              : hasSuggestedBranch
-                ? `Tu tienda es ${suggestedBranch.shortName}`
-                : 'Direccion fuera de rango'}
-          </h2>
-          <p style={{ margin: 0, color: '#475569', fontWeight: 700, lineHeight: 1.6 }}>
-            {routeAvailable
-              ? 'Puedes pedir desde Granada y elegir una franja. Si pides antes de las 10 p. m., puedes recibir manana por la tarde. El envio es gratis.'
-              : hasSuggestedBranch
-                ? `Tu direccion esta dentro del area de ${suggestedBranch.name}. Tu cuenta y tu sesion continuaran abiertas.`
-                : `${branch?.name || 'La tienda seleccionada'} cubre un radio de ${Number(
-                  branch?.coverageRadiusKm || 7.5
-                ).toFixed(1)} km y sus alrededores.`}
-          </p>
-          {!hasSuggestedBranch && !routeAvailable && (
-            <p style={{ margin: 0, color: '#0f3b82', fontWeight: 900, lineHeight: 1.6 }}>
-              Proximamente abarcaremos nuevas zonas. 🙌
-            </p>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="store-button"
-          onClick={hasSuggestedBranch ? onSwitch : onClose}
-        >
-          {hasSuggestedBranch
-            ? `Cambiar a Tienda ${suggestedBranch.shortName}`
-            : 'Entendido'}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function PoketPaymentAction({ order, onBeforeRedirect, showPending = true, variant = 'card' }) {
   const [busy, setBusy] = useState(false);

@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Build iOS web assets
-        run: npm run build:ios:web
+        run: npm run test:store-access && npm run test:apple-auth && npm run build:ios:web
         env:
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
 

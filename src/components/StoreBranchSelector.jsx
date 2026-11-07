@@ -54,6 +54,7 @@ export default function StoreBranchSelector({
   userLocation = null,
   onSelect,
   onKeepCurrent,
+  onShowBranches,
   onClose,
 }) {
   useEffect(() => {
@@ -109,7 +110,18 @@ export default function StoreBranchSelector({
           ×
         </button>
 
-        {isNearbyPrompt ? (
+        {mode === 'coverage' ? (
+          <>
+            <span className="store-branch-eyebrow">Tu entrega</span>
+            <h2>Tu direccion esta fuera de rango</h2>
+            <p>La direccion de entrega no tiene cobertura desde {selectedBranch?.name || 'esta tienda'}. Podes cambiar de tienda, usar otra direccion o elegir retiro al finalizar.</p>
+            {nearbyBranch && <button type="button" className="store-branch-primary" onClick={() => onSelect?.(nearbyBranch)}>
+              Cambiar a {nearbyBranch.shortName}
+            </button>}
+            <button type="button" className={nearbyBranch ? 'store-branch-secondary' : 'store-branch-primary'} onClick={onShowBranches}>Ver tiendas</button>
+            <button type="button" className="store-branch-secondary" onClick={onClose}>Seguir comprando</button>
+          </>
+        ) : isNearbyPrompt ? (
           <>
             <div className="store-branch-nearby-icon">
               <LocationPin />
