@@ -82,6 +82,11 @@ receiving a simulator authorization error is not a completed login.
 - Signed release run `42423444946` succeeded. Apple validated and accepted
   **1.0.0 (4)** at 17:11 Nicaragua on 2026-11-07. Build ID:
   `110ea2fe-9cb8-4d07-9928-8cfe900a6c74`.
+- Apple exposed build 4 for testing at approximately 17:29 Nicaragua. Saved
+  Spanish test instructions and assigned the existing private internal group
+  `San Martin - Revision interna` (one existing tester). App Store Connect
+  confirmed `Grupo (1)` on the build detail. No new tester or public group was
+  created. The owner must update to 1.0.0 (4), not retest build 3.
 - IPA: `tmp/ios-app-store-1.0.0-4/App.ipa`; SHA256:
   `9C03B99E6981F600156E0D4E09C657B0BF5C8E5A5E9A486CF6CDD7CBA63B9BD9`.
 - All 19 bundled privacy manifests are byte-identical to signed build 3. No new

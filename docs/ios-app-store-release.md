@@ -5,7 +5,7 @@
 - Nombre: `Carnes San Martin`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Ultimo build: `4` (codigo de app `7b7fd25f02101aaba6cfdeb6946f757ebd9a1dac`), cargado para TestFlight; App Review sigue retirada
+- Ultimo build: `4` (codigo de app `7b7fd25f02101aaba6cfdeb6946f757ebd9a1dac`), habilitado en TestFlight privado; App Review sigue retirada
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
 
@@ -15,7 +15,7 @@ El proyecto nativo esta en `ios/App` y se sincroniza con:
 npm run ios:sync
 ```
 
-## Estado vigente: correccion cargada, pendiente prueba fisica (2026-11-07)
+## Estado vigente: TestFlight corregido, pendiente prueba fisica (2026-11-07)
 
 La compilacion 1.0.0 (4) fue firmada, validada y cargada a Apple mediante run
 `42423444946`. Corrige el bloqueo comun de Google/Apple: un cargador async
@@ -29,6 +29,10 @@ error del simulador sin Apple ID. Dos pruebas correctas, pero no constituyen
 un ingreso exitoso con cuentas reales. Queda la prueba del titular en iPhone
 antes de reenviar a revision. Build 4 incluye tambien cajas mixtas 2-5 y Home.
 Detalle y evidencias en `docs/ios-native-auth-repair-2026-11.md`.
+
+Build 4 quedo asignado al grupo privado existente `San Martin - Revision interna`
+(un tester), con instrucciones en espanol guardadas. Actualizar desde TestFlight
+a 1.0.0 (4) para probar los accesos; no se reenvio a App Review.
 
 ## Historial: retirada por fallo de acceso (2026-11-07)
 
