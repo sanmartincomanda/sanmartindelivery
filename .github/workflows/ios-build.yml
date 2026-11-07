@@ -119,6 +119,7 @@ jobs:
         timeout-minutes: 30
         run: |
           set -euo pipefail
+          FAILED=0
           for FAMILY in iPhone iPad; do
             DEVICE=$(xcrun simctl list devices available -j | FAMILY="$FAMILY" node -e '
               let input=""; process.stdin.on("data",c=>input+=c).on("end",()=>{
@@ -131,17 +132,24 @@ jobs:
             xcrun simctl bootstatus "$DEVICE" -b
             xcrun simctl status_bar "$DEVICE" override --time '9:41' --batteryState charged --batteryLevel 100
             xcrun simctl uninstall "$DEVICE" com.sanmartinsr.app || true
+            xcrun simctl install "$DEVICE" build/ios/Build/Products/Debug-iphonesimulator/App.app
+            xcrun simctl launch "$DEVICE" com.sanmartinsr.app
+            sleep 20
+            mkdir -p "build/ios/screenshots/$FAMILY"
+            xcrun simctl io "$DEVICE" screenshot "build/ios/screenshots/$FAMILY/00-Startup.png"
             TEST_STATUS=0
             xcodebuild test-without-building -project ios/App/App.xcodeproj -scheme StoreScreenshots \
-              -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios \
+              -destination "platform=iOS Simulator,id=$DEVICE,arch=arm64" -derivedDataPath build/ios \
+              -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
               -resultBundlePath "build/ios/$FAMILY.xcresult" CODE_SIGNING_ALLOWED=NO \
               > "build/ios/$FAMILY-test.log" 2>&1 || TEST_STATUS=$?
             if [ -d "build/ios/$FAMILY.xcresult" ]; then
-              xcrun xcresulttool export attachments --path "build/ios/$FAMILY.xcresult" --output-path "build/ios/screenshots/$FAMILY"
+              xcrun xcresulttool export attachments --path "build/ios/$FAMILY.xcresult" --output-path "build/ios/screenshots/$FAMILY/attachments"
             fi
             xcrun simctl shutdown "$DEVICE"
-            if [ "$TEST_STATUS" -ne 0 ]; then tail -100 "build/ios/$FAMILY-test.log"; exit "$TEST_STATUS"; fi
+            if [ "$TEST_STATUS" -ne 0 ]; then tail -100 "build/ios/$FAMILY-test.log"; FAILED=1; fi
           done
+          exit "$FAILED"
       - uses: actions/upload-artifact@v4
         if: always() && inputs.screenshots
         with:

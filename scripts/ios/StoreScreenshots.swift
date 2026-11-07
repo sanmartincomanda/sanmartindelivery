@@ -12,7 +12,8 @@ final class StoreScreenshots: XCTestCase {
 
     func testGuestShoppingScreens() {
         continueAfterFailure = false
-        app.launch()
+        // The workflow opens the app with simctl before attaching XCTest.
+        app.activate()
         let browse = app.buttons["Navegar catalogo"]
         XCTAssertTrue(browse.waitForExistence(timeout: 40), app.debugDescription)
         XCTAssertTrue(app.buttons["Continuar con Apple"].exists)
