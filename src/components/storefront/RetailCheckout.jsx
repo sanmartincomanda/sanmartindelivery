@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useOnlineStatus } from './useRetailNavigation';
 import { isRouteSanMartinEnabled } from '../../services/routeSanMartin';
+import { describeBoxContents } from '../../services/storeBoxSales';
 
 export const RETAIL_CHECKOUT_STEPS = ['cart', 'delivery', 'address', 'schedule', 'payment', 'benefits', 'review'];
 
@@ -92,6 +93,7 @@ export default function RetailCheckout(props) {
                     <img src={item.image || '/tienda/branding/logo-mark.svg'} alt={item.nombre} width="88" height="88" onError={(event) => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = '1'; event.currentTarget.src = '/tienda/branding/logo-mark.svg'; } }} />
                     <div className="retail-cart-copy"><strong>{item.nombre}</strong><small>{money(item.precioUnitario)} / {item.unidad}</small>
                       {item.boxSale && <small>{item.cantidad} {Number(item.cantidad) === 1 ? 'caja' : 'cajas'} · {Number(item.cantidad) * item.boxSale.poundsPerBox} lb · {money(item.boxSale.pricePerPound)} / lb</small>}
+                      {item.boxSale?.type === 'mixed' && <small>{describeBoxContents(item.boxSale, item.cantidad)}</small>}
                       <div className="retail-cart-actions"><div className="retail-card-stepper">
                         <button type="button" aria-label={`Reducir ${item.nombre}`} onClick={() => onQuantityChange(item.codigo, Number(item.cantidad) <= Number(item.minQuantity || 0) + 0.000001 ? 0 : Number(item.cantidad) - Number(item.quantityStep || 1))}>−</button>
                         <QuantityInput className="retail-quantity-input" value={Number(item.cantidad)} step={item.quantityStep} ariaLabel={`Cantidad de ${item.nombre}`} onChange={(value) => onQuantityChange(item.codigo, value)} />

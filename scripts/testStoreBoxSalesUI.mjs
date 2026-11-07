@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { JSDOM } from 'jsdom';
 import { buildBoxCatalogProduct } from '../src/services/storeBoxSales.js';
@@ -10,17 +10,20 @@ globalThis.HTMLElement=dom.window.HTMLElement; globalThis.FileReader=dom.window.
 Object.defineProperty(globalThis,'navigator',{value:dom.window.navigator,configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 dom.window.HTMLElement.prototype.scrollIntoView=()=>{};
+dom.window.HTMLElement.prototype.scrollTo=()=>{};
 await mkdir('tmp',{recursive:true});
 await build({stdin:{contents:`export {default as Admin} from './src/components/StoreBoxSalesAdminSection.jsx';
   export {default as Card} from './src/components/storefront/RetailProductCard.jsx';
+  export {default as Checkout} from './src/components/storefront/RetailCheckout.jsx';
   export {normalizeCatalogProduct, resolveCatalogProductForBranch} from './src/services/storeCatalog.js';
-  export {buildStoreOrderText,buildStoreKitchenOrderText} from './src/services/orders.js';`,resolveDir:process.cwd(),loader:'jsx'},
+  export {buildStoreOrderText,buildStoreKitchenOrderText,qaNormalizeStoreItems} from './src/services/orders.js';`,resolveDir:process.cwd(),loader:'jsx'},
   outfile:'tmp/box-sales-tests.cjs',bundle:true,platform:'node',format:'cjs',packages:'external',loader:{'.css':'empty'},
   define:{'import.meta.env':'{}'},plugins:[{name:'no-live-firebase',setup(build) {
     build.onLoad({filter:/[\\/]src[\\/]firebase\.js$/},()=>({contents:'export const database={};export const storage={};export const auth={};',loader:'js'}));
+    build.onLoad({filter:/[\\/]src[\\/]services[\\/]orders\.js$/},async ({path})=>({contents:(await readFile(path,'utf8'))+'\nexport { normalizeStoreItems as qaNormalizeStoreItems };',loader:'js'}));
   }}]});
 const require=createRequire(import.meta.url);
-const {Admin,Card,normalizeCatalogProduct,resolveCatalogProductForBranch,buildStoreOrderText,buildStoreKitchenOrderText}=require('../tmp/box-sales-tests.cjs');
+const {Admin,Card,Checkout,normalizeCatalogProduct,resolveCatalogProductForBranch,buildStoreOrderText,buildStoreKitchenOrderText,qaNormalizeStoreItems}=require('../tmp/box-sales-tests.cjs');
 const {act,createElement:h}=await import('react'); const {createRoot}=await import('react-dom/client');
 const root=createRoot(document.getElementById('app'));
 const source={code:'TEST-001',name:'Corbata',price:160,unit:'lb',active:true};
@@ -73,5 +76,72 @@ assert.ok(!text.includes('[BOX_test]'));
 const kitchen=buildStoreKitchenOrderText([cartItem]);
 assert.ok(kitchen.includes('60 lb'));
 assert.ok(kitchen.includes('2 cajas de 30 lb'));
+const sources = [source,{...source,code:'TEST-002',name:'Diezmillo'},{...source,code:'TEST-003',name:'Posta'}];
+await act(async()=>root.render(h(Admin,{products:[...sources,box],onSave:async p=>{saved=p;}})));
+await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Mixta · 3 cortes').click());
+assert.equal(document.querySelectorAll('select').length,3);
+assert.ok(document.querySelector('.box-sales-distribution').textContent.includes('10 lb de cada corte'));
+await inputValue(document.querySelectorAll('select')[0],source.code);
+assert.equal(document.querySelectorAll('select')[1].querySelector(`option[value="${source.code}"]`).disabled,true);
+await inputValue(document.querySelectorAll('select')[1],sources[1].code);
+await inputValue(document.querySelectorAll('select')[2],sources[2].code);
+await inputValue(document.querySelector('input[name=boxName]'),'Mixta familiar');
+await inputValue(document.querySelectorAll('input[type=number]')[0],'45');
+assert.ok(document.querySelector('.box-sales-distribution').textContent.includes('15 lb de cada corte'));
+await inputValue(document.querySelectorAll('input[type=number]')[0],'30');
+await inputValue(document.querySelectorAll('input[type=number]')[1],'146');
+const mixedFile=document.querySelector('input[type=file]');
+Object.defineProperty(mixedFile,'files',{value:[new window.File(['fixture'],'mixed.png',{type:'image/png'})]});
+await act(async()=>{mixedFile.dispatchEvent(new window.Event('change',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,30));});
+await act(async()=>document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
+const mixed=saved;
+assert.equal(mixed.name,'Mixta familiar');
+assert.equal(mixed.boxSale.type,'mixed');
+assert.equal(mixed.boxSale.components.length,3);
+assert.equal(mixed.price,4380);
+assert.equal(mixed.active,false);
+assert.equal(document.querySelectorAll('select').length,1,'Reset returns to single-cut form');
+await act(async()=>root.render(h(Admin,{products:[...sources,box,mixed],onSave:async p=>{saved=p;}})));
+assert.ok(document.querySelector('.box-sales-list').textContent.includes('10 lb de Diezmillo'));
+await act(async()=>document.querySelector('button[aria-label="Editar Mixta familiar"]').click());
+assert.equal(document.activeElement.name,'boxName');
+for (const [i,select] of [...document.querySelectorAll('select')].entries()) {assert.equal(select.value,sources[i].code);assert.equal(select.disabled,true);}
+await inputValue(document.querySelectorAll('input[type=number]')[1],'140');
+await act(async()=>document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
+assert.equal(saved.code,mixed.code);
+assert.equal(saved.price,4200);
+assert.equal(saved.boxSale.components.length,3);
+await act(async()=>root.render(h(Card,{product:mixed,quantity:0,image:mixed.image,fallback:()=>{},money:n=>'C$'+n,formatQuantity:String,step:1,minimum:1,onOpen:()=>{},onQuantityChange:n=>quantity=n})));
+assert.ok(document.querySelector('.retail-product').textContent.includes('10 lb de Corbata + 10 lb de Diezmillo + 10 lb de Posta'));
+await act(async()=>document.querySelector('.retail-card-add').click());assert.equal(quantity,1);
+assert.deepEqual(normalizeCatalogProduct(mixed).boxSale,mixed.boxSale);
+assert.equal(resolveCatalogProductForBranch(mixed,'masaya').active,false);
+const mixedCart={codigo:mixed.code,nombre:mixed.name,cantidad:2,unidad:'caja',precioUnitario:mixed.price,boxSale:mixed.boxSale};
+const mixedText=buildStoreOrderText([cartItem,mixedCart]);
+const mixedKitchen=buildStoreKitchenOrderText([mixedCart]);
+for(const p of sources) assert.ok(mixedText.includes(`[${p.code}]`));
+assert.ok(mixedText.includes('17520.00'));
+assert.ok(mixedKitchen.includes('20 lb Corbata'));
+assert.ok(mixedKitchen.includes('20 lb Diezmillo'));
+assert.ok(mixedKitchen.includes('20 lb Posta'));
+assert.ok(mixedKitchen.includes('2 cajas mixtas de 30 lb; 10 lb de este corte por caja'));
+const operational=qaNormalizeStoreItems([{codigo:'',cantidad:0},mixedCart,cartItem,{...mixedCart,cantidad:1}]);
+assert.equal(operational.length,7);
+assert.equal(operational[0].cantidad,20);
+assert.deepEqual(operational[0].ventaPorCaja.lineKeys,{0:'0',1:'1',2:'2'});
+assert.deepEqual(operational[4].ventaPorCaja.lineKeys,{0:'4',1:'5',2:'6'});
+assert.deepEqual(qaNormalizeStoreItems(operational),operational,'Normalization remains idempotent');
+const noop=()=>{};
+const checkoutProps={cartItems:[{...mixedCart,minQuantity:1,quantityStep:1,subtotal:8760}],totalAmount:8760,discountedProductTotal:8760,approximateTotalAmount:8760,
+  selectedBranch:{name:'Granada'},model:{pickupFlow:false},onClose:noop,onQuantityChange:(_,n)=>{quantity=n;},onCheckoutStepChange:noop,
+  ui:{money:n=>'C$'+n,formatQuantity:String,discountLabel:()=>'',hasLocation:()=>true,Back:({label,onClick})=>h('button',{onClick},label),
+    Icon:()=>null,QuantityInput:({value})=>h('input',{'aria-label':'Cajas',value,readOnly:true}),GiftCard:()=>null,GiftLine:()=>null}};
+await act(async()=>root.render(h(Checkout,checkoutProps)));
+assert.ok(document.querySelector('.retail-cart-copy').textContent.includes('20 lb de Corbata + 20 lb de Diezmillo + 20 lb de Posta'));
+assert.ok(document.querySelector('.retail-cart-copy').textContent.includes('2 cajas · 60 lb'));
+assert.equal(document.querySelector('.retail-line-total').textContent,'C$8760');
+await act(async()=>document.querySelector('button[aria-label="Agregar Mixta familiar"]').click());assert.equal(quantity,3);
+await act(async()=>document.querySelector('button[aria-label="Reducir Mixta familiar"]').click());assert.equal(quantity,1);
+await act(async()=>document.querySelector('button[aria-label="Quitar Mixta familiar"]').click());assert.equal(quantity,0);
 await act(async()=>root.unmount()); dom.window.close();
-console.log('PASS: Admin edit/save/focus, card/whole boxes, catalog normalization/branches, real order and kitchen text. Firebase mocked; no real orders.');
+console.log('PASS: Single/mixed admin create/edit/save, unique cuts, equal weights, focus, card, catalog/branches, real order and kitchen text. Firebase mocked; no real orders.');

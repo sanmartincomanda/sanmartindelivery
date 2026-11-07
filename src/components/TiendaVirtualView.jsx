@@ -5,7 +5,7 @@ import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
 import RetailSearchBox from './storefront/RetailSearchBox';
 import RetailQuickActions from './storefront/RetailQuickActions';
-import { BOX_CATEGORY_ID, resolveBoxAvailability } from '../services/storeBoxSales';
+import { BOX_CATEGORY_ID, describeBoxContents, resolveBoxAvailability } from '../services/storeBoxSales';
 import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnnouncementProducts } from '../services/storeBoxAnnouncement.js';
 import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
 import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
@@ -914,7 +914,7 @@ const getQuickQuantities = (product, currentQuantity = 0) => {
 };
 
 const getQuantityRuleMessage = (product) => {
-  if (product.boxSale) return `Cada caja contiene ${product.boxSale.poundsPerBox} lb a C$${Number(product.boxSale.pricePerPound).toFixed(2)} por lb. Elegí cajas completas.`;
+  if (product.boxSale) return `Cada caja contiene ${product.boxSale.poundsPerBox} lb a C$${Number(product.boxSale.pricePerPound).toFixed(2)} por lb. ${describeBoxContents(product.boxSale)}${product.boxSale.type === 'mixed' ? '. ' : ''}Elegí cajas completas.`;
   const minQuantity = getMinQuantity(product);
   const step = getQuantityStep(product);
   const minLabel = `${formatStoreQuantity(minQuantity, product?.unit)} ${product?.unit || ''}`.trim();
@@ -2215,7 +2215,7 @@ export default function TiendaVirtualView({
       const branchCatalog = catalog.map(product => resolveCatalogProductForBranch(product, selectedBranch?.id));
       const byCode = new Map(branchCatalog.map(product => [product.code, product]));
       return applyStoreProductPromotionsToCatalog(
-        branchCatalog.map(product => resolveBoxAvailability(product, byCode.get(product.boxSale?.sourceCode))).filter((product) => {
+        branchCatalog.map(product => resolveBoxAvailability(product, byCode)).filter((product) => {
           if (product.active === false) {
             return false;
           }

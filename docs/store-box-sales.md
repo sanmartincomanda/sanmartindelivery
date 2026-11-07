@@ -60,7 +60,44 @@ Before enabling boxes in production, deploy the reviewed database rules along
 with the web release. No live records, rules, orders or price changes are made
 by the tests. Native Android/iOS require their normal separate update.
 
-## Checks
+## Mixed boxes (2026-11-07)
+
+In AdminTV choose "Mixta - 3 cortes", select three distinct original lb
+articles, the total box weight, one shared price per pound, a name and a photo.
+The preview shows equal shares immediately. 30 lb means 10 + 10 + 10 lb;
+two boxes mean 20 lb of each article. New presentations remain inactive until
+explicitly enabled. Existing single-cut presentations are unchanged.
+
+Mixed boxSale records have type=mixed, poundsPerBox, pricePerPound and
+components[0..2] with sourceCode, sourceKey and name. Top-level sourceCode/key
+are omitted. Total weight must be a multiple of 1.5 lb so each third is an
+exact 0.5 lb increment compatible with the existing order normalizer.
+No uneven remainder or silent rounding is allowed. The whole box must also
+yield exact cents. The original three SKUs and loose prices are not modified.
+
+Source availability and stock use all three articles in the selected branch.
+Cart stock validation aggregates mixed boxes, single-cut boxes and loose cuts.
+The product card, product detail and cart show the composition.
+
+Checkout expands a mixed cart line into three original-SKU lb lines with
+the same fixed price per pound. ventaPorCaja also stores type, boxName,
+poundsPerComponent, componentIndex, groupId and lineKeys. The links bind the
+three rows after normalization/filtering. Rules verify all three siblings,
+their count, SKU, weights, common price, branch and shared group. A partial
+box or cross-linked group is rejected. Existing operational updates remain
+allowed as before; no change to kitchen adjustments or original-order history.
+
+scripts/mixedBoxRuleExpressions.mjs is the readable source of these rule
+expressions. The rules test asserts that firebase.database.rules.json matches
+the exports before testing against the local emulator. Write permissions are
+not widened, and no new endpoint, Function, listener or inventory job is added.
+This does not change existing non-box order authorization or reserve stock.
+
+Publish the reviewed database validations with the web build when approved.
+An older native bundle that only understands single-cut boxes cannot sell the
+new mixed format; update Android/iOS separately before advertising it there.
+
+## Automated checks
 
     npm run test:box-sales
     npm run test:box-sales-ui
@@ -74,6 +111,31 @@ The rules suite uses a local demo namespace, tests canonical writes and
 tampering, and verifies updates to previously placed orders after deactivation.
 Browser/phone and real SICAR quotation acceptance remain separate rollout QA;
 no synthetic production orders should be created.
+
+Mixed-box QA on 2026-11-07:
+- Pure pricing/stock tests and DOM create/edit/cart/normalization tests pass.
+- The local RTDB emulator passes 240 checks, including incomplete triples,
+  duplicate components, wrong price/weight, stale config, shared sibling
+  tampering, branch/source availability and previous single-cut behavior.
+- Build, web-release, retail-home, store-editorial, manual-route, box-images,
+  box-announcement, retail-interactions, order-traceability and
+  store-product-promotions pass.
+- An isolated browser fixture uses the real Admin, product card and Checkout
+  components with fake data and no live Firebase module. Mobile widths 360,
+  390 and 430 and desktop 1280 were checked. Three selects, equal weight
+  updates (30/45 lb), local save/edit, card quantity and cart contents were
+  exercised. No horizontal overflow in the fixture or browser errors.
+- Evidence: ignored tmp/mixed-box-admin-mobile.jpg. Native Android, actual
+  phones and a live SICAR quotation were not exercised. These tests changed no
+  production orders, catalog records or rules.
+
+Release authorized on 2026-11-07 for GitHub, AdminTV and the public web store.
+The live pre-release rules match the previous published revision. The only
+planned rule changes are storeCatalog/$productId/.validate, its boxSale child
+validation and orders/$orderId/items/$itemId/.validate. A local backup is kept
+at tmp/mixed-box-rules-before-publish-2026-11-07.json. No catalog presentation
+is created or activated by this release; administrators configure them.
+Native app builds and the unrelated local SICAR sync changes are excluded.
 
 ## Box photo optimization
 

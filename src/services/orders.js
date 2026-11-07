@@ -1,7 +1,7 @@
 import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, startAt, update } from 'firebase/database';
 import { database } from '../firebase.js';
 import { captureStoreOrderSource } from './storeOrderSource.js';
-import { boxOrderItem, validateBoxCart } from './storeBoxSales.js';
+import { boxOrderItem, linkMixedBoxLines, validateBoxCart } from './storeBoxSales.js';
 import { STORE_CATALOG_PATH, resolveCatalogProductForBranch } from './storeCatalog.js';
 import { requestRouteAction } from './routeSanMartinApi.js';
 import { hoyISO } from '../components/Utils.js';
@@ -265,8 +265,8 @@ const normalizeItemSpecialPromotion = (value = null) => {
 };
 
 const normalizeStoreItems = (items = []) =>
-  items
-    .map(boxOrderItem)
+  linkMixedBoxLines(items
+    .flatMap(boxOrderItem)
     .map((item) => {
       const cantidad = roundToHalf(item.cantidad ?? item.quantity ?? 0);
       const precioUnitario = Number(item.precioUnitario ?? item.price ?? 0);
@@ -293,7 +293,7 @@ const normalizeStoreItems = (items = []) =>
         ...(item.ventaPorCaja ? { ventaPorCaja: item.ventaPorCaja } : {}),
       };
     })
-    .filter((item) => item.codigo && item.nombre && item.cantidad > 0 && item.precioUnitario > 0);
+    .filter((item) => item.codigo && item.nombre && item.cantidad > 0 && item.precioUnitario > 0));
 
 export const buildStoreOrderText = (items = [], notes = '', summary = {}) => {
   const normalizedItems = normalizeStoreItems(items);
@@ -384,7 +384,7 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   }
 
   lines.push(
-    ...normalizedItems.map((item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}${item.ventaPorCaja ? ` (${item.ventaPorCaja.boxes} cajas de ${item.ventaPorCaja.poundsPerBox} lb)` : ''}`.trim())
+    ...normalizedItems.map((item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}${item.ventaPorCaja ? ` (${item.ventaPorCaja.boxes} cajas${item.ventaPorCaja.type === 'mixed' ? ' mixtas' : ''} de ${item.ventaPorCaja.poundsPerBox} lb${item.ventaPorCaja.type === 'mixed' ? `; ${item.ventaPorCaja.poundsPerComponent} lb de este corte por caja` : ''})` : ''}`.trim())
   );
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
   const firstOrderRewardLines = buildFirstOrderRewardTextLines(summary.firstOrderReward);
