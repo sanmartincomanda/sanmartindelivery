@@ -1,7 +1,15 @@
-// Keep RTDB's repeated three-component validations readable and testable.
+// Keep RTDB's repeated 2-5 component validations readable and testable.
 const and = parts => `(${parts.join(' && ')})`;
 const child = (node, path) => `${node}.child('${path}')`;
 const val = (node, path) => `${child(node, path)}.val()`;
+const indices = [0, 1, 2, 3, 4];
+const componentCount = node => `(${child(node, '4')}.exists() ? 5 : ${child(node, '3')}.exists() ? 4 : ${child(node, '2')}.exists() ? 3 : 2)`;
+const contiguousComponents = node => and([
+  `${node}.hasChildren(['0','1'])`,
+  `(!${child(node, '3')}.exists() || ${child(node, '2')}.exists())`,
+  `(!${child(node, '4')}.exists() || ${child(node, '3')}.exists())`,
+]);
+const exactCents = amount => `((${amount} * 100 % 1) < 0.00001 || (${amount} * 100 % 1) > 0.99999)`;
 const source = component => `root.child('storeCatalog').child(${val(component, 'sourceKey')})`;
 const originalSource = component => and([
   `${child(component, 'sourceCode')}.isString()`, `${val(component, 'sourceCode')} != ''`,
@@ -11,7 +19,8 @@ const originalSource = component => and([
 ]);
 const p = 'newData';
 const b = child(p, 'boxSale');
-const parts = [0, 1, 2].map(i => child(b, `components/${i}`));
+const parts = indices.map(i => child(b, `components/${i}`));
+const count = componentCount(child(b, 'components'));
 const totalDifference = `${val(p, 'price')} - ${val(b, 'poundsPerBox')} * ${val(b, 'pricePerPound')}`;
 export const catalogBoxValidation = `!${b}.exists() || ${and([
   `${val(p, 'code')} == $productId`, `${val(p, 'code')}.matches(/^BOX_.+/)`, `${val(p, 'unit')} == 'caja'`,
@@ -21,16 +30,16 @@ export const catalogBoxValidation = `!${b}.exists() || ${and([
   `${child(p, 'price')}.isNumber()`, `${val(p, 'price')} > 0`, `(${totalDifference}) > -0.000001`, `(${totalDifference}) < 0.000001`,
   `(${and([`(!${child(b, 'type')}.exists() || ${val(b, 'type')} == 'single')`, `!${child(b, 'components')}.exists()`, originalSource(b)])} || ${and([
     `${val(b, 'type')} == 'mixed'`, `!${child(b, 'sourceCode')}.exists()`, `!${child(b, 'sourceKey')}.exists()`,
-    `${child(b, 'components')}.hasChildren(['0','1','2'])`, `${val(b, 'poundsPerBox')} * 2 % 3 == 0`,
-    ...parts.map(originalSource),
-    `${val(parts[0], 'sourceCode')} != ${val(parts[1], 'sourceCode')}`,
-    `${val(parts[0], 'sourceCode')} != ${val(parts[2], 'sourceCode')}`,
-    `${val(parts[1], 'sourceCode')} != ${val(parts[2], 'sourceCode')}`,
+    contiguousComponents(child(b, 'components')), `${val(b, 'poundsPerBox')} * 2 % ${count} == 0`,
+    exactCents(val(b, 'pricePerPound')), exactCents(`(${val(b, 'poundsPerBox')} / ${count} * ${val(b, 'pricePerPound')})`),
+    ...parts.map(part => `(!${part}.exists() || ${originalSource(part)})`),
+    ...parts.flatMap((part, i) => parts.slice(i + 1).map(other =>
+      `(!${part}.exists() || !${other}.exists() || ${val(part, 'sourceCode')} != ${val(other, 'sourceCode')})`)),
   ])})`,
 ])}`;
 export const catalogComponentRules = {
-  '.validate': "newData.parent().child('type').val() == 'mixed' && newData.hasChildren(['0','1','2'])",
-  '$component': { '.validate': "($component == '0' || $component == '1' || $component == '2') && newData.hasChildren(['sourceCode','sourceKey','name']) && newData.child('name').isString() && newData.child('name').val() != ''" },
+  '.validate': `newData.parent().child('type').val() == 'mixed' && ${contiguousComponents('newData')}`,
+  '$component': { '.validate': "$component.matches(/^[0-4]$/) && newData.hasChildren(['sourceCode','sourceKey','name']) && newData.child('name').isString() && newData.child('name').val() != ''" },
 };
 
 const v = child(p, 'ventaPorCaja');
@@ -51,23 +60,24 @@ const singleOrder = and([
   `${val(p, 'cantidad')} == ${val(v, 'boxes')} * ${val(box, 'poundsPerBox')}`,
 ]);
 const component = `${box}.child('components').child(${val(v, 'componentIndex')})`;
+const orderCount = componentCount(child(box, 'components'));
 const keys = child(v, 'lineKeys');
 const mixedOrder = and([
   `${val(box, 'type')} == 'mixed'`, `${val(v, 'type')} == 'mixed'`,
-  `${child(v, 'componentIndex')}.isString()`, `${val(v, 'componentIndex')}.matches(/^[012]$/)`,
+  `${child(v, 'componentIndex')}.isString()`, `${val(v, 'componentIndex')}.matches(/^[0-4]$/)`, `${component}.exists()`,
   `${child(v, 'groupId')}.isString()`, available(source(component)),
   `${val(v, 'sourceCode')} == ${val(component, 'sourceCode')}`, `${val(p, 'codigo')} == ${val(component, 'sourceCode')}`,
-  `${val(v, 'poundsPerComponent')} == ${val(box, 'poundsPerBox')} / 3`,
-  `${val(p, 'cantidad')} == ${val(v, 'boxes')} * ${val(box, 'poundsPerBox')} / 3`,
-  `${keys}.hasChildren(['0','1','2'])`, `${keys}.child(${val(v, 'componentIndex')}).val() == $itemId`,
-  ...[0, 1, 2].map(i => {
+  `${val(v, 'poundsPerComponent')} == ${val(box, 'poundsPerBox')} / ${orderCount}`,
+  `${val(p, 'cantidad')} == ${val(v, 'boxes')} * ${val(box, 'poundsPerBox')} / ${orderCount}`,
+  `${keys}.hasChildren(['0','1'])`, `${keys}.child(${val(v, 'componentIndex')}).val() == $itemId`,
+  ...indices.map(i => {
     const peer = `newData.parent().child(${val(keys, String(i))}).child('ventaPorCaja')`;
-    return and([
+    return `(${child(box, `components/${i}`)}.exists() ? ${and([
       `${child(keys, String(i))}.isString()`, `${val(keys, String(i))}.matches(/^[0-9]+$/)`,
       `${val(peer, 'type')} == 'mixed'`, `${val(peer, 'componentIndex')} == '${i}'`,
       ...['catalogCode','boxes','groupId'].map(field => `${val(peer, field)} == ${val(v, field)}`),
-      ...[0, 1, 2].map(j => `${val(peer, `lineKeys/${j}`)} == ${val(keys, String(j))}`),
-    ]);
+      ...indices.map(j => `${val(peer, `lineKeys/${j}`)} == ${val(keys, String(j))}`),
+    ])} : !${child(keys, String(i))}.exists())`;
   }),
 ]);
 export const orderBoxValidation = `data.exists() || ${and([
@@ -75,3 +85,7 @@ export const orderBoxValidation = `data.exists() || ${and([
   `!newData.child('boxSale').exists()`,
   `(!${v}.exists() || ${and([...commonOrder, `(${singleOrder} || ${mixedOrder})`])})`,
 ])}`;
+
+export const orderBoxLineKeyRules = {
+  '$component': { '.validate': "data.parent().parent().parent().exists() || ($component.matches(/^[0-4]$/) && newData.isString() && newData.val().matches(/^[0-9]+$/))" },
+};

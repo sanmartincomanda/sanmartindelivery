@@ -78,13 +78,14 @@ assert.ok(kitchen.includes('60 lb'));
 assert.ok(kitchen.includes('2 cajas de 30 lb'));
 const sources = [source,{...source,code:'TEST-002',name:'Diezmillo'},{...source,code:'TEST-003',name:'Posta'}];
 await act(async()=>root.render(h(Admin,{products:[...sources,box],onSave:async p=>{saved=p;}})));
-await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Mixta · 3 cortes').click());
-assert.equal(document.querySelectorAll('select').length,3);
+await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Mixta · 2 a 5 cortes').click());
+const cuts = () => document.querySelectorAll('select[aria-label^="Corte "]');
+assert.equal(cuts().length,3);
 assert.ok(document.querySelector('.box-sales-distribution').textContent.includes('10 lb de cada corte'));
-await inputValue(document.querySelectorAll('select')[0],source.code);
-assert.equal(document.querySelectorAll('select')[1].querySelector(`option[value="${source.code}"]`).disabled,true);
-await inputValue(document.querySelectorAll('select')[1],sources[1].code);
-await inputValue(document.querySelectorAll('select')[2],sources[2].code);
+await inputValue(cuts()[0],source.code);
+assert.equal(cuts()[1].querySelector(`option[value="${source.code}"]`).disabled,true);
+await inputValue(cuts()[1],sources[1].code);
+await inputValue(cuts()[2],sources[2].code);
 await inputValue(document.querySelector('input[name=boxName]'),'Mixta familiar');
 await inputValue(document.querySelectorAll('input[type=number]')[0],'45');
 assert.ok(document.querySelector('.box-sales-distribution').textContent.includes('15 lb de cada corte'));
@@ -105,7 +106,7 @@ await act(async()=>root.render(h(Admin,{products:[...sources,box,mixed],onSave:a
 assert.ok(document.querySelector('.box-sales-list').textContent.includes('10 lb de Diezmillo'));
 await act(async()=>document.querySelector('button[aria-label="Editar Mixta familiar"]').click());
 assert.equal(document.activeElement.name,'boxName');
-for (const [i,select] of [...document.querySelectorAll('select')].entries()) {assert.equal(select.value,sources[i].code);assert.equal(select.disabled,true);}
+for (const [i,select] of [...cuts()].entries()) {assert.equal(select.value,sources[i].code);assert.equal(select.disabled,false);}
 await inputValue(document.querySelectorAll('input[type=number]')[1],'140');
 await act(async()=>document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
 assert.equal(saved.code,mixed.code);
@@ -143,5 +144,35 @@ assert.equal(document.querySelector('.retail-line-total').textContent,'C$8760');
 await act(async()=>document.querySelector('button[aria-label="Agregar Mixta familiar"]').click());assert.equal(quantity,3);
 await act(async()=>document.querySelector('button[aria-label="Reducir Mixta familiar"]').click());assert.equal(quantity,1);
 await act(async()=>document.querySelector('button[aria-label="Quitar Mixta familiar"]').click());assert.equal(quantity,0);
+const fiveSources=[...sources,{...source,code:'TEST-004',name:'Lomo'},{...source,code:'TEST-005',name:'Puyazo'}];
+for(const count of [2,3,4,5]) {
+  await act(async()=>root.render(h(Admin,{products:[...fiveSources,mixed],onSave:async p=>{saved=p;}})));
+  await act(async()=>document.querySelector('button[aria-label="Editar Mixta familiar"]').click());
+  await inputValue(document.querySelector('select[aria-label="Cantidad de cortes"]'),String(count));
+  assert.equal(cuts().length,count);
+  assert.equal(cuts()[0].value,source.code,'Keep selected cuts when resizing');
+  assert.deepEqual([...document.querySelector('select[aria-label="Cantidad de cortes"]').options].map(o=>o.value),['2','3','4','5']);
+  assert.ok(document.querySelector('.box-sales-distribution').textContent.includes(`${30/count} lb de cada corte`));
+  assert.equal(document.querySelector('input[type=number]').step,String(count/2));
+  for(let i=0;i<count;i++) await inputValue(cuts()[i],fiveSources[i].code);
+  assert.equal(cuts()[1].querySelector(`option[value="${source.code}"]`).disabled,true);
+  await act(async()=>document.querySelector('form').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true})));
+  assert.equal(saved.code,mixed.code,'Editing keeps the presentation identity');
+  assert.equal(saved.boxSale.components.length,count);
+  assert.equal(saved.price,4380);
+  const entry={...mixedCart,boxSale:saved.boxSale};
+  const rows=qaNormalizeStoreItems([entry]);
+  assert.equal(rows.length,count);
+  assert.equal(rows.reduce((sum,row)=>sum+row.cantidad,0),60);
+  assert.deepEqual(qaNormalizeStoreItems(rows),rows);
+  for(const cut of fiveSources.slice(0,count)) {
+    assert.ok(buildStoreKitchenOrderText([entry]).includes(`${60/count} lb ${cut.name}`));
+    assert.ok(buildStoreOrderText([entry]).includes(`[${cut.code}]`));
+  }
+  await act(async()=>root.render(h(Card,{product:saved,quantity:0,image:saved.image,fallback:()=>{},money:n=>'C$'+n,formatQuantity:String,step:1,minimum:1,onOpen:()=>{},onQuantityChange:noop})));
+  assert.ok(document.querySelector('.retail-product').textContent.includes(`${30/count} lb de ${fiveSources[count-1].name}`));
+  await act(async()=>root.render(h(Checkout,{...checkoutProps,cartItems:[{...entry,subtotal:8760,minQuantity:1,quantityStep:1}]})));
+  assert.ok(document.querySelector('.retail-cart-copy').textContent.includes(`${60/count} lb de ${fiveSources[count-1].name}`));
+}
 await act(async()=>root.unmount()); dom.window.close();
 console.log('PASS: Single/mixed admin create/edit/save, unique cuts, equal weights, focus, card, catalog/branches, real order and kitchen text. Firebase mocked; no real orders.');

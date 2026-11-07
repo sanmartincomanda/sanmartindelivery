@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createRetailHomeView, retailViewKey } from '../src/components/storefront/retailNavigationState.js';
-import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from '../src/components/storefront/retailHomePromotions.js';
+import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from '../src/components/storefront/retailHomePromotions.js';
+import { BOX_HOME_SECTION_ID } from '../src/services/storeBoxAnnouncement.js';
+import { readFileSync } from 'node:fs';
 
 const products = Array.from({ length: 13 }, (_, index) => ({ code: String(index) }));
 const sections = ['promo-a', 'res-gold', 'res-diaria', 'promo-b', 'promo-c', 'store-home-combos', 'otros-productos']
@@ -16,6 +18,25 @@ for (const section of sections) {
 }
 assert.deepEqual(getRetailHomeSectionProducts({ id: 'promo-single', products: products.slice(0, 1) }, false, 5), products.slice(0, 1));
 assert.deepEqual(sections, originalSections, 'Presentation must not alter products, prices or order');
+const boxes={id:BOX_HOME_SECTION_ID,title:'Venta por caja',products};
+const black={id:'promo-black_meat_november_2026',title:'BLACK MEAT NOVEMBER',products};
+const withFeatured=[boxes,...sections.slice(0,3),black,...sections.slice(3)];
+const originalFeatured=structuredClone(withFeatured);
+assert.deepEqual(getRetailHomeSections(withFeatured,false).slice(0,2),[black,boxes]);
+assert.equal(getRetailHomeSections(withFeatured,true),withFeatured,'Do not reorder admin');
+assert.deepEqual(withFeatured,originalFeatured,'Sorting never mutates campaign data');
+for(const section of [black,boxes]) {
+  assert.equal(isRetailHomeCarousel(section),true);
+  assert.equal(getRetailHomeSectionProducts(section,false,5),products,'All products stay reachable by horizontal scrolling');
+  assert.deepEqual(getRetailHomeSectionProducts(section,true,5),products.slice(0,5));
+}
+assert.equal(isRetailHomeCarousel({id:'promo-renamed',title:'Black November'}),true);
+assert.equal(isRetailHomeCarousel({id:'promo-other',title:'Otra promocion'}),false);
+assert.equal(getRetailHomeSections([boxes,...sections],false)[0],boxes);
+assert.equal(getRetailHomeSections([...sections,black],false)[0],black);
+const homeSource=readFileSync(new URL('../src/components/TiendaVirtualView.jsx',import.meta.url),'utf8');
+assert.match(homeSource,/isHorizontalSection \? <RetailProductRail/);
+assert.match(homeSource,/sectionIndex === homeFoodStoryIndex/,'No food ad between Black November and boxes');
 console.log('Home promotions: every campaign, combo and product is visible; regular rails and admin pagination are preserved.');
 
 const snapshot = {

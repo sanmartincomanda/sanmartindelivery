@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getDatabase, connectDatabaseEmulator, ref, set, update } from 'firebase/database';
 import { buildBoxCatalogProduct, boxOrderItem, linkMixedBoxLines } from '../src/services/storeBoxSales.js';
-import { catalogBoxValidation, catalogComponentRules, orderBoxValidation } from './mixedBoxRuleExpressions.mjs';
+import { catalogBoxValidation, catalogComponentRules, orderBoxValidation, orderBoxLineKeyRules } from './mixedBoxRuleExpressions.mjs';
 const namespace = 'demo-box-sales';
 const base = 'http://127.0.0.1:19000';
 const admin = async (route, body) => {
@@ -16,12 +16,16 @@ const rules=JSON.parse(await readFile('firebase.database.rules.json','utf8'));
 assert.equal(rules.rules.storeCatalog.$productId['.validate'],catalogBoxValidation);
 assert.deepEqual(rules.rules.storeCatalog.$productId.boxSale.components,catalogComponentRules);
 assert.equal(rules.rules.orders.$orderId.items.$itemId['.validate'],orderBoxValidation);
+assert.deepEqual(rules.rules.orders.$orderId.items.$itemId.ventaPorCaja.lineKeys,orderBoxLineKeyRules);
 await admin('.settings/rules',rules);
 const source = {code:'001',name:'Corbata',unit:'lb',price:160,active:true,inventory:100};
 const product = buildBoxCatalogProduct({name:'Corbata por caja',poundsPerBox:30,pricePerPound:146,image:'/caja.jpg',active:true,branchIds:['granada','nindiri']},source,null,'test');
 const diezmillo = {code:'00476',name:'DIEZMILLO (E)',unit:'lb',price:180,active:true,inventory:100};
 const posta = {code:'002',name:'Posta',unit:'lb',price:170,active:true,inventory:100};
-await admin('', {userRoles:{buyer:{role:'client'},manager:{role:'admin'},service:{role:'service',branchId:'granada'},branch:{role:'branch_admin',branchId:'granada'}},storeCatalog:{'001':source,'00476':diezmillo,'002':posta}});
+const lomo = {...source,code:'003',name:'Lomo'};
+const puyazo = {...source,code:'004',name:'Puyazo'};
+const allSources=[source,diezmillo,posta,lomo,puyazo];
+await admin('', {userRoles:{buyer:{role:'client'},manager:{role:'admin'},service:{role:'service',branchId:'granada'},branch:{role:'branch_admin',branchId:'granada'}},storeCatalog:Object.fromEntries(allSources.map(s=>[s.code,s]))});
 const apps=[];
 const db = uid => {
   const app = initializeApp({projectId:namespace,databaseURL:`https://${namespace}.firebaseio.com`},uid); apps.push(app);
@@ -73,7 +77,7 @@ try {
   await deny(set(ref(buyer,'storeCatalog/BOX_mixed-other'),{...mixed,code:'BOX_mixed-other'}));
   await deny(set(ref(branch,`storeCatalog/${mixed.code}`),mixed));
   for (const [label,components] of Object.entries({
-    missing:mixed.boxSale.components.slice(0,2),
+    missing:mixed.boxSale.components.slice(0,1),
     fourth:[...mixed.boxSale.components,{...mixed.boxSale.components[0],sourceCode:'other'}],
     duplicate:[mixed.boxSale.components[0],mixed.boxSale.components[0],mixed.boxSale.components[2]],
     absent:mixed.boxSale.components.map((c,i)=>i===2?{...c,sourceKey:'absent'}:c),
@@ -87,7 +91,7 @@ try {
   await deny(update(ref(manager,`storeCatalog/${mixed.code}`),{price:1}));
   await deny(update(ref(manager,`storeCatalog/${mixed.code}`),{'boxSale/type':'invalid'}));
   await deny(update(ref(manager,`storeCatalog/${mixed.code}`),{'boxSale/sourceCode':'001'}));
-  await deny(update(ref(manager,`storeCatalog/${mixed.code}/boxSale/components`),{'2':null}));
+  await deny(update(ref(manager,`storeCatalog/${mixed.code}/boxSale/components`),{'0':null}));
   await deny(update(ref(manager,`storeCatalog/${mixed.code}`),{'boxSale/components':null}));
   for (const boxes of [1,2,3]) {
     for (const branchId of ['granada','nindiri']) await allow(set(ref(buyer,`orders/mixed-${boxes}-${branchId}`),mixedOrder(boxes,branchId)));
@@ -135,6 +139,45 @@ try {
   await allow(update(ref(manager,`storeCatalog/${mixed.code}`),{price:4380,'boxSale/pricePerPound':146,active:false}));
   await deny(set(ref(buyer,'orders/mixed-paused'),mixedOrder()));
   await allow(update(ref(service,'orders/mixed-1-granada'),{estado:'Enviado','items/0/cantidad':10.5}));
+  for(const count of [2,3,4,5]) {
+    const selected=allSources.slice(0,count);
+    const boxed=buildBoxCatalogProduct({name:`Mixta ${count}`,type:'mixed',poundsPerBox:30,pricePerPound:146,image:'/mixed.jpg',active:true,branchIds:['granada','nindiri']},selected,null,`mixed-${count}`);
+    const path=`storeCatalog/${boxed.code}`;
+    const payload=(boxes=1)=>({...order(),items:linkMixedBoxLines([{codigo:boxed.code,nombre:boxed.name,cantidad:boxes,precioUnitario:boxed.price,boxSale:boxed.boxSale}].flatMap(boxOrderItem))});
+    await allow(set(ref(manager,path),boxed));
+    for(const boxes of [1,2,3]) await allow(set(ref(buyer,`orders/count-${count}-${boxes}`),payload(boxes)));
+    for(const [label,change] of Object.entries({
+      missingLast:o=>{o.items.pop();},
+      weightLast:o=>{o.items.at(-1).cantidad+=0.5;},
+      priceLast:o=>{o.items.at(-1).precioUnitario=1;},
+      lastSku:o=>{o.items.at(-1).codigo=source.code;},
+      badIndex:o=>{o.items.at(-1).ventaPorCaja.componentIndex='5';},
+      extraLink:o=>{o.items.forEach(line=>{line.ventaPorCaja.lineKeys[String(count)]='99';});},
+      mismatch:o=>{o.items.at(-1).ventaPorCaja.boxes=2;},
+      group:o=>{o.items.at(-1).ventaPorCaja.groupId='other';},
+    })) {
+      const invalid=payload();change(invalid);
+      await deny(set(ref(buyer,`orders/count-${count}-bad-${label}`),invalid));
+    }
+    for(const i of selected.keys()) {
+      await allow(update(ref(manager,`storeCatalog/${selected[i].code}`),{active:false}));
+      await deny(set(ref(buyer,`orders/count-${count}-inactive-${i}`),payload()));
+      await allow(update(ref(manager,`storeCatalog/${selected[i].code}`),{active:true,'branchSettings/granada/active':false}));
+      await deny(set(ref(buyer,`orders/count-${count}-branch-${i}`),payload()));
+      await allow(update(ref(manager,`storeCatalog/${selected[i].code}`),{'branchSettings/granada/active':true}));
+    }
+    const parts=boxed.boxSale.components;
+    await deny(update(ref(manager,path),{'boxSale/components':{...parts,[count-1]:parts[0]}}));
+    await deny(update(ref(manager,path),{'boxSale/components':{...parts,1:null}}));
+    await deny(update(ref(manager,path),{'boxSale/components':{...parts,5:parts[0]}}));
+    await deny(update(ref(manager,path),{'boxSale/components':{...parts,extra:parts[0]}}));
+    // Equal shares cannot introduce half-cent rounding differences at checkout.
+    if(count===2 || count===4) await deny(update(ref(manager,path),{'boxSale/poundsPerBox':count/2,'boxSale/pricePerPound':146.01,price:count/2*146.01}));
+    const resized=buildBoxCatalogProduct({...boxed,...boxed.boxSale,type:'mixed',branchIds:['granada','nindiri']},allSources.slice(0,count===5?2:count+1),boxed);
+    await allow(set(ref(manager,path),resized));
+    await deny(set(ref(buyer,`orders/count-${count}-stale-size`),payload()));
+    await allow(update(ref(service,`orders/count-${count}-1`),{estado:'Enviado'}));
+  }
   const untouched=JSON.parse(await readFile('firebase.database.rules.json','utf8'));
   assert.equal(untouched.rules.orders.$orderId['.write'],rules.rules.orders.$orderId['.write']);
   await allow(update(ref(manager,'storeCatalog/BOX_test'),{active:false}));

@@ -87,10 +87,10 @@ assert.deepEqual(differentGroups[5].ventaPorCaja.lineKeys,{0:'5',1:'6',2:'7'});
 assert.equal(differentGroups[1].ventaPorCaja.groupId,'1');
 assert.equal(differentGroups[5].ventaPorCaja.groupId,'3');
 for (const count of [0,-1,1.5,NaN,Infinity,10001]) assert.throws(()=>boxOrderItem(mixedCart(count)));
-for (const badSources of [[],sources.slice(0,2),[...sources,source],[source,source,sources[1]],[source,sources[1],null],[source,sources[1],product],[source,sources[1],{...sources[2],unit:'unidad'}]]) {
+for (const badSources of [[],sources.slice(0,1),[...sources,source],[source,source,sources[1]],[source,sources[1],null],[source,sources[1],product],[source,sources[1],{...sources[2],unit:'unidad'}]]) {
   assert.throws(()=>buildBoxCatalogProduct({...form,type:'mixed'},badSources,null,'bad'));
 }
-for (const poundsPerBox of [10,20,31,.5]) assert.throws(()=>buildBoxCatalogProduct({...form,type:'mixed',poundsPerBox},sources,null,'bad'),/tres/);
+for (const poundsPerBox of [10,20,31,.5]) assert.throws(()=>buildBoxCatalogProduct({...form,type:'mixed',poundsPerBox},sources,null,'bad'),/entre 3/);
 for (const poundsPerBox of [1.5,15,30,45,99]) {
   const p = buildBoxCatalogProduct({...form,type:'mixed',poundsPerBox},sources,null,'weight');
   const rows = boxOrderItem({...mixedCart(1),boxSale:p.boxSale,precioUnitario:p.price,precioUnitarioOriginal:p.price});
@@ -98,6 +98,8 @@ for (const poundsPerBox of [1.5,15,30,45,99]) {
   assert.equal(rows.reduce((sum,row)=>sum+row.subtotal,0),p.price);
 }
 assert.throws(()=>validateBoxSale({...mixed.boxSale,components:[null,...mixed.boxSale.components.slice(1)]}),/SICAR/);
+const sparseParts = [...mixed.boxSale.components]; delete sparseParts[1];
+assert.throws(()=>validateBoxSale({...mixed.boxSale,components:sparseParts}),/SICAR/);
 assert.throws(()=>validateBoxSale({...mixed.boxSale,type:'other'}));
 assert.throws(()=>validateBoxSale({...mixed.boxSale,components:mixed.boxSale.components.map(c=>({...c,name:''}))}));
 assert.equal(resolveBoxAvailability(mixed,sources).inventory,3);
@@ -121,6 +123,40 @@ for (const benefit of [{},{usesPromotionalPrices:true},resolveStoreDiscountBenef
   const rows = boxOrderItem(buildStoreCheckoutItems([mixedCart(2)],benefit)[0]);
   assert.equal(rows.reduce((sum,row)=>sum+row.subtotal,0),8760);
 }
+const fiveSources = [...sources, {...source,code:'TEST-CUARTO',name:'Cuarto'}, {...source,code:'TEST-QUINTO',name:'Quinto'}];
+assert.throws(()=>buildBoxCatalogProduct({...form,type:'mixed'},[...fiveSources,{...source,code:'TEST-SEXTO'}],null,'six'),/2 y 5/);
+for (const count of [2,3,4,5]) {
+  const selected = fiveSources.slice(0,count);
+  const p = buildBoxCatalogProduct({...form,type:'mixed'},selected,null,`count-${count}`);
+  const line = boxes => ({...cart(boxes),codigo:p.code,boxSale:p.boxSale});
+  assert.equal(p.boxSale.components.length,count);
+  assert.ok(describeBoxContents(p.boxSale).startsWith(`${30/count} lb de Corbata`));
+  for (const boxes of [1,2,3]) {
+    const rows = linkMixedBoxLines([line(boxes)].flatMap(boxOrderItem));
+    assert.equal(rows.length,count);
+    assert.equal(rows.reduce((sum,row)=>sum+row.cantidad,0),boxes*30);
+    assert.equal(rows.reduce((sum,row)=>sum+row.subtotal,0),boxes*4380);
+    rows.forEach((row,i)=>{
+      assert.equal(row.codigo,selected[i].code);
+      assert.equal(row.cantidad,boxes*30/count);
+      assert.equal(row.ventaPorCaja.poundsPerComponent,30/count);
+      assert.equal(Object.keys(row.ventaPorCaja.lineKeys).length,count);
+    });
+  }
+  for (const i of selected.keys()) {
+    assert.equal(resolveBoxAvailability(p,selected.map((s,j)=>({...s,inventory:i===j?30/count-0.5:100}))).active,false);
+    assert.equal(resolveBoxAvailability(p,selected.map((s,j)=>({...s,active:i!==j}))).active,false);
+  }
+  validateBoxCart([line(1)],[p,...selected]);
+  assert.throws(()=>validateBoxCart([line(1),{codigo:selected.at(-1).code,cantidad:100}],[p,...selected]),/suficientes/);
+  const changed = buildBoxCatalogProduct({...form,type:'mixed'},fiveSources.slice(0,count===5?2:count+1),p);
+  assert.throws(()=>validateBoxCart([line(1)],[changed,...fiveSources]),/Cambió/);
+  const decimal = buildBoxCatalogProduct({...form,type:'mixed',pricePerPound:146.02},selected,null,`decimal-${count}`);
+  const decimalRows=boxOrderItem({...line(1),boxSale:decimal.boxSale,precioUnitario:decimal.price,precioUnitarioOriginal:decimal.price});
+  assert.ok(Math.abs(decimalRows.reduce((sum,row)=>sum+row.subtotal,0)-decimal.price)<0.000001);
+  assert.throws(()=>buildBoxCatalogProduct({...form,type:'mixed',poundsPerBox:count/2,pricePerPound:146.01},selected,null,'half-cent'),/centavos/);
+}
+assert.throws(()=>buildBoxCatalogProduct({...form,type:'mixed',pricePerPound:146.01},fiveSources.slice(0,4),null,'quarter-cent'),/cada corte/);
 // Exercise the existing bridge's pure merger without starting its sync service.
 const bridge = await readFile(new URL('./sicarQuoteSync.mjs',import.meta.url),'utf8');
 const marker = 'const mergeDuplicateQuoteDetailItems = ';
@@ -148,4 +184,4 @@ const mixedMerged=merge([...mixedDetails,detail(5,160)]);
 assert.equal(mixedMerged.length,3);
 assert.equal(mixedMerged.find(row=>row.code===source.code).quantity,25);
 assert.equal(mixedMerged.reduce((sum,row)=>sum+row.importeCon,0),8760+800);
-console.log('PASS single/mixed boxes: equal thirds, 1/2/3 boxes, exact totals, original SKUs, grouped lines, shared stock, fixed pricing, branches, stale data, invalid input and SICAR merging.');
+console.log('PASS single/mixed boxes: 2-5 equal cuts, 1/2/3 boxes, exact totals, original SKUs, grouped lines, shared stock, fixed pricing, branches, stale data, invalid input and SICAR merging.');

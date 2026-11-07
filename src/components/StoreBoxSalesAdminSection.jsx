@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { buildBoxCatalogProduct, describeBoxContents, getBoxComponents, isBoxProduct, isMixedBox } from '../services/storeBoxSales';
+import { buildBoxCatalogProduct, describeBoxContents, getBoxComponents, isBoxProduct, isMixedBox, MIXED_BOX_COUNTS } from '../services/storeBoxSales';
 import { saveCatalogProduct } from '../services/storeCatalog';
 import '../styles/storeBoxSales.css';
 
@@ -19,6 +19,7 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
   const boxes = products.filter(isBoxProduct);
   const sources = products.filter(product => !isBoxProduct(product) && product.unit === 'lb');
   const mixed = isMixedBox(form);
+  const componentCount = form.sourceCodes.length;
   const filtered = sources.filter(product => product.code === form.sourceCode || form.sourceCodes.includes(product.code) ||
     `${product.code} ${product.name}`.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')));
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }));
@@ -68,24 +69,28 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
         <fieldset disabled={busy || loading}>
           <div className="box-sales-type" role="group" aria-label="Tipo de caja">
             <button type="button" aria-pressed={!mixed} disabled={Boolean(editing)} onClick={() => update('type', 'single')}>Un corte</button>
-            <button type="button" aria-pressed={mixed} disabled={Boolean(editing)} onClick={() => update('type', 'mixed')}>Mixta · 3 cortes</button>
+            <button type="button" aria-pressed={mixed} disabled={Boolean(editing)} onClick={() => update('type', 'mixed')}>Mixta · 2 a 5 cortes</button>
           </div>
           <label>Buscar artículo original<input className="cfg-input" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre del corte o código SICAR" /></label>
           {mixed ? <div className="box-sales-components">
-            {[0, 1, 2].map(index => <label key={index}>Corte {index + 1}<select className="cfg-select" required value={form.sourceCodes[index]} disabled={Boolean(editing)} onChange={e => {
+            <label>Cantidad de cortes<select className="cfg-select" aria-label="Cantidad de cortes" value={componentCount} onChange={e => {
+              const count = Number(e.target.value);
+              setForm(current => ({ ...current, sourceCodes: Array.from({ length: count }, (_, i) => current.sourceCodes[i] || '') }));
+            }}>{MIXED_BOX_COUNTS.map(count => <option key={count} value={count}>{count} cortes</option>)}</select></label>
+            {form.sourceCodes.map((_, index) => <label key={index}>Corte {index + 1}<select className="cfg-select" aria-label={`Corte ${index + 1}`} required value={form.sourceCodes[index]} onChange={e => {
               const sourceCodes = form.sourceCodes.map((code, i) => i === index ? e.target.value : code);
               setForm(current => ({ ...current, sourceCodes, name: current.name || 'Caja mixta' }));
             }}><option value="">Seleccioná un corte por libra</option>{filtered.map(p => <option key={p.code} value={p.code} disabled={form.sourceCodes.includes(p.code) && form.sourceCodes[index] !== p.code}>{p.code} · {p.name}</option>)}</select></label>)}
-            <p className="box-sales-distribution" role="status">{Number(form.poundsPerBox) > 0 && Number(form.poundsPerBox) * 2 % 3 === 0
-              ? `${Number(form.poundsPerBox) / 3} lb de cada corte por caja. Dos cajas: ${Number(form.poundsPerBox) * 2 / 3} lb de cada corte.`
-              : 'Elegí un peso que permita tres partes iguales en incrementos de 0.5 lb por corte.'}</p>
+            <p className="box-sales-distribution" role="status">{Number(form.poundsPerBox) > 0 && Number(form.poundsPerBox) * 2 % componentCount === 0
+              ? `${Number(form.poundsPerBox) / componentCount} lb de cada corte por caja. Dos cajas: ${Number(form.poundsPerBox) * 2 / componentCount} lb de cada corte.`
+              : `Elegí un peso que permita ${componentCount} partes iguales en incrementos de 0.5 lb por corte.`}</p>
           </div> : <label>Artículo de SICAR<select className="cfg-select" required value={form.sourceCode} disabled={Boolean(editing)} onChange={e => {
             const source = sources.find(p => p.code === e.target.value);
             setForm(current => ({ ...current, sourceCode: e.target.value, name: source ? `${source.name} por caja` : '' }));
           }}><option value="">Seleccioná un corte por libra</option>{filtered.map(p => <option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}</select></label>}
           <label>Nombre en la tienda<input name="boxName" className="cfg-input" required maxLength={120} value={form.name} onChange={e => update('name', e.target.value)} /></label>
           <div className="box-sales-fields">
-            <label>Libras por caja<input className="cfg-input" type="number" inputMode="decimal" required min={mixed ? '1.5' : '0.5'} max="10000" step={mixed ? '1.5' : '0.5'} value={form.poundsPerBox} onChange={e => update('poundsPerBox', e.target.value)} /></label>
+            <label>Libras por caja<input className="cfg-input" type="number" inputMode="decimal" required min={mixed ? componentCount / 2 : 0.5} max="10000" step={mixed ? componentCount / 2 : 0.5} value={form.poundsPerBox} onChange={e => update('poundsPerBox', e.target.value)} /></label>
             <label>{mixed ? 'Precio único por libra (C$)' : 'Precio por libra (C$)'}<input className="cfg-input" type="number" inputMode="decimal" required min="0.01" max="100000" step="0.01" value={form.pricePerPound} onChange={e => update('pricePerPound', e.target.value)} /></label>
           </div>
           <div className="box-sales-total" aria-live="polite"><span>Precio de una caja</span><strong>{money(total)}</strong><small>2 cajas: {Number(form.poundsPerBox || 0) * 2} lb · {money(total * 2)}</small></div>

@@ -14,7 +14,8 @@ import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnn
 import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
 import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
 import PromotionShareButton from './storefront/PromotionShareButton';
-import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from './storefront/retailHomePromotions';
+import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
+import RetailProductRail from './storefront/RetailProductRail';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
 import { GOOGLE_PLAY_STORE_URL, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
 import RetailCheckout from './storefront/RetailCheckout';
@@ -2528,6 +2529,7 @@ export default function TiendaVirtualView({
   }, [activeCategory, activeProductPromotions, boxSalesEnabled, filteredProducts]);
 
   const visibleHomeSections = getRetailHomeSections(groupedAllProductsSections, isDashboard);
+  const homeFoodStoryIndex = visibleHomeSections.reduce((last, section, index) => isRetailHomeCarousel(section) ? index : last, 0);
   const homeHasGoldSection = visibleHomeSections.some(isRetailGoldSection);
 
   useEffect(() => {
@@ -10210,6 +10212,7 @@ export default function TiendaVirtualView({
                 const visibleCount = Number(groupVisibleCounts[section.id] || STORE_GROUP_PAGE_SIZE);
                 const visibleProducts = getRetailHomeSectionProducts(section, isDashboard, visibleCount);
                 const showAllPromotionProducts = !isDashboard && isRetailHomePromotion(section);
+                const isHorizontalSection = !isDashboard && isRetailHomeCarousel(section);
                 const remainingCount = Math.max(section.products.length - visibleProducts.length, 0);
                 const nextBatchSize = Math.min(STORE_GROUP_PAGE_SIZE, remainingCount);
                 const actionLabel = getStoreGroupActionLabel(section);
@@ -10251,9 +10254,11 @@ export default function TiendaVirtualView({
                         )}
                       </div>
                     </div>
-                    <div className={`store-grid${showAllPromotionProducts ? ' retail-promotion-grid' : ''}`}>
+                    {isHorizontalSection ? <RetailProductRail title={section.title}>
                       {visibleProducts.map((product) => renderStoreProductTile(product))}
-                    </div>
+                    </RetailProductRail> : <div className={`store-grid${showAllPromotionProducts ? ' retail-promotion-grid' : ''}`}>
+                      {visibleProducts.map((product) => renderStoreProductTile(product))}
+                    </div>}
                     {isDashboard && remainingCount > 0 && (
                       <div className="store-product-group-footer">
                         <button
@@ -10274,7 +10279,7 @@ export default function TiendaVirtualView({
                       </div>
                     )}
                   </section>
-                  {!isDashboard && sectionIndex === (visibleHomeSections[0]?.id === BOX_HOME_SECTION_ID ? 1 : 0) && activeProducts.some(isRetailBurgerProduct) && (
+                  {!isDashboard && sectionIndex === homeFoodStoryIndex && activeProducts.some(isRetailBurgerProduct) && (
                     <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('Hamburguesas')} />
                   )}
                   {!isDashboard && !homeHasGoldSection && sectionIndex === visibleHomeSections.length - 1 && (

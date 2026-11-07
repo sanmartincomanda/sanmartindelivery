@@ -145,6 +145,14 @@ html body .store-shell.storefront-brand-v3.storefront-retail .store-product-grou
   margin: 0 !important; padding: 0 !important; scroll-snap-type: none;
 }
 .storefront-retail .store-product-group .retail-promotion-grid .retail-product { max-width: none; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group { min-width: 0; }
+html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group .store-grid.retail-home-carousel {
+  display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important;
+  scroll-padding-inline: 16px; overscroll-behavior-x: contain; cursor: grab;
+}
+.storefront-retail .retail-home-carousel:focus-visible { outline: 2px solid var(--retail-blue); outline-offset: 3px; }
+.storefront-retail .retail-home-carousel[data-dragging=true] { cursor: grabbing !important; scroll-snap-type: none !important; user-select: none; }
+.storefront-retail .retail-home-carousel[data-dragging=true] * { cursor: grabbing; }
 .storefront-retail .retail-product-link { display: flex; flex: 1; flex-direction: column; align-items: stretch; min-width: 0; padding: 0; border: 0; background: none; text-align: left; color: var(--retail-ink); }
 .storefront-retail .retail-product-photo { aspect-ratio: 1; display: grid; place-items: center; position: relative; width: 100%; overflow: hidden; background: #f4f4f2; border-radius: 12px; margin-bottom: 10px; }
 .storefront-retail .retail-product-photo:not(.is-loaded)::before { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg,#f1f2f3 20%,#fafafa 45%,#f1f2f3 70%); background-size: 200% 100%; animation: retail-shimmer 1.5s ease-in-out 3; }

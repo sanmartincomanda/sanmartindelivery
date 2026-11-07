@@ -60,29 +60,34 @@ Before enabling boxes in production, deploy the reviewed database rules along
 with the web release. No live records, rules, orders or price changes are made
 by the tests. Native Android/iOS require their normal separate update.
 
-## Mixed boxes (2026-11-07)
+## Mixed boxes: 2-5 cuts (2026-11-07)
 
-In AdminTV choose "Mixta - 3 cortes", select three distinct original lb
+In AdminTV choose "Mixta - 2 a 5 cortes", select 2, 3, 4 or 5 distinct original lb
 articles, the total box weight, one shared price per pound, a name and a photo.
-The preview shows equal shares immediately. 30 lb means 10 + 10 + 10 lb;
-two boxes mean 20 lb of each article. New presentations remain inactive until
+The preview shows equal shares immediately. A 30 lb box contains 15 lb each
+for 2 cuts, 10 lb for 3, 7.5 lb for 4, or 6 lb for 5. Two boxes double each share.
+The form defaults to 3 cuts and existing boxes retain their stored count. Mixed
+boxes can change composition when edited; stale carts must reload before checkout.
+New presentations remain inactive until
 explicitly enabled. Existing single-cut presentations are unchanged.
 
 Mixed boxSale records have type=mixed, poundsPerBox, pricePerPound and
-components[0..2] with sourceCode, sourceKey and name. Top-level sourceCode/key
-are omitted. Total weight must be a multiple of 1.5 lb so each third is an
+components[0..count-1] with sourceCode, sourceKey and name. No new count field is
+required; the length is authoritative. Top-level sourceCode/key are omitted.
+Total weight must be a multiple of count / 2 lb so each equal share is an
 exact 0.5 lb increment compatible with the existing order normalizer.
 No uneven remainder or silent rounding is allowed. The whole box must also
-yield exact cents. The original three SKUs and loose prices are not modified.
+yield exact cents per component as well as per box, avoiding differences from
+rounding separate operational lines. Original SKUs and loose prices are not modified.
 
-Source availability and stock use all three articles in the selected branch.
+Source availability and stock use all selected articles in the selected branch.
 Cart stock validation aggregates mixed boxes, single-cut boxes and loose cuts.
 The product card, product detail and cart show the composition.
 
-Checkout expands a mixed cart line into three original-SKU lb lines with
+Checkout expands a mixed cart line into 2-5 original-SKU lb lines with
 the same fixed price per pound. ventaPorCaja also stores type, boxName,
 poundsPerComponent, componentIndex, groupId and lineKeys. The links bind the
-three rows after normalization/filtering. Rules verify all three siblings,
+rows after normalization/filtering. Rules verify all configured siblings,
 their count, SKU, weights, common price, branch and shared group. A partial
 box or cross-linked group is rejected. Existing operational updates remain
 allowed as before; no change to kitchen adjustments or original-order history.
@@ -92,10 +97,29 @@ expressions. The rules test asserts that firebase.database.rules.json matches
 the exports before testing against the local emulator. Write permissions are
 not widened, and no new endpoint, Function, listener or inventory job is added.
 This does not change existing non-box order authorization or reserve stock.
+Regenerate these nodes with `node scripts/updateMixedBoxRules.mjs`; this only
+updates the local rules file and performs no deployment. The lineKeys child rule
+rejects extra indexes for new rows and preserves existing operational updates.
 
 Publish the reviewed database validations with the web build when approved.
-An older native bundle that only understands single-cut boxes cannot sell the
-new mixed format; update Android/iOS separately before advertising it there.
+Native bundles limited to 3-cut mixed boxes cannot sell the new 2/4/5-cut format;
+they hide unsupported boxes through their existing validation. Publish the rules
+before the web release and update Android/iOS separately before advertising the
+new combinations there. The prior single-cut and 3-cut formats remain compatible.
+
+2-5 cut extension QA (repeated before authorized release):
+- Pricing/stock and DOM suites pass for all four counts, 1/2/3 box quantities,
+  equal half-pound shares, exact cents, duplicate/absent cuts, resized stale carts,
+  create/edit, product cards, cart and normalized order/kitchen descriptions.
+- RTDB emulator: 388 checks pass, including last-component tampering, missing
+  lines, extra links/indexes, disabled cuts/branches, composition edits and
+  updates to historical orders. No write permissions or production data changed.
+- Isolated browser preview: edited 3 to 5 cuts, saved locally, checked five-cut
+  storefront/cart contents, resized to 2 and 4, and checked widths 360/390/430/1280.
+  No horizontal overflow or browser errors. Preview uses fake Firebase and data.
+  Evidence: ignored `tmp/mixed-box-five-cuts-mobile.png`.
+- No real SICAR quotation, native-device test or new app package was produced
+  for this extension. Web build passes; existing bundle-size warnings remain.
 
 ## Automated checks
 
@@ -171,8 +195,16 @@ uploads, content-addressed cache URLs and safe migration record replacement.
 
 ## Launch announcement and Home
 
-- Home places "Venta por caja" before promotion sections, without duplicating
-  the boxes in the general catalog rail or hiding previously visible sections.
+- Public Home places active Black November promotions first, then "Venta por
+  caja", followed by the remaining sections. Both use one horizontal row with
+  every eligible product, native touch scrolling, mouse dragging and keyboard
+  navigation. Other promotions retain their full grid; admin pagination is
+  unchanged. The hamburger editorial stays after these two rows.
+- Local QA verified 5 Black November products and all 11 box presentations,
+  one row at 360/390/430/1280 px without page overflow, reaching the final box,
+  dragging without opening a product and normal detail/back navigation.
+  The owner authorized GitHub and web publication together with 2-5 cut boxes
+  on 2026-11-07, before starting further Apple authentication changes.
 - "Disponible ahora: Ventas por caja" previews up to three active, available
   box presentations from the selected branch, using their existing photos.
   Closing is optional; "Ir a comprar" opens the existing box category.

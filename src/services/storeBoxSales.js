@@ -1,5 +1,6 @@
 // A box is a storefront presentation, never a new SICAR article.
 export const BOX_CATEGORY_ID = 'venta_por_cajas';
+export const MIXED_BOX_COUNTS = [2, 3, 4, 5];
 export const isBoxProduct = (product) => Boolean(product?.boxSale);
 export const isMixedBox = (box) => box?.type === 'mixed';
 const money = (n) => Number(Number(n).toFixed(2));
@@ -25,10 +26,12 @@ export function validateBoxSale(box) {
   }
   const weightAndPrice = { poundsPerBox: Number(box.poundsPerBox), pricePerPound: Number(box.pricePerPound) };
   if (isMixedBox(box)) {
-    if (!Array.isArray(box.components) || box.components.length !== 3) throw new Error('Seleccioná exactamente tres cortes para la caja mixta.');
-    const components = box.components.map(component => ({ ...sourceIdentity(component), name: String(component?.name || '').trim() }));
-    if (new Set(components.map(component => component.sourceCode)).size !== 3) throw new Error('Los tres cortes deben ser distintos.');
-    if (weightAndPrice.poundsPerBox * 2 % 3 !== 0) throw new Error('El peso debe repartirse entre tres en incrementos de 0.5 lb por corte (por ejemplo: 15, 30 o 45 lb).');
+    if (!Array.isArray(box.components) || !MIXED_BOX_COUNTS.includes(box.components.length)) throw new Error('Seleccioná entre 2 y 5 cortes para la caja mixta.');
+    const components = Array.from(box.components, component => ({ ...sourceIdentity(component), name: String(component?.name || '').trim() }));
+    if (new Set(components.map(component => component.sourceCode)).size !== components.length) throw new Error('Los cortes deben ser distintos.');
+    if (weightAndPrice.poundsPerBox * 2 % components.length !== 0) throw new Error(`El peso debe repartirse entre ${components.length} en incrementos de 0.5 lb por corte.`);
+    const componentTotal = weightAndPrice.poundsPerBox / components.length * weightAndPrice.pricePerPound;
+    if (Math.abs(money(componentTotal) - componentTotal) > 0.000001) throw new Error('El importe de cada corte debe resultar en centavos exactos. Ajustá el peso o el precio por libra.');
     if (components.some(component => !component.name)) throw new Error('Cada corte debe tener un nombre.');
     return { type: 'mixed', ...weightAndPrice, components };
   }
@@ -39,7 +42,7 @@ export const getBoxComponents = box => isMixedBox(box) ? box.components : [box];
 
 export function describeBoxContents(box, boxes = 1) {
   if (!isMixedBox(box)) return '';
-  return box.components.map(component => `${Number(boxes) * box.poundsPerBox / 3} lb de ${component.name}`).join(' + ');
+  return box.components.map(component => `${Number(boxes) * box.poundsPerBox / box.components.length} lb de ${component.name}`).join(' + ');
 }
 
 export function buildBoxCatalogProduct(form, source, existing = null, id = '') {
@@ -94,13 +97,14 @@ export function boxOrderItem(item, groupId = 0) {
   const pounds = boxes * box.poundsPerBox;
   const { boxSale, ...rest } = item;
   if (isMixedBox(box)) {
+    const poundsPerComponent = box.poundsPerBox / box.components.length;
     return box.components.map((component, index) => ({
-      ...rest, codigo: component.sourceCode, nombre: component.name, unidad: 'lb', cantidad: pounds / 3,
+      ...rest, codigo: component.sourceCode, nombre: component.name, unidad: 'lb', cantidad: boxes * poundsPerComponent,
       precioUnitario: box.pricePerPound, precioUnitarioOriginal: box.pricePerPound, precioFijo: true,
-      subtotal: money(pounds / 3 * box.pricePerPound),
-      descripcion: `${item.nombre}: ${boxes} ${boxes === 1 ? 'caja mixta' : 'cajas mixtas'} de ${box.poundsPerBox} lb; ${box.poundsPerBox / 3} lb de este corte por caja. ${item.descripcion || ''}`.trim(),
+      subtotal: money(boxes * poundsPerComponent * box.pricePerPound),
+      descripcion: `${item.nombre}: ${boxes} ${boxes === 1 ? 'caja mixta' : 'cajas mixtas'} de ${box.poundsPerBox} lb; ${poundsPerComponent} lb de este corte por caja. ${item.descripcion || ''}`.trim(),
       ventaPorCaja: { type: 'mixed', catalogCode: item.codigo, boxName: String(item.nombre || ''),
-        ...sourceIdentity(component), poundsPerBox: box.poundsPerBox, poundsPerComponent: box.poundsPerBox / 3,
+        ...sourceIdentity(component), poundsPerBox: box.poundsPerBox, poundsPerComponent,
         pricePerPound: box.pricePerPound, boxes, componentIndex: String(index), groupId: String(groupId) },
     }));
   }
@@ -113,7 +117,7 @@ export function boxOrderItem(item, groupId = 0) {
   };
 }
 
-// Bind the three operational lines after filtering so rules can reject partial boxes.
+// Bind all operational lines after filtering so rules can reject partial boxes.
 export function linkMixedBoxLines(items) {
   const groups = new Map();
   items.forEach((item, index) => {
