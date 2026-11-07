@@ -26,11 +26,21 @@ final class StoreScreenshots: XCTestCase {
         let password = app.secureTextFields["Contrasena"]
         password.tap()
         password.typeText("Invalid-QA-password-2026")
+        // On iPad XCTest can report the submit button hittable while its center
+        // sits under the keyboard accessory bar. Dismiss it before tapping.
+        let hideKeyboard = app.buttons.matching(NSPredicate(format: "label == 'Ocultar teclado' OR label == 'Hide keyboard'")).firstMatch
+        if hideKeyboard.exists && hideKeyboard.isHittable {
+            hideKeyboard.tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        }
+        XCTAssertEqual(email.value as? String, "native-qa@example.invalid")
         let submit = app.buttons["Entrar a la tienda"]
         for _ in 0..<4 {
             if submit.isHittable { break }
             app.swipeUp()
         }
+        XCTAssertTrue(submit.isHittable, app.debugDescription)
+        capture("01a-Ready-to-submit")
         submit.tap()
         XCTAssertTrue(app.staticTexts["Correo, telefono o contrasena incorrectos."].waitForExistence(timeout: 40), app.debugDescription)
         XCTAssertTrue(browse.isEnabled, "Login must recover from a rejected password")
