@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:box-images": "node scripts/testStoreBoxImages.mjs",
+    "catalog:optimize-box-images": "node scripts/optimizeBoxCatalogImages.mjs",
     "test:box-announcement": "node scripts/testBoxAnnouncement.mjs",
     "test:box-announcement-rules": "node scripts/testBoxAnnouncementRules.mjs",
     "test:box-sales": "node scripts/testStoreBoxSales.mjs",
@@ -72,6 +74,7 @@
     "@capacitor/cli": "^8.4.2",
     "@vitejs/plugin-react": "^4.5.2",
     "jsdom": "^26.1.0",
+    "sharp": "0.32.6",
     "vite": "^5.4.19"
   }
 }

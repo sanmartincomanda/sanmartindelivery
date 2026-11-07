@@ -1,5 +1,6 @@
 import { getDownloadURL, ref as storageRef, uploadString } from 'firebase/storage';
 import { storage } from '../firebase.js';
+import { optimizeBoxImage } from './storeBoxImage.js';
 
 const STORE_MEDIA_ROOT = 'store';
 const STORE_CATALOG_MEDIA_ROOT = `${STORE_MEDIA_ROOT}/catalog`;
@@ -84,6 +85,7 @@ export async function uploadStoreImage({
   image,
   hashHint = '',
   allowInlineFallback = false,
+  cacheControl,
 }) {
   const imageData = String(image || '').trim();
   if (!isDataUrlImage(imageData)) {
@@ -103,7 +105,7 @@ export async function uploadStoreImage({
 
   try {
     await withTimeout(
-      uploadString(imageRef, imageData, 'data_url'),
+      uploadString(imageRef, imageData, 'data_url', cacheControl ? { cacheControl } : undefined),
       STORAGE_UPLOAD_TIMEOUT_MS,
       'La subida de la foto a Firebase Storage tardo demasiado.'
     );
@@ -142,12 +144,16 @@ export async function uploadCatalogImage({
   hashHint = '',
   allowInlineFallback = false,
 }) {
+  const isBox = String(code || '').startsWith('BOX_');
+  const optimized = isBox && isDataUrlImage(image) ? await optimizeBoxImage(image) : image;
   return uploadStoreImage({
     root: STORE_CATALOG_MEDIA_ROOT,
     entityId: code,
-    image,
-    hashHint,
+    image: optimized,
+    // Box photos have immutable, content-addressed URLs; never reuse an old photo's hash.
+    hashHint: isBox ? '' : hashHint,
     allowInlineFallback,
+    cacheControl: isBox ? 'public, max-age=31536000, immutable' : undefined,
   });
 }
 

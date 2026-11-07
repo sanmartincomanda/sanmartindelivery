@@ -76,6 +76,7 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
           </div>
           <div className="box-sales-total" aria-live="polite"><span>Precio de una caja</span><strong>{money(total)}</strong><small>2 cajas: {Number(form.poundsPerBox || 0) * 2} lb · {money(total * 2)}</small></div>
           <label>Foto de esta presentación<input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} /></label>
+          <small>La foto se optimiza al guardar, sin recortes y conservando sus proporciones.</small>
           {form.image && <img className="box-sales-preview" src={form.image} alt="Vista previa de la caja" />}
           <label>Descripción opcional<textarea className="cfg-input" rows={2} maxLength={400} value={form.description} onChange={e => update('description', e.target.value)} /></label>
           <div className="box-sales-branches" role="group" aria-label="Sucursales">{branches.map(([id, name]) =>

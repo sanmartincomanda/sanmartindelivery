@@ -75,6 +75,38 @@ tampering, and verifies updates to previously placed orders after deactivation.
 Browser/phone and real SICAR quotation acceptance remain separate rollout QA;
 no synthetic production orders should be created.
 
+## Box photo optimization
+
+New inline photos for BOX_ catalog records are optimized at upload, before
+hashing and storing. Normal articles, SICAR imports and promotion artwork are
+unchanged. Maximum long edge is 1200 px, with no crop or enlargement; WebP
+quality starts at 86 and can fall to 80 when above the 300 KiB target. The
+target is not a hard cap that sacrifices quality. An already-smaller original
+is retained. Browsers without WebP encoding use JPEG for opaque images or PNG
+to preserve transparency. Decode/encode failures leave the form intact.
+
+URLs use a fresh content hash (not the previous image's hash) and immutable
+public cache headers. Changing a photo creates a new URL. Do not overwrite
+these objects in place. Existing original objects are not deleted.
+
+For existing box photos, `npm run catalog:optimize-box-images -- prepare`
+downloads originals and builds a manifest plus WebP files under ignored tmp/.
+This is read-only remotely. Review the images before running
+`npm run catalog:optimize-box-images -- apply <manifest.json>`.
+Apply verifies file hashes, uploads new objects, checks their downloaded bytes,
+and replaces only image/imageStoragePath using Firebase ETag conditional writes.
+Concurrent photo changes are skipped; concurrent commercial edits are preserved
+or cause a safe conflict. The local originals, before-apply records and applied
+manifest provide rollback references. Update only image fields if rolling back;
+never restore an old full catalog record over current prices or inventory.
+Catalog metadata is refreshed after successful changes. No rules or orders change.
+
+    npm run test:box-images
+
+Tests include real WebP encoding/alpha/EXIF orientation and mocked browser
+canvas/storage paths, quality floor, fallback, invalid photos, unchanged normal
+uploads, content-addressed cache URLs and safe migration record replacement.
+
 ## Launch announcement and Home
 
 - Home places "Venta por caja" before promotion sections, without duplicating
