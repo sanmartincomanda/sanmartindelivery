@@ -67,6 +67,35 @@ receiving a simulator authorization error is not a completed login.
   `42423164418` were canceled when superseded by the confirmed shared-loader fix.
 - No real order, customer credential or reward record is used by these tests.
 
+## Verified candidate and upload
+
+- Source `7b7fd25f02101aaba6cfdeb6946f757ebd9a1dac` passed native iPhone 17 Pro
+  run `42423423517`: two XCTest cases, zero failures. Google presented the
+  accounts.google.com system consent alert, cancellation restored the form, and
+  a second tap reopened it. Apple's native controller was reached and returned
+  AuthorizationError 1000 on the unsigned simulator without an Apple account;
+  the form recovered immediately instead of remaining in processing. This is
+  NOT evidence of completed Apple consent. Debug-only native logs confirm both
+  entry points execute on main; they contain no customer credentials.
+- Screenshots and logs: `tmp/ios-auth-fixed-42423423517/`. The old Apple hang is
+  preserved separately in the baseline evidence. Images were visually reviewed.
+- Signed release run `42423444946` succeeded. Apple validated and accepted
+  **1.0.0 (4)** at 17:11 Nicaragua on 2026-11-07. Build ID:
+  `110ea2fe-9cb8-4d07-9928-8cfe900a6c74`.
+- IPA: `tmp/ios-app-store-1.0.0-4/App.ipa`; SHA256:
+  `9C03B99E6981F600156E0D4E09C657B0BF5C8E5A5E9A486CF6CDD7CBA63B9BD9`.
+- All 19 bundled privacy manifests are byte-identical to signed build 3. No new
+  SDK, scope, backend permission or privacy declaration was introduced.
+- The signed executable and its embedded provisioning profile both contain the
+  `com.apple.developer.applesignin` entitlement with `Default`.
+- Also passed box-sales UI and manual Ruta regression tests (578 assertions).
+- Web production build and its four release gates pass; web login keeps its
+  existing popup route. This verification is not a new web hosting deployment.
+- App Review remains withdrawn. Successful Google/Apple account login, profile
+  completion and Apple reauthentication/revocation still require a physical
+  device. Do not submit the old build 3 or represent the simulator response as a
+  successful customer login.
+
 ## Primary references
 
 - Google redirect handling: https://developers.google.com/identity/sign-in/ios/sign-in

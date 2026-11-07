@@ -44,6 +44,13 @@ UI explains how to close/reopen the app instead of starting a competing login.
 
 ## Release record (2026-11-07)
 
+Update after the records below: native build 4 fixes the shared plugin-loader
+hang reproduced with the real Capacitor Proxy. Native Google presentation and
+cancel/retry now pass, and Apple responds through its native controller instead
+of hanging. See `docs/ios-native-auth-repair-2026-11.md` for exact test limits,
+source, IPA and upload evidence. App Review remains withdrawn pending a successful
+physical-device account login; no new Android binary was published in this repair.
+
 - Source: `494ced71d150a1407b9e2d00f58d9b42ffcf1ebb`, pushed to main and
   release/ios-app-store. Unrelated local SICAR bridge changes were not committed.
 - Web: Netlify production deploy `6aef8fe2fe3bce3e1bf6fea7`. The actual

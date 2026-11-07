@@ -5,7 +5,7 @@
 - Nombre: `Carnes San Martin`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Ultimo build: `3` (codigo de app `494ced71d150a1407b9e2d00f58d9b42ffcf1ebb`), retirado de App Review
+- Ultimo build: `4` (codigo de app `7b7fd25f02101aaba6cfdeb6946f757ebd9a1dac`), cargado para TestFlight; App Review sigue retirada
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
 
@@ -15,7 +15,22 @@ El proyecto nativo esta en `ios/App` y se sincroniza con:
 npm run ios:sync
 ```
 
-## Estado vigente: retirada por fallo de acceso (2026-11-07)
+## Estado vigente: correccion cargada, pendiente prueba fisica (2026-11-07)
+
+La compilacion 1.0.0 (4) fue firmada, validada y cargada a Apple mediante run
+`42423444946`. Corrige el bloqueo comun de Google/Apple: un cargador async
+devolvia el Proxy de Capacitor, cuyo metodo `then` sintetizado hacia que la
+promesa nunca terminara antes de abrir el proveedor. Se usa ahora una fachada
+normal; la regresion se reproduce con el Proxy real, no solo con mocks planos.
+
+Run nativo `42423423517`: Google abre su consentimiento, cancela y permite
+reintentar; Apple llega al controlador nativo y recupera el formulario tras el
+error del simulador sin Apple ID. Dos pruebas correctas, pero no constituyen
+un ingreso exitoso con cuentas reales. Queda la prueba del titular en iPhone
+antes de reenviar a revision. Build 4 incluye tambien cajas mixtas 2-5 y Home.
+Detalle y evidencias en `docs/ios-native-auth-repair-2026-11.md`.
+
+## Historial: retirada por fallo de acceso (2026-11-07)
 
 El titular reporto que "Continuar con Apple" queda procesando sin abrir la
 ventana nativa y autorizo retirar la version hasta corregirla. Despues pidio
@@ -29,10 +44,9 @@ Connect con confirmacion expresa. Tras actualizar, Apple muestra la version
 activo de esta version. Comprobante:
 `tmp/apple-review-withdrawn-login-2026-11-07.png`.
 
-Pendiente: diagnosticar el bloqueo ANTES de la ventana Apple, corregirlo,
-producir un nuevo build y comprobar el acceso nativo en un iPhone real antes
-de volver a enviar. No se afirma reparado ni se ha resuelto con los tests
-simulados existentes. El titular no confirmo que build tiene instalado.
+En ese momento quedaron pendientes el diagnostico y un nuevo build. La
+correccion y carga posteriores se describen arriba. Sigue pendiente comprobar
+el ingreso completo en un iPhone real antes de volver a enviar a revision.
 
 ## Historial: envio a App Review (2026-11-07, luego cancelado)
 
