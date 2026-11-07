@@ -7,12 +7,23 @@ Apple's authorization sheet does not appear on their iPhone. The public 1.0.0
 submission was withdrawn with permission; do not resubmit until a physical-device
 test confirms successful provider consent, profile completion and a retry.
 
-This is an iOS-native repair. Web and Android authentication, existing customer
-accounts, prices, orders and backend rules are unchanged. The current source also
+This repairs the shared native loader and hardens the iOS presentation layer.
+Web popup behavior, existing customer accounts, prices, orders and backend rules
+are unchanged. Android uses the corrected loader when a new binary is built;
+publishing source or the website does not update an installed native binary.
+The current source also
 includes the already-published 2-5-cut mixed boxes and single-row Home sections.
 
 ## Findings and changes
 
+- CONFIRMED COMMON ROOT CAUSE: `authRoles.js` returned the raw Capacitor plugin
+  Proxy from an async loader. Capacitor 8.4.2 synthesizes a callable `then` property;
+  JavaScript Promise assimilation calls it, producing `FirebaseAuthentication.then()
+  is not implemented` while the outer loader never settles. Neither Apple nor
+  Google reaches native code. `testNativeAuthLoading.mjs` reproduces this using the
+  actual installed Capacitor/plugin Proxy (only device transport is stubbed), then
+  proves a plain-method facade reaches both providers, cancels and retries. All
+  three loaders, including Apple revocation, now use that safe facade.
 - Inspected the actual signed build 3 IPA from run `42412985970`, not just local
   generated files. Its bundled Capacitor config includes `google.com`, `apple.com`
   and `skipNativeAuth: true`. Missing provider configuration is not the cause in
@@ -36,9 +47,9 @@ includes the already-published 2-5-cut mixed boxes and single-row Home sections.
   applied by `prepareIos.mjs` after every `cap sync ios`. They do not depend on an
   uncommitted local node_modules edit. Upstream changes stop the build for review.
 
-These findings are defects in the inspected paths, not yet proof of the precise
-cause on the owner's physical device. The native comparison and owner test must
-be recorded below before claiming a complete resolution.
+The loader defect is reproduced and fixed. Successful account consent and profile
+completion still require the owner's physical-device test; presenting a dialog or
+receiving a simulator authorization error is not a completed login.
 
 ## Verification
 
@@ -47,8 +58,13 @@ be recorded below before claiming a complete resolution.
 - Added `StoreNativeAuthTests` with a fresh login screen, Google native consent,
   cancellation/retry and Apple response without waiting for the JS timeout.
   The simulator has no Apple ID; a returned system error does not prove consent.
-- Baseline comparison: run `42422213250`, source `cb06528` (no app repair).
-- Candidate native validation: run `42422517588`, source `2697359`.
+- Baseline run `42422213250`, source `cb06528`: Apple reproduced the disabled form
+  and endless processing with no native sheet. Evidence in
+  `tmp/ios-auth-baseline-42422213250`. Google was not invoked because its accessible
+  label includes the decorative G; the test selector was corrected.
+- Run `42422517588` caught an obsolete optional guard in the Swift compatibility
+  patch. Fixed and covered in `test:ios-config`. Subsequent runs `42422928915` and
+  `42423164418` were canceled when superseded by the confirmed shared-loader fix.
 - No real order, customer credential or reward record is used by these tests.
 
 ## Primary references

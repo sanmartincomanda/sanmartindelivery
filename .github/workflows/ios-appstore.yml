@@ -43,7 +43,7 @@ jobs:
         run: '[[ "$BUILD_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]]'
       - run: npm ci
       - name: Prepare iOS
-        run: npm run ios:sync && npm run test:ios-config && npm run test:google-auth && npm run test:apple-auth
+        run: npm run ios:sync && npm run test:ios-config && npm run test:store-access && npm run test:google-auth && npm run test:apple-auth
         env:
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
       - name: Install distribution identity

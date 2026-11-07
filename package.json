@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test:store-access": "node scripts/testStoreAccess.mjs",
+    "test:store-access": "node scripts/testStoreAccess.mjs && node scripts/testNativeAuthLoading.mjs",
     "test:box-images": "node scripts/testStoreBoxImages.mjs",
     "catalog:optimize-box-images": "node scripts/optimizeBoxCatalogImages.mjs",
     "test:box-announcement": "node scripts/testBoxAnnouncement.mjs",
