@@ -83,7 +83,7 @@ jobs:
           DEVICE=$(xcrun simctl list devices available -j | node -e '
             let input=""; process.stdin.on("data",c=>input+=c).on("end",()=>{
               const devices=Object.values(JSON.parse(input).devices).flat();
-              const device=devices.find(d=>d.name==="iPhone 17 Pro Max") || devices.find(d=>d.name.startsWith("iPhone"));
+              const device=devices.find(d=>d.name==="iPhone 17 Pro") || devices.find(d=>d.name.startsWith("iPhone"));
               if(!device) process.exit(1); process.stdout.write(device.udid);
             });')
           xcrun simctl boot "$DEVICE"
@@ -116,8 +116,8 @@ jobs:
             DEVICE=$(xcrun simctl list devices available -j | FAMILY="$FAMILY" node -e '
               let input=""; process.stdin.on("data",c=>input+=c).on("end",()=>{
                 const devices=Object.values(JSON.parse(input).devices).flat();
-                const expected=process.env.FAMILY==="iPhone" ? "iPhone 17 Pro Max" : "iPad Pro 13-inch";
-                const d=devices.find(d=>d.name.startsWith(expected)) || devices.find(d=>d.name.startsWith(process.env.FAMILY));
+                const expected=process.env.FAMILY==="iPhone" ? "iPhone 17 Pro" : "iPad Pro 13-inch";
+                const d=devices.find(d=>d.name===expected) || devices.find(d=>d.name.startsWith(expected)) || devices.find(d=>d.name.startsWith(process.env.FAMILY));
                 if(!d)process.exit(1); process.stdout.write(d.udid);
               });')
             xcrun simctl boot "$DEVICE" || true
