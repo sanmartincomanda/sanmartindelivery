@@ -5,7 +5,7 @@
 - Nombre: `Carnes San Martin`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Build inicial: `1`
+- Build candidato: `2` (codigo de app `f085730`)
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
 
@@ -31,7 +31,7 @@ aplicacion para el simulador como artefacto temporal.
 Los certificados, perfiles y claves privadas deben guardarse como secretos de
 GitHub. Nunca deben agregarse al repositorio.
 
-## Datos que se configuraran como secretos
+## Secretos configurados
 
 - `APPLE_TEAM_ID`
 - `APPLE_CERTIFICATE_BASE64`
@@ -41,8 +41,8 @@ GitHub. Nunca deben agregarse al repositorio.
 - `APP_STORE_CONNECT_KEY_ID`
 - `APP_STORE_CONNECT_PRIVATE_KEY_BASE64`
 
-Una vez configurados, se agregara el workflow firmado para producir el archivo
-`.ipa`, validarlo y cargarlo a TestFlight.
+El workflow firmado ya produce el archivo `.ipa`, lo valida y lo carga a
+App Store Connect. Las claves privadas nunca forman parte del IPA ni del codigo.
 
 ## Estado del primer lanzamiento (2026-11-07)
 
@@ -59,9 +59,10 @@ Una vez configurados, se agregara el workflow firmado para producir el archivo
   clave privada cifrada y su contrasena estan en los secretos de GitHub;
   ninguna clave privada esta en el repositorio.
 - Firebase iOS app: `1:41323183250:ios:293d96e144f574e6917a4b`, dentro del
-  proyecto existente `comanda-digital-ac1ec`. No se modificaron reglas ni datos
-  comerciales. El plist es configuracion publica de cliente, no una clave de
-  administracion.
+  proyecto existente `comanda-digital-ac1ec`. No se modificaron reglas, pedidos,
+  precios o puntos. Se creo una cuenta cliente exclusiva para Apple, autorizada
+  por el titular, sin compras ni recompensas. El plist es configuracion publica
+  de cliente, no una clave de administracion.
 
 ## Google nativo y SPM
 
@@ -88,10 +89,60 @@ solo construye; `upload=true` valida y carga a App Store Connect. **No envia
 automaticamente a revision ni publica la app.** Cada carga necesita un numero
 de build nuevo. El perfil se aplica solo al target Release de la app, no a SPM.
 
-El workflow firmado aun no se ha ejecutado: faltan el perfil App Store y los
-secretos de la API de App Store Connect. La solicitud de acceso a esa API
-presento condiciones de uso adicionales; se pidio confirmacion al titular y
-no se aceptaron ni enviaron sin ella.
+El titular acepto las condiciones de la API. Perfil App Store con capacidad
+Sign in with Apple y los siete secretos instalados. Clave de carga limitada
+al rol Developer. La firma se aplica solo al target de la app.
+
+Se despacha desde el workflow registrado en la rama principal, sin publicar web:
+
+```bash
+gh workflow run ios-build.yml --ref release/ios-app-store -f release=true -f build_number=3
+```
+
+El ejemplo usa el siguiente numero libre, no vuelve a cargar el build 2.
+
+- Build 1: run `42404126827`, firmado, validado y procesado por Apple.
+- Build 2: run `42404530784`, firmado, validado y procesado por Apple.
+  Asociado a la ficha 1.0.0 y al grupo privado `San Martin - Revision interna`.
+- Unico tester interno: titular existente de la cuenta. Invitacion enviada;
+  distribucion automatica desactivada. No se creo enlace publico de prueba.
+- IPA local: `tmp/ios-app-store-1.0.0-2/App.ipa` (gitignored).
+- Cargar un IPA no significa enviarlo a App Review ni publicarlo.
+
+## Continuar con Apple
+
+- Proveedor `apple.com` habilitado en Firebase, con autorizacion del titular.
+- App ID primario `com.sanmartinsr.app`; Services ID
+  `com.sanmartinsr.app.login`; callback
+  `https://comanda-digital-ac1ec.firebaseapp.com/__/auth/handler`.
+- Clave de login separada de la clave de carga. Solo guardada en Firebase y
+  copia local protegida fuera del repositorio; no se entrega al cliente.
+- Remitente `noreply@comanda-digital-ac1ec.firebaseapp.com` registrado en el
+  relay privado de Apple, coincidente con las plantillas actuales de Firebase.
+- Boton negro estandar solo en iOS. Google y correo conservan sus flujos;
+  no aparece un boton Apple inoperante en Android o web.
+- Nonce nativo verificado por Firebase JS; no se crea una segunda sesion
+  Firebase nativa. Perfil incompleto pide consentimiento para nombre, telefono
+  y direccion; no vincula cuentas automaticamente por coincidencia de correo.
+- Al solicitar eliminacion, la cuenta vinculada a Apple se reautentica y
+  revoca el acceso mediante Identity Platform antes de registrar la solicitud.
+  El borrado de los datos comerciales sigue el proceso existente (hasta 30 dias),
+  no se presenta como borrado inmediato. No se desplegaron Functions ni reglas.
+
+## Ficha y privacidad
+
+- Privacidad publicada tras aprobacion expresa: 13 tipos de datos vinculados
+  al cliente, sin seguimiento publicitario entre empresas.
+- Politica: `https://tienda.sanmartinsr.com/privacidad`.
+- Solicitudes: `https://tienda.sanmartinsr.com/eliminar-cuenta`.
+- Clasificacion calculada 4+, no categoria infantil. Sin apuestas, contenido
+  sexual/violento, red social, chat entre clientes o navegador no restringido.
+  Miembro Gold no es una caja de recompensas aleatorias ni una apuesta.
+- Derechos sobre contenido de terceros declarados tras confirmacion del titular.
+- Credenciales de revision guardadas solo en el apartado privado de Apple y
+  archivo local protegido fuera del repo. No usar cuentas de clientes reales.
+- Revision validada en consola: los requisitos faltantes son capturas de
+  iPhone Dynamic Island mediano y iPad 13 pulgadas.
 
 ## Verificacion y pendientes
 
@@ -103,12 +154,19 @@ no se aceptaron ni enviaron sin ella.
   desbordamiento. Captura local: `tmp/ios-startup-42402103604/iphone-startup.png`.
   Esto no prueba compras ni el login real con una cuenta Apple/Google.
 - Icono App Store comprobado: PNG de 1024x1024 sin canal alfa.
-- Falta habilitar e implementar Sign in with Apple como alternativa al login
-  Google, previa autorizacion solicitada. Auditar tambien revocacion del token
-  Apple al solicitar eliminacion de cuenta y consentimiento para datos de entrega.
-- Completar privacidad, clasificacion por edades, capturas reales de iPhone/iPad,
-  contacto y acceso de demostracion para revision. No usar credenciales de un
-  cliente real ni crear pedidos comerciales durante QA.
-- Probar login real, mapa, carrito, cajas mixtas y checkout en iPhone/TestFlight
-  antes de seleccionar el build final y enviarlo a revision.
-- Ninguna version iOS ha sido cargada, enviada a revision o publicada aun.
+- Arranque con Apple nativo: run `42403740994`, correcto. La captura descubrio
+  un estilo azul que sobreescribia el boton Apple; corregido en build 2.
+- Pruebas locales correctas: `test:apple-auth`, `test:google-auth`,
+  `test:ios-config`, `test:box-sales`, `test:box-sales-ui`, `test:retail-home`,
+  `test:store-editorial`, `test:store-order-source`, `test:manual-route`,
+  `build:ios:web`. Queda advertencia preexistente de bundles mayores de 500 KB.
+- Run `42404528186` agoto seis minutos mientras inicializaba el simulador,
+  antes de instalar la app. Se amplio el limite a 12 minutos. Run `42405416292`
+  se cancelo para seleccionar el tamano de iPhone requerido por la ficha.
+- Run `42405742633`: validacion y capturas pendientes de comprobar. XCTest
+  recorre ingreso, catalogo, producto y carrito sin confirmar compras reales.
+- El titular pospuso su prueba fisica. No estan comprobados de extremo a
+  extremo el ingreso con Apple/Google, el mapa ni la revocacion de una cuenta
+  Apple real. Los tests de tokens/revocacion usan dobles de prueba.
+- Estado actual: IPA cargado, disponible en TestFlight privado; ficha en
+  preparacion, **no enviada a App Review ni publicada en App Store**.
