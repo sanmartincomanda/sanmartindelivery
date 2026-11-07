@@ -1408,3 +1408,20 @@
   top: 5px !important;
   right: 5px !important;
 }
+
+/* Keep Apple's standard sign-in treatment above the storefront button theme. */
+html body .store-shell.storefront-brand-v3.storefront-retail .store-auth-card .store-button.store-apple-button {
+  background: #000 !important;
+  color: #fff !important;
+  border-color: #000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 17px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+}
+html body .store-shell.storefront-brand-v3.storefront-retail .store-apple-button .store-apple-mark {
+  color: #fff !important;
+  font: 24px/1 -apple-system, BlinkMacSystemFont, sans-serif !important;
+}

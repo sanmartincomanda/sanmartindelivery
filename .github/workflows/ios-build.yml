@@ -11,6 +11,10 @@ on:
         description: Unique App Store build number for signed releases
         type: string
         default: '1'
+      screenshots:
+        description: Run real iPhone and iPad guest shopping UI tests and capture screenshots
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -26,7 +30,7 @@ jobs:
   build-ios:
     if: ${{ !inputs.release }}
     runs-on: macos-26
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -97,5 +101,42 @@ jobs:
         with:
           name: Carnes-San-Martin-iOS-startup
           path: build/ios/smoke/*.png
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Capture real iPhone and iPad shopping screens
+        if: inputs.screenshots
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          ruby scripts/ios/prepareScreenshotTests.rb
+          for FAMILY in iPhone iPad; do
+            DEVICE=$(xcrun simctl list devices available -j | FAMILY="$FAMILY" node -e '
+              let input=""; process.stdin.on("data",c=>input+=c).on("end",()=>{
+                const devices=Object.values(JSON.parse(input).devices).flat();
+                const expected=process.env.FAMILY==="iPhone" ? "iPhone 17 Pro Max" : "iPad Pro 13-inch";
+                const d=devices.find(d=>d.name.startsWith(expected)) || devices.find(d=>d.name.startsWith(process.env.FAMILY));
+                if(!d)process.exit(1); process.stdout.write(d.udid);
+              });')
+            xcrun simctl boot "$DEVICE" || true
+            xcrun simctl bootstatus "$DEVICE" -b
+            xcrun simctl status_bar "$DEVICE" override --time '9:41' --batteryState charged --batteryLevel 100
+            xcrun simctl uninstall "$DEVICE" com.sanmartinsr.app || true
+            xcodebuild test -project ios/App/App.xcodeproj -scheme StoreScreenshots \
+              -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios \
+              -resultBundlePath "build/ios/$FAMILY.xcresult" CODE_SIGNING_ALLOWED=NO \
+              > "build/ios/$FAMILY-test.log" 2>&1 || { tail -100 "build/ios/$FAMILY-test.log"; exit 1; }
+            xcrun xcresulttool export attachments --path "build/ios/$FAMILY.xcresult" --output-path "build/ios/screenshots/$FAMILY"
+            xcrun simctl shutdown "$DEVICE"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.screenshots
+        with:
+          name: Carnes-San-Martin-iOS-shopping-screens
+          path: |
+            build/ios/screenshots
+            build/ios/*-test.log
+            build/ios/*.xcresult
           if-no-files-found: ignore
           retention-days: 3
