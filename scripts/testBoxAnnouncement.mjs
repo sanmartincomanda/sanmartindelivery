@@ -8,6 +8,7 @@ import {
   canShowBoxAnnouncement, nextBoxAnnouncementHistory, mergeBoxAnnouncementHistory, getBoxAnnouncementProducts,
 } from '../src/services/storeBoxAnnouncement.js';
 import { getRetailHomeSections } from '../src/components/storefront/retailHomePromotions.js';
+import { orderBoxProductsForDisplay } from '../src/services/storeBoxSales.js';
 
 assert.equal(boxAnnouncementDay(Date.parse('2026-11-07T05:59:59.999Z')), '2026-11-06');
 assert.equal(boxAnnouncementDay(Date.parse('2026-11-07T06:00:00Z')), '2026-11-07');
@@ -27,6 +28,21 @@ const box = { code: 'BOX_test', name: 'Corbata por caja', image: '/real-catalog-
   inventory: 4, boxSale: { sourceCode: '001', poundsPerBox: 30, pricePerPound: 146 }, price: 4380 };
 assert.deepEqual(getBoxAnnouncementProducts([box, { ...box, active: false }, { ...box, inventory: 0 },
   { ...box, image: '' }, { ...box, boxSale: null }]), [box]);
+const mixed15 = { ...box, code: 'BOX_94f78ea2-6b6f-4772-af5e-ba51b652783e',
+  name: 'Caja mixta', price: 2175, boxSale: { type: 'mixed', poundsPerBox: 15, pricePerPound: 145 } };
+const other = { ...box, code: 'BOX_other', price: 6000 };
+const originalOrder = Object.freeze([other, box, mixed15]);
+const expectedOrder = [mixed15, other, box];
+assert.deepEqual(orderBoxProductsForDisplay(originalOrder), expectedOrder, 'Category pins the selected box before more expensive boxes');
+assert.deepEqual(getBoxAnnouncementProducts(originalOrder), expectedOrder, 'Home uses the same order');
+assert.deepEqual(originalOrder, [other, box, mixed15], 'No mutation of the shared catalog');
+assert.equal(orderBoxProductsForDisplay(originalOrder)[0], mixed15, 'Keep the original price, contents and identity');
+assert.deepEqual(orderBoxProductsForDisplay([other, box]), [other, box], 'Without the featured box, existing order is unchanged');
+assert.deepEqual(orderBoxProductsForDisplay([]), []);
+for (const unavailable of [{ active: false }, { inventory: 0 }, { image: '' }]) {
+  assert.deepEqual(getBoxAnnouncementProducts([other, { ...mixed15, ...unavailable }, box]), [other, box],
+    'Featuring never bypasses visibility or stock checks');
+}
 const sections = ['promo-a', 'res-gold', 'res-diaria', 'promo-b', 'promo-c', 'store-home-combos', 'otros'].map(id => ({ id }));
 assert.deepEqual(getRetailHomeSections([{ id: BOX_HOME_SECTION_ID }, ...sections], false),
   [{ id: BOX_HOME_SECTION_ID }, ...getRetailHomeSections(sections, false)], 'Boxes do not push existing sections off Home');
@@ -34,6 +50,8 @@ const storeSource = await readFile('src/components/TiendaVirtualView.jsx', 'utf8
 assert.match(storeSource, /return \[\.\.\.\(boxSection \? \[boxSection\] : \[\]\), \.\.\.productPromotionSections/);
 assert.ok(storeSource.includes('if (boxCodes.has(productCode) ||'), 'Box products must not be duplicated in regular rails');
 assert.ok(storeSource.includes('targetCategory: BOX_CATEGORY_ID'));
+assert.match(storeSource, /if \(activeCategory === BOX_CATEGORY_ID\) \{\s*return orderBoxProductsForDisplay\(matchingProducts\);/,
+  'Category ordering happens after branch, category and search filtering');
 
 const dom = new JSDOM('<div id="app"></div>', { url: 'http://localhost', pretendToBeVisual: true });
 globalThis.window = dom.window; globalThis.document = dom.window.document;

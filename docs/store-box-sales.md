@@ -3,6 +3,20 @@
 AdminTV: Tienda virtual > Venta por cajas. Also available in Catalogo maestro.
 The public category is "Venta por cajas". Regular loose-cut listings remain unchanged.
 
+## Storefront merchandising (2026-11-07)
+
+The 15 lb mixed presentation `BOX_94f78ea2-6b6f-4772-af5e-ba51b652783e`
+is pinned first by `orderBoxProductsForDisplay` in the Home box rail, launch
+preview and box category. Other boxes retain their existing relative order.
+The pin is by presentation identity, not a fake price/sales value or a name
+match. Branch availability, stock and search filtering still run first; no
+catalog records, prices, contents, rules or orders are changed.
+
+Black November's product-photo seal is also reduced by 60% in cards and
+product detail, preserving its transparent image and other campaign seals.
+The shared sources apply to future native builds; an existing installed
+Android/iOS binary is not updated by a web deployment.
+
 ## Data and pricing
 
 - Each presentation is an independent storeCatalog/BOX_UUID record. This is a

@@ -1,4 +1,4 @@
-import { isBoxProduct } from './storeBoxSales.js';
+import { isBoxProduct, orderBoxProductsForDisplay } from './storeBoxSales.js';
 
 export const BOX_ANNOUNCEMENT_ID = 'box_sales_launch_v1';
 export const BOX_ANNOUNCEMENT_LIMIT = 10;
@@ -36,6 +36,6 @@ export function nextBoxAnnouncementHistory(record, now = Date.now()) {
 }
 
 export function getBoxAnnouncementProducts(products = []) {
-  return products.filter(product => isBoxProduct(product) && product.active !== false && product.image &&
-    (product.inventory == null || Number(product.inventory) > 0));
+  return orderBoxProductsForDisplay(products.filter(product => isBoxProduct(product) && product.active !== false && product.image &&
+    (product.inventory == null || Number(product.inventory) > 0)));
 }

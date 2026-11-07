@@ -9,7 +9,7 @@ import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
 import RetailSearchBox from './storefront/RetailSearchBox';
 import RetailQuickActions from './storefront/RetailQuickActions';
-import { BOX_CATEGORY_ID, describeBoxContents, resolveBoxAvailability } from '../services/storeBoxSales';
+import { BOX_CATEGORY_ID, describeBoxContents, orderBoxProductsForDisplay, resolveBoxAvailability } from '../services/storeBoxSales';
 import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnnouncementProducts } from '../services/storeBoxAnnouncement.js';
 import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
 import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
@@ -2369,6 +2369,10 @@ export default function TiendaVirtualView({
 
       return matchesCategory && matchesSubcategory && matchesSearch;
     });
+
+    if (activeCategory === BOX_CATEGORY_ID) {
+      return orderBoxProductsForDisplay(matchingProducts);
+    }
 
     if (activeCategory !== 'todos') {
       return matchingProducts;

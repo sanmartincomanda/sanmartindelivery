@@ -3,6 +3,12 @@ export const BOX_CATEGORY_ID = 'venta_por_cajas';
 export const MIXED_BOX_COUNTS = [2, 3, 4, 5];
 export const isBoxProduct = (product) => Boolean(product?.boxSale);
 export const isMixedBox = (box) => box?.type === 'mixed';
+// Merchandising pin: keep this presentation first without changing catalog prices.
+const FEATURED_BOX_CODE = 'BOX_94f78ea2-6b6f-4772-af5e-ba51b652783e';
+export const orderBoxProductsForDisplay = (products = []) =>
+  [...products].sort((left, right) =>
+    Number(isBoxProduct(right) && right.code === FEATURED_BOX_CODE) -
+    Number(isBoxProduct(left) && left.code === FEATURED_BOX_CODE));
 const money = (n) => Number(Number(n).toFixed(2));
 const positive = (n, max) => Number.isFinite(Number(n)) && Number(n) > 0 && Number(n) <= max;
 const sourceIdentity = (source = {}) => {

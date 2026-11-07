@@ -48,6 +48,9 @@ html body .storefront-retail .retail-campaign-seal img {
   mix-blend-mode: normal !important; opacity: 1 !important;
 }
 .storefront-retail .store-detail-image .retail-campaign-seal { width: min(56%, 240px); top: 12px; right: 12px; }
+/* Black November is 40% of the previous width; other campaign seals stay unchanged. */
+.storefront-retail .retail-campaign-seal--black-november { width: min(27.2%, 60px); }
+.storefront-retail .store-detail-image .retail-campaign-seal--black-november { width: min(22.4%, 96px); }
 .retail-promo-seal { display: none; }
 .storefront-retail .retail-promo-seal {
   position: absolute; top: 7px; right: 7px; z-index: 1; display: block;

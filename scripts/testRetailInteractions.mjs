@@ -41,11 +41,12 @@ await build({ stdin: {
     export {default as RetailSearchBox} from './src/components/storefront/RetailSearchBox.jsx';
     export {default as RetailQuickActions} from './src/components/storefront/RetailQuickActions.jsx';
     export {default as RetailProductCard} from './src/components/storefront/RetailProductCard.jsx';
+    export {default as RetailPromoSeal} from './src/components/storefront/RetailPromoSeal.jsx';
     export {default as RetailProductRail} from './src/components/storefront/RetailProductRail.jsx';`,
   resolveDir: process.cwd(), loader: 'jsx',
 }, bundle:true, packages:'external', platform:'node', format:'cjs', loader:{'.css':'empty'}, outfile:'tmp/retail-interactions-tests.cjs' });
 const require = createRequire(import.meta.url);
-const {StoreLaunch, RetailSearchBox, RetailQuickActions, RetailProductCard, RetailProductRail} = require('../tmp/retail-interactions-tests.cjs');
+const {StoreLaunch, RetailSearchBox, RetailQuickActions, RetailProductCard, RetailPromoSeal, RetailProductRail} = require('../tmp/retail-interactions-tests.cjs');
 const React = await import('react');
 const {createRoot} = await import('react-dom/client');
 const {act, createElement:h, useEffect, useState, StrictMode} = React;
@@ -172,8 +173,18 @@ assert.equal(document.activeElement,node.querySelector('.retail-card-add'),'Keyb
 assert.ok(node.querySelector('.retail-card-add'));
 assert.equal(node.querySelector('.is-in-cart'),null);
 assert.equal(node.querySelector('.retail-campaign-seal img').getAttribute('src'),'/tienda/promotions/black-meat-november-2026-transparent.png');
+assert.ok(node.querySelector('.retail-campaign-seal--black-november'), 'Black November gets the compact campaign seal');
 await act(async () => node.querySelector('.retail-campaign-seal img').dispatchEvent(new window.Event('error')));
 assert.ok(node.querySelector('.retail-promo-seal'), 'Broken campaign images fall back safely');
+const campaignPhoto = '/tienda/promotions/black-meat-november-2026-transparent.png';
+await render(h(RetailPromoSeal,{promotion:{id:'other',title:'Otra oferta',sealImage:campaignPhoto}}));
+assert.ok(node.querySelector('.retail-campaign-seal'));
+assert.equal(node.querySelector('.retail-campaign-seal--black-november'),null,'Other campaign seals keep their original size');
+await render(h(RetailPromoSeal,{promotion:{id:'black_meat_november_2026',title:'Nombre editado',sealImage:campaignPhoto}}));
+assert.ok(node.querySelector('.retail-campaign-seal--black-november'),'Campaign ID preserves the compact size after a title edit');
+const sealCss = await readFile('src/styles/storefrontEditorial.css','utf8');
+assert.ok(sealCss.includes('.retail-campaign-seal--black-november { width: min(27.2%, 60px); }'));
+assert.ok(sealCss.includes('.store-detail-image .retail-campaign-seal--black-november { width: min(22.4%, 96px); }'));
 await render(h(RetailProductRail,{title:'Black November'},h(CardHarness)));
 const rail=node.querySelector('.retail-home-carousel');
 Object.defineProperty(rail,'clientWidth',{value:400});

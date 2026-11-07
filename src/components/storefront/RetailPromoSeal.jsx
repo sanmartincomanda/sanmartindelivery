@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { normalizePromotionSealImage } from '../../services/storeProductPromotionCore';
+import { isBlackNovemberSection } from './retailHomePromotions';
 
 export default function RetailPromoSeal({ promotion }) {
   const [failedImage, setFailedImage] = useState('');
   const image = normalizePromotionSealImage(promotion?.sealImage);
+  const compact = isBlackNovemberSection({ id: `promo-${promotion?.id || ''}`, title: promotion?.title });
   if (image && failedImage !== image) return (
-    <span className="retail-campaign-seal">
+    <span className={`retail-campaign-seal${compact ? ' retail-campaign-seal--black-november' : ''}`}>
       <img src={image} alt={promotion.title || 'Promocion especial'} width="1280" height="435"
         onError={() => setFailedImage(image)} />
     </span>
