@@ -30,7 +30,7 @@ jobs:
   build-ios:
     if: ${{ !inputs.release }}
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 55
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -76,7 +76,8 @@ jobs:
           retention-days: 3
 
       - name: Smoke test native startup
-        timeout-minutes: 6
+        # Fresh macOS runners can spend several minutes migrating the simulator.
+        timeout-minutes: 12
         run: |
           set -euo pipefail
           DEVICE=$(xcrun simctl list devices available -j | node -e '
@@ -106,7 +107,7 @@ jobs:
 
       - name: Capture real iPhone and iPad shopping screens
         if: inputs.screenshots
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: |
           set -euo pipefail
           gem install xcodeproj --no-document
