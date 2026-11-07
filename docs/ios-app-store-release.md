@@ -97,9 +97,12 @@ no se aceptaron ni enviaron sin ella.
 
 - Compilacion base sin firma: run `42400950172`, correcta.
 - Compilacion con Google SPM y plist: run `42401906803`, correcta.
-- Prueba de arranque nativo con captura: run `42402103604`; consultar resultado
-  antes de considerar validado el arranque. Una captura no prueba compras ni
-  el login real con una cuenta Apple/Google.
+- Prueba de arranque nativo con captura: run `42402103604`, correcta (7m32s).
+  Se instalo y abrio la app en iPhone 17 Pro Max del simulador; el proceso siguio
+  vivo y la captura muestra ingreso, Google, correo y Navegar catalogo sin
+  desbordamiento. Captura local: `tmp/ios-startup-42402103604/iphone-startup.png`.
+  Esto no prueba compras ni el login real con una cuenta Apple/Google.
+- Icono App Store comprobado: PNG de 1024x1024 sin canal alfa.
 - Falta habilitar e implementar Sign in with Apple como alternativa al login
   Google, previa autorizacion solicitada. Auditar tambien revocacion del token
   Apple al solicitar eliminacion de cuenta y consentimiento para datos de entrega.
