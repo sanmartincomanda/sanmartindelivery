@@ -69,6 +69,18 @@ UI explains how to close/reopen the app instead of starting a competing login.
   Build ID: `3fee5558-48f6-46fa-9210-2e5008f10fe4`. Test instructions saved.
   The owner retracted the App Review submission request; no public Apple review
   was submitted. Successful native Google/Apple consent awaits device confirmation.
+- Later on 2026-11-07 the owner explicitly renewed App Review authorization.
+  Build 3 replaced build 2 on the public 1.0.0 listing and was submitted;
+  Apple confirmed "1 articulo enviado" / "Pendiente de revision" under
+  submission `7a9424ae-0e77-45d8-868c-6808461a69b5`. Automatic release after
+  approval remains selected. This is not yet approval or public availability.
+- The owner subsequently reported Apple sign-in still processing without the
+  native Apple sheet, authorized withdrawal, then prioritized the pending web
+  release. After publishing `c8c5e67`, the App Review submission was canceled;
+  Apple confirmed "Rechazado por el desarrollador" / submission "Eliminado".
+  Native Apple login remains unresolved. No new authentication code or binary
+  was produced in that web publication/withdrawal turn. Investigate the native
+  presentation path and require real-device confirmation before resubmission.
 - Native UI regression run `42412545565`: iPhone passed invalid-password recovery,
   guest browsing, product detail and adding to the cart without a coverage notice.
   iPad failed before submitting: XCTest considered the submit button hittable,

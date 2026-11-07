@@ -5,7 +5,7 @@
 - Nombre: `Carnes San Martin`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Build candidato: `2` (codigo de app `f085730`)
+- Ultimo build: `3` (codigo de app `494ced71d150a1407b9e2d00f58d9b42ffcf1ebb`), retirado de App Review
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
 
@@ -14,6 +14,53 @@ El proyecto nativo esta en `ios/App` y se sincroniza con:
 ```bash
 npm run ios:sync
 ```
+
+## Estado vigente: retirada por fallo de acceso (2026-11-07)
+
+El titular reporto que "Continuar con Apple" queda procesando sin abrir la
+ventana nativa y autorizo retirar la version hasta corregirla. Despues pidio
+publicar primero los cambios anteriores en GitHub y web antes de empezar a
+modificar Apple. Se completo esa publicacion como `c8c5e67`, documentada en
+`docs/store-box-sales.md`; no se modifico codigo de autenticacion iOS.
+
+Se cancelo el envio `7a9424ae-0e77-45d8-868c-6808461a69b5` desde App Store
+Connect con confirmacion expresa. Tras actualizar, Apple muestra la version
+**Rechazado por el desarrollador** y el envio **Eliminado**. No hay envio publico
+activo de esta version. Comprobante:
+`tmp/apple-review-withdrawn-login-2026-11-07.png`.
+
+Pendiente: diagnosticar el bloqueo ANTES de la ventana Apple, corregirlo,
+producir un nuevo build y comprobar el acceso nativo en un iPhone real antes
+de volver a enviar. No se afirma reparado ni se ha resuelto con los tests
+simulados existentes. El titular no confirmo que build tiene instalado.
+
+## Historial: envio a App Review (2026-11-07, luego cancelado)
+
+El titular volvio a autorizar expresamente terminar el envio a Apple. Se
+sustituyo la compilacion 2 de la ficha por 1.0.0 (3), ya cargada y procesada,
+con las correcciones de acceso y cobertura documentadas en
+`docs/store-access-2026-11.md`. No se genero ni cargo otro IPA.
+
+Apple termino de procesar las capturas existentes. Se guardo la compilacion 3,
+se anadio a revision y se confirmo "Enviar a revision". La consola devolvio
+"1 articulo enviado" y el estado **Pendiente de revision** el 7 de noviembre
+de 2026, aproximadamente a las 15:53 de Nicaragua.
+
+- Solicitud: `7a9424ae-0e77-45d8-868c-6808461a69b5`.
+- Compilacion: `3fee5558-48f6-46fa-9210-2e5008f10fe4`.
+- Publicacion automatica al aprobarse, conservando Nicaragua como mercado.
+- Comprobante local: `tmp/apple-review-submitted-build3.png`.
+- La confirmacion de Apple indica que la revision puede tardar hasta 48 horas;
+  no equivale a aprobacion ni a disponibilidad publica.
+- Se repitieron correctamente test:store-access, test:apple-auth,
+  test:google-auth y test:ios-config. El consentimiento Google/Apple exitoso
+  en un iPhone fisico sigue sin confirmacion del titular; no se afirma probado.
+- Los cambios locales posteriores de cajas mixtas de 2 a 5 productos y filas
+  horizontales de Home NO estan en este IPA. Sus reglas y frontend web ya se
+  publicaron en `c8c5e67`; falta incluirlos en una proxima version nativa.
+
+Las secciones siguientes conservan el historial de preparacion; sus estados
+anteriores de "no enviada" quedan sustituidos por este registro.
 
 ## Validacion sin firma
 

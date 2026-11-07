@@ -121,6 +121,34 @@ new combinations there. The prior single-cut and 3-cut formats remain compatible
 - No real SICAR quotation, native-device test or new app package was produced
   for this extension. Web build passes; existing bundle-size warnings remain.
 
+## Release: 2-5 cuts and horizontal Home (2026-11-07)
+
+- Source `c8c5e67ec610fd4731c8f269876675a765c58292`, pushed to main and
+  release/ios-app-store after checking current origin/main.
+- Compared live database rules to the prior committed revision: no unrelated
+  live differences. Published only the reviewed database rules, then read them
+  back and verified an exact match. Permissions, Functions, Storage rules and
+  catalog/order data were not changed. Backup and verification files are under
+  ignored tmp/mixed-box-2-5-{prepublish,published}-live-rules.json.
+- Netlify production deploy `6aefa8630bd4a2b9ae5cec6c`. Both
+  tienda.sanmartinsr.com/release.json and admintv.sanmartinsr.com/release.json
+  report the source revision above.
+- Production UI: AdminTV shows 2/3/4/5 cuts and equal 30 lb shares of
+  15/10/7.5/6 lb. No presentation was saved or altered. Public mobile Home
+  shows Black November first (5 products), boxes second (11), one row each;
+  the final box is reachable and the page has no horizontal overflow.
+- Evidence: tmp/mixed-box-2-5-admin-published.png and
+  tmp/home-black-boxes-published.png. No real orders were created.
+- Repeated box-sales, box-sales-ui, 388 database-emulator checks, retail-home,
+  retail-interactions, box-announcement, store-editorial, manual-route,
+  web-release and web build successfully. Existing large-bundle warnings remain.
+- The secondary Firebase Hosting workflow `42421521608` failed on the existing
+  serviceusage.services.get permission issue. The actual custom domains above
+  are live on Netlify; no IAM permissions were broadened.
+- No native package or Apple authentication code was changed by this release.
+  Existing 3-cut app bundles still require a separate update for 2/4/5 cuts.
+  The unrelated local scripts/sicarQuoteSync.mjs edits were not committed.
+
 ## Automated checks
 
     npm run test:box-sales
