@@ -23,7 +23,7 @@ final class StoreNativeAuthTests: XCTestCase {
     }
 
     func testGoogleOpensAndCancelAllowsRetry() {
-        let google = app.buttons["Continuar con Google"]
+        let google = app.buttons.matching(NSPredicate(format: "label ENDSWITH 'Continuar con Google'")).firstMatch
         XCTAssertTrue(google.isHittable, app.debugDescription)
         google.tap()
         let consent = springboard.alerts.firstMatch

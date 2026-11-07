@@ -13,11 +13,17 @@ export function patchNativeAuth(file, input) {
       for (const action of ['signIn', 'link']) {
         const method = `${action}With${provider}`;
         source = replace(source, `        implementation?.${method}(call)`, `        // Capacitor dispatches calls on its bridge queue; provider UI belongs on main.
+        #if DEBUG
+        NSLog("[CSMAuth] ${method}: bridge received")
+        #endif
         DispatchQueue.main.async {
             guard let implementation = self.implementation else {
                 call.reject("Native authentication is not initialized.", "auth/native-not-ready")
                 return
             }
+            #if DEBUG
+            NSLog("[CSMAuth] ${method}: starting on main")
+            #endif
             implementation.${method}(call)
         }`);
       }
