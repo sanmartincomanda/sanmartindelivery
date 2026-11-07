@@ -148,8 +148,14 @@ El ejemplo usa el siguiente numero libre, no vuelve a cargar el build 2.
 - Derechos sobre contenido de terceros declarados tras confirmacion del titular.
 - Credenciales de revision guardadas solo en el apartado privado de Apple y
   archivo local protegido fuera del repo. No usar cuentas de clientes reales.
-- Revision validada en consola: los requisitos faltantes son capturas de
-  iPhone Dynamic Island mediano y iPad 13 pulgadas.
+- Capturas reales cargadas en consola: tres de iPhone Dynamic Island mediano
+  (1206x2622) y tres de iPad 13 pulgadas (2064x2752), en orden tienda, producto
+  y carrito. Sin maquetas, pedidos reales ni datos privados de clientes.
+- Al intentar anadir la version a revision, Apple solo indica: "Una o mas
+  capturas de pantalla deben terminar de procesarse". Las seis imagenes y
+  sus miniaturas estan guardadas. No borrar ni volver a cargar los archivos
+  mientras se procesan. Reintentar el envio cuando Apple termine; no existe
+  todavia una solicitud de revision enviada ni aprobacion de publicacion.
 
 ## Verificacion y pendientes
 
@@ -174,11 +180,19 @@ El ejemplo usa el siguiente numero libre, no vuelve a cargar el build 2.
   verificado en `tmp/ios-startup-build2/iphone-startup.png` (1206x2622).
   El target de pruebas fallo al compilar porque faltaba `PRODUCT_NAME`;
   corregido en `5bb38d4`. Ahora compila las pruebas antes de arrancar simuladores.
-- Run `42407245997`: recorrido XCTest pendiente. Recorre ingreso, catalogo,
-  producto y carrito sin confirmar compras reales, y conserva capturas incluso
-  si falla una asercion. No sustituye una prueba de autenticacion con Apple real.
+- Run `42407245997`: compilacion y arranque correctos; XCTest agoto el tiempo
+  al lanzar la app mediante el depurador. Se corrigio el entorno de captura:
+  apertura con simctl, conexion con activate() y ejecucion sin paralelismo.
+- Run `42409009679`: correcto, 23m14s. Recorrido nativo completo de invitado
+  en iPhone 17 Pro e iPad Pro 13-inch (M5): ingreso visible, catalogo, detalle
+  de Corbata por caja, agregar una caja y abrir carrito. Ambas pruebas con
+  cero fallos; imagenes revisadas visualmente. No se confirmaron compras.
+  Evidencia local: `tmp/ios-shopping-42409009679/`, incluidos logs y xcresult.
+  El codigo de app sigue siendo el de build 2; solo cambiaron CI y documentacion.
+  No sustituye una prueba de autenticacion con Apple real.
 - El titular pospuso su prueba fisica. No estan comprobados de extremo a
   extremo el ingreso con Apple/Google, el mapa ni la revocacion de una cuenta
   Apple real. Los tests de tokens/revocacion usan dobles de prueba.
 - Estado actual: IPA cargado, disponible en TestFlight privado; ficha en
-  preparacion, **no enviada a App Review ni publicada en App Store**.
+  preparacion a la espera del procesamiento de capturas por Apple,
+  **no enviada a App Review ni publicada en App Store**.
