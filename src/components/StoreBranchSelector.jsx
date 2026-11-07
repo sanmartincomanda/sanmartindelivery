@@ -192,6 +192,7 @@ export default function StoreBranchSelector({
           backdrop-filter: none;
         }
         .store-branch-modal {
+          box-sizing: border-box;
           position: relative;
           width: min(540px, 100%);
           max-height: min(760px, 92dvh);
