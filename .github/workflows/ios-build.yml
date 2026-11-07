@@ -9,6 +9,7 @@ permissions:
 jobs:
   build-ios:
     runs-on: macos-26
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -54,6 +55,7 @@ jobs:
           retention-days: 3
 
       - name: Smoke test native startup
+        timeout-minutes: 6
         run: |
           set -euo pipefail
           DEVICE=$(xcrun simctl list devices available -j | node -e '
