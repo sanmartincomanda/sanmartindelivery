@@ -125,8 +125,6 @@ html body .store-shell.storefront-brand-v3.storefront-retail .store-subtabs { di
 html body .store-shell.storefront-brand-v3.storefront-retail .store-subtabs .store-chip { min-height: 44px !important; padding: 8px 13px !important; border-radius: 8px !important; flex: 0 0 auto !important; font-size: 13px !important; font-weight: 500 !important; background: #f4f6f8 !important; color: var(--retail-muted) !important; border: 0 !important; box-shadow: none !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-subtabs .store-chip.active { background: #eaf0fd !important; color: var(--retail-blue) !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-filter-badge { display: none !important; }
-html body .store-shell.storefront-brand-v3.storefront-retail[data-retail-tab="catalog"] .store-category-gallery,
-html body .store-shell.storefront-brand-v3.storefront-retail[data-retail-tab="search"] .store-category-gallery { display: none !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail[data-retail-tab="catalog"] .store-product-head { display: none !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-grouped-sections { display: grid; gap: 26px !important; margin: 0 !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group { margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }

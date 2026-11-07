@@ -49,6 +49,12 @@ branches. It rejects unconverted BOX_ SKUs. Existing operational updates are
 not blocked by later campaign/catalog changes. Administrative catalog write
 permissions remain unchanged.
 
+Box total validation allows only a sub-microcordoba floating-point difference
+between the rounded currency total and pounds x price per pound. An exact
+comparison previously rejected valid decimal prices as PERMISSION_DENIED.
+The emulator verifies decimal create/edit/checkout cases, rejects totals even
+one cent off, and still denies catalog writes by clients and non-admin staff.
+
 This does not redesign existing non-box checkout pricing authorization.
 Before enabling boxes in production, deploy the reviewed database rules along
 with the web release. No live records, rules, orders or price changes are made
