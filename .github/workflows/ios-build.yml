@@ -75,6 +75,15 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: Compile shopping UI tests before starting simulators
+        if: inputs.screenshots
+        run: |
+          gem install xcodeproj --no-document
+          ruby scripts/ios/prepareScreenshotTests.rb
+          xcodebuild build-for-testing -project ios/App/App.xcodeproj -scheme StoreScreenshots \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO
+
       - name: Smoke test native startup
         # Fresh macOS runners can spend several minutes migrating the simulator.
         timeout-minutes: 12
@@ -110,8 +119,6 @@ jobs:
         timeout-minutes: 30
         run: |
           set -euo pipefail
-          gem install xcodeproj --no-document
-          ruby scripts/ios/prepareScreenshotTests.rb
           for FAMILY in iPhone iPad; do
             DEVICE=$(xcrun simctl list devices available -j | FAMILY="$FAMILY" node -e '
               let input=""; process.stdin.on("data",c=>input+=c).on("end",()=>{
@@ -124,12 +131,16 @@ jobs:
             xcrun simctl bootstatus "$DEVICE" -b
             xcrun simctl status_bar "$DEVICE" override --time '9:41' --batteryState charged --batteryLevel 100
             xcrun simctl uninstall "$DEVICE" com.sanmartinsr.app || true
-            xcodebuild test -project ios/App/App.xcodeproj -scheme StoreScreenshots \
+            TEST_STATUS=0
+            xcodebuild test-without-building -project ios/App/App.xcodeproj -scheme StoreScreenshots \
               -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios \
               -resultBundlePath "build/ios/$FAMILY.xcresult" CODE_SIGNING_ALLOWED=NO \
-              > "build/ios/$FAMILY-test.log" 2>&1 || { tail -100 "build/ios/$FAMILY-test.log"; exit 1; }
-            xcrun xcresulttool export attachments --path "build/ios/$FAMILY.xcresult" --output-path "build/ios/screenshots/$FAMILY"
+              > "build/ios/$FAMILY-test.log" 2>&1 || TEST_STATUS=$?
+            if [ -d "build/ios/$FAMILY.xcresult" ]; then
+              xcrun xcresulttool export attachments --path "build/ios/$FAMILY.xcresult" --output-path "build/ios/screenshots/$FAMILY"
+            fi
             xcrun simctl shutdown "$DEVICE"
+            if [ "$TEST_STATUS" -ne 0 ]; then tail -100 "build/ios/$FAMILY-test.log"; exit "$TEST_STATUS"; fi
           done
       - uses: actions/upload-artifact@v4
         if: always() && inputs.screenshots

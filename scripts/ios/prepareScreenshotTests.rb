@@ -9,6 +9,7 @@ target.add_dependency(app)
 source = project.main_group.new_file('../../scripts/ios/StoreScreenshots.swift')
 target.add_file_references([source])
 target.build_configurations.each do |configuration|
+  configuration.build_settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
   configuration.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.sanmartinsr.app.screenshots'
   configuration.build_settings['TEST_TARGET_NAME'] = 'App'
   configuration.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
