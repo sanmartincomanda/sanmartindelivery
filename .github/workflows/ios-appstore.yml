@@ -1,6 +1,14 @@
 name: Build and upload iOS
 
 on:
+  workflow_call:
+    inputs:
+      build_number:
+        type: string
+        required: true
+      upload:
+        type: boolean
+        required: true
   workflow_dispatch:
     inputs:
       build_number:

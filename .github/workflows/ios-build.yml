@@ -2,12 +2,29 @@ name: Validate iOS build
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Build and upload a signed App Store version instead of simulator validation
+        type: boolean
+        default: false
+      build_number:
+        description: Unique App Store build number for signed releases
+        type: string
+        default: '1'
 
 permissions:
   contents: read
 
 jobs:
+  app-store:
+    if: inputs.release
+    uses: ./.github/workflows/ios-appstore.yml
+    with:
+      build_number: ${{ inputs.build_number }}
+      upload: true
+    secrets: inherit
   build-ios:
+    if: ${{ !inputs.release }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:

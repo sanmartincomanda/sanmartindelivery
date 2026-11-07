@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { canUseNativeAppleSignIn, signInApple, getAppleAuthErrorMessage } from '../src/services/appleSignIn.js';
+import { canUseNativeAppleSignIn, signInApple, revokeAppleForDeletion, getAppleAuthErrorMessage } from '../src/services/appleSignIn.js';
 
 function fixture() {
   const calls = [];
@@ -65,3 +65,53 @@ const ui = readFileSync(new URL('../src/components/TiendaVirtualView.jsx', impor
 assert.match(ui, /onAppleLogin=\{canUseNativeAppleSignIn\(Capacitor\)/);
 assert.match(ui, /Autorizo asociar mi nombre, telefono y direccion/);
 console.log('Apple auth passed: iOS-only, secure nonce, missing credentials, name persistence, private relay and error handling.');
+
+function deletionFixture() {
+  const f = fixture();
+  f.result.credential.authorizationCode = 'single-use-code';
+  f.user.providerData = [{ providerId: 'apple.com' }];
+  f.user.getIdToken = async force => { assert.equal(force, true); return 'firebase-session-token'; };
+  const deps = {
+    ...f.deps, user: f.user, apiKey: 'public-firebase-key',
+    reauthenticate: async (user, credential) => { assert.equal(user, f.user); assert.equal(credential, 'credential'); f.calls.push('reauthenticated'); },
+    fetchImpl: async (url, options) => { f.calls.push({ url, options }); return { ok: true }; },
+  };
+  return { ...f, deps };
+}
+{
+  const f = deletionFixture();
+  assert.equal(await revokeAppleForDeletion(f.deps), true);
+  assert.equal(f.calls[2], 'reauthenticated');
+  const request = f.calls[3];
+  assert.match(request.url, /^https:\/\/identitytoolkit.googleapis.com\/v2\/accounts:revokeToken\?key=/);
+  assert.deepEqual(JSON.parse(request.options.body), { providerId: 'apple.com', tokenType: 'CODE', token: 'single-use-code', idToken: 'firebase-session-token' });
+}
+{
+  const f = deletionFixture();
+  f.deps.reauthenticate = async () => { throw Object.assign(new Error('Wrong user'), { code: 'auth/user-mismatch' }); };
+  await assert.rejects(revokeAppleForDeletion(f.deps), { code: 'auth/user-mismatch' });
+  assert.equal(f.calls.length, 2, 'Never revoke another customer account');
+}
+{
+  const f = deletionFixture();
+  delete f.result.credential.authorizationCode;
+  await assert.rejects(revokeAppleForDeletion(f.deps), { code: 'auth/missing-apple-credential' });
+}
+{
+  const f = deletionFixture();
+  f.deps.fetchImpl = async () => ({ ok: false });
+  await assert.rejects(revokeAppleForDeletion(f.deps), { code: 'auth/apple-revocation-failed' });
+}
+for (const platform of ['web', 'android']) {
+  const f = deletionFixture();
+  f.deps.runtime.getPlatform = () => platform;
+  assert.equal(await revokeAppleForDeletion(f.deps), false);
+  assert.equal(f.calls.length, 0);
+}
+{
+  const f = deletionFixture();
+  f.user.providerData = [{ providerId: 'google.com' }];
+  assert.equal(await revokeAppleForDeletion(f.deps), false);
+  assert.equal(f.calls.length, 0);
+}
+console.log('Apple revocation passed: fresh consent, same-user reauthentication, success, failure and platform isolation.');

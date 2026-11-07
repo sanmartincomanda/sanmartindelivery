@@ -1,6 +1,6 @@
 import { ref, set } from 'firebase/database';
 import { database } from '../firebase';
-import { getCurrentAuthUser } from './authRoles';
+import { getCurrentAuthUser, revokeStoreAppleAccessForDeletion } from './authRoles';
 
 export const STORE_PRIVACY_URL = 'https://tienda.sanmartinsr.com/privacidad';
 export const STORE_ACCOUNT_DELETION_URL = 'https://tienda.sanmartinsr.com/eliminar-cuenta';
@@ -17,6 +17,10 @@ export async function requestStoreAccountDeletion(user = {}, reason = '') {
     throw error;
   }
 
+  const appleAccessRevoked = await revokeStoreAppleAccessForDeletion(authUser);
+  if (getCurrentAuthUser()?.uid !== uid) {
+    throw Object.assign(new Error('La sesion cambio. Inicia sesion nuevamente.'), { code: 'AUTH_REQUIRED' });
+  }
   const now = Date.now();
   const payload = {
     uid,
@@ -29,6 +33,7 @@ export async function requestStoreAccountDeletion(user = {}, reason = '') {
     customerCode: String(user?.codigo || '').trim(),
     reason: String(reason || '').trim().slice(0, 500),
     source: 'store_app',
+    ...(appleAccessRevoked ? { appleAccessRevokedAt: now } : {}),
   };
 
   await set(ref(database, `${STORE_ACCOUNT_DELETION_REQUESTS_PATH}/${uid}`), payload);

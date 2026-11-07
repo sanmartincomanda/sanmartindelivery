@@ -19,6 +19,34 @@ export async function signInApple({ runtime, loadNative, credentialFromTokens, s
   return user;
 }
 
+export async function revokeAppleForDeletion({ runtime, user, loadNative, credentialFromTokens, reauthenticate, apiKey, fetchImpl = fetch }) {
+  if (!canUseNativeAppleSignIn(runtime) || !user?.providerData?.some(item => item.providerId === 'apple.com')) return false;
+  if (!runtime.isPluginAvailable('FirebaseAuthentication')) throw authError('auth/native-apple-unavailable', 'Apple authentication is unavailable.');
+  const native = await loadNative();
+  const result = await native.signInWithApple({ skipNativeAuth: true });
+  const { idToken, nonce, authorizationCode } = result?.credential || {};
+  if (!idToken || !nonce || !authorizationCode) throw authError('auth/missing-apple-credential', 'Apple did not return a complete credential.');
+  // Reauthentication rejects another Apple account instead of changing the active customer.
+  await reauthenticate(user, credentialFromTokens(idToken, nonce));
+  const firebaseToken = await user.getIdToken(true);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    // Same Identity Platform request used by Firebase's native revokeToken API.
+    // Use the existing JS session, not a second persistent native Firebase session.
+    const response = await fetchImpl(`https://identitytoolkit.googleapis.com/v2/accounts:revokeToken?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providerId: 'apple.com', tokenType: 'CODE', token: authorizationCode, idToken: firebaseToken }),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw authError('auth/apple-revocation-failed', 'Apple access could not be revoked. Please retry.');
+    return true;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function getAppleAuthErrorMessage(error = {}) {
   const text = `${error.code || ''} ${error.message || ''}`;
   if (/cancel|1001/i.test(text)) return 'Se cancelo el ingreso con Apple. Puedes intentarlo nuevamente.';
