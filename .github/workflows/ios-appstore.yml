@@ -96,6 +96,27 @@ jobs:
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/ios-release"
           codesign --verify --deep --strict "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+      - name: Verify bundled authentication configuration
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, plistlib
+          app = pathlib.Path(os.environ['RUNNER_TEMP']) / 'App.xcarchive/Products/Applications/App.app'
+          config = json.loads((app / 'capacitor.config.json').read_text())
+          auth = config['plugins']['FirebaseAuthentication']
+          assert set(auth['providers']) == {'google.com', 'apple.com'}, 'Missing bundled auth provider'
+          assert auth['skipNativeAuth'] is True, 'Keep the existing JS customer session'
+          assert 'FirebaseAuthenticationPlugin' in config['packageClassList'], 'Missing native bridge'
+          with (app / 'GoogleService-Info.plist').open('rb') as f:
+              google = plistlib.load(f)
+          with (app / 'Info.plist').open('rb') as f:
+              info = plistlib.load(f)
+          assert google['BUNDLE_ID'] == info['CFBundleIdentifier'] == 'com.sanmartinsr.app'
+          assert google['PROJECT_ID'] == 'comanda-digital-ac1ec'
+          assert google['CLIENT_ID'].endswith('.apps.googleusercontent.com')
+          schemes = [s for entry in info['CFBundleURLTypes'] for s in entry['CFBundleURLSchemes']]
+          assert google['REVERSED_CLIENT_ID'] in schemes, 'Missing Google callback scheme'
+          print('Signed archive: native bridge, both providers, Firebase project and Google callback verified.')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: Carnes-San-Martin-iOS-1.0.0-${{ inputs.build_number }}
