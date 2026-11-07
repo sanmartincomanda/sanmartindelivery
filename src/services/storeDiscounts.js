@@ -124,7 +124,7 @@ export const buildStoreCheckoutItems = (items = [], benefit = {}) => {
     return {
       ...item,
       precioUnitario: originalUnitPrice,
-      precioFijo: false,
+      precioFijo: Boolean(item.boxSale),
       promocionEspecial: null,
       subtotal: roundMoney(Number(item?.cantidad || 0) * originalUnitPrice),
     };

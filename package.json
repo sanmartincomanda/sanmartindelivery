@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test:box-sales": "node scripts/testStoreBoxSales.mjs",
+    "test:box-sales-rules": "node scripts/testStoreBoxSalesRules.mjs",
+    "test:box-sales-ui": "node scripts/testStoreBoxSalesUI.mjs",
     "test:retail-interactions": "node scripts/testRetailInteractions.mjs",
     "dev": "vite",
     "build": "vite build && node scripts/preserveLegacyChunkAliases.mjs && node scripts/writeWebRelease.mjs",

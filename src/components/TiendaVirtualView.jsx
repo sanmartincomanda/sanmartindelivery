@@ -5,6 +5,7 @@ import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
 import RetailSearchBox from './storefront/RetailSearchBox';
 import RetailQuickActions from './storefront/RetailQuickActions';
+import { resolveBoxAvailability } from '../services/storeBoxSales';
 import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion } from './storefront/retailHomePromotions';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
@@ -224,6 +225,7 @@ const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
 const STORE_THEME = SAN_MARTIN_THEME;
 const STORE_CATEGORY_ICON_BY_KEY = Object.freeze({
+  venta_por_cajas: '/tienda/categorias/icons/cajas.svg',
   todos: '/tienda/categorias/icons/todos.png',
   res: '/tienda/categorias/icons/res.png',
   pollo: '/tienda/categorias/icons/pollo.png',
@@ -909,6 +911,7 @@ const getQuickQuantities = (product, currentQuantity = 0) => {
 };
 
 const getQuantityRuleMessage = (product) => {
+  if (product.boxSale) return `Cada caja contiene ${product.boxSale.poundsPerBox} lb a C$${Number(product.boxSale.pricePerPound).toFixed(2)} por lb. Elegí cajas completas.`;
   const minQuantity = getMinQuantity(product);
   const step = getQuantityStep(product);
   const minLabel = `${formatStoreQuantity(minQuantity, product?.unit)} ${product?.unit || ''}`.trim();
@@ -2205,9 +2208,11 @@ export default function TiendaVirtualView({
   );
 
   const activeProducts = useMemo(
-    () =>
-      applyStoreProductPromotionsToCatalog(
-        catalog.map((product) => resolveCatalogProductForBranch(product, selectedBranch?.id)).filter((product) => {
+    () => {
+      const branchCatalog = catalog.map(product => resolveCatalogProductForBranch(product, selectedBranch?.id));
+      const byCode = new Map(branchCatalog.map(product => [product.code, product]));
+      return applyStoreProductPromotionsToCatalog(
+        branchCatalog.map(product => resolveBoxAvailability(product, byCode.get(product.boxSale?.sourceCode))).filter((product) => {
           if (product.active === false) {
             return false;
           }
@@ -2223,7 +2228,8 @@ export default function TiendaVirtualView({
         }),
         activeProductPromotions,
         currentTimeMs
-      ),
+      );
+    },
     [activeProductPromotions, catalog, currentTimeMs, selectedBranch?.id]
   );
 
@@ -2664,13 +2670,14 @@ export default function TiendaVirtualView({
 
           return {
             codigo: product.code,
+            ...(product.boxSale ? { boxSale: product.boxSale } : {}),
             nombre: product.name,
             descripcion: product.description,
             unidad: product.unit,
             cantidad,
             precioUnitario: product.price,
             precioUnitarioOriginal: Number(originalUnitPrice.toFixed(2)),
-            precioFijo: Boolean(product.hasSpecialPromotion),
+            precioFijo: Boolean(product.hasSpecialPromotion || product.boxSale),
             promocionEspecial: specialPromotion,
             subtotal: Number((cantidad * product.price).toFixed(2)),
             image: product.image,
@@ -12834,7 +12841,7 @@ function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQ
         <div className="store-sheet-head product">
           <StoreBackButton onClick={onClose} />
           <div className="store-product-sheet-heading">
-            <span>{product.code}</span>
+            <span>{product.boxSale?.sourceCode || product.code}</span>
             <strong>Detalle del producto</strong>
           </div>
         </div>

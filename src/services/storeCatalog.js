@@ -1,9 +1,10 @@
 import { get, ref, set, update } from 'firebase/database';
-import { database } from '../firebase';
-import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual';
-import { normalizeStoreCategoryId, normalizeStoreSubcategory } from '../data/storeSubcategoryRules';
-import { isDataUrlImage, uploadCatalogImage } from './storeMedia';
-import { getStoreProductPriceForBranch, NINDIRI_SHARED_PRICE_BRANCH_ID } from './storePricing';
+import { database } from '../firebase.js';
+import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/tiendaVirtual.js';
+import { normalizeStoreCategoryId, normalizeStoreSubcategory } from '../data/storeSubcategoryRules.js';
+import { isDataUrlImage, uploadCatalogImage } from './storeMedia.js';
+import { getStoreProductPriceForBranch, NINDIRI_SHARED_PRICE_BRANCH_ID } from './storePricing.js';
+import { validateBoxSale } from './storeBoxSales.js';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 export const STORE_CATALOG_META_PATH = 'storeCatalogMeta';
@@ -54,7 +55,7 @@ const normalizeOptionalInventory = (value, fallback = null) => {
   return Number(numeric.toFixed(3));
 };
 
-export const isUnitMeasure = (unit = '') => String(unit || '').trim().toLowerCase() === 'unidad';
+export const isUnitMeasure = (unit = '') => ['unidad', 'caja'].includes(String(unit || '').trim().toLowerCase());
 
 export const getDefaultProductMinQuantity = (unit = 'lb') => (isUnitMeasure(unit) ? 1 : 0.5);
 
@@ -184,6 +185,7 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
 
   return {
     code: String(source.code ?? fallback.code ?? '').trim(),
+    ...((source.boxSale ?? fallback.boxSale) ? { boxSale: { ...(source.boxSale ?? fallback.boxSale) } } : {}),
     name: String(source.name ?? fallback.name ?? '').trim(),
     price: roundPrice(source.price ?? fallback.price ?? 0),
     unit,
@@ -387,6 +389,13 @@ export async function saveCatalogProduct(product, existingProduct = null) {
   if (!normalized.code || !normalized.name || !normalized.price) {
     throw new Error('Producto incompleto');
   }
+  if (normalized.boxSale) {
+    const box = validateBoxSale(normalized.boxSale);
+    if (normalized.unit !== 'caja' || normalized.minQuantity !== 1 || normalized.quantityStep !== 1 ||
+        normalized.price !== roundPrice(box.poundsPerBox * box.pricePerPound)) {
+      throw new Error('Editá esta presentación desde Venta por cajas.');
+    }
+  }
 
   await set(ref(database, `${STORE_CATALOG_PATH}/${getCatalogProductKey(normalized.code)}`), normalized);
   await touchCatalogMeta();
@@ -508,7 +517,7 @@ export async function inactivateBranchProductsWithoutRecentSales(
 
   Object.entries(currentMap).forEach(([productKey, rawProduct]) => {
     const product = normalizeCatalogProduct(rawProduct);
-    if (!product.code || soldCodes.has(product.code)) {
+    if (!product.code || product.boxSale || soldCodes.has(product.code)) {
       return;
     }
 

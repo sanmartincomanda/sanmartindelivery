@@ -1,5 +1,5 @@
 import { getDownloadURL, ref as storageRef, uploadString } from 'firebase/storage';
-import { storage } from '../firebase';
+import { storage } from '../firebase.js';
 
 const STORE_MEDIA_ROOT = 'store';
 const STORE_CATALOG_MEDIA_ROOT = `${STORE_MEDIA_ROOT}/catalog`;

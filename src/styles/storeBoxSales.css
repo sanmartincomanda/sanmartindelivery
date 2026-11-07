@@ -1,0 +1,26 @@
+.box-sales-admin { color: #142c3c; max-width: 1240px; margin: auto; }
+.box-sales-admin > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.box-sales-admin h2 { margin: 5px 0; }
+.box-sales-admin p,.box-sales-admin small { color: #536373; line-height: 1.5; }
+.box-sales-kicker { color: #0044c5; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+.box-sales-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; }
+.box-sales-admin fieldset { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 16px; }
+.box-sales-admin label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; min-width: 0; }
+.box-sales-admin :is(input,select,textarea) { box-sizing: border-box; width: 100%; max-width: 100%; min-height: 44px; font-size: 16px; margin: 0; }
+.box-sales-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.box-sales-total { display: grid; gap: 4px; border-left: 3px solid #0044c5; padding: 10px 14px; background: #f0f5ff; }
+.box-sales-total strong { font-size: 24px; color: #0044c5; }
+.box-sales-preview { max-width: 180px; width: 100%; height: 140px; object-fit: contain; background: #f5f7f8; border-radius: 8px; }
+.box-sales-branches { display: flex; flex-wrap: wrap; gap: 14px; }
+.box-sales-admin .box-sales-branches label,.box-sales-admin .box-sales-active { display: flex; align-items: center; min-height: 44px; }
+.box-sales-admin input[type=checkbox] { width: 20px; min-height: 20px; flex-shrink: 0; accent-color: #0044c5; }
+.box-sales-admin footer { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: env(safe-area-inset-bottom,0px); }
+.box-sales-admin button { min-height: 44px; }
+.box-sales-list article { display: flex; gap: 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid #e1e6e9; }
+.box-sales-list article img { object-fit: contain; flex-shrink: 0; background: #fff; border-radius: 8px; }
+.box-sales-list article > div { flex: 1; min-width: 0; display: grid; gap: 5px; overflow-wrap: anywhere; }
+.box-sales-list span { font-size: 13px; }
+.box-sales-admin .box-sales-error { background: #fff2f2; color: #9a1521; padding: 12px; border-left: 3px solid #d60917; }
+.box-sales-notice { background: #eef5ff; padding: 12px; }
+@media(max-width:850px) { .box-sales-layout { grid-template-columns: minmax(0,1fr); } }
+@media(max-width:380px) { .box-sales-fields { grid-template-columns: 1fr; } .box-sales-list article { flex-wrap: wrap; } }

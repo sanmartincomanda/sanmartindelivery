@@ -1,6 +1,8 @@
 import { endAt, equalTo, get, limitToLast, onValue, orderByChild, query, ref, runTransaction, startAt, update } from 'firebase/database';
 import { database } from '../firebase.js';
 import { captureStoreOrderSource } from './storeOrderSource.js';
+import { boxOrderItem, validateBoxCart } from './storeBoxSales.js';
+import { STORE_CATALOG_PATH, resolveCatalogProductForBranch } from './storeCatalog.js';
 import { requestRouteAction } from './routeSanMartinApi.js';
 import { hoyISO } from '../components/Utils.js';
 import { normalizeLocation } from './geo.js';
@@ -264,6 +266,7 @@ const normalizeItemSpecialPromotion = (value = null) => {
 
 const normalizeStoreItems = (items = []) =>
   items
+    .map(boxOrderItem)
     .map((item) => {
       const cantidad = roundToHalf(item.cantidad ?? item.quantity ?? 0);
       const precioUnitario = Number(item.precioUnitario ?? item.price ?? 0);
@@ -287,6 +290,7 @@ const normalizeStoreItems = (items = []) =>
           item.precioFijo === true || item.priceLocked === true || Boolean(promocionEspecial),
         promocionEspecial,
         subtotal,
+        ...(item.ventaPorCaja ? { ventaPorCaja: item.ventaPorCaja } : {}),
       };
     })
     .filter((item) => item.codigo && item.nombre && item.cantidad > 0 && item.precioUnitario > 0);
@@ -380,7 +384,7 @@ export const buildStoreKitchenOrderText = (items = [], summary = {}) => {
   }
 
   lines.push(
-    ...normalizedItems.map((item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}`.trim())
+    ...normalizedItems.map((item) => `- ${formatWeight(item.cantidad)} ${item.unidad} ${item.nombre}${item.ventaPorCaja ? ` (${item.ventaPorCaja.boxes} cajas de ${item.ventaPorCaja.poundsPerBox} lb)` : ''}`.trim())
   );
   const rewardLines = buildStoreRewardRedemptionTextLines(summary.rewardRedemption);
   const firstOrderRewardLines = buildFirstOrderRewardTextLines(summary.firstOrderReward);
@@ -577,6 +581,11 @@ export async function createOrder(payload, options = {}) {
     : null;
   if (routeSanMartinOrder && (!payload.routeSlotId || !routeSchedule?.slotId)) {
     throw new Error('Selecciona una franja disponible para Ruta San Martin.');
+  }
+  if ((payload.items || []).some(item => item.boxSale)) {
+    const snapshot = await get(query(ref(database, STORE_CATALOG_PATH), orderByChild('active'), equalTo(true)));
+    const liveCatalog = Object.values(snapshot.val() || {}).map(product => resolveCatalogProductForBranch(product, storeBranchId));
+    validateBoxCart(payload.items, liveCatalog);
   }
   const normalizedItems = normalizeStoreItems(payload.items || []);
   const subtotal =

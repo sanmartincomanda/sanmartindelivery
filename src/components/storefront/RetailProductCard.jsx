@@ -24,7 +24,7 @@ export default function RetailProductCard({ product, quantity, image, fallback, 
           {discounted && <RetailPromoSeal promotion={product.specialPromotion} />}
         </span>
         <span className="retail-product-name">{product.name}</span>
-        <span className="retail-product-unit">Por {product.unit} <span aria-hidden="true">·</span> {product.code}</span>
+        <span className="retail-product-unit">{product.boxSale ? `${product.boxSale.poundsPerBox} lb por caja · ${money(product.boxSale.pricePerPound)} / lb` : <>Por {product.unit} <span aria-hidden="true">·</span> {product.code}</>}</span>
         <span className="retail-product-price">{money(product.price)} <small>/ {product.unit}</small></span>
         {discounted && <span className="retail-product-was"><s>{money(product.originalPrice)}</s> <span>{product.specialPromotion?.title || 'Precio especial'}</span></span>}
       </button>

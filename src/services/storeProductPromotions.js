@@ -204,7 +204,7 @@ export const applyStoreProductPromotionsToCatalog = (catalog = [], promotions = 
     const promotion = resolveStoreProductPromotionForCode(product?.code, promotions, now, product?.branchId);
     const basePrice = roundMoney(product?.price || 0);
 
-    if (!promotion || basePrice <= 0) {
+    if (!promotion || basePrice <= 0 || product.boxSale) {
       return {
         ...product,
         originalPrice: basePrice,

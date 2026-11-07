@@ -144,6 +144,7 @@ import {
 } from '../services/geo';
 import { canUseLocalBridgeHistory, fetchArchivedOrdersFromBridge } from '../services/historyBridge';
 import StoreRewardsAdminSection from './StoreRewardsAdminSection';
+import StoreBoxSalesAdminSection from './StoreBoxSalesAdminSection';
 import StoreCustomersAdminSection from './StoreCustomersAdminSection';
 import StoreCustomerDiscountsAdminSection from './StoreCustomerDiscountsAdminSection';
 import StoreBranchesAdminSection from './StoreBranchesAdminSection';
@@ -182,6 +183,7 @@ const STORE_ADMIN_GROUPS = [
     icon: 'catalog',
     sections: [
       { id: 'catalogo', label: 'Articulos' },
+      { id: 'venta_por_cajas', label: 'Venta por cajas' },
       { id: 'categorias', label: 'Categorias' },
     ],
   },
@@ -231,6 +233,7 @@ const STORE_ADMIN_SCOPES = {
     label: 'Catalogo',
     sections: [
       { id: 'catalogo', label: 'Articulos' },
+      { id: 'venta_por_cajas', label: 'Venta por cajas' },
       { id: 'categorias', label: 'Categorias' },
     ],
   },
@@ -238,6 +241,7 @@ const STORE_ADMIN_SCOPES = {
     label: 'Tienda virtual',
     sections: [
       { id: 'resumen', label: 'Resumen' },
+      { id: 'venta_por_cajas', label: 'Venta por cajas' },
       { id: 'sucursales', label: 'Sucursales y entrega' },
       { id: 'ruta_san_martin', label: 'Ruta San Martín' },
       { id: 'categorias', label: 'Presentacion de categorias' },
@@ -881,7 +885,7 @@ export default function ConfiguracionView({
   }, [isStoreMode, section]);
 
   useEffect(() => {
-    if (!isStoreMode || !['resumen', 'catalogo', 'categorias', 'recompensas', 'promos_tienda'].includes(section)) {
+    if (!isStoreMode || !['resumen', 'catalogo', 'venta_por_cajas', 'categorias', 'recompensas', 'promos_tienda'].includes(section)) {
       return undefined;
     }
 
@@ -1409,6 +1413,7 @@ export default function ConfiguracionView({
   };
 
   const editProduct = (product) => {
+    if (product.boxSale) { setSection('venta_por_cajas'); return; }
     setImageCrop(buildEmptyImageCrop());
     setForm({
       code: product.code || '',
@@ -2642,6 +2647,10 @@ export default function ConfiguracionView({
           path: 'Tienda Virtual / Catalogo maestro',
           title: 'Articulos',
         },
+        venta_por_cajas: {
+          path: 'Tienda Virtual / Catalogo maestro',
+          title: 'Venta por cajas',
+        },
         cupones: {
           path: 'Tienda Virtual / Beneficios',
           title: 'Cupones',
@@ -3155,6 +3164,8 @@ export default function ConfiguracionView({
               </form>
             </div>
           </section>
+        ) : isStoreMode && section === 'venta_por_cajas' ? (
+          <StoreBoxSalesAdminSection products={products} loading={!catalogHydrated} />
         ) : isStoreMode && section === 'catalogo' ? (
           <>
             <section className="cfg-section-card">

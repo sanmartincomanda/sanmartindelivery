@@ -1,4 +1,4 @@
-import { STORE_SUBCATEGORY_CANONICALS } from './storeSubcategoryRules';
+import { STORE_SUBCATEGORY_CANONICALS } from './storeSubcategoryRules.js';
 
 export const STORE_PRODUCTS = [
   {
@@ -121,6 +121,7 @@ export const STORE_CATEGORIES = [
     label: 'Promociones',
     subcategories: STORE_SUBCATEGORY_CANONICALS.promociones,
   },
+  { id: 'venta_por_cajas', label: 'Venta por cajas', subcategories: [] },
 ];
 
 export const QUICK_WEIGHTS = [0.5, 1, 1.5, 2, 2.5];
