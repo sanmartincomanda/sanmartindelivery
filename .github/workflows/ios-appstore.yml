@@ -1,0 +1,116 @@
+name: Build and upload iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Unique App Store build number
+        required: true
+        default: '1'
+      upload:
+        description: Upload the signed build to App Store Connect (does not submit to review)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-appstore
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate build number
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: '[[ "$BUILD_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]]'
+      - run: npm ci
+      - name: Prepare iOS
+        run: npm run ios:sync && npm run test:ios-config && npm run test:google-auth
+        env:
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+      - name: Install distribution identity
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CERTIFICATE" && test -n "$PROFILE" && test -n "$APPLE_TEAM_ID"
+          umask 077
+          printf %s "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/distribution.p12"
+          printf %s "$PROFILE" | base64 --decode > "$RUNNER_TEMP/app.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/app.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/app-signing.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/app-signing.keychain-db"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/app-signing.keychain-db"
+          security import "$RUNNER_TEMP/distribution.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$RUNNER_TEMP/app-signing.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/app-signing.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/app-signing.keychain-db" login.keychain-db
+          export APPLE_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$RUNNER_TEMP/profile.plist")
+          PROFILE_APP=$(/usr/libexec/PlistBuddy -c 'Print Entitlements:application-identifier' "$RUNNER_TEMP/profile.plist")
+          test "$PROFILE_APP" = "$APPLE_TEAM_ID.com.sanmartinsr.app"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          cp "$RUNNER_TEMP/app.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$APPLE_PROFILE_UUID.mobileprovision"
+          cp "$RUNNER_TEMP/app.mobileprovision" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$APPLE_PROFILE_UUID.mobileprovision"
+          node scripts/configureIosSigning.mjs
+          python3 - <<'PY'
+          import os, plistlib
+          with open(os.environ['RUNNER_TEMP'] + '/ExportOptions.plist', 'wb') as f:
+              plistlib.dump({'method': 'app-store-connect', 'signingStyle': 'manual',
+                  'teamID': os.environ['APPLE_TEAM_ID'], 'signingCertificate': 'Apple Distribution',
+                  'provisioningProfiles': {'com.sanmartinsr.app': os.environ['APPLE_PROFILE_UUID']},
+                  'manageAppVersionAndBuildNumber': False, 'uploadSymbols': True}, f)
+          PY
+      - name: Archive iPhone and iPad
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" archive > "$RUNNER_TEMP/archive.log" 2>&1 || { tail -150 "$RUNNER_TEMP/archive.log"; exit 1; }
+      - name: Export signed IPA
+        run: |
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/ios-release"
+          codesign --verify --deep --strict "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Carnes-San-Martin-iOS-1.0.0-${{ inputs.build_number }}
+          path: ${{ runner.temp }}/ios-release/*.ipa
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload to App Store Connect
+        if: inputs.upload
+        env:
+          API_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          API_ISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$API_PRIVATE_KEY" && test -n "$API_KEY_ID" && test -n "$API_ISSUER"
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf %s "$API_PRIVATE_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8"
+          xcrun altool --validate-app --type ios -f "$RUNNER_TEMP/ios-release/App.ipa" --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER"
+          xcrun altool --upload-app --type ios -f "$RUNNER_TEMP/ios-release/App.ipa" --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER"
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/distribution.p12" "$RUNNER_TEMP/app.mobileprovision" "$RUNNER_TEMP/profile.plist"
+          rm -f "$HOME/.appstoreconnect/private_keys/"AuthKey_*.p8

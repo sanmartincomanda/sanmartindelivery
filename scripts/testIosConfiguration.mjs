@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { enableIosGoogleProvider } from './prepareIos.mjs';
+
+const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const google = read('ios/App/App/GoogleService-Info.plist');
+const info = read('ios/App/App/Info.plist');
+const project = read('ios/App/App.xcodeproj/project.pbxproj');
+const reverseClient = google.match(/<key>REVERSED_CLIENT_ID<\/key>\s*<string>([^<]+)<\/string>/)?.[1];
+assert.ok(reverseClient, 'Google native configuration must include an OAuth client');
+assert.ok(info.includes(reverseClient), 'Google callback URL must match the native client');
+assert.match(google, /<key>BUNDLE_ID<\/key>\s*<string>com\.sanmartinsr\.app<\/string>/);
+assert.match(google, /<key>PROJECT_ID<\/key>\s*<string>comanda-digital-ac1ec<\/string>/);
+assert.match(project, /GoogleService-Info\.plist in Resources/);
+assert.ok(!info.includes('<string>armv7</string>'));
+const source = read('node_modules/@capacitor-firebase/authentication/Package.swift');
+const patched = enableIosGoogleProvider(source);
+assert.match(patched, /\.product\(name: "GoogleSignIn"/);
+assert.match(patched, /swiftSettings: \[\.define\("RGCFA_INCLUDE_GOOGLE"\)\]/);
+assert.equal(enableIosGoogleProvider(patched), patched);
+assert.throws(() => enableIosGoogleProvider('unknown manifest'), /manifest changed/);
+console.log('iOS configuration: bundle, Firebase project, Google callback, provider and repeatable preparation passed.');

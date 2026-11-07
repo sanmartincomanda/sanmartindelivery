@@ -5,7 +5,16 @@
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>es</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.41323183250-9rtp2sfkhv3ap5naqssj6pipfvtp8j56</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDisplayName</key>
         <string>Carnes San Martin</string>
 	<key>CFBundleExecutable</key>
@@ -34,7 +43,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

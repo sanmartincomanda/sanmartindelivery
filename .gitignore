@@ -15,3 +15,7 @@ sicar.local.json
 android/keystore.properties
 *.jks
 *.keystore
+*.p12
+*.p8
+*.mobileprovision
+*.key.pem

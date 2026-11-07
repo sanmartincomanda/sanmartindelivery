@@ -28,7 +28,10 @@ jobs:
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
 
       - name: Sync Capacitor iOS project
-        run: npx cap sync ios
+        run: |
+          npx cap sync ios
+          node scripts/prepareIos.mjs
+          npm run test:ios-config
 
       - name: Build for iOS Simulator
         run: |
