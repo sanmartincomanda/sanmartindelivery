@@ -48,6 +48,7 @@ assert.match(apple, /self\.authorizationController = authorizationController/);
 assert.match(apple, /presentationWindow = window/);
 assert.ok(!apple.includes('webView?.window)!'));
 assert.ok(!apple.includes('appleIDToken.debugDescription'));
+assert.ok(!apple.includes('guard let isLink = self.isLink'), 'The action is now non-optional');
 assert.match(apple, /fail\("Apple did not return an identity token/);
 assert.match(apple, /fail\("Apple authorization no longer has a valid nonce/);
 assert.match(apple, /request\.nonce = sha256\(nonce\)/);

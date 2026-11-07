@@ -117,7 +117,7 @@ export function patchNativeAuth(file, input) {
             return
         }
         if isLink == true {
-            self.pluginImplementation.handleSuccessfulLink`, `        if isLink == true {
+            self.pluginImplementation.handleSuccessfulLink`, `        if self.isLink {
             self.pluginImplementation.handleSuccessfulLink`);
     source = replace(source, `        guard let isLink = self.isLink else {
             return
