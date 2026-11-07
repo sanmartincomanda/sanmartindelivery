@@ -8,6 +8,8 @@ target = project.new_target(:ui_test_bundle, 'StoreScreenshots', :ios, '15.0')
 target.add_dependency(app)
 source = project.main_group.new_file('../../scripts/ios/StoreScreenshots.swift')
 target.add_file_references([source])
+auth_source = project.main_group.new_file('../../scripts/ios/StoreNativeAuthTests.swift')
+target.add_file_references([auth_source])
 target.build_configurations.each do |configuration|
   configuration.build_settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
   configuration.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.sanmartinsr.app.screenshots'

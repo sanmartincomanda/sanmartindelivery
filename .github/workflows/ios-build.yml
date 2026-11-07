@@ -15,6 +15,10 @@ on:
         description: Run real iPhone and iPad guest shopping UI tests and capture screenshots
         type: boolean
         default: false
+      auth_only:
+        description: Test native Apple and Google presentation on iPhone (no real credentials)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -76,7 +80,7 @@ jobs:
           retention-days: 3
 
       - name: Compile shopping UI tests before starting simulators
-        if: inputs.screenshots
+        if: inputs.screenshots || inputs.auth_only
         run: |
           gem install xcodeproj --no-document
           ruby scripts/ios/prepareScreenshotTests.rb
@@ -85,8 +89,9 @@ jobs:
             -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO
 
       - name: Smoke test native startup
+        if: ${{ !inputs.screenshots && !inputs.auth_only }}
         # Fresh macOS runners can spend several minutes migrating the simulator.
-        timeout-minutes: 12
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           DEVICE=$(xcrun simctl list devices available -j | node -e '
@@ -115,12 +120,18 @@ jobs:
           retention-days: 3
 
       - name: Capture real iPhone and iPad shopping screens
-        if: inputs.screenshots
+        if: inputs.screenshots || inputs.auth_only
         timeout-minutes: 30
         run: |
           set -euo pipefail
           FAILED=0
-          for FAMILY in iPhone iPad; do
+          FAMILIES="iPhone iPad"
+          TEST_FILTER="-only-testing:StoreScreenshots/StoreScreenshots"
+          if [ "${{ inputs.auth_only }}" = "true" ]; then
+            FAMILIES="iPhone"
+            TEST_FILTER="-only-testing:StoreScreenshots/StoreNativeAuthTests"
+          fi
+          for FAMILY in $FAMILIES; do
             DEVICE=$(xcrun simctl list devices available -j | FAMILY="$FAMILY" node -e '
               let input=""; process.stdin.on("data",c=>input+=c).on("end",()=>{
                 const devices=Object.values(JSON.parse(input).devices).flat();
@@ -141,22 +152,26 @@ jobs:
             xcodebuild test-without-building -project ios/App/App.xcodeproj -scheme StoreScreenshots \
               -destination "platform=iOS Simulator,id=$DEVICE,arch=arm64" -derivedDataPath build/ios \
               -parallel-testing-enabled NO -maximum-concurrent-test-simulator-destinations 1 \
+              "$TEST_FILTER" \
               -resultBundlePath "build/ios/$FAMILY.xcresult" CODE_SIGNING_ALLOWED=NO \
               > "build/ios/$FAMILY-test.log" 2>&1 || TEST_STATUS=$?
             if [ -d "build/ios/$FAMILY.xcresult" ]; then
               xcrun xcresulttool export attachments --path "build/ios/$FAMILY.xcresult" --output-path "build/ios/screenshots/$FAMILY/attachments"
             fi
+            xcrun simctl spawn "$DEVICE" log show --last 10m --style compact \
+              --predicate 'process == "App"' > "build/ios/$FAMILY-native.log" 2>&1 || true
             xcrun simctl shutdown "$DEVICE"
             if [ "$TEST_STATUS" -ne 0 ]; then tail -100 "build/ios/$FAMILY-test.log"; FAILED=1; fi
           done
           exit "$FAILED"
       - uses: actions/upload-artifact@v4
-        if: always() && inputs.screenshots
+        if: always() && (inputs.screenshots || inputs.auth_only)
         with:
           name: Carnes-San-Martin-iOS-shopping-screens
           path: |
             build/ios/screenshots
             build/ios/*-test.log
+            build/ios/*-native.log
             build/ios/*.xcresult
           if-no-files-found: ignore
           retention-days: 3
