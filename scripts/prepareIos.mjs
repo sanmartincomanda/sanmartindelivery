@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { nativeAuthPatchFiles, patchNativeAuth } from './ios/patchNativeAuth.mjs';
 
 // Authentication 8.0.0 omits the Google provider from its SPM target.
 // Keep this iOS-only and fail closed if a dependency update changes the manifest.
@@ -25,8 +26,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const source = readFileSync(manifest, 'utf8');
   const patched = enableIosGoogleProvider(source);
   if (patched !== source) writeFileSync(manifest, patched);
+  for (const file of nativeAuthPatchFiles) {
+    const target = new URL(`../node_modules/@capacitor-firebase/authentication/ios/Plugin/${file}`, import.meta.url);
+    const original = readFileSync(target, 'utf8');
+    const fixed = patchNativeAuth(file, original);
+    if (fixed !== original) writeFileSync(target, fixed);
+  }
   const appPackage = new URL('../ios/App/CapApp-SPM/Package.swift', import.meta.url);
   const generated = readFileSync(appPackage, 'utf8');
   writeFileSync(appPackage, generated.replace(/\\/g, '/'));
-  console.log('iOS: Google SPM provider and portable package paths ready.');
+  console.log('iOS: provider UI threading, explicit errors, Google SPM and portable paths ready.');
 }
