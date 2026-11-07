@@ -36,7 +36,7 @@ export function getGoogleAuthErrorMessage(error = {}) {
     return 'Se cancelo el ingreso con Google. Puedes intentarlo nuevamente.';
   }
   if (code === 'auth/native-google-unavailable' || code === 'UNIMPLEMENTED') {
-    return 'Actualiza la app desde Play Store para ingresar con Google. Mientras tanto puedes ingresar con correo y contrasena.';
+    return 'Actualiza la app desde la tienda de aplicaciones para ingresar con Google. Mientras tanto puedes ingresar con correo y contrasena.';
   }
   if (code === 'auth/network-request-failed' || /network|network_error/i.test(message)) {
     return 'No pudimos conectar con Google. Revisa tu conexion e intenta nuevamente.';

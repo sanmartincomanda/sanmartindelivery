@@ -1,6 +1,7 @@
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
+  OAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithCredential,
@@ -13,6 +14,7 @@ import { Capacitor } from '@capacitor/core';
 import { get, ref, set, update } from 'firebase/database';
 import { auth, database } from '../firebase';
 import { signInGoogle } from './googleSignIn.js';
+import { signInApple } from './appleSignIn.js';
 
 export const USER_ROLES_PATH = 'userRoles';
 
@@ -269,6 +271,16 @@ export async function signInStoreCustomerWithGoogle() {
     signInPopup: () => signInWithPopup(auth, googleProvider),
     credentialFromTokens: (idToken, accessToken) => GoogleAuthProvider.credential(idToken, accessToken),
     signInCredential: (credential) => signInWithCredential(auth, credential),
+  });
+}
+
+export async function signInStoreCustomerWithApple() {
+  return signInApple({
+    runtime: Capacitor,
+    loadNative: async () => (await import('@capacitor-firebase/authentication')).FirebaseAuthentication,
+    credentialFromTokens: (idToken, rawNonce) => new OAuthProvider('apple.com').credential({ idToken, rawNonce }),
+    signInCredential: (credential) => signInWithCredential(auth, credential),
+    saveDisplayName: (user, displayName) => updateProfile(user, { displayName }),
   });
 }
 

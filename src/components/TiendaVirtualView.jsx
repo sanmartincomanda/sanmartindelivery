@@ -1,5 +1,7 @@
 import React, { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { getGoogleAuthErrorMessage } from '../services/googleSignIn.js';
+import { Capacitor } from '@capacitor/core';
+import { canUseNativeAppleSignIn, getAppleAuthErrorMessage } from '../services/appleSignIn.js';
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
@@ -133,6 +135,7 @@ import {
   cleanStorePhone,
   completeExistingStoreUserProfile,
   loginStoreUserWithGoogle,
+  loginStoreUserWithApple,
   loginStoreUser,
   registerStoreUser,
   requestStorePasswordReset,
@@ -3961,13 +3964,13 @@ export default function TiendaVirtualView({
     }
   };
 
-  const handleStoreGoogleLogin = async () => {
+  const handleStoreSocialLogin = async (provider) => {
     setAuthLoading(true);
     setAuthError('');
     setAuthNotice('');
 
     try {
-      const user = await loginStoreUserWithGoogle();
+      const user = await (provider === 'apple' ? loginStoreUserWithApple() : loginStoreUserWithGoogle());
       setAuthProviderDraft(null);
       persistStoreSession(user);
       const nextIntent = pendingAuthIntent;
@@ -3976,10 +3979,10 @@ export default function TiendaVirtualView({
         setOrdersOpen(true);
       }
     } catch (error) {
-      console.error('Error iniciando sesion con Google:', error);
+      console.error('Error iniciando sesion:', provider, error?.code || 'unknown');
       if (error.code === 'PROFILE_REQUIRED') {
         const authUser = error.authUser || {};
-        setAuthProviderDraft({ provider: 'google', uid: authUser.uid });
+        setAuthProviderDraft({ provider, uid: authUser.uid });
         setAuthMode('register');
         setAuthForm((current) => ({
           ...current,
@@ -3990,7 +3993,7 @@ export default function TiendaVirtualView({
         }));
         setAuthError('Completa telefono, direccion y punto del mapa para terminar tu cuenta.');
       } else {
-        setAuthError(getGoogleAuthErrorMessage(error));
+        setAuthError(provider === 'apple' ? getAppleAuthErrorMessage(error) : getGoogleAuthErrorMessage(error));
       }
     } finally {
       setAuthLoading(false);
@@ -5230,6 +5233,32 @@ export default function TiendaVirtualView({
           font-weight: 950;
           box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.72);
         }
+        .store-auth-card .store-button.store-apple-button {
+          width: 100%;
+          min-height: 44px;
+          justify-content: center;
+          gap: 10px;
+          margin-bottom: 10px;
+          background: #000;
+          border: 1px solid #000;
+          border-radius: 8px;
+          color: #fff;
+          box-shadow: none;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+          font-weight: 600;
+          font-size: 17px;
+        }
+        .store-apple-mark { font-size: 24px; line-height: 1; }
+        .store-apple-consent {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 8px 0;
+          font-size: 13px;
+          line-height: 1.5;
+          color: #334155;
+        }
+        .store-apple-consent input { width: 20px; height: 20px; flex: 0 0 20px; }
         .store-account-card {
           margin: 0 0 14px;
           padding: 12px;
@@ -10677,7 +10706,8 @@ export default function TiendaVirtualView({
             );
           }}
           onLogin={handleStoreLogin}
-          onGoogleLogin={handleStoreGoogleLogin}
+          onGoogleLogin={() => handleStoreSocialLogin('google')}
+          onAppleLogin={canUseNativeAppleSignIn(Capacitor) ? () => handleStoreSocialLogin('apple') : undefined}
           onPasswordReset={handleStorePasswordReset}
           onRegister={handleStoreRegister}
         />
@@ -11031,6 +11061,7 @@ function StoreAuthView({
   onFormChange,
   onLogin,
   onGoogleLogin,
+  onAppleLogin,
   onPasswordReset,
   onRegister,
   onBrowseCatalog,
@@ -11074,6 +11105,13 @@ function StoreAuthView({
 
       {authError && <div className="store-auth-error">{authError}</div>}
       {authNotice && <div className="store-auth-notice">{authNotice}</div>}
+
+      {onAppleLogin && !isAuthProfileCompletion && (
+        <button type="button" className="store-button store-apple-button" onClick={onAppleLogin} disabled={authLoading}>
+          <span className="store-apple-mark" aria-hidden="true">&#63743;</span>
+          Continuar con Apple
+        </button>
+      )}
 
       <button
         type="button"
@@ -11199,6 +11237,12 @@ function StoreAuthView({
               />
             </label>
           </>
+        )}
+        {isAuthProfileCompletion && authProviderDraft?.provider === 'apple' && (
+          <label className="store-apple-consent">
+            <input type="checkbox" required />
+            <span>Autorizo asociar mi nombre, telefono y direccion con mi cuenta de Apple para gestionar mis pedidos.</span>
+          </label>
         )}
         <button type="submit" className="store-button" disabled={authLoading}>
           {authLoading

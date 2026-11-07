@@ -9,6 +9,7 @@ import {
   sendStoreCustomerPasswordReset,
   signInStoreCustomer,
   signInStoreCustomerWithGoogle,
+  signInStoreCustomerWithApple,
   touchLastLogin,
   upsertOwnClientRole,
 } from './authRoles';
@@ -564,7 +565,14 @@ export async function loginStoreUserWithEmail({ email, telefono, password }) {
 }
 
 export async function loginStoreUserWithGoogle() {
-  const authUser = await signInStoreCustomerWithGoogle();
+  return completeSocialStoreLogin(await signInStoreCustomerWithGoogle(), 'google');
+}
+
+export async function loginStoreUserWithApple() {
+  return completeSocialStoreLogin(await signInStoreCustomerWithApple(), 'apple');
+}
+
+async function completeSocialStoreLogin(authUser, provider) {
   const authUserKey = authUser.uid;
   const userRef = ref(database, `${STORE_USERS_PATH}/${authUserKey}`);
   const userSnapshot = await get(userRef);
@@ -574,7 +582,7 @@ export async function loginStoreUserWithGoogle() {
     await upsertOwnClientRole(authUserKey, {
       nombre: authUser.displayName,
       email: authUser.email,
-      provider: 'google',
+      provider,
     });
 
     const error = new Error('Perfil incompleto');
@@ -591,7 +599,7 @@ export async function loginStoreUserWithGoogle() {
     nombre: user.nombre || authUser.displayName,
     email: user.email || authUser.email,
     telefono: user.telefono,
-    provider: 'google',
+    provider,
   });
 
   await update(userRef, {
@@ -628,7 +636,7 @@ export async function completeExistingStoreUserProfile({
 }) {
   const authUser = getCurrentAuthUser();
   if (!authUser) {
-    const error = new Error('Sesion de Google no encontrada');
+    const error = new Error('Sesion no encontrada');
     error.code = 'AUTH_REQUIRED';
     throw error;
   }

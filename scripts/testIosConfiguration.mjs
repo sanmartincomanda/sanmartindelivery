@@ -13,6 +13,9 @@ assert.match(google, /<key>BUNDLE_ID<\/key>\s*<string>com\.sanmartinsr\.app<\/st
 assert.match(google, /<key>PROJECT_ID<\/key>\s*<string>comanda-digital-ac1ec<\/string>/);
 assert.match(project, /GoogleService-Info\.plist in Resources/);
 assert.ok(!info.includes('<string>armv7</string>'));
+assert.match(read('ios/App/App/App.entitlements'), /com\.apple\.developer\.applesignin/);
+assert.equal((project.match(/CODE_SIGN_ENTITLEMENTS = App\/App.entitlements;/g) || []).length, 2);
+assert.ok(JSON.parse(read('capacitor.config.json')).plugins.FirebaseAuthentication.providers.includes('apple.com'));
 const source = read('node_modules/@capacitor-firebase/authentication/Package.swift');
 const patched = enableIosGoogleProvider(source);
 assert.match(patched, /\.product\(name: "GoogleSignIn"/);
