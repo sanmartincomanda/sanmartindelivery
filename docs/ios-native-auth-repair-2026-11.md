@@ -101,6 +101,17 @@ receiving a simulator authorization error is not a completed login.
   device. Do not submit the old build 3 or represent the simulator response as a
   successful customer login.
 
+## Follow-up: owner confirmation and review (2026-11-09)
+
+The owner reported that login now works and explicitly requested TestFlight,
+App Review, then Google Play. Build 5 includes the native repair, latest store
+changes and Apple web login support without replacing iOS native authentication.
+It was assigned to the existing private internal group and submitted to App Review
+as 1.0.0 (5), submission `78fd9602-cabc-4066-b859-98aaea2acda1`.
+Apple displayed `1 articulo enviado`. This supersedes the withdrawn-review
+status above. The owner's confirmation is not a new physical-device test by
+the agent. See `ios-app-store-release.md` for build identity and screenshots.
+
 ## Primary references
 
 - Google redirect handling: https://developers.google.com/identity/sign-in/ios/sign-in

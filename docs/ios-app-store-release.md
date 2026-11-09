@@ -5,7 +5,7 @@
 - Nombre: `Carnes San Martin`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Ultimo build cargado: `5` (codigo de app `8a5d9af4118f`), procesado como `VALID`; falta asignarlo al grupo privado. Build 4 sigue siendo la referencia previamente habilitada. App Review sigue retirada.
+- Ultimo build: `5` (codigo de app `8a5d9af4118f`), habilitado en TestFlight privado y enviado a App Review el 2026-11-09. Aprobacion/publicacion pendientes.
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
 
@@ -60,13 +60,28 @@ invalidos/expirados o grupos distintos/publicos. Run `42650266251` confirmo
 build 5 como `VALID` a las 10:06:47 Nicaragua. El siguiente GET del directorio
 de grupos internos devolvio `403 FORBIDDEN_ERROR` con la clave Developer
 existente; el workflow se detuvo sin POST ni cambios a testers. No se crearon
-grupos alternativos ni se ampliaron permisos. La carga esta validada, pero
-la asignacion al grupo y disponibilidad de descarga para ese grupo NO estan
-confirmadas. Debe completarse desde la sesion autorizada de App Store Connect.
+grupos alternativos ni se ampliaron permisos. La asignacion se completo despues
+desde la sesion autorizada de App Store Connect, sin ampliar la clave API.
 
-El acceso al navegador esta deshabilitado en Work; se solicito habilitarlo para
-continuar con App Store Connect y Google Play Console. No adelantar Google al
-envio a revision de Apple sin una nueva instruccion del titular.
+### Distribucion completada desde consola (2026-11-09)
+
+El titular habilito el navegador y confirmo enviar build 5. En este orden:
+
+1. TestFlight: asociado al grupo privado existente `San Martin - Revision interna`
+   (`644c1f5e-34c2-4073-87eb-60c5b1cdef67`), con su unico tester existente.
+   La consola confirmo `Grupo (1)` y las instrucciones de prueba guardadas.
+   No se crearon testers, enlaces publicos ni grupos nuevos.
+2. Ficha 1.0.0: sustituida la asociacion del build 3 por **1.0.0 (5)**, guardada
+   y anadida a revision. No se elimino ni expiro el archivo de build 3.
+3. Confirmado `Enviar a revision`; Apple mostro **1 articulo enviado**.
+   Solicitud `78fd9602-cabc-4066-b859-98aaea2acda1`, 2026-11-09 alrededor de
+   11:54 Nicaragua. Se conserva publicacion automatica y mercado Nicaragua.
+   No hubo cambios a privacidad, derechos, cuenta privada de revision o SDK.
+4. Solo despues se inicio la actualizacion de Google Play.
+
+Evidencias locales: `tmp/ios-build5-testflight-enabled.png` y
+`tmp/ios-build5-review-submitted.png`. El envio esta confirmado, no la aprobacion
+ni disponibilidad publica. Los historiales inferiores describen estados anteriores.
 
 ## Historial: TestFlight corregido, pendiente prueba fisica (2026-11-07)
 
