@@ -5,7 +5,7 @@
 - Nombre: `Carnes San Martin`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Ultimo build: `4` (codigo de app `7b7fd25f02101aaba6cfdeb6946f757ebd9a1dac`), habilitado en TestFlight privado; App Review sigue retirada
+- Ultimo build cargado: `5` (codigo de app `8a5d9af4118f`), procesado como `VALID`; falta asignarlo al grupo privado. Build 4 sigue siendo la referencia previamente habilitada. App Review sigue retirada.
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
 
@@ -35,6 +35,38 @@ Pruebas repetidas: test:apple-auth, test:store-access, test:google-auth y
 test:ios-config. La verificacion anterior en el navegador integrado comprobo
 el boton y recuperacion del formulario, pero no un consentimiento Apple
 completo; no confundirlo con una prueba de cuenta real.
+
+Run `42649692279` completo firma, validacion y carga de **1.0.0 (5)** en
+7m23s. Apple confirmo recepcion el 2026-11-09 a las 10:03 Nicaragua; delivery
+`a6bf7c1c-8f69-4d8a-8c18-eec73a4c2dea`. Esto no es aprobacion de App Review.
+IPA local: `tmp/ios-app-store-1.0.0-5/App.ipa`, SHA256
+`D03DC641792F95D27779E8D1C532BA2A3A1DF1C6A0E0C1504A98FB065278AE75`.
+Los 19 manifiestos de privacidad son identicos a build 4. El paquete firmado
+conserva ambos proveedores y `skipNativeAuth: true`; CI verifica bridge,
+Bundle ID, proyecto Firebase y callback Google. No hay SDK o permisos nuevos.
+
+Tambien pasaron test:box-sales, test:box-sales-ui, test:retail-home,
+test:store-editorial, test:manual-route (578 assertions),
+test:store-product-promotions, test:store-order-source, test:retail-interactions,
+build:ios:web, build web y test:web-release (4). El dist final local es web;
+no se desplego hosting en esta publicacion movil. Se conserva la advertencia
+preexistente de chunks mayores de 500 KB.
+
+El workflow manual `ios-testflight.yml` usa la clave de carga existente para
+esperar a que Apple valide el build y asociarlo exclusivamente al grupo interno
+privado existente. No crea testers, grupos, enlaces publicos ni envios a review.
+Su prueba cubre version/plataforma exactas, idempotencia y rechazo de builds
+invalidos/expirados o grupos distintos/publicos. Run `42650266251` confirmo
+build 5 como `VALID` a las 10:06:47 Nicaragua. El siguiente GET del directorio
+de grupos internos devolvio `403 FORBIDDEN_ERROR` con la clave Developer
+existente; el workflow se detuvo sin POST ni cambios a testers. No se crearon
+grupos alternativos ni se ampliaron permisos. La carga esta validada, pero
+la asignacion al grupo y disponibilidad de descarga para ese grupo NO estan
+confirmadas. Debe completarse desde la sesion autorizada de App Store Connect.
+
+El acceso al navegador esta deshabilitado en Work; se solicito habilitarlo para
+continuar con App Store Connect y Google Play Console. No adelantar Google al
+envio a revision de Apple sin una nueva instruccion del titular.
 
 ## Historial: TestFlight corregido, pendiente prueba fisica (2026-11-07)
 

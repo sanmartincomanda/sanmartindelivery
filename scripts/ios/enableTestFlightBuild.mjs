@@ -23,6 +23,7 @@ export async function enableTestFlightBuild({ buildNumber, request, wait, attemp
   }
   if (!build) throw new Error('Apple processing is not complete; no group changes made');
   if (build.attributes.expired) throw new Error('Cannot distribute an expired build');
+  log(JSON.stringify({ appId: APP_ID, version: '1.0.0', buildNumber, buildId: build.id, processingState: 'VALID' }));
 
   const groups = await request(`/v1/apps/${APP_ID}/betaGroups?limit=200`);
   const matches = groups.data.filter(group => group.attributes.name === GROUP_NAME);
@@ -67,7 +68,7 @@ async function main() {
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(`Apple API ${response.status}: ${(error.errors || []).map(item => item.code).join(', ')}`);
+      throw new Error(`Apple API ${method} ${path.split('?')[0]}: ${response.status} ${(error.errors || []).map(item => item.code).join(', ')}`);
     }
     return response.status === 204 ? null : response.json();
   };

@@ -43,3 +43,13 @@ for (const modify of [
   assert.equal(f.calls.some(call => call.options?.method === 'POST'), false);
 }
 console.log('TestFlight: exact version, existing private group, idempotence and unsafe-state rejection passed.');
+{
+  const f = fixture();
+  const request = f.deps.request;
+  f.deps.request = (path, options) => {
+    if (path.includes('/apps/')) throw new Error('Apple API 403 FORBIDDEN_ERROR');
+    return request(path, options);
+  };
+  await assert.rejects(enableTestFlightBuild(f.deps), /403/);
+  assert.equal(f.calls.some(call => call.options?.method === 'POST'), false, 'Do not create alternative groups or widen permissions');
+}
