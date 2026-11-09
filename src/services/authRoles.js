@@ -4,6 +4,8 @@ import {
   OAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  revokeAccessToken,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
@@ -72,6 +74,10 @@ export const normalizeAuthEmail = (email) => String(email || '').trim().toLowerC
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+const appleProvider = new OAuthProvider('apple.com');
+appleProvider.addScope('email');
+appleProvider.addScope('name');
+appleProvider.setCustomParameters({ locale: 'es' });
 
 const sanitizeEmailToken = (value = '') =>
   String(value || '')
@@ -280,6 +286,7 @@ export async function signInStoreCustomerWithApple() {
   return signInApple({
     runtime: Capacitor,
     loadNative: loadNativeAuthentication,
+    signInPopup: () => signInWithPopup(auth, appleProvider),
     credentialFromTokens: (idToken, rawNonce) => new OAuthProvider('apple.com').credential({ idToken, rawNonce }),
     signInCredential: (credential) => signInWithCredential(auth, credential),
     saveDisplayName: (user, displayName) => updateProfile(user, { displayName }),
@@ -294,6 +301,9 @@ export async function revokeStoreAppleAccessForDeletion(user) {
     loadNative: loadNativeAuthentication,
     credentialFromTokens: (idToken, rawNonce) => new OAuthProvider('apple.com').credential({ idToken, rawNonce }),
     reauthenticate: reauthenticateWithCredential,
+    reauthenticatePopup: (currentUser) => reauthenticateWithPopup(currentUser, appleProvider),
+    credentialFromResult: (result) => OAuthProvider.credentialFromResult(result),
+    revokeAccessToken: (token) => revokeAccessToken(auth, token),
   });
 }
 

@@ -22,7 +22,7 @@ export function createStoreLoginRunner() {
     };
     let work;
     try {
-      // Invoke synchronously so web Google popup keeps the user's click gesture.
+      // Invoke synchronously so web provider popups keep the user's click gesture.
       work = Promise.resolve(operation(checkActive));
     } catch (error) {
       work = Promise.reject(error);

@@ -3,7 +3,7 @@ import { getGoogleAuthErrorMessage } from '../services/googleSignIn.js';
 import { getStoreLoginErrorMessage } from '../services/storeLoginAttempt.js';
 import { cartCoverageNoticeKey, createCoverageNoticeGate } from '../services/storeCoverageNotice.js';
 import { Capacitor } from '@capacitor/core';
-import { canUseNativeAppleSignIn, getAppleAuthErrorMessage } from '../services/appleSignIn.js';
+import { canUseAppleSignIn, getAppleAuthErrorMessage } from '../services/appleSignIn.js';
 import RetailProductCard from './storefront/RetailProductCard';
 import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
@@ -5170,7 +5170,7 @@ export default function TiendaVirtualView({
           font-weight: 600;
           font-size: 17px;
         }
-        .store-apple-mark { font-size: 24px; line-height: 1; }
+        .store-apple-mark { width: 20px; height: 24px; flex-shrink: 0; }
         .store-apple-consent {
           display: flex;
           align-items: flex-start;
@@ -10578,7 +10578,7 @@ export default function TiendaVirtualView({
           }}
           onLogin={handleStoreLogin}
           onGoogleLogin={() => handleStoreSocialLogin('google')}
-          onAppleLogin={canUseNativeAppleSignIn(Capacitor) ? () => handleStoreSocialLogin('apple') : undefined}
+          onAppleLogin={canUseAppleSignIn(Capacitor) ? () => handleStoreSocialLogin('apple') : undefined}
           onPasswordReset={handleStorePasswordReset}
           onRegister={handleStoreRegister}
         />
@@ -10986,7 +10986,10 @@ function StoreAuthView({
 
       {onAppleLogin && !isAuthProfileCompletion && (
         <button type="button" className="store-button store-apple-button" onClick={onAppleLogin} disabled={authLoading}>
-          <span className="store-apple-mark" aria-hidden="true">&#63743;</span>
+          <svg className="store-apple-mark" viewBox="9 8 19 23" fill="currentColor" aria-hidden="true" focusable="false">
+            <path d="M24.76888,20.30068a4.94881,4.94881,0,0,1,2.35656-4.15206,5.06566,5.06566,0,0,0-3.99116-2.15768c-1.67924-.17626-3.30719,1.00483-4.1629,1.00483-.87227,0-2.18977-.98733-3.6085-.95814a5.31529,5.31529,0,0,0-4.47292,2.72787c-1.934,3.34842-.49141,8.26947,1.3612,10.97608.9269,1.32535,2.01018,2.8058,3.42763,2.7533,1.38706-.05753,1.9051-.88448,3.5794-.88448,1.65876,0,2.14479.88448,3.591.8511,1.48838-.02416,2.42613-1.33124,3.32051-2.66914a10.962,10.962,0,0,0,1.51842-3.09251A4.78205,4.78205,0,0,1,24.76888,20.30068Z" />
+            <path d="M22.03725,12.21089a4.87248,4.87248,0,0,0,1.11452-3.49062,4.95746,4.95746,0,0,0-3.20758,1.65961,4.63634,4.63634,0,0,0-1.14371,3.36139A4.09905,4.09905,0,0,0,22.03725,12.21089Z" />
+          </svg>
           Continuar con Apple
         </button>
       )}

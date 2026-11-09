@@ -3,7 +3,12 @@ const authError = (code, message) => Object.assign(new Error(message), { code })
 export const canUseNativeAppleSignIn = (runtime) =>
   runtime.isNativePlatform() && runtime.getPlatform() === 'ios';
 
-export async function signInApple({ runtime, loadNative, credentialFromTokens, signInCredential, saveDisplayName }) {
+export const canUseAppleSignIn = (runtime) =>
+  !runtime.isNativePlatform() || canUseNativeAppleSignIn(runtime);
+
+export async function signInApple({ runtime, loadNative, signInPopup, credentialFromTokens, signInCredential, saveDisplayName }) {
+  // Invoke from the click without loading the native plugin or losing the popup gesture.
+  if (!runtime.isNativePlatform()) return (await signInPopup()).user;
   if (!canUseNativeAppleSignIn(runtime) || !runtime.isPluginAvailable('FirebaseAuthentication')) {
     throw authError('auth/native-apple-unavailable', 'Native Apple sign-in is unavailable.');
   }
@@ -19,8 +24,18 @@ export async function signInApple({ runtime, loadNative, credentialFromTokens, s
   return user;
 }
 
-export async function revokeAppleForDeletion({ runtime, user, loadNative, credentialFromTokens, reauthenticate, apiKey, fetchImpl = fetch }) {
-  if (!canUseNativeAppleSignIn(runtime) || !user?.providerData?.some(item => item.providerId === 'apple.com')) return false;
+export async function revokeAppleForDeletion({ runtime, user, loadNative, credentialFromTokens, reauthenticate,
+  reauthenticatePopup, credentialFromResult, revokeAccessToken, apiKey, fetchImpl = fetch }) {
+  if (!user?.providerData?.some(item => item.providerId === 'apple.com')) return false;
+  if (!runtime.isNativePlatform()) {
+    const result = await reauthenticatePopup(user);
+    if (result?.user?.uid !== user.uid) throw authError('auth/user-mismatch', 'The Apple account does not match.');
+    const accessToken = credentialFromResult(result)?.accessToken;
+    if (!accessToken) throw authError('auth/missing-apple-credential', 'Apple did not return an access token.');
+    await revokeAccessToken(accessToken);
+    return true;
+  }
+  if (!canUseNativeAppleSignIn(runtime)) return false;
   if (!runtime.isPluginAvailable('FirebaseAuthentication')) throw authError('auth/native-apple-unavailable', 'Apple authentication is unavailable.');
   const native = await loadNative();
   const result = await native.signInWithApple({ skipNativeAuth: true });
@@ -49,6 +64,11 @@ export async function revokeAppleForDeletion({ runtime, user, loadNative, creden
 
 export function getAppleAuthErrorMessage(error = {}) {
   const text = `${error.code || ''} ${error.message || ''}`;
+  if (error.code === 'auth/popup-blocked') return 'Permite las ventanas emergentes para esta pagina y vuelve a tocar Continuar con Apple.';
+  if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') return 'Se cancelo el ingreso con Apple. Puedes intentarlo nuevamente.';
+  if (['auth/unauthorized-domain', 'auth/operation-not-allowed', 'auth/invalid-oauth-client-id'].includes(error.code)) {
+    return 'El acceso con Apple necesita una revision de configuracion. Puedes ingresar con correo y contrasena o contactar a la tienda.';
+  }
   if (/cancel|1001/i.test(text)) return 'Se cancelo el ingreso con Apple. Puedes intentarlo nuevamente.';
   if (/network|conexion/i.test(text)) return 'No pudimos conectar con Apple. Revisa tu conexion e intenta nuevamente.';
   if (error.code === 'auth/account-exists-with-different-credential') {

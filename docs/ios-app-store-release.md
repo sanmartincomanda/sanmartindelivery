@@ -15,7 +15,28 @@ El proyecto nativo esta en `ios/App` y se sincroniza con:
 npm run ios:sync
 ```
 
-## Estado vigente: TestFlight corregido, pendiente prueba fisica (2026-11-07)
+## Actualizacion solicitada (2026-11-09)
+
+El titular confirmo "Ya quedo funcionando" y solicito actualizar TestFlight,
+enviar despues a App Review y finalmente actualizar Google Play, en ese orden.
+La confirmacion es del titular; no se presenta como una nueva prueba fisica
+ejecutada por el agente. Preparar una compilacion nueva con el codigo actual,
+sin reenviar build 3 ni modificar los datos comerciales. La publicacion sigue
+limitada a Nicaragua y depende de la aprobacion de cada tienda.
+
+El acceso Apple web deja de estar limitado al runtime iOS: usa el proveedor
+Firebase existente y popup iniciado en el gesto del usuario. iOS conserva su
+flujo nativo y Android nativo conserva Google/correo. El formulario muestra
+Apple tanto al ingresar como al crear cuenta; la marca SVG no depende de una
+fuente especifica del dispositivo. La revocacion web requiere reautenticacion
+de la misma cuenta y token fresco. No se anaden claves, SDK ni permisos.
+
+Pruebas repetidas: test:apple-auth, test:store-access, test:google-auth y
+test:ios-config. La verificacion anterior en el navegador integrado comprobo
+el boton y recuperacion del formulario, pero no un consentimiento Apple
+completo; no confundirlo con una prueba de cuenta real.
+
+## Historial: TestFlight corregido, pendiente prueba fisica (2026-11-07)
 
 La compilacion 1.0.0 (4) fue firmada, validada y cargada a Apple mediante run
 `42423444946`. Corrige el bloqueo comun de Google/Apple: un cargador async
