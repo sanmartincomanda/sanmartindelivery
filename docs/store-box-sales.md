@@ -287,6 +287,9 @@ uploads, content-addressed cache URLs and safe migration record replacement.
   data, catalog values, prices or orders were changed for deployment/QA.
 - This ordering feature is not included in the already-submitted iOS build 5
   / Android 17. Those review submissions were not withdrawn or replaced.
+- Android 1.2.15 (18) and iOS 1.0.1 (6) were subsequently built with ordering,
+  but not uploaded, at the owner's request to wait for initial Apple approval.
+  See mobile-box-order-release-hold.md for packages, checks and the release hold.
 
 - Public Home places active Black November promotions first, then "Venta por
   caja", followed by the remaining sections. Both use one horizontal row with
