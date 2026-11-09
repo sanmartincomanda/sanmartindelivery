@@ -248,7 +248,7 @@ uploads, content-addressed cache URLs and safe migration record replacement.
 
 ### Configurable box order (2026-11-09)
 
-- AdminTV > Tienda virtual > Catalogo Maestro > Venta por cajas > Editar now has
+- AdminTV > Tienda Virtual > Venta por cajas > Editar now has
   `Orden en la tienda`: positive integer 1-99999, optional. Lower numbers appear
   first in Home, the box category, the announcement and the admin list.
 - Catalog metadata `storeCatalog/BOX_CODE/boxDisplayOrder` stores the numeric
@@ -272,8 +272,21 @@ uploads, content-addressed cache URLs and safe migration record replacement.
   mixed 1 / single 2, checked negative-number rejection and no horizontal overflow.
   Fixture-only saves: no live customer/catalog changes. Screenshot:
   tmp/box-order-mobile.png.
-- Implemented locally; not yet deployed or included in the already-submitted
-  iOS build 5 / Android 17. Those review submissions were not withdrawn/replaced.
+- Published to AdminTV and the storefront on 2026-11-09 at 13:48 America/Managua.
+  Netlify production deploy: 6af22369778938f604f63095; web source revision:
+  d81d285c308f41c84b7653078994f948be6cb468. Both custom domains returned this
+  revision from /release.json. Web build and all four required release gates
+  passed again before publishing.
+- Production browser QA: opened Tienda Virtual > Venta por cajas, edited the
+  existing 15 lb mixed box without saving, and verified its order field is 1.
+  Verified it is first in the live Home rail, announcement and box category.
+  Both pages had no captured console errors. Screenshots:
+  tmp/box-order-live-admin.png and tmp/box-order-live-store.png.
+- Static assets only: all four existing Netlify function digests were reused
+  unchanged and verified after publication. No rules, SICAR bridge, customer
+  data, catalog values, prices or orders were changed for deployment/QA.
+- This ordering feature is not included in the already-submitted iOS build 5
+  / Android 17. Those review submissions were not withdrawn or replaced.
 
 - Public Home places active Black November promotions first, then "Venta por
   caja", followed by the remaining sections. Both use one horizontal row with
