@@ -246,6 +246,35 @@ uploads, content-addressed cache URLs and safe migration record replacement.
 
 ## Launch announcement and Home
 
+### Configurable box order (2026-11-09)
+
+- AdminTV > Tienda virtual > Catalogo Maestro > Venta por cajas > Editar now has
+  `Orden en la tienda`: positive integer 1-99999, optional. Lower numbers appear
+  first in Home, the box category, the announcement and the admin list.
+- Catalog metadata `storeCatalog/BOX_CODE/boxDisplayOrder` stores the numeric
+  order separately from boxSale, so changing order does not invalidate a cart
+  or change prices, pounds, source SKUs, stock, branch availability or orders.
+- Empty input persists 0 (last, no manual priority). It must not be removed/null:
+  retaining 0 distinguishes an intentional clearing from a legacy record.
+- Legacy mixed box BOX_94f78ea2-6b6f-4772-af5e-ba51b652783e defaults to 1 until
+  edited; a saved number or 0 overrides this fallback. Other legacy boxes go
+  after explicitly ordered boxes. Equal numbers retain the incoming catalog
+  order. Sorting copies the list instead of mutating shared catalog objects.
+- Catalog normalization and branch resolution preserve the field. Invalid
+  stored metadata safely becomes unranked; admin saves reject invalid numbers.
+  Existing admin-only catalog permissions apply. No rule deployment/new listener
+  or production catalog migration is needed.
+- Passed box-sales, box-sales-ui, box-announcement, and 393 database-emulator
+  checks, including admin write and buyer/branch/service denial for ordering.
+  Passed web build/release, retail-home, store-editorial and manual-route gates.
+- Isolated browser QA at 390px and 1280px: edited/saved/reopened both boxes,
+  moved the mixed box behind another, verified store cards reordered, restored
+  mixed 1 / single 2, checked negative-number rejection and no horizontal overflow.
+  Fixture-only saves: no live customer/catalog changes. Screenshot:
+  tmp/box-order-mobile.png.
+- Implemented locally; not yet deployed or included in the already-submitted
+  iOS build 5 / Android 17. Those review submissions were not withdrawn/replaced.
+
 - Public Home places active Black November promotions first, then "Venta por
   caja", followed by the remaining sections. Both use one horizontal row with
   every eligible product, native touch scrolling, mouse dragging and keyboard

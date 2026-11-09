@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { buildBoxCatalogProduct, describeBoxContents, getBoxComponents, isBoxProduct, isMixedBox, MIXED_BOX_COUNTS } from '../services/storeBoxSales';
+import { buildBoxCatalogProduct, describeBoxContents, getBoxComponents, getBoxDisplayOrder, isBoxProduct, isMixedBox, MAX_BOX_DISPLAY_ORDER, MIXED_BOX_COUNTS, orderBoxProductsForDisplay } from '../services/storeBoxSales';
 import { saveCatalogProduct } from '../services/storeCatalog';
 import '../styles/storeBoxSales.css';
 
-const freshForm = () => ({ type: 'single', sourceCode: '', sourceCodes: ['', '', ''], name: '', image: '', description: '', poundsPerBox: 30, pricePerPound: '', active: false, branchIds: ['granada', 'nindiri'] });
+const freshForm = () => ({ type: 'single', sourceCode: '', sourceCodes: ['', '', ''], name: '', image: '', description: '', poundsPerBox: 30, pricePerPound: '', boxDisplayOrder: '', active: false, branchIds: ['granada', 'nindiri'] });
 const money = value => Number(value || 0).toLocaleString('es-NI', { style: 'currency', currency: 'NIO' });
 const branches = [['granada', 'Granada'], ['nindiri', 'Nindirí'], ['masaya', 'Masaya']];
 
@@ -16,7 +16,7 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
   const [error, setError] = useState('');
   const formRef = useRef(null);
   const fileRef = useRef(null);
-  const boxes = products.filter(isBoxProduct);
+  const boxes = orderBoxProductsForDisplay(products.filter(isBoxProduct));
   const sources = products.filter(product => !isBoxProduct(product) && product.unit === 'lb');
   const mixed = isMixedBox(form);
   const componentCount = form.sourceCodes.length;
@@ -26,7 +26,7 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
   const reset = () => { setForm(freshForm()); setEditing(null); setSearch(''); if (fileRef.current) fileRef.current.value = ''; };
   const edit = product => {
     setEditing(product); setError(''); setMessage('');
-    setForm({ ...freshForm(), ...product, ...product.boxSale, sourceCodes: isMixedBox(product.boxSale) ? product.boxSale.components.map(p => p.sourceCode) : ['', '', ''], branchIds: branches.filter(([id]) => product.branchSettings?.[id]?.active !== false).map(([id]) => id) });
+    setForm({ ...freshForm(), ...product, ...product.boxSale, boxDisplayOrder: getBoxDisplayOrder(product) || '', sourceCodes: isMixedBox(product.boxSale) ? product.boxSale.components.map(p => p.sourceCode) : ['', '', ''], branchIds: branches.filter(([id]) => product.branchSettings?.[id]?.active !== false).map(([id]) => id) });
     if (fileRef.current) fileRef.current.value = '';
     formRef.current?.scrollIntoView({ block: 'start' });
     formRef.current?.querySelector('input[name="boxName"]')?.focus({ preventScroll: true });
@@ -94,6 +94,8 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
             <label>{mixed ? 'Precio único por libra (C$)' : 'Precio por libra (C$)'}<input className="cfg-input" type="number" inputMode="decimal" required min="0.01" max="100000" step="0.01" value={form.pricePerPound} onChange={e => update('pricePerPound', e.target.value)} /></label>
           </div>
           <div className="box-sales-total" aria-live="polite"><span>Precio de una caja</span><strong>{money(total)}</strong><small>2 cajas: {Number(form.poundsPerBox || 0) * 2} lb · {money(total * 2)}</small></div>
+          <label>Orden en la tienda<input name="boxDisplayOrder" className="cfg-input" type="number" inputMode="numeric" min="1" max={MAX_BOX_DISPLAY_ORDER} step="1" placeholder="Sin orden" aria-describedby="box-display-order-help" value={form.boxDisplayOrder} onChange={e => update('boxDisplayOrder', e.target.value)} /></label>
+          <small id="box-display-order-help">1 aparece primero, 2 después. Se aplica en Inicio, la categoría y el anuncio de cajas. Sin número queda al final; si repetís un número se conserva el orden anterior entre esas cajas.</small>
           <label>Foto de esta presentación<input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={upload} /></label>
           <small>La foto se optimiza al guardar, sin recortes y conservando sus proporciones.</small>
           {form.image && <img className="box-sales-preview" src={form.image} alt="Vista previa de la caja" />}
@@ -110,7 +112,7 @@ export default function StoreBoxSalesAdminSection({ products = [], loading = fal
         {loading ? <p role="status">Cargando catálogo…</p> : !boxes.length ? <p>Creá la primera caja seleccionando un corte, su peso y su precio especial.</p> : boxes.map(product =>
           <article key={product.code}>
             <img src={product.image} alt="" loading="lazy" width="72" height="72" />
-            <div><strong>{product.name}</strong><span>{product.boxSale.poundsPerBox} lb · {money(product.boxSale.pricePerPound)} / lb</span><span>{money(product.price)} / caja</span>
+            <div><small className="box-sales-order">{getBoxDisplayOrder(product) ? `Orden ${getBoxDisplayOrder(product)}` : 'Sin orden · al final'}</small><strong>{product.name}</strong><span>{product.boxSale.poundsPerBox} lb · {money(product.boxSale.pricePerPound)} / lb</span><span>{money(product.price)} / caja</span>
               {isMixedBox(product.boxSale) && <small>{describeBoxContents(product.boxSale)}</small>}
               <small>SICAR {getBoxComponents(product.boxSale).map(p => p.sourceCode).join(' / ')} · {product.active ? 'Activa' : 'Inactiva'}</small></div>
             <button className="cfg-button secondary" type="button" disabled={busy} onClick={() => edit(product)} aria-label={`Editar ${product.name}`}>Editar</button>

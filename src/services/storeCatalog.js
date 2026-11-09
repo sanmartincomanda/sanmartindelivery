@@ -4,7 +4,7 @@ import { LEGACY_STORE_COMBO_CODES, STORE_COMBOS, STORE_PRODUCTS } from '../data/
 import { normalizeStoreCategoryId, normalizeStoreSubcategory } from '../data/storeSubcategoryRules.js';
 import { isDataUrlImage, uploadCatalogImage } from './storeMedia.js';
 import { getStoreProductPriceForBranch, NINDIRI_SHARED_PRICE_BRANCH_ID } from './storePricing.js';
-import { validateBoxSale } from './storeBoxSales.js';
+import { getBoxDisplayOrder, validateBoxDisplayOrder, validateBoxSale } from './storeBoxSales.js';
 
 export const STORE_CATALOG_PATH = 'storeCatalog';
 export const STORE_CATALOG_META_PATH = 'storeCatalogMeta';
@@ -185,7 +185,11 @@ const buildCatalogProductShape = (source = {}, fallback = {}) => {
 
   return {
     code: String(source.code ?? fallback.code ?? '').trim(),
-    ...((source.boxSale ?? fallback.boxSale) ? { boxSale: { ...(source.boxSale ?? fallback.boxSale) } } : {}),
+    ...((source.boxSale ?? fallback.boxSale) ? {
+      boxSale: { ...(source.boxSale ?? fallback.boxSale) },
+      boxDisplayOrder: getBoxDisplayOrder({ code: source.code ?? fallback.code,
+        boxSale: source.boxSale ?? fallback.boxSale, boxDisplayOrder: source.boxDisplayOrder ?? fallback.boxDisplayOrder }),
+    } : {}),
     name: String(source.name ?? fallback.name ?? '').trim(),
     price: roundPrice(source.price ?? fallback.price ?? 0),
     unit,
@@ -372,6 +376,7 @@ const buildEditableProductPayload = (product = {}, existingProduct = {}) => {
 };
 
 export async function saveCatalogProduct(product, existingProduct = null) {
+  if (product?.boxSale) validateBoxDisplayOrder(product.boxDisplayOrder);
   const resolvedExisting =
     existingProduct ||
     (product?.code

@@ -39,6 +39,11 @@ const item=boxOrderItem({codigo:product.code,nombre:product.name,cantidad:2,prec
 const order=(line=item,branch='granada')=>({canal:'tienda_virtual',storeUserKey:'buyer',storeBranchId:branch,estado:'Pendiente',items:[line]});
 try {
   await allow(set(ref(manager,'storeCatalog/BOX_test'),product));
+  await allow(update(ref(manager,'storeCatalog/BOX_test'),{boxDisplayOrder:1}));
+  await allow(update(ref(manager,'storeCatalog/BOX_test'),{boxDisplayOrder:0}));
+  await deny(update(ref(buyer,'storeCatalog/BOX_test'),{boxDisplayOrder:1}));
+  await deny(update(ref(branch,'storeCatalog/BOX_test'),{boxDisplayOrder:1}));
+  await deny(update(ref(service,'storeCatalog/BOX_test'),{boxDisplayOrder:1}));
   await deny(set(ref(buyer,'storeCatalog/BOX_other'),{...product,code:'BOX_other'}));
   await deny(set(ref(manager,'storeCatalog/BOX_bad'),{...product,code:'BOX_bad',price:1}));
   // Decimal pound prices must not fail because IEEE-754 multiplication has dust.

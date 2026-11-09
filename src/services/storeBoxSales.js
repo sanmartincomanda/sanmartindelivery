@@ -3,12 +3,25 @@ export const BOX_CATEGORY_ID = 'venta_por_cajas';
 export const MIXED_BOX_COUNTS = [2, 3, 4, 5];
 export const isBoxProduct = (product) => Boolean(product?.boxSale);
 export const isMixedBox = (box) => box?.type === 'mixed';
-// Merchandising pin: keep this presentation first without changing catalog prices.
+// Preserve the previous placement until an administrator saves an explicit order.
 const FEATURED_BOX_CODE = 'BOX_94f78ea2-6b6f-4772-af5e-ba51b652783e';
+export const MAX_BOX_DISPLAY_ORDER = 99999;
+export function normalizeBoxDisplayOrder(value) {
+  const numeric = typeof value === 'number' || typeof value === 'string' ? Number(value) : 0;
+  return Number.isSafeInteger(numeric) && numeric > 0 && numeric <= MAX_BOX_DISPLAY_ORDER ? numeric : 0;
+}
+export const getBoxDisplayOrder = product => !isBoxProduct(product) ? 0
+  : product.boxDisplayOrder === undefined && product.code === FEATURED_BOX_CODE ? 1
+    : normalizeBoxDisplayOrder(product.boxDisplayOrder);
+export function validateBoxDisplayOrder(value) {
+  if (value === undefined || value === null || value === '' || value === 0) return 0;
+  const order = normalizeBoxDisplayOrder(value);
+  if (!order) throw new Error('El orden debe ser un número entero entre 1 y 99999.');
+  return order;
+}
 export const orderBoxProductsForDisplay = (products = []) =>
   [...products].sort((left, right) =>
-    Number(isBoxProduct(right) && right.code === FEATURED_BOX_CODE) -
-    Number(isBoxProduct(left) && left.code === FEATURED_BOX_CODE));
+    (getBoxDisplayOrder(left) || MAX_BOX_DISPLAY_ORDER + 1) - (getBoxDisplayOrder(right) || MAX_BOX_DISPLAY_ORDER + 1));
 const money = (n) => Number(Number(n).toFixed(2));
 const positive = (n, max) => Number.isFinite(Number(n)) && Number(n) > 0 && Number(n) <= max;
 const sourceIdentity = (source = {}) => {
@@ -67,7 +80,8 @@ export function buildBoxCatalogProduct(form, source, existing = null, id = '') {
   if (!/^BOX_[a-zA-Z0-9_-]+$/.test(code)) throw new Error('Identificador de presentación inválido.');
   return {
     code, name, image, imageStoragePath: existing?.imageStoragePath || '',
-    boxSale, price: money(boxSale.poundsPerBox * boxSale.pricePerPound),
+    boxSale, boxDisplayOrder: validateBoxDisplayOrder(form.boxDisplayOrder ?? getBoxDisplayOrder(existing)),
+    price: money(boxSale.poundsPerBox * boxSale.pricePerPound),
     unit: 'caja', minQuantity: 1, quantityStep: 1, active: form.active === true,
     category: BOX_CATEGORY_ID, categoryLabel: 'Venta por cajas', subcategory: '',
     description: String(form.description || '').trim(),

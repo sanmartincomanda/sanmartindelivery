@@ -26,6 +26,7 @@
 .box-sales-list article img { object-fit: contain; flex-shrink: 0; background: #fff; border-radius: 8px; }
 .box-sales-list article > div { flex: 1; min-width: 0; display: grid; gap: 5px; overflow-wrap: anywhere; }
 .box-sales-list span { font-size: 13px; }
+.box-sales-admin .box-sales-order { color: #0044c5; font-size: 12px; font-weight: 700; }
 .box-sales-admin .box-sales-error { background: #fff2f2; color: #9a1521; padding: 12px; border-left: 3px solid #d60917; }
 .box-sales-notice { background: #eef5ff; padding: 12px; }
 @media(max-width:850px) { .box-sales-layout { grid-template-columns: minmax(0,1fr); } }

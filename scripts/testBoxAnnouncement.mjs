@@ -8,7 +8,7 @@ import {
   canShowBoxAnnouncement, nextBoxAnnouncementHistory, mergeBoxAnnouncementHistory, getBoxAnnouncementProducts,
 } from '../src/services/storeBoxAnnouncement.js';
 import { getRetailHomeSections } from '../src/components/storefront/retailHomePromotions.js';
-import { orderBoxProductsForDisplay } from '../src/services/storeBoxSales.js';
+import { getBoxDisplayOrder, orderBoxProductsForDisplay } from '../src/services/storeBoxSales.js';
 
 assert.equal(boxAnnouncementDay(Date.parse('2026-11-07T05:59:59.999Z')), '2026-11-06');
 assert.equal(boxAnnouncementDay(Date.parse('2026-11-07T06:00:00Z')), '2026-11-07');
@@ -39,6 +39,18 @@ assert.deepEqual(originalOrder, [other, box, mixed15], 'No mutation of the share
 assert.equal(orderBoxProductsForDisplay(originalOrder)[0], mixed15, 'Keep the original price, contents and identity');
 assert.deepEqual(orderBoxProductsForDisplay([other, box]), [other, box], 'Without the featured box, existing order is unchanged');
 assert.deepEqual(orderBoxProductsForDisplay([]), []);
+const ranked = [{ ...box, code: 'BOX_ten', boxDisplayOrder: 10 },
+  { ...box, code: 'BOX_second', boxDisplayOrder: '2' }, { ...mixed15, boxDisplayOrder: 3 },
+  { ...other, boxDisplayOrder: 1 }, { ...box, code: 'BOX_last', boxDisplayOrder: 0 }];
+const expectedRanked = [ranked[3], ranked[1], ranked[2], ranked[0], ranked[4]];
+assert.deepEqual(orderBoxProductsForDisplay(ranked), expectedRanked, 'Manual numeric order overrides the legacy featured pin');
+assert.deepEqual(getBoxAnnouncementProducts(ranked), expectedRanked, 'Home and announcement share manual ordering');
+assert.deepEqual(orderBoxProductsForDisplay([{ ...other, boxDisplayOrder: 2 }, { ...box, boxDisplayOrder: 2 }]).map(p => p.code),
+  [other.code, box.code], 'Equal positions keep existing catalog order');
+assert.equal(getBoxDisplayOrder(mixed15), 1, 'Legacy mixed box starts at position one');
+assert.equal(getBoxDisplayOrder({ ...mixed15, boxDisplayOrder: 0 }), 0, 'Explicit clearing disables the legacy pin');
+assert.equal(getBoxDisplayOrder({ ...box, boxDisplayOrder: -1 }), 0);
+assert.equal(getBoxDisplayOrder({ code: mixed15.code, boxDisplayOrder: 1 }), 0, 'Only box presentations have an order');
 for (const unavailable of [{ active: false }, { inventory: 0 }, { image: '' }]) {
   assert.deepEqual(getBoxAnnouncementProducts([other, { ...mixed15, ...unavailable }, box]), [other, box],
     'Featuring never bypasses visibility or stock checks');

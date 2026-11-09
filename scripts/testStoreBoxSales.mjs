@@ -18,6 +18,15 @@ assert.equal(product.boxSale.sourceCode, source.code);
 assert.notEqual(product.code, source.code, 'Distinct cart identities');
 assert.equal(buildBoxCatalogProduct(form, source, product, 'ignored').code, product.code);
 assert.notEqual(buildBoxCatalogProduct(form, source, null, 'second').code, product.code);
+const orderedBox = buildBoxCatalogProduct({ ...form, boxDisplayOrder: '2' }, source, product);
+assert.equal(orderedBox.boxDisplayOrder, 2);
+assert.deepEqual(orderedBox.boxSale, product.boxSale, 'Ordering is not part of the purchased presentation');
+assert.equal(orderedBox.price, product.price);
+assert.equal(buildBoxCatalogProduct(form, source, orderedBox).boxDisplayOrder, 2, 'Other edits retain order');
+assert.equal(buildBoxCatalogProduct({ ...form, boxDisplayOrder: '' }, source, orderedBox).boxDisplayOrder, 0, 'Empty order persists a last-place sentinel');
+for (const boxDisplayOrder of [-1, 1.5, '0', 'bad', Infinity, NaN, true, {}, 100000]) {
+  assert.throws(() => buildBoxCatalogProduct({ ...form, boxDisplayOrder }, source, product), /orden/);
+}
 for (const n of [1, 2, 3, 10]) {
   const orderItem = boxOrderItem(cart(n));
   assert.equal(orderItem.codigo, source.code);
