@@ -32,6 +32,9 @@ jobs:
       - name: Verify Google sign-in configuration
         run: npm run test:google-auth && npm run test:store-access
 
+      - name: Verify configurable box ordering
+        run: npm run test:box-sales && npm run test:box-sales-ui && npm run test:box-announcement
+
       - name: Build Android web assets
         run: npm run build:android:web
         env:
@@ -72,7 +75,7 @@ jobs:
       - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Carnes-San-Martin-v1.2.14-release
+          name: Carnes-San-Martin-v1.2.15-release
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/apk/release/app-release.apk
