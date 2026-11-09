@@ -1,0 +1,34 @@
+name: Verify and enable private TestFlight build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Existing uploaded 1.0.0 build to enable for the existing internal group
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-distribution
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/ios/testTestFlightDistribution.mjs
+      - name: Confirm processing and enable the existing private group
+        run: node scripts/ios/enableTestFlightBuild.mjs
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
