@@ -86,3 +86,14 @@ orders. Mobile store submissions remain on hold pending Apple approval.
 - Installed embedded Android/iOS builds need the next binary update to adopt
   daily frequency logic. This web publication does not lift the store-upload
   hold pending Apple approval.
+- Published source 45efea3511dfbd9bf1dc9209174c4014f285681c via Netlify
+  6af36314fb80bbb9b8b954ea. Both custom-domain release markers verified; all four
+  production function digests unchanged. Campaign patch applied at
+  2026-11-10T18:31:56.903Z and verified to change only the three frequency fields.
+- Live browser: reloaded the already-exposed Nindiri guest session; no popup
+  appeared. AdminTV lists 10 vistas and Maximo una vez al dia; Edit reads 10
+  and the daily checkbox checked. Screenshot capture was unavailable for this
+  follow-up, so evidence is the inspected live DOM and configuration readback.
+- Passed build, test:web-release, test:popup-ads, test:box-announcement,
+  test:retail-home, test:store-editorial and test:manual-route. Daily progression
+  and cross-device account claims were simulated, not executed on real customers.
