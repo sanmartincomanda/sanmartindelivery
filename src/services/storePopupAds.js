@@ -90,6 +90,7 @@ export const normalizeStorePopupAd = (popupAd = {}, fallback = {}, index = 0) =>
       STORE_DEFAULT_POPUP_ADS[index]?.maxViewsPerUser || 2
     ),
     ctaLabel: String(source.ctaLabel ?? backup.ctaLabel ?? '').trim(),
+    targetProductCode: String(source.targetProductCode ?? backup.targetProductCode ?? '').trim(),
     targetCategory: String(source.targetCategory ?? backup.targetCategory ?? '').trim(),
     targetSubcategory: String(source.targetSubcategory ?? backup.targetSubcategory ?? '').trim(),
   };
@@ -167,6 +168,10 @@ export async function saveStorePopupAd(popupAd, existingPopupAd = null) {
 
   if (!normalized.id || !normalized.title || !normalized.image) {
     throw new Error('El anuncio popup necesita titulo e imagen.');
+  }
+
+  if (normalized.ctaLabel && !normalized.targetProductCode && !normalized.targetCategory) {
+    throw new Error('El boton del anuncio necesita un producto o una categoria de destino.');
   }
 
   let nextPopupAd = normalized;

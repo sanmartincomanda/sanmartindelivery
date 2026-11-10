@@ -12,6 +12,8 @@ import RetailQuickActions from './storefront/RetailQuickActions';
 import { BOX_CATEGORY_ID, describeBoxContents, orderBoxProductsForDisplay, resolveBoxAvailability } from '../services/storeBoxSales';
 import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnnouncementProducts } from '../services/storeBoxAnnouncement.js';
 import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
+import StorePopupAdModal from './storefront/StorePopupAdModal';
+import { getStorePopupTargetProduct, isStorePopupTargetAvailable } from '../services/storePopupTarget.js';
 import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
 import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
@@ -1423,6 +1425,7 @@ export default function TiendaVirtualView({
     )
   );
   const [cart, setCart] = useState({});
+  const [popupAdsLoading, setPopupAdsLoading] = useState(true);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponMessage, setCouponMessage] = useState('');
@@ -1927,12 +1930,12 @@ export default function TiendaVirtualView({
           remotePopupAds
         );
         if (!cancelled) {
-          startTransition(() => {
-            setPopupAds(mergeStorePopupAds(remotePopupAds, { includeDefaults: true }));
-          });
+          setPopupAds(mergeStorePopupAds(remotePopupAds, { includeDefaults: true }));
         }
       } catch (error) {
         console.error('No se pudieron cargar los anuncios popup de tienda:', error);
+      } finally {
+        if (!cancelled) setPopupAdsLoading(false);
       }
     };
 
@@ -3005,31 +3008,22 @@ export default function TiendaVirtualView({
   );
 
   const activePopupAds = useMemo(
-    () => popupAds.filter((popupAd) => isStorePopupAdVisible(popupAd, currentTimeMs)),
-    [currentTimeMs, popupAds]
+    () => popupAds.filter((popupAd) => isStorePopupAdVisible(popupAd, currentTimeMs) &&
+      isStorePopupTargetAvailable(popupAd, activeProducts)),
+    [currentTimeMs, popupAds, activeProducts]
   );
   const popupViewerKey = useMemo(
     () => getStorePopupViewerKey(currentUser?.key),
     [currentUser?.key]
   );
   const hasBlockingWelcomeCoupon = ['available', 'claimed'].includes(welcomeCouponStatus);
-  const storeAdsBlocked = isDashboard || catalogLoading || mobileNavSection !== 'home' ||
+  const storeAdsBlocked = isDashboard || catalogLoading || popupAdsLoading || mobileNavSection !== 'home' ||
     activeCategory !== 'todos' || Boolean(query.trim()) || searchFocused || selectedProduct ||
     checkoutOpen || ordersOpen || profileOpen || rewardsOpen || authSheetOpen || authLoading ||
     orderSuccessOpen || firstOrderGiftOpen || welcomeCouponOpen || storeClosedNoticeOpen ||
     branchSelectorOpen || cartCoverageNotice || pendingOrderUpdateReview || !online;
-  const boxAnnouncementPending = useBoxSalesAnnouncement({
-    enabled: !storeAdsBlocked && !popupAdOpen && boxSalesProducts.length > 0 &&
-      !popupAdSessionRef.current.endsWith(`:${boxAnnouncementDay()}`),
-    user: currentUser,
-    onShow: () => {
-      popupAdSessionRef.current = `${popupViewerKey}:${BOX_ANNOUNCEMENT_ID}:${boxAnnouncementDay()}`;
-      setOpenedPopupAdId(BOX_ANNOUNCEMENT_ID);
-      setPopupAdOpen(true);
-    },
-  });
   const popupAdCandidate = useMemo(() => {
-    if (hasBlockingWelcomeCoupon || boxAnnouncementPending) {
+    if (hasBlockingWelcomeCoupon) {
       return null;
     }
 
@@ -3040,15 +3034,25 @@ export default function TiendaVirtualView({
           Math.max(1, Number(popupAd.maxViewsPerUser || 1))
       ) || null
     );
-  }, [activePopupAds, boxAnnouncementPending, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey]);
+  }, [activePopupAds, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey]);
+  const boxAnnouncementPending = useBoxSalesAnnouncement({
+    enabled: !storeAdsBlocked && !popupAdCandidate && !popupAdOpen && boxSalesProducts.length > 0 &&
+      !popupAdSessionRef.current.endsWith(`:${boxAnnouncementDay()}`),
+    user: currentUser,
+    onShow: () => {
+      popupAdSessionRef.current = `${popupViewerKey}:${BOX_ANNOUNCEMENT_ID}:${boxAnnouncementDay()}`;
+      setOpenedPopupAdId(BOX_ANNOUNCEMENT_ID);
+      setPopupAdOpen(true);
+    },
+  });
   const openedPopupAd = useMemo(
     () => openedPopupAdId === BOX_ANNOUNCEMENT_ID
       ? boxSalesProducts.length > 0 ? {
           id: BOX_ANNOUNCEMENT_ID, title: 'Ventas por caja', image: boxSalesProducts[0].image,
           targetCategory: BOX_CATEGORY_ID, ctaLabel: 'Ir a comprar', active: true,
         } : null
-      : popupAds.find((popupAd) => popupAd.id === openedPopupAdId) || null,
-    [boxSalesProducts, openedPopupAdId, popupAds]
+      : activePopupAds.find((popupAd) => popupAd.id === openedPopupAdId) || null,
+    [boxSalesProducts, openedPopupAdId, activePopupAds]
   );
   const welcomeCouponHeroImage = useMemo(
     () => findWelcomeCouponHeroImage(catalog),
@@ -4115,11 +4119,18 @@ export default function TiendaVirtualView({
   };
 
   const openPopupAdTarget = () => {
+    const targetProduct = getStorePopupTargetProduct(openedPopupAd, activeProducts);
     const targetCategory = String(openedPopupAd?.targetCategory || '').trim();
     const targetSubcategory = String(openedPopupAd?.targetSubcategory || '').trim();
 
     setPopupAdOpen(false);
     setOpenedPopupAdId('');
+
+    if (openedPopupAd?.targetProductCode) {
+      if (targetProduct) openProduct(targetProduct);
+      else setQuantityNotice('Este producto ya no esta disponible en esta sucursal.');
+      return;
+    }
 
     if (!targetCategory) {
       return;
@@ -10647,103 +10658,6 @@ export default function TiendaVirtualView({
     </div>
     </RetailHomeContext.Provider>
   );
-}
-
-function StorePopupAdModal({ popupAd, onClose, onAction }) {
-  if (!popupAd) {
-    return null;
-  }
-
-  const modalContent = (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 88,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 18,
-        background: 'rgba(3, 12, 28, 0.84)',
-        backdropFilter: 'blur(8px)',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          position: 'relative',
-          width: 'min(460px, 100%)',
-          maxHeight: '92vh',
-          borderRadius: 30,
-          overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 38px 90px rgba(0, 0, 0, 0.4)',
-          background: '#fff',
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar anuncio"
-          style={{
-            position: 'absolute',
-            top: 14,
-            right: 14,
-            zIndex: 2,
-            width: 42,
-            height: 42,
-            borderRadius: '50%',
-            border: '1px solid rgba(255,255,255,0.18)',
-            background: 'rgba(8, 15, 29, 0.64)',
-            color: '#fff',
-            fontSize: 24,
-            cursor: 'pointer',
-          }}
-        >
-          ×
-        </button>
-        <img
-          src={popupAd.image}
-          alt={popupAd.title || 'Anuncio especial'}
-          style={{
-            display: 'block',
-            width: '100%',
-            maxHeight: popupAd.ctaLabel ? 'calc(92vh - 86px)' : '92vh',
-            objectFit: 'contain',
-            background: '#fcebdd',
-          }}
-        />
-        {popupAd.ctaLabel && (
-          <div style={{ padding: 14 }}>
-            <button
-              type="button"
-              onClick={onAction}
-              style={{
-                width: '100%',
-                minHeight: 54,
-                border: 0,
-                borderRadius: 14,
-                background: '#ff000c',
-                color: '#fff',
-                fontSize: 17,
-                fontWeight: 800,
-                cursor: 'pointer',
-              }}
-            >
-              {popupAd.ctaLabel}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  if (typeof document === 'undefined' || !document.body) {
-    return modalContent;
-  }
-
-  return createPortal(modalContent, document.body);
 }
 
 function WelcomeCouponModal({

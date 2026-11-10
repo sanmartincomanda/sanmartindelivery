@@ -491,6 +491,7 @@ const emptyPopupAd = {
   title: '',
   image: '',
   ctaLabel: '',
+  targetProductCode: '',
   targetCategory: '',
   targetSubcategory: '',
   active: true,
@@ -1484,6 +1485,7 @@ export default function ConfiguracionView({
       title: popupAd.title || '',
       image: popupAd.image || '',
       ctaLabel: popupAd.ctaLabel || '',
+      targetProductCode: popupAd.targetProductCode || '',
       targetCategory: popupAd.targetCategory || '',
       targetSubcategory: popupAd.targetSubcategory || '',
       active: popupAd.active !== false,
@@ -1897,6 +1899,7 @@ export default function ConfiguracionView({
     const startsAt = normalizeDateTimeInputValue(popupAdForm.startsAt);
     const endsAt = normalizeDateTimeInputValue(popupAdForm.endsAt);
     const ctaLabel = String(popupAdForm.ctaLabel || '').trim();
+    const targetProductCode = String(popupAdForm.targetProductCode || '').trim();
     const targetCategory = String(popupAdForm.targetCategory || '').trim();
     const targetSubcategory = String(popupAdForm.targetSubcategory || '').trim();
 
@@ -1915,8 +1918,8 @@ export default function ConfiguracionView({
       return;
     }
 
-    if (ctaLabel && !targetCategory) {
-      setMessage('Selecciona la categoria a la que debe llevar el boton del popup.');
+    if (ctaLabel && !targetCategory && !targetProductCode) {
+      setMessage('Selecciona el producto o la categoria que debe abrir el boton del popup.');
       return;
     }
 
@@ -1931,6 +1934,7 @@ export default function ConfiguracionView({
           title: popupAdForm.title,
           image: popupAdForm.image,
           ctaLabel,
+          targetProductCode: ctaLabel ? targetProductCode : '',
           targetCategory: ctaLabel ? targetCategory : '',
           targetSubcategory: ctaLabel ? targetSubcategory : '',
           active: popupAdForm.active,
@@ -3545,6 +3549,7 @@ export default function ConfiguracionView({
           />
         ) : isStoreMode && section === 'popup_ads' ? (
           <PopupAdsManager
+            products={products}
             popupAds={popupAds}
             popupAdForm={popupAdForm}
             savingPopupAd={savingPopupAd}
@@ -5994,6 +5999,7 @@ function ProductPromotionsManager({
 }
 
 function PopupAdsManager({
+  products = [],
   popupAds,
   popupAdForm,
   savingPopupAd,
@@ -6159,6 +6165,16 @@ function PopupAdsManager({
             onChange={(event) => updatePopupAdForm('ctaLabel', event.target.value)}
             placeholder="Ejemplo: Comprar Combos"
           />
+          <label style={{ display: 'grid', gap: 6 }}>
+            <span>Producto que abre el boton</span>
+            <select className="cfg-select" value={popupAdForm.targetProductCode}
+              onChange={event => updatePopupAdForm('targetProductCode', event.target.value)}>
+              <option value="">Abrir una categoria</option>
+              {products.map(product => <option key={product.code} value={product.code}>
+                {product.name} · {product.code}
+              </option>)}
+            </select>
+          </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
             <input
               className="cfg-input"
@@ -6174,7 +6190,8 @@ function PopupAdsManager({
             />
           </div>
           <span style={{ color: '#64748b', fontSize: 12, fontWeight: 700 }}>
-            Para los paquetes Casero usa categoria "promociones" y subcategoria "Combos".
+            Si seleccionas un producto, abre su detalle y solo se muestra donde este disponible.
+            Sin producto, abre la categoria indicada. Para Casero: "promociones" y "Combos".
           </span>
         </div>
         <div style={{ color: '#64748b', fontSize: 13, fontWeight: 700, lineHeight: 1.5 }}>

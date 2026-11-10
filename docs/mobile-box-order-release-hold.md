@@ -33,6 +33,11 @@ the existing 1.0.0 train).
 
 ## Resume checklist
 
+The web popup change dated 2026-11-10 adds direct product destinations. The
+prepared binaries below predate that change; rebuild before a future store
+upload if this behavior is to be included. The web-only release does not lift
+the Apple-approval hold.
+
 1. Verify Apple 1.0.0 (5) is approved in App Store Connect, not merely processing
    or Pending Review. Re-check the highest build/version codes in both stores.
 2. Confirm the packages still contain all intended changes; rebuild if code,
