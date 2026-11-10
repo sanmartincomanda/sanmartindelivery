@@ -497,6 +497,8 @@ const emptyPopupAd = {
   active: true,
   sortOrder: '',
   maxViewsPerUser: '2',
+  oncePerDay: false,
+  dailyLimitStartedAt: '',
   startsAt: '',
   endsAt: '',
 };
@@ -1491,6 +1493,8 @@ export default function ConfiguracionView({
       active: popupAd.active !== false,
       sortOrder: popupAd.sortOrder ?? '',
       maxViewsPerUser: String(popupAd.maxViewsPerUser ?? 2),
+      oncePerDay: popupAd.oncePerDay === true,
+      dailyLimitStartedAt: popupAd.dailyLimitStartedAt || '',
       startsAt: toDateTimeInputValue(popupAd.startsAt),
       endsAt: toDateTimeInputValue(popupAd.endsAt),
     });
@@ -1940,6 +1944,9 @@ export default function ConfiguracionView({
           active: popupAdForm.active,
           sortOrder: popupAdForm.sortOrder === '' ? popupAds.length * 10 : Number(popupAdForm.sortOrder || 0),
           maxViewsPerUser: Math.max(1, Math.trunc(Number(popupAdForm.maxViewsPerUser || 2))),
+          oncePerDay: popupAdForm.oncePerDay === true,
+          dailyLimitStartedAt: popupAdForm.oncePerDay
+            ? popupAdForm.dailyLimitStartedAt || new Date().toISOString() : '',
           startsAt,
           endsAt,
         },
@@ -6108,6 +6115,7 @@ function PopupAdsManager({
                         {popupAd.active === false ? 'Apagado' : 'Visible'}
                       </span>
                       <span className="cfg-badge">{Math.max(1, Number(popupAd.maxViewsPerUser || 1))} vistas</span>
+                      {popupAd.oncePerDay && <span className="cfg-badge">Maximo una vez al dia</span>}
                     </div>
                     <div style={{ color: '#64748b', marginTop: 8, fontSize: 13, lineHeight: 1.6 }}>
                       <div>Inicio: {popupAd.startsAt ? formatAdminDateTime(popupAd.startsAt) : 'Inmediato'}</div>
@@ -6214,8 +6222,19 @@ function PopupAdsManager({
             value={popupAdForm.maxViewsPerUser}
             onChange={(event) => updatePopupAdForm('maxViewsPerUser', event.target.value)}
             placeholder="Veces por cliente"
+            aria-label="Maximo de apariciones por cliente"
           />
         </div>
+        <label style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
+          <input type="checkbox" checked={popupAdForm.oncePerDay}
+            onChange={event => {
+              updatePopupAdForm('oncePerDay', event.target.checked);
+              if (event.target.checked && !popupAdForm.dailyLimitStartedAt) {
+                updatePopupAdForm('dailyLimitStartedAt', new Date().toISOString());
+              }
+            }} />
+          Maximo una vez al dia (hora de Nicaragua)
+        </label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <input
             className="cfg-input"

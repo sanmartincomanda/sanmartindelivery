@@ -14,6 +14,7 @@ import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnn
 import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
 import StorePopupAdModal from './storefront/StorePopupAdModal';
 import { getStorePopupTargetProduct, isStorePopupTargetAvailable } from '../services/storePopupTarget.js';
+import { STORE_POPUP_AD_VIEW_COUNT_KEY, readStorePopupAdViewCounts, canShowStorePopupAd, claimStorePopupAd, syncStorePopupAdExposure } from '../services/storePopupExposure.js';
 import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
 import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
@@ -246,7 +247,6 @@ const STORE_CATEGORY_ICON_BY_KEY = Object.freeze({
   refrigerados: '/tienda/categorias/icons/refrigerados.png',
 });
 const STORE_SESSION_KEY = 'sanmartin_store_user';
-const STORE_POPUP_AD_VIEW_COUNT_KEY = 'sanmartin_store_popup_ad_view_counts_v1';
 const STORE_ORDER_UPDATE_ACK_KEY = 'sanmartin_store_order_update_ack';
 const STORE_FALLBACK_WHATSAPP_NUMBER = '50584657949';
 const DELIVERY_SERVICE_ITEM_CODES = new Set(['00171', '00172', '00247', '00248', '00249']);
@@ -812,55 +812,9 @@ const getInitialStoreCollection = (cacheKey, cacheVersion, mergeCollection, fall
   return fallbackValue;
 };
 
-const readStorePopupAdViewCounts = () => {
-  if (typeof window === 'undefined') {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(STORE_POPUP_AD_VIEW_COUNT_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (error) {
-    console.error('No se pudo leer el historial local de anuncios popup:', error);
-    return {};
-  }
-};
-
-const writeStorePopupAdViewCounts = (value) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(STORE_POPUP_AD_VIEW_COUNT_KEY, JSON.stringify(value || {}));
-  } catch (error) {
-    console.error('No se pudo guardar el historial local de anuncios popup:', error);
-  }
-};
-
 const getStorePopupViewerKey = (userKey = '') => {
   const cleanUserKey = String(userKey || '').trim();
   return cleanUserKey ? `user:${cleanUserKey}` : 'guest';
-};
-
-const getStorePopupAdViewCount = (viewCounts = {}, viewerKey = 'guest', popupAdId = '') =>
-  Math.max(0, Number(viewCounts?.[viewerKey]?.[popupAdId] || 0));
-
-const incrementStorePopupAdViewCount = (currentViewCounts = {}, viewerKey = 'guest', popupAdId = '') => {
-  const cleanPopupAdId = String(popupAdId || '').trim();
-  if (!cleanPopupAdId) {
-    return currentViewCounts;
-  }
-
-  const nextViewerCounts = {
-    ...(currentViewCounts?.[viewerKey] || {}),
-    [cleanPopupAdId]: getStorePopupAdViewCount(currentViewCounts, viewerKey, cleanPopupAdId) + 1,
-  };
-
-  return {
-    ...(currentViewCounts || {}),
-    [viewerKey]: nextViewerCounts,
-  };
 };
 
 const isUnitProduct = (product) => isUnitMeasure(product?.unit);
@@ -1433,6 +1387,19 @@ export default function TiendaVirtualView({
   const [popupAdOpen, setPopupAdOpen] = useState(false);
   const [openedPopupAdId, setOpenedPopupAdId] = useState('');
   const [popupAdViewCounts, setPopupAdViewCounts] = useState(() => readStorePopupAdViewCounts());
+  useEffect(() => {
+    const refresh = event => {
+      if (event.type !== 'storage' || event.key === STORE_POPUP_AD_VIEW_COUNT_KEY || event.key === null) {
+        setPopupAdViewCounts(readStorePopupAdViewCounts());
+      }
+    };
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   const [welcomeCouponActionBusy, setWelcomeCouponActionBusy] = useState(false);
   const [quantityNotice, setQuantityNotice] = useState('');
   const [query, setQuery] = useState('');
@@ -3030,13 +2997,21 @@ export default function TiendaVirtualView({
     return (
       activePopupAds.find(
         (popupAd) =>
-          getStorePopupAdViewCount(popupAdViewCounts, popupViewerKey, popupAd.id) <
-          Math.max(1, Number(popupAd.maxViewsPerUser || 1))
+          canShowStorePopupAd(popupAdViewCounts, popupViewerKey, popupAd, currentTimeMs)
       ) || null
     );
-  }, [activePopupAds, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey]);
+  }, [activePopupAds, hasBlockingWelcomeCoupon, popupAdViewCounts, popupViewerKey, currentTimeMs]);
+  const dailyPopupCampaignActive = activePopupAds.some(ad => ad.oncePerDay);
+  useEffect(() => {
+    if (!currentUser?.key) return;
+    activePopupAds.filter(ad => ad.oncePerDay).forEach(ad => {
+      syncStorePopupAdExposure({ viewerKey: popupViewerKey, ad }).catch(error => {
+        console.warn('No se pudo sincronizar la frecuencia del anuncio.', error);
+      });
+    });
+  }, [currentUser?.key, popupViewerKey, activePopupAds]);
   const boxAnnouncementPending = useBoxSalesAnnouncement({
-    enabled: !storeAdsBlocked && !popupAdCandidate && !popupAdOpen && boxSalesProducts.length > 0 &&
+    enabled: !storeAdsBlocked && !popupAdCandidate && !popupAdOpen && !dailyPopupCampaignActive && boxSalesProducts.length > 0 &&
       !popupAdSessionRef.current.endsWith(`:${boxAnnouncementDay()}`),
     user: currentUser,
     onShow: () => {
@@ -3246,14 +3221,22 @@ export default function TiendaVirtualView({
       return;
     }
 
-    popupAdSessionRef.current = sessionKey;
-    setOpenedPopupAdId(popupAdCandidate.id);
-    setPopupAdOpen(true);
-    setPopupAdViewCounts((current) => {
-      const next = incrementStorePopupAdViewCount(current, popupViewerKey, popupAdCandidate.id);
-      writeStorePopupAdViewCounts(next);
-      return next;
-    });
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const next = await claimStorePopupAd({ viewerKey: popupViewerKey, ad: popupAdCandidate,
+          isEligible: () => !cancelled && !popupAdSessionRef.current && document.visibilityState !== 'hidden',
+        });
+        if (!next || cancelled) return;
+        popupAdSessionRef.current = sessionKey;
+        setOpenedPopupAdId(popupAdCandidate.id);
+        setPopupAdOpen(true);
+        setPopupAdViewCounts(next);
+      } catch (error) {
+        console.warn('No se pudo registrar el anuncio; la compra sigue disponible.', error);
+      }
+    }, 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [
     hasBlockingWelcomeCoupon,
     orderSuccessOpen,

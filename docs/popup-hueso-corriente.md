@@ -6,8 +6,8 @@
   box contents are not changed.
 - Product: BOX_7f2a4f25-28c4-4095-90bc-d5920faa263b, not the loose SKU 00069.
 - Campaign ID: hueso_corriente_caja_nov_2026. CTA: Ir a comprar.
-- Uses the existing popup limit: two impressions per viewer, one popup per
-  visit. No expiration was requested. Limits, dates, image and destination
+- Updated frequency: ten lifetime impressions, maximum one per calendar day
+  in America/Managua. No expiration was requested. Limits, dates, image and destination
   remain editable in AdminTV's popup manager.
 - Only appears where the selected product is active and available in the
   branch-resolved catalog. Active custom ads precede the generic box notice.
@@ -62,3 +62,27 @@ orders. Mobile store submissions remain on hold pending Apple approval.
   preserves targetProductCode and Ir a comprar; no extra save was made for QA.
 - Screenshots retained under ignored tmp/: popup-hueso-live-mobile.png.
 - Existing customer welcome-coupon precedence and impression limits remain.
+
+## Daily frequency update
+
+- Added optional oncePerDay and dailyLimitStartedAt to campaign configuration;
+  both are preserved by AdminTV edits. Hueso uses maxViewsPerUser=10.
+- Existing numeric local counters remain intact. Daily metadata is stored in
+  __daily within the same local key. Existing impressions count toward ten;
+  counters without dates are suppressed on the rollout day, not reset.
+- Signed-in impressions additionally use an atomic transaction at
+  storeUsers/{uid}/popupAdViews/{campaignId}, containing count and lastDay.
+  The existing owner-scoped profile access rule covers this field. No rules,
+  endpoints or backend functions were changed. No collection scans/polling.
+- Guest impressions transfer on login. Account transactions prevent repeated
+  impressions across devices. Anonymous users are limited per browser;
+  clearing browser storage removes anonymous history.
+- Active daily campaigns also suppress the generic box-launch popup, rather
+  than replacing a suppressed ad with another interruption.
+- test:popup-ads now also simulates ten distinct days, midnight in Managua,
+  same-day re-entry, old counters, login/logout, two tabs, two devices,
+  transaction aborts and unchanged legacy campaigns. No customer records were
+  modified for these tests.
+- Installed embedded Android/iOS builds need the next binary update to adopt
+  daily frequency logic. This web publication does not lift the store-upload
+  hold pending Apple approval.

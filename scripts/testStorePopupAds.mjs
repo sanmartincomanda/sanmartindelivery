@@ -26,6 +26,13 @@ assert.equal(api.normalizeStorePopupAd({ targetProductCode: ' BOX_TEST ' }).targ
 assert.equal(api.normalizeStorePopupAd({ title: 'Edited' }, ad).targetProductCode, box.code, 'Editing does not discard the destination');
 assert.equal(api.normalizeStorePopupAd({ targetProductCode: '' }, ad).targetProductCode, '', 'Explicitly switching to category clears the product');
 assert.equal(api.mergeStorePopupAds({ ad })[0].targetProductCode, box.code);
+assert.equal(api.normalizeStorePopupAd({}, { oncePerDay: true }).oncePerDay, true);
+assert.equal(api.normalizeStorePopupAd({ oncePerDay: false }, { oncePerDay: true }).oncePerDay, false);
+const daily = { ...ad, oncePerDay: true, maxViewsPerUser: 10, dailyLimitStartedAt: '2026-11-10T17:00:00.000Z' };
+await api.saveStorePopupAd({ title: 'Edited' }, daily);
+assert.equal(saved.oncePerDay, true);
+assert.equal(saved.maxViewsPerUser, 10);
+assert.equal(saved.dailyLimitStartedAt, daily.dailyLimitStartedAt);
 await api.saveStorePopupAd(ad);
 assert.equal(saved.targetProductCode, box.code);
 assert.equal(saved.ctaLabel, 'Ir a comprar');

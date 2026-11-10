@@ -89,6 +89,8 @@ export const normalizeStorePopupAd = (popupAd = {}, fallback = {}, index = 0) =>
       source.maxViewsPerUser ?? backup.maxViewsPerUser,
       STORE_DEFAULT_POPUP_ADS[index]?.maxViewsPerUser || 2
     ),
+    oncePerDay: (source.oncePerDay ?? backup.oncePerDay) === true,
+    dailyLimitStartedAt: normalizePopupAdDate(source.dailyLimitStartedAt ?? backup.dailyLimitStartedAt),
     ctaLabel: String(source.ctaLabel ?? backup.ctaLabel ?? '').trim(),
     targetProductCode: String(source.targetProductCode ?? backup.targetProductCode ?? '').trim(),
     targetCategory: String(source.targetCategory ?? backup.targetCategory ?? '').trim(),
@@ -213,6 +215,12 @@ export async function updateStorePopupAd(id, patch = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(normalizedPatch, 'maxViewsPerUser')) {
     normalizedPatch.maxViewsPerUser = normalizePopupAdViews(normalizedPatch.maxViewsPerUser);
+  }
+  if (Object.prototype.hasOwnProperty.call(normalizedPatch, 'oncePerDay')) {
+    normalizedPatch.oncePerDay = normalizedPatch.oncePerDay === true;
+  }
+  if (Object.prototype.hasOwnProperty.call(normalizedPatch, 'dailyLimitStartedAt')) {
+    normalizedPatch.dailyLimitStartedAt = normalizePopupAdDate(normalizedPatch.dailyLimitStartedAt);
   }
 
   if (normalizedPatch.active === true) {
