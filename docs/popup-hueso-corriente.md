@@ -44,3 +44,21 @@ The complete artwork remains visible; reduced-motion is respected.
 Web-only static deployment; preserve all existing Netlify function digests.
 No Firebase rules/functions, SICAR changes, app-store uploads or customer
 orders. Mobile store submissions remain on hold pending Apple approval.
+
+## Published verification, 2026-11-10
+
+- Source: 12eeafb6c423708205d74ff601f18b42cba1f71f, pushed to main and
+  release/ios-app-store. Netlify deploy: 6af35229f7ee51d955e86d86.
+- Both tienda.sanmartinsr.com/release.json and
+  admintv.sanmartinsr.com/release.json match the source revision.
+- All four production function digests were retained without re-uploading.
+- Created the campaign after the web release. Browser checks in Granada and
+  Nindiri show the actual artwork, close button and Ir a comprar. The CTA opens
+  HUESO CORRIENTE (E) por caja, C$350, 40 lb at C$8.75/lb, with the existing
+  quantity selector and cart action. No order or cart item was submitted.
+- Returning to home did not stack the generic box announcement. Mobile live
+  artwork/CTA verified at 390 x 844; local small-screen/orientation checks above.
+- AdminTV > Marketing > Anuncios popup lists one active ad. Opening Edit
+  preserves targetProductCode and Ir a comprar; no extra save was made for QA.
+- Screenshots retained under ignored tmp/: popup-hueso-live-mobile.png.
+- Existing customer welcome-coupon precedence and impression limits remain.
