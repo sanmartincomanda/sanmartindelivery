@@ -23,6 +23,29 @@ autenticacion, pedidos, precios, datos o permisos. La actualizacion del nombre
 en la ficha requiere guardarlo tambien en Informacion de la app de App Store
 Connect; el nombre nativo por si solo no cambia el nombre publico.
 
+La ficha de 1.0.1 ya tiene el nombre exacto guardado. GitHub run `43102028571`
+compilo, firmo, valido y cargo **1.0.1 (6)** desde `553b70d4e8f8` en 9m32s.
+Apple confirmo recepcion el 2026-11-11 a las 15:28 Nicaragua; delivery
+`e14a1f4b-87bf-44eb-bade-6df63fe7b16c`. La recepcion no implica aprobacion.
+
+IPA: `tmp/ios-app-store-1.0.1-6/App.ipa` (12,870,050 bytes), SHA256
+`3a5c0f2f27cb750418e24dffdd416d477b7a084476a4412e788d833bb39b30a8`.
+Comprobado dentro del IPA: nombre/version/build, bundle ID, ambos proveedores,
+19 manifiestos de privacidad sin cambios e iconos compilados iPhone/iPad
+(formato Apple CgBI) con fondo exacto #0044C5. Pasaron ios:sync, test:ios-config,
+store-access, google-auth, apple-auth, box-sales, box-sales-ui, box-announcement,
+popup-ads, build web, web-release, retail-home, store-editorial y manual-route.
+No se ejecuto inicio de sesion en un iPhone fisico durante este cambio visual.
+No se publicaron funciones, reglas, SICAR ni Android como parte de esta correccion.
+
+App Store Connect confirmo **1 articulo enviado** y **Pendiente de revision**
+para 1.0.1 (6) el 2026-11-11. Se incluyo explicitamente el cambio de Nombre
+(Espanol Mexico); publicacion automatica al aprobar, sin retiro de 1.0.0.
+TestFlight tiene build 6 asignado al grupo existente `San Martin - Revision interna`.
+Evidencias locales: `output/apple-name-1.0.1.png` y
+`output/apple-1.0.1-6-review-submitted.png`. No confundir con aprobacion de 1.0.1:
+el nombre y el icono publicos anteriores pueden continuar hasta la nueva revision.
+
 El proyecto nativo esta en `ios/App` y se sincroniza con:
 
 ```bash
