@@ -20,7 +20,7 @@ import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
 import RetailProductRail from './storefront/RetailProductRail';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
-import { GOOGLE_PLAY_STORE_URL, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
+import { GOOGLE_PLAY_STORE_URL, APP_STORE_URL, getHeaderAppDownload, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
 import RetailCheckout from './storefront/RetailCheckout';
 import { useOnlineStatus, useRetailNavigation, useRetailFocusLayers } from './storefront/useRetailNavigation';
 import { createPortal } from 'react-dom';
@@ -1535,6 +1535,7 @@ export default function TiendaVirtualView({
   const usePublicStorefrontDesign = !isDashboard;
   const showAppDownloadLinks = !isDashboard &&
     !(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
+  const headerAppDownload = getHeaderAppDownload(typeof navigator === 'undefined' ? undefined : navigator);
   const pickupFlow = fulfillmentType === ORDER_FULFILLMENT_PICKUP;
   const showMobileBottomNav = !isDashboard;
   const online = useOnlineStatus();
@@ -6033,24 +6034,8 @@ export default function TiendaVirtualView({
           outline: 3px solid var(--sm-red);
           outline-offset: 3px;
         }
-        .store-app-download-link--upcoming {
+        .store-app-download-link--apple {
           padding: 0 4px;
-          cursor: not-allowed;
-        }
-        .store-app-download-link--upcoming::after {
-          content: 'PRÓXIMAMENTE';
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          padding: 4px 6px;
-          border-radius: 4px;
-          background: rgba(255, 255, 255, 0.95);
-          color: var(--sm-blue-deep);
-          font-size: 9px;
-          font-weight: 900;
-          letter-spacing: 0.06em;
-          white-space: nowrap;
-          transform: translate(-50%, -50%) rotate(-7deg);
         }
         .store-product-group {
           padding: 16px 16px 18px;
@@ -9955,9 +9940,10 @@ export default function TiendaVirtualView({
             </div>
             {!isDashboard && <span className="retail-header-delivery">{fulfillmentType === ORDER_FULFILLMENT_PICKUP ? 'Retiro en tienda' : fulfillmentType === ORDER_FULFILLMENT_ROUTE_SAN_MARTIN ? 'Ruta San Martín' : 'Entrega a domicilio'}</span>}
             {showAppDownloadLinks && (
-              <a className="retail-header-play" href={GOOGLE_PLAY_STORE_URL} target="_blank" rel="noopener noreferrer"
-                aria-label="Descargar Carnes San Martín en Google Play">
-                <img src="/tienda/branding/google-play-badge.png" alt="Get it on Google Play" width="646" height="250" />
+              <a className="retail-header-play" href={headerAppDownload.url} target="_blank" rel="noopener noreferrer"
+                aria-label={`Descargar Carnes San Martín en ${headerAppDownload.store}`}>
+                <img src={`/tienda/branding/${headerAppDownload.badge}`} alt={`Disponible en ${headerAppDownload.store}`}
+                  width={headerAppDownload.width} height={headerAppDownload.height} />
               </a>
             )}
           </div>
@@ -10144,14 +10130,16 @@ export default function TiendaVirtualView({
                 >
                   <img src="/tienda/branding/google-play-badge.png" alt="" width="646" height="250" loading="lazy" />
                 </a>
-                <button
-                  type="button"
-                  className="store-app-download-link store-app-download-link--upcoming"
-                  aria-label="App Store, próximamente"
-                  disabled
+                <a
+                  className="store-app-download-link store-app-download-link--apple"
+                  href={APP_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Descargar Carnes San Martín en App Store"
+                  title="Ya disponible en App Store"
                 >
                   <img src="/tienda/branding/app-store-badge.svg" alt="" width="120" height="40" loading="lazy" />
-                </button>
+                </a>
               </div>
             </section>
           )}
