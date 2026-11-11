@@ -16,7 +16,7 @@
 		</dict>
 	</array>
 	<key>CFBundleDisplayName</key>
-        <string>Carnes San Martin</string>
+	<string>Carnes San Martin Delivery GR</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

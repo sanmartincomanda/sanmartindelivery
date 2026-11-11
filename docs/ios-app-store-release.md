@@ -2,12 +2,26 @@
 
 ## Aplicacion
 
-- Nombre: `Carnes San Martin`
+- Nombre solicitado para 1.0.1: `Carnes San Martin Delivery GR`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Ultimo build: `5` (codigo de app `8a5d9af4118f`), habilitado en TestFlight privado y enviado a App Review el 2026-11-09. Aprobacion/publicacion pendientes.
+- Ultimo build aprobado: `5` (codigo de app `8a5d9af4118f`), version 1.0.0. App Store Connect verificado el 2026-11-11: **Listo para distribucion**. La version aprobada conserva el nombre anterior y el icono blanco.
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
+
+## Identidad corregida (2026-11-11)
+
+El titular solicita `Carnes San Martin Delivery GR` y confirma fondo solido
+`#0044C5`, no el degradado azul oscuro de Google Play. Se conserva la geometria
+del logo delivery existente. La fuente editable esta en `assets/app-icon.svg`;
+`node scripts/generateIosIcon.mjs` genera el PNG iOS de 1024 px sin alpha ni
+esquinas blancas. `test:ios-config` valida nombre, color, formato y paridad.
+
+Apple exige una nueva version para cambiar nombre e icono de una app publicada.
+La correccion se prepara para 1.0.1, sin retirar 1.0.0 ni modificar identificador,
+autenticacion, pedidos, precios, datos o permisos. La actualizacion del nombre
+en la ficha requiere guardarlo tambien en Informacion de la app de App Store
+Connect; el nombre nativo por si solo no cambia el nombre publico.
 
 El proyecto nativo esta en `ios/App` y se sincroniza con:
 

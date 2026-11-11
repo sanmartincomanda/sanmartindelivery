@@ -113,6 +113,7 @@ jobs:
           with (app / 'Info.plist').open('rb') as f:
               info = plistlib.load(f)
           assert google['BUNDLE_ID'] == info['CFBundleIdentifier'] == 'com.sanmartinsr.app'
+          assert info['CFBundleDisplayName'] == config['appName'] == 'Carnes San Martin Delivery GR'
           assert google['PROJECT_ID'] == 'comanda-digital-ac1ec'
           assert google['CLIENT_ID'].endswith('.apps.googleusercontent.com')
           schemes = [s for entry in info['CFBundleURLTypes'] for s in entry['CFBundleURLSchemes']]

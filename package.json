@@ -19,7 +19,7 @@
     "build:ios:web": "vite build --mode ios",
     "android:sync": "npm run build:android:web && npx cap sync android",
     "ios:sync": "npm run build:ios:web && npx cap sync ios && node scripts/prepareIos.mjs",
-    "test:ios-config": "node scripts/testIosConfiguration.mjs",
+    "test:ios-config": "node scripts/testIosConfiguration.mjs && node scripts/testIosBranding.mjs",
     "android:apk": "npm run android:sync && cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "test:first-order-rewards": "node scripts/testFirstOrderRewards.mjs",
