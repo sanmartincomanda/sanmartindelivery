@@ -2,6 +2,21 @@
 
 Authorized by the owner on 2026-11-14, web first and then both app stores.
 
+## HOLD: profile repair required
+
+The customer subsequently reported broken profile text on iPhone. The binaries
+listed below contain that defect: DO NOT submit Android 19 or iOS build 7 for
+review as-is. They predate the isolated account layout and profile-photo change
+documented in retail-profile-repair.md. The earlier claim of aligned controls
+was not supported by a full-app visual check; the old fixture missed inherited
+checkout icon CSS.
+
+Rebuild Android before uploading (verify Play's current version code first).
+iOS build 7 was already uploaded, so use a new build number for its replacement.
+The corrected source is local only. Browser access is unavailable; no new
+store submission, production deployment or device QA was performed for this fix.
+Review the privacy disclosures for optional profile photos before mobile release.
+
 ## Source and scope
 
 - Web source: d9d39a5055f20b05b32d81eeaba9327e55b73c71.

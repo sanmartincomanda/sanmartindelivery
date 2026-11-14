@@ -16,6 +16,7 @@ import {
 import { normalizeBirthdayValue } from './customerBirthday';
 import { createStoreLoginRunner, withAuthDeadline, canTryLegacyStoreLogin } from './storeLoginAttempt.js';
 import { setClientDirectoryEntry } from './clientDirectory';
+import { createProfilePhotoSaver } from './storeProfilePhoto';
 import { ensureStoreWelcomeCouponForUser } from './storeWelcomeCoupon';
 import {
   getDefaultStoreAddress,
@@ -25,6 +26,11 @@ import {
 
 export const STORE_USERS_PATH = 'storeUsers';
 const runStoreLogin = createStoreLoginRunner();
+
+export const saveStoreProfilePhoto = createProfilePhotoSaver({
+  getAuthUser: getCurrentAuthUser,
+  writePhoto: (uid, patch) => withAuthDeadline(update(ref(database, `${STORE_USERS_PATH}/${uid}`), patch)),
+});
 
 export const cleanStorePhone = (phone) => String(phone || '').replace(/[^\d+]/g, '').trim();
 export const cleanStoreEmail = (email) => normalizeAuthEmail(email);

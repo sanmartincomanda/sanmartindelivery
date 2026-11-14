@@ -35,36 +35,12 @@ html body .storefront-retail .retail-product { transition: box-shadow 160ms ease
 html body .storefront-retail .retail-product.is-in-cart { box-shadow: inset 0 0 0 1.5px #0044c5; }
 .storefront-retail .retail-quantity-value { display: inline-block; animation: retail-quantity-enter 150ms ease-out; }
 .storefront-retail .retail-card-stepper { animation: retail-controls-enter 160ms ease-out; }
-html body .storefront-retail :is(.retail-card-add,.retail-card-stepper button,.retail-quick-actions button,.retail-profile-menu button,.store-mobile-nav-button) { transition: background-color 140ms ease-out, color 140ms ease-out, transform 140ms ease-out; }
-html body .storefront-retail :is(.retail-card-add,.retail-profile-menu button):active:not(:disabled) { transform: translateY(1px); background-color: #e0ebfa; }
+html body .storefront-retail :is(.retail-card-add,.retail-card-stepper button,.retail-quick-actions button,.store-mobile-nav-button) { transition: background-color 140ms ease-out, color 140ms ease-out, transform 140ms ease-out; }
+html body .storefront-retail .retail-card-add:active:not(:disabled) { transform: translateY(1px); background-color: #e0ebfa; }
 html body .storefront-retail .store-mobile-nav-button.active .store-mobile-nav-icon { position: relative; }
 html body .storefront-retail .store-mobile-nav-button.active .store-mobile-nav-icon::after { content: ''; position: absolute; width: 5px; height: 3px; bottom: -4px; left: calc(50% - 2.5px); background: #0044c5; border-radius: 2px; }
-html body .store-shell.storefront-brand-v3.storefront-retail .retail-profile { max-width: 760px; margin-inline: auto !important; }
-html body .storefront-retail .retail-profile > h1 { margin: 8px 0; font-size: 14px; color: var(--retail-muted); font-weight: 500; letter-spacing: 0; }
-html body .storefront-retail .retail-profile-identity { margin: 0 0 24px; padding: 0; gap: 20px; border: 0; background: transparent; }
-.storefront-retail .retail-profile-identity > div { min-width: 0; flex: 1; }
-html body .storefront-retail .retail-profile-identity h2 { font-size: clamp(26px, 6vw, 34px); line-height: 1.12; }
-.storefront-retail .retail-profile-edit { display: grid; place-items: center; flex: 0 0 56px; width: 56px; min-height: 56px; border: 0; background: #e5ecf8; border-radius: 50%; color: #0044c5; font-size: 24px; font-weight: 600; }
-.storefront-retail .retail-profile-shortcuts { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
-.storefront-retail .retail-profile-shortcuts > button { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 64px; padding: 14px; border: 0; border-radius: 10px; box-shadow: none; background: #edf0f2; color: var(--retail-ink); text-align: left; font-size: 14px; font-weight: 600; }
-.storefront-retail .retail-profile-shortcuts span { min-width: 0; overflow-wrap: anywhere; }
-.storefront-retail .retail-profile-shortcuts svg { width: 22px; height: 22px; flex: 0 0 22px; }
-.storefront-retail .retail-profile-gold { display: grid; grid-template-columns: 24px minmax(0,1fr) auto 12px; align-items: center; gap: 12px; width: 100%; padding: 18px 4px; margin-bottom: 8px; border: 0; border-block: 1px solid #e5dfd1; border-radius: 0; background: transparent; box-shadow: none; color: #61440f; text-align: left; }
-.storefront-retail .retail-profile-gold > svg { width: 24px; height: 24px; }
-.storefront-retail .retail-profile-gold > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; }
-.storefront-retail .retail-profile-gold strong { font-size: 15px; font-weight: 600; }
-.storefront-retail .retail-profile-gold small { font-size: 12px; font-weight: 400; }
-.storefront-retail .retail-profile-gold b { font-size: 18px; text-align: right; overflow-wrap: anywhere; }
-.storefront-retail .retail-profile-chevron { font-size: 23px; line-height: 1; justify-self: end; }
-html body .storefront-retail .retail-profile-menu { border: 0; border-radius: 0; }
-html body .storefront-retail .retail-profile-menu > button { display: grid; grid-template-columns: 24px minmax(0,1fr) 12px; padding: 18px 4px; gap: 14px; min-height: 68px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
-.storefront-retail .retail-profile-menu > button > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
-.storefront-retail .retail-profile-menu > button > svg { width: 24px; height: 24px; padding: 0; color: var(--retail-ink); background: transparent; }
-html body .storefront-retail .retail-signout { display: block; min-height: 48px; margin-top: 16px; padding: 12px 4px; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: #b9202c; font-size: 14px; text-align: left; }
-.storefront-retail :is(.retail-profile-shortcuts > button,.retail-profile-gold,.retail-profile-edit) { transition: background-color 140ms ease-out; }
-.storefront-retail :is(.retail-profile-shortcuts > button,.retail-profile-gold):active { background: #dfe8f3; }
 @media (max-width: 370px) { .storefront-retail .retail-quick-actions { gap: 6px; } .storefront-retail .retail-quick-actions button { padding-inline: 10px; } }
-@media (prefers-reduced-motion: reduce) { .storefront-retail :is(.retail-quick-actions button,.retail-profile button) { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .storefront-retail .retail-quick-actions button { transition: none !important; } }
 @keyframes retail-quantity-enter { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @keyframes retail-controls-enter { from { opacity: .4; } to { opacity: 1; } }
 @media (prefers-reduced-motion:reduce) { .storefront-retail .retail-quantity-value,.storefront-retail .retail-card-stepper { animation: none; } }

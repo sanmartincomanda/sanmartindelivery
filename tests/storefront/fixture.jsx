@@ -35,6 +35,7 @@ function Fixture() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [selectedGift, setSelectedGift] = useState(null);
   const [profile, setProfile] = useState('');
+  const [profilePhoto, setProfilePhoto] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [closedModal, setClosedModal] = useState(false);
   const [saved, setSaved] = useState(null);
@@ -47,7 +48,8 @@ function Fixture() {
   const settings = { enabled: true, pointsPerCurrencyUnit: 1 };
   const setScreenFromMenu = (view) => { if (view === 'profile') setScreen('profile'); else setProfile(view); };
   const slots = getRouteSanMartinSlots(new Date('2026-10-06T18:00:00-06:00'));
-  return <div className="store-shell storefront-public-v2 storefront-brand-v3 storefront-retail">
+  return <div className="store-shell storefront-public-v2 storefront-brand-v3 storefront-retail" data-retail-tab={screen}>
+    <style>{`.store-checkout-icon { grid-area: icon; width: 36px; height: 36px; }`}</style>
     <main style={{ padding: 16 }}>
       {!params.has('presentation') && <><p>QA aislado. Sin cuentas, pedidos ni cobros reales.</p>
       <button onClick={() => setScreen('checkout')}>Abrir carrito de prueba</button>
@@ -55,7 +57,7 @@ function Fixture() {
       <button onClick={() => setScreen('activity')}>Actividad de prueba</button>
       <button onClick={() => setGold(true)}>Gold de prueba</button></>}
       {params.has('presentation') && <p style={{fontSize: 11, color: '#586875'}}>Vista previa · Datos ficticios</p>}
-      {screen === 'profile' && <StoreMobileProfilePage currentUser={params.has('longName') ? {...user, nombre: 'María Fernanda de los Ángeles San Martín Rodríguez'} : user} rewardsEnabled={!params.has('goldDisabled')} rewardPoints={804} selectedBranch={branch} onEditProfile={setScreenFromMenu} onOpenRewards={() => setGold(true)} onOpenActivity={() => setScreen('activity')} onSignOut={() => setScreen('signedout')} />}
+      {screen === 'profile' && <StoreMobileProfilePage currentUser={{...user, profilePhoto, ...(params.has('longName') ? {nombre: 'María Fernanda de los Ángeles San Martín Rodríguez'} : {})}} rewardsEnabled={!params.has('goldDisabled')} rewardPoints={804} selectedBranch={{...branch, whatsapp: '50500000000'}} onSavePhoto={async value => setProfilePhoto(value)} onEditProfile={setScreenFromMenu} onOpenRewards={() => setGold(true)} onOpenActivity={() => setScreen('activity')} onSignOut={() => setScreen('signedout')} />}
       {screen === 'activity' && <StoreMobileActivityPage currentUser={user} orders={orders} selectedOrderId={selectedOrderId} onSelectOrder={setSelectedOrderId} onOrderBack={() => setSelectedOrderId('')} onCancelOrder={() => setSaved({ canceled: true })} />}
       {saved && <output data-testid="saved">{JSON.stringify(saved)}</output>}
       {submitted && <output data-testid="submitted">{JSON.stringify(submitted)}</output>}

@@ -147,6 +147,7 @@ import {
   requestStorePasswordReset,
   sanitizeStoreUser,
   updateStoreUserProfile,
+  saveStoreProfilePhoto,
 } from '../services/storeUsers';
 import {
   createStoreAddressDraft,
@@ -232,6 +233,7 @@ import '../styles/storefrontRefinement2026.css';
 import '../styles/storefrontRetail.css';
 import '../styles/storefrontEditorial.css';
 import '../styles/storefrontInteractions.css';
+import './storefront/retailProfile.css';
 
 const LOGO_PATH = '/tienda/branding/logo-mark.svg';
 const PRODUCT_PLACEHOLDER_PATH = '/tienda/branding/product-placeholder.svg';
@@ -4020,6 +4022,14 @@ export default function TiendaVirtualView({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleProfilePhotoSave = async (photo) => {
+    const userKey = currentUser?.key;
+    const patch = await saveStoreProfilePhoto(currentUser, photo);
+    if (getCurrentAuthUser()?.uid !== userKey) return;
+    // Patch only the current profile, never reset checkout/order state for a photo.
+    setCurrentUser(user => user?.key === userKey ? { ...user, ...patch } : user);
   };
 
   const handleAccountDeletionRequest = async (reason = '') => {
@@ -10008,6 +10018,7 @@ export default function TiendaVirtualView({
           />
         ) : showMobileBottomNav && mobileNavSection === 'profile' ? (
           <StoreMobileProfilePage
+            key={currentUser?.key}
             currentUser={currentUser}
             rewardsEnabled={rewardSettings.enabled !== false}
             rewardPoints={Number(rewardAccount?.pointsBalance || 0)}
@@ -10017,6 +10028,7 @@ export default function TiendaVirtualView({
               scrollToStoreRef(pageTopRef);
             }}
             onEditProfile={openProfilePanel}
+            onSavePhoto={handleProfilePhotoSave}
             onOpenRewards={openRewardsPanel}
             onOpenActivity={() => {
               setMobileNavSection('activity');
@@ -12662,7 +12674,7 @@ function StoreMobileActivityPage({ currentUser, orders, createdOrder, onCancelOr
 }
 
 function StoreMobileProfilePage(props) {
-  return <RetailProfile {...props} Icon={StoreCheckoutIcon} />;
+  return <RetailProfile {...props} />;
 }
 
 function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQuantityChange }) {

@@ -36,7 +36,7 @@ jobs:
         run: npm run test:box-sales && npm run test:box-sales-ui && npm run test:box-announcement
 
       - name: Verify retail navigation and presentation
-        run: npm run test:retail-home && npm run test:retail-interactions && npm run test:store-categories && npm run test:store-editorial
+        run: npm run test:retail-home && npm run test:retail-interactions && npm run test:retail-profile && npm run test:store-categories && npm run test:store-editorial
 
       - name: Build Android web assets
         run: npm run build:android:web

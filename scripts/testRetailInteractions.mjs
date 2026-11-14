@@ -151,25 +151,27 @@ assert.deepEqual(calls, ['offers','orders','gold', 'offers','orders', 'orders','
 const profileCalls = [];
 const profileProps = {
   currentUser: { nombre: 'Cliente con un nombre muy largo para comprobar el perfil', telefono: '50500000000' },
-  rewardPoints: 1580, selectedBranch: { name: 'Granada' },
-  Icon: ({name}) => h('svg', {'aria-hidden': true, 'data-icon': name}),
+  rewardPoints: 1580, selectedBranch: { name: 'Granada', whatsapp: '50584657949' },
   onEditProfile: view => profileCalls.push(view), onOpenRewards: () => profileCalls.push('gold'),
   onOpenActivity: () => profileCalls.push('orders'), onSignOut: () => profileCalls.push('signout'),
 };
 await render(h(RetailProfile, profileProps));
-assert.equal(node.querySelector('.retail-profile-identity h2').textContent, profileProps.currentUser.nombre);
-assert.equal(node.querySelectorAll('.retail-profile-shortcuts button').length, 2);
-assert.equal(node.querySelectorAll('.retail-profile-menu button').length, 2);
-assert.match(node.querySelector('.retail-profile-gold b').textContent, /1[.,]580/);
-for (const selector of ['.retail-profile-edit', '.retail-profile-shortcuts button:first-child',
-  '.retail-profile-shortcuts button:last-child', '.retail-profile-gold',
-  '.retail-profile-menu button:first-child', '.retail-profile-menu button:last-child', '.retail-signout']) {
+assert.equal(node.querySelector('.csm-account-name h1').textContent, profileProps.currentUser.nombre);
+assert.equal(node.querySelectorAll('.csm-account-shortcuts button').length, 4);
+assert.equal(node.querySelector('[data-account-action="wallet"]').disabled, true);
+assert.match(node.querySelector('.csm-account-points').textContent, /1[.,]580/);
+assert.match(node.querySelector('.csm-account-menu a').href, /^https:\/\/wa.me\/50584657949/);
+for (const selector of ['[data-account-action="help"]', '[data-account-action="wallet"]',
+  '[data-account-action="addresses"]', '[data-account-action="orders"]', '.csm-account-gold',
+  '.csm-account-menu button', '.csm-account-signout']) {
   await click(selector);
 }
-assert.deepEqual(profileCalls, ['information', 'orders', 'addresses', 'gold', 'information', 'help', 'signout']);
+assert.deepEqual(profileCalls, ['help', 'addresses', 'orders', 'gold', 'information', 'signout']);
 await render(h(RetailProfile, {...profileProps, rewardsEnabled: false, currentUser: null}));
-assert.equal(node.querySelector('.retail-profile-gold'), null, 'Disabled Gold is not promoted');
-assert.equal(node.querySelector('.retail-profile-identity h2').textContent, 'Mi cuenta');
+assert.equal(node.querySelector('.csm-account-gold'), null, 'Disabled Gold is not promoted');
+assert.equal(node.querySelector('.csm-account-name h1').textContent, 'Mi cuenta');
+assert.equal(node.querySelector('.csm-account-avatar img'), null, 'No photo uses the person icon, not an initial');
+assert.equal(node.querySelector('.store-checkout-icon'), null, 'Profile cannot inherit checkout grid placement');
 node.classList.remove('storefront-retail');
 actionStyles.remove();
 await reset();

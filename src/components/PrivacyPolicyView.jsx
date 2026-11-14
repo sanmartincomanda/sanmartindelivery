@@ -20,7 +20,7 @@ export default function PrivacyPolicyView() {
         </header>
 
         <article className="store-legal-card">
-          <p><strong>Ultima actualizacion:</strong> 3 de agosto de 2026.</p>
+          <p><strong>Ultima actualizacion:</strong> 14 de noviembre de 2026.</p>
           <p>
             Carnes San Martin respeta tu privacidad. Esta politica explica que informacion usamos al
             navegar, crear una cuenta, hacer pedidos, elegir una sucursal y participar en Miembro Gold.
@@ -29,6 +29,7 @@ export default function PrivacyPolicyView() {
           <h2>Informacion que recopilamos</h2>
           <ul>
             <li>Nombre, correo electronico, telefono e identificadores de cuenta.</li>
+            <li>Foto de perfil opcional, solo si decides agregarla.</li>
             <li>Direccion, referencia y ubicacion precisa elegida para calcular cobertura y entrega.</li>
             <li>Pedidos, productos, montos, sucursal, cupones, puntos y recompensas.</li>
             <li>Metodo de pago seleccionado. No almacenamos numeros completos de tarjetas.</li>
@@ -56,6 +57,16 @@ export default function PrivacyPolicyView() {
             La ubicacion se solicita mientras usas la app para seleccionar una tienda cercana, validar la
             cobertura y entregar el pedido. No solicitamos ubicacion en segundo plano. Puedes rechazar el
             permiso, aunque algunas funciones de delivery no estaran disponibles.
+          </p>
+
+          <h2>Foto de perfil</h2>
+          <p>
+            Puedes elegir una imagen de tu galeria para personalizar tu cuenta. Antes de guardarla,
+            la app la recorta y comprime en tu dispositivo; solo se envia una miniatura a Google
+            Firebase, no el archivo original ni sus metadatos. La foto queda vinculada a tu cuenta,
+            con acceso restringido al titular y administradores autorizados. No se publica en el
+            catalogo ni se utiliza para reconocimiento facial o publicidad. Puedes cambiarla o
+            quitarla desde Perfil. No es necesaria para comprar.
           </p>
 
           <h2>Seguridad y conservacion</h2>

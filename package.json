@@ -13,6 +13,7 @@
     "test:box-sales-rules": "node scripts/testStoreBoxSalesRules.mjs",
     "test:box-sales-ui": "node scripts/testStoreBoxSalesUI.mjs",
     "test:retail-interactions": "node scripts/testRetailInteractions.mjs",
+    "test:retail-profile": "node scripts/testRetailProfile.mjs",
     "dev": "vite",
     "build": "vite build && node scripts/preserveLegacyChunkAliases.mjs && node scripts/writeWebRelease.mjs",
     "build:android:web": "vite build --mode android",
