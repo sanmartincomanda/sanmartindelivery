@@ -20,6 +20,7 @@ import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
 import PromotionShareButton from './storefront/PromotionShareButton';
 import { getRetailHomeSections, getRetailHomeSectionProducts, getRetailHomeSectionTitle, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
 import RetailProductRail from './storefront/RetailProductRail';
+import { orderRetailCategoryProducts } from './storefront/retailCatalogOrder.js';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
 import { GOOGLE_PLAY_STORE_URL, APP_STORE_URL, getHeaderAppDownload, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
 import RetailCheckout from './storefront/RetailCheckout';
@@ -2348,7 +2349,13 @@ export default function TiendaVirtualView({
     }
 
     if (activeCategory !== 'todos') {
-      return matchingProducts;
+      return orderRetailCategoryProducts(matchingProducts, {
+        category: activeCategory,
+        subcategory: activeSubcategory,
+        query: deferredQuery,
+        isDashboard,
+        subcategoryOrder: orderedSubcategoryOptions,
+      });
     }
 
     return [...matchingProducts].sort((left, right) => {
@@ -2377,7 +2384,7 @@ export default function TiendaVirtualView({
 
       return compareCatalogProducts(left, right);
     });
-  }, [activeCategory, activeProducts, activeSubcategory, deferredQuery, isDashboard]);
+  }, [activeCategory, activeProducts, activeSubcategory, deferredQuery, isDashboard, orderedSubcategoryOptions]);
 
   const hasActiveStoreSearch = deferredQuery.trim().length > 0;
   const showSearchResultsAsFlatList = activeCategory === 'todos' && hasActiveStoreSearch;
