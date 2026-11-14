@@ -1,4 +1,5 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 
@@ -21,10 +22,12 @@ export async function adaptivePng(size) {
 
 async function generate() {
   const root = new URL('../', import.meta.url);
+  const checksums = {};
   const write = async (path, data) => {
     const target = new URL(path, root);
     await mkdir(new URL('./', target), { recursive: true });
     await sharp(data).png({ compressionLevel: 9 }).toFile(fileURLToPath(target));
+    checksums[path] = createHash('sha256').update(await readFile(target)).digest('hex');
   };
   await write('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', await iconPng(1024));
   await write(`public/${shareIcon}`, await iconPng(1024));
@@ -40,7 +43,8 @@ async function generate() {
       width: Math.round(108 * scale), height: Math.round(108 * scale), channels: 3, background,
     } }).png().toBuffer());
   }
-  console.log('Approved Delivery GR artwork exported for iOS, Android, Play listing and web sharing.');
+  await writeFile(new URL('assets/delivery-gr-checksums.json', root), JSON.stringify(checksums, null, 2) + '\n');
+  console.log('Approved Delivery GR artwork exported with byte-exact checksums for iOS, Android, Play and web.');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await generate();

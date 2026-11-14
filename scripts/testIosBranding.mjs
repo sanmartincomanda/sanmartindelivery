@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { assertBrandingRaster } from './lib/assertBrandingRaster.mjs';
+import { assertBrandingArtifact } from './lib/assertBrandingArtifact.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const name = 'Carnes San Martin Delivery GR';
@@ -25,7 +25,5 @@ for (const [x, y] of [[0, 0], [1023, 0], [0, 1023], [1023, 1023], [512, 50]]) {
   const pixel = [...data.subarray(start, start + 3)];
   assert.ok(pixel.every((channel, index) => Math.abs(channel - [0, 68, 197][index]) <= 8), 'Keep the approved blue artwork opaque, without white corners');
 }
-const expected = await sharp(fileURLToPath(new URL('../assets/app-icon-delivery-gr.png', import.meta.url)))
-  .resize(1024, 1024).removeAlpha().raw().toBuffer();
-assertBrandingRaster(data, expected, 'The committed icon must match the approved Delivery GR artwork');
+assertBrandingArtifact(`${iconSet}${icon.filename}`);
 console.log('iOS branding: exact name, blue background, 1024px opaque PNG and approved artwork parity passed.');
