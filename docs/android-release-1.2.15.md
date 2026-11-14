@@ -1,17 +1,24 @@
-# Android 1.2.15 (18): rebuilt, pending Play Console upload
+# Android 1.2.15 (18): submitted to production review
 
 Prepared on 2026-11-13 at the owner's request to update both stores.
-This document does not claim Play upload, review submission or publication.
+Uploaded and submitted on 2026-11-13, approximately 21:45 America/Managua.
+Google approval and public availability are not yet confirmed.
 
 ## Current state
 
 - Source e64ceff1ede29923b56b3a9030c48165232e3545 matched origin/main.
 - Signed build succeeded in 2m11s in GitHub run 43532109488:
   https://github.com/sanmartincomanda/sanmartindelivery/actions/runs/43532109488
-- Play Console could not be inspected or changed because browser access was
-  disabled for this chat. The owner was asked to enable it. Recheck the highest
-  version code before upload, preserve Nicaragua-only distribution, and leave
-  the unrelated Alpha draft unsent. Last verified public code was 17.
+- After the owner enabled browser access, Play Console confirmed production
+  17 (1.2.14), with Nicaragua as its only targeted country. The rebuilt AAB
+  was accepted as 18 (1.2.15), replacing 17 with a 100% production rollout.
+- Exactly one change was submitted. Play displayed "1 cambio enviado a
+  revision" and listed Production 18 (1.2.15) under "Cambios en revision".
+  Automated preliminary checks were still running at the last observation;
+  do not interpret submission as approval or immediate public availability.
+- Managed publishing remains disabled: publication is automatic after approval.
+  The unrelated closed Alpha 10 (1.2.7) was explicitly saved for later before
+  submission and remains in the unsent section. Do not submit that draft.
 - iOS does not need a duplicate build: Apple public lookup already returns
   1.0.1, Carnes San Martin Delivery GR, released 2026-11-12T14:48:22Z.
   Its signed build 6 contains the latest native features. The only later app
@@ -49,8 +56,24 @@ This document does not claim Play upload, review submission or publication.
   device installation, account consent or Gradle lint; the previous lint
   baseline was zero errors and 26 warnings.
 - Compilation ran on CI; local dist was not replaced with native web assets.
+- Play release validation: zero errors, one non-blocking deobfuscation/R8
+  warning. No devices lost compatibility: phone 12,622, tablet 6,839, TV 7,
+  wearable 0, car 30, Chromebook 77 and Android XR 2. Minimum API 24 and
+  target API 36 are unchanged. Displayed download size: 14.1 MB.
+- Rechecked the uploaded file's SHA256 immediately before upload. Fetched
+  origin/main; dc4d82d differed from build source only in release documentation.
 
-## Files to upload
+## Submission evidence
+
+- Production release: tracks/4697538253228337307/releases/10/review.
+- Publishing status:
+  https://play.google.com/console/u/1/developers/8423250849699696422/app/4976378919018801367/publishing
+- Local screenshot:
+  ../android-release-1.2.15-2026-11-13/play-console-1.2.15-review.jpg
+- No physical-device purchase/sign-in was performed during submission. No
+  changes were made to app code, web hosting, backend, pricing or customer data.
+
+## Uploaded artifact and direct-install package
 
 Use the NEW files, not the older held 1.2.15 build from November 9:
 
@@ -61,11 +84,11 @@ Use the NEW files, not the older held 1.2.15 build from November 9:
   14,943,196 bytes; SHA256
   1656CCF24ACCE2D1F1ADC07258A490F7CFB9731AAB7F3B27CE007C018CBD674A
 
-Upload AAB to production. The direct-install APK has the upload-key signature;
+The AAB was uploaded to production. The direct-install APK has the upload-key signature;
 existing Play-signed customers must update through Play, not uninstall their
 app to bypass certificate differences.
 
-## Suggested release notes
+## Submitted release notes (es-419)
 
 Mejoramos el orden de las cajas en el inicio y las categorias. Los anuncios
 ahora abren directamente el producto y se muestran con menor frecuencia.
