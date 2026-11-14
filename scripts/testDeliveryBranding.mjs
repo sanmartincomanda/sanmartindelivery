@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { JSDOM } from 'jsdom';
 import { iconSource, iconPng, adaptivePng, densities, shareIcon } from './generateDeliveryBranding.mjs';
+import { assertBrandingRaster } from './lib/assertBrandingRaster.mjs';
 
 const path = value => fileURLToPath(new URL(`../${value}`, import.meta.url));
 const read = value => readFileSync(path(value), 'utf8');
@@ -18,7 +19,7 @@ async function verifyPng(file, size, expected) {
   assert.equal(meta.height, size, file);
   assert.equal(meta.hasAlpha, false, file);
   const actual = await sharp(path(file)).raw().toBuffer();
-  assert.ok(actual.equals(await sharp(expected).raw().toBuffer()), `Artwork mismatch: ${file}`);
+  assertBrandingRaster(actual, await sharp(expected).raw().toBuffer(), `Artwork mismatch: ${file}`);
 }
 
 for (const [file, size] of [
