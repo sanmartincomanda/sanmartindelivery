@@ -17,6 +17,9 @@ no contiene estos cambios nuevos.
   editorial y manual-route. Sin cambios de backend ni datos de clientes.
 - Siguientes binarios: Android 1.2.16 (19), iOS 1.0.2 (7). No interpretar
   esta preparacion como aprobacion de las tiendas.
+- Ambos binarios quedaron compilados y verificados. iOS fue cargado a Apple
+  sin errores; Android queda listo para carga. Envio a revision pendiente
+  de acceso al navegador. Ver mobile-retail-release-2026-11-14.md.
 
 ## Auditoria y decisiones
 
