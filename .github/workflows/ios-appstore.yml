@@ -48,6 +48,8 @@ jobs:
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
       - name: Verify configurable box ordering
         run: npm run test:box-sales && npm run test:box-sales-ui && npm run test:box-announcement
+      - name: Verify retail navigation and presentation
+        run: npm run test:retail-home && npm run test:retail-interactions && npm run test:store-categories && npm run test:store-editorial
       - name: Install distribution identity
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -122,7 +124,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: Carnes-San-Martin-iOS-1.0.1-${{ inputs.build_number }}
+          name: Carnes-San-Martin-iOS-1.0.2-${{ inputs.build_number }}
           path: ${{ runner.temp }}/ios-release/*.ipa
           if-no-files-found: error
           retention-days: 7

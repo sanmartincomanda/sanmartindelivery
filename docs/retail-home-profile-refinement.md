@@ -1,8 +1,22 @@
 # Inicio y perfil: refinamiento retail
 
-Fecha local: 2026-11-13. Estado: implementado y comprobado localmente, sin
-publicacion web, push ni envio de binarios a las tiendas. La version Android
-1.2.15 (18) enviada anteriormente no contiene estos cambios nuevos.
+Diseno comprobado el 2026-11-13. Publicacion web autorizada el 2026-11-14,
+seguida por nuevas apps. La version Android 1.2.15 (18) enviada anteriormente
+no contiene estos cambios nuevos.
+
+## Publicacion web del 14 de noviembre
+
+- GitHub main y release/ios-app-store: d9d39a5055f20b05b32d81eeaba9327e55b73c71.
+- Netlify produccion: 6af867366e4181ff3d6b4e53. El dominio real
+  https://tienda.sanmartinsr.com/release.json devuelve ese commit.
+- Firebase Hosting: workflow 43601705360 finalizado correctamente.
+- HTML y nuevo JS descargados del dominio real: perfil refinado y anuncios
+  despues de los productos presentes. La comprobacion visual posterior al
+  despliegue esta pendiente de habilitar navegador; no se afirma realizada.
+- Repetidos build, web-release, retail-home, retail-interactions, categorias,
+  editorial y manual-route. Sin cambios de backend ni datos de clientes.
+- Siguientes binarios: Android 1.2.16 (19), iOS 1.0.2 (7). No interpretar
+  esta preparacion como aprobacion de las tiendas.
 
 ## Auditoria y decisiones
 

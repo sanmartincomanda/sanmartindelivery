@@ -35,6 +35,9 @@ jobs:
       - name: Verify configurable box ordering
         run: npm run test:box-sales && npm run test:box-sales-ui && npm run test:box-announcement
 
+      - name: Verify retail navigation and presentation
+        run: npm run test:retail-home && npm run test:retail-interactions && npm run test:store-categories && npm run test:store-editorial
+
       - name: Build Android web assets
         run: npm run build:android:web
         env:
@@ -75,7 +78,7 @@ jobs:
       - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Carnes-San-Martin-v1.2.15-release
+          name: Carnes-San-Martin-v1.2.16-release
           path: |
             android/app/build/outputs/bundle/release/app-release.aab
             android/app/build/outputs/apk/release/app-release.apk
