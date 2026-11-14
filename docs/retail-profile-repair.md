@@ -75,4 +75,9 @@ Physical iPhone/Android, larger accessibility text, real database persistence
 and native gallery checks remain pending. No real orders or customer writes.
 The public privacy page now explicitly describes optional private profile
 photos. Store declarations must also be checked before review submission.
-Rebuild Android 1.2.16 (19) and iOS 1.0.2 (8); never submit the earlier artifacts.
+Both were rebuilt from 240a089: Android 1.2.16 (19) is submitted to Google
+with automatic pre-review checks in progress; iOS 1.0.2 (8) was uploaded
+successfully, but review submission still requires Apple browser sign-in
+and the optional-photo disclosure. Never submit the earlier artifacts.
+Web production and both GitHub branches already contain the repair.
+See mobile-retail-release-2026-11-14.md for hashes and exact release states.

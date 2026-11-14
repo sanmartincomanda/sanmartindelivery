@@ -1,4 +1,73 @@
-# Retail release: Android 1.2.16 (19), iOS 1.0.2 (7)
+# Retail release: Android 1.2.16 (19), iOS 1.0.2 (8)
+
+## Current status: repaired profile published on 2026-11-14
+
+This section supersedes the historical artifact/release records below.
+
+- Source: 240a08948c7e08f2fd805af08c7483a56c94eac5, pushed to main and
+  release/ios-app-store. Unrelated scripts/sicarQuoteSync.mjs remains local.
+- Web: Netlify production 6af882ce445aae27ed4f60c4; Firebase workflow
+  43612136854 succeeded. release.json on tienda, admintv and Firebase Hosting
+  returns 240a089; web entry is index-B8IW4rZn.js. Public Nindiri storefront
+  was inspected without signing in or creating orders.
+- Browser QA: real account component with legacy styles at 360x800 (long
+  name), 390x844, 430x932 and 1280x900; no horizontal overflow. Checked menu
+  destinations/back, wallet disabled, photo sheet/focus, real JPEG canvas
+  compression and simulated save. Full evidence: retail-profile-repair.md.
+- Local gates passed: retail-profile, retail-interactions, store-access,
+  retail-home, store-editorial, manual-route (578 assertions), box-sales,
+  ios-config, build and web-release. Native CI gates also passed.
+
+### Android: submitted to Google Play
+
+- Workflow 43612136753 succeeded for 1.2.16 (19), rebuilt from 240a089.
+- Fixed artifacts: ../android-profile-1.2.16-19/.
+- APK SHA256:
+  1359A2B89B20B9C1C17D4D28509398405831935B879D4EEEA69B3CAD4B352490.
+- AAB SHA256:
+  4D9CD38A3792B0D92FA76A7431036EA1F1BBE34DE63482D5FC2BF8EF0A839BE6.
+- bundletool and signatures verified; package com.sanmartinsr.app,
+  minSdk 24/targetSdk 36 and existing signer unchanged. Embedded assets
+  contain isolated account controls and photo persistence. Native auth
+  providers remain Google/Apple with skipNativeAuth=true, no remote URL.
+- Uploaded to production release 11; rollout 100% of existing target
+  countries (Nicaragua), no device compatibility reduction. The only
+  validation warning was the absent deobfuscation mapping file.
+- Owner explicitly authorized discarding only the unrelated Alpha 1.2.7
+  (10) draft. It was removed from pending publication; uploaded artifacts
+  remain in Play's library and the existing Alpha release was not changed.
+- Sent two changes: production 19 and Data Safety. Play now displays
+  "Cambios en revision" with automatic pre-review checks in progress.
+  Managed publishing remains disabled. Approval/public availability of 19
+  is NOT established by this submission; live production was 18 beforehand.
+- Data Safety now includes optional profile photos (functionality/account
+  management, no sharing), UID, purchase history, other profile information
+  and OAuth. No existing declaration was removed. This was not a complete
+  SDK/privacy audit. The inherited encryption answer remains No and needs a
+  separate verified transport audit rather than an unsupported assertion.
+- Screenshot: output/playwright/google-profile-1.2.16-review.jpg.
+
+### iOS: uploaded, review submission blocked by login
+
+- Workflow 43612139605 succeeded, including signed archive validation and
+  upload to App Store Connect: 1.0.2 (8), source 240a089.
+- IPA: tmp/ios-profile-1.0.2-8/App.ipa, 12,873,607 bytes.
+- SHA256:
+  12B48CF56B784622E48B508236D3A7536276F0E9E92CE6F85937CA237B49ADCD.
+- Parsed Info.plist confirms build 8, com.sanmartinsr.app, display name
+  Carnes San Martin Delivery GR, iOS 15.0 minimum. Verified account/photo
+  markers, disabled wallet, native auth providers and no remote server URL.
+- Apple browser still displays "No se pudo verificar tu identidad". Owner
+  is completing sign-in directly. No password or verification code requested.
+- NOT submitted for review yet. After login: verify build 8 processing,
+  update the Photos/Videos privacy declaration for the optional private
+  avatar (linked to account, app functionality, no advertising/tracking),
+  select build 8 rather than 7, update release notes, then submit 1.0.2.
+  Obtain confirmation if Apple presents a new binding privacy attestation.
+- Physical-device sign-in, native gallery and real database photo saving
+  have not been tested. No production orders/customer writes were used.
+
+## Historical artifacts below: do not submit
 
 Authorized by the owner on 2026-11-14, web first and then both app stores.
 
