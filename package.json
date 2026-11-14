@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "branding:generate": "node scripts/generateDeliveryBranding.mjs",
+    "test:delivery-branding": "node scripts/testDeliveryBranding.mjs",
     "test:popup-ads": "node scripts/testStorePopupAds.mjs && node scripts/testStorePopupExposure.mjs",
     "test:store-access": "node scripts/testStoreAccess.mjs && node scripts/testNativeAuthLoading.mjs",
     "test:box-images": "node scripts/testStoreBoxImages.mjs",

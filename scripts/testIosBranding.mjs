@@ -21,9 +21,10 @@ assert.equal(metadata.hasAlpha, false, 'App Store artwork must be opaque');
 const { data, info } = await sharp(iconPath).raw().toBuffer({ resolveWithObject: true });
 for (const [x, y] of [[0, 0], [1023, 0], [0, 1023], [1023, 1023], [512, 50]]) {
   const start = (y * info.width + x) * info.channels;
-  assert.deepEqual([...data.subarray(start, start + 3)], [0, 68, 197], 'Use exact corporate blue #0044C5, without white corners');
+  const pixel = [...data.subarray(start, start + 3)];
+  assert.ok(pixel.every((channel, index) => Math.abs(channel - [0, 68, 197][index]) <= 8), 'Keep the approved blue artwork opaque, without white corners');
 }
-const expected = await sharp(fileURLToPath(new URL('../assets/app-icon.svg', import.meta.url)))
+const expected = await sharp(fileURLToPath(new URL('../assets/app-icon-delivery-gr.png', import.meta.url)))
   .resize(1024, 1024).removeAlpha().raw().toBuffer();
-assert.ok(data.equals(expected), 'The committed icon must match its editable vector source');
-console.log('iOS branding: exact name, corporate blue, 1024px opaque PNG and vector parity passed.');
+assert.ok(data.equals(expected), 'The committed icon must match the approved Delivery GR artwork');
+console.log('iOS branding: exact name, blue background, 1024px opaque PNG and approved artwork parity passed.');

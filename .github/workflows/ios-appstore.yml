@@ -14,7 +14,7 @@ on:
       build_number:
         description: Unique App Store build number
         required: true
-        default: '9'
+        default: '10'
       upload:
         description: Upload the signed build to App Store Connect (does not submit to review)
         type: boolean
@@ -59,7 +59,7 @@ jobs:
       - name: Verify configurable box ordering
         run: npm run test:box-sales && npm run test:box-sales-ui && npm run test:box-announcement
       - name: Verify retail navigation and presentation
-        run: npm run test:retail-home && npm run test:retail-interactions && npm run test:retail-profile && npm run test:store-categories && npm run test:store-editorial
+        run: npm run test:delivery-branding && npm run test:retail-home && npm run test:retail-interactions && npm run test:retail-profile && npm run test:store-categories && npm run test:store-editorial
       - name: Install distribution identity
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
