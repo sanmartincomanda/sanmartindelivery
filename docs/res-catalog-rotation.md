@@ -29,4 +29,15 @@ any edit. This release does not replace or resubmit the mobile builds currently
 under store review; those builds do not yet include this rotation.
 
 Pre-publication checks also passed test:manual-route, including 578 assertions.
-Final deployment verification will be recorded after the release is live.
+Published runtime commit: 70566566e86b3e562875a6a363fb72a305ef5fb8.
+Firebase Hosting workflow 43644762777 completed successfully. The custom domain
+https://tienda.sanmartinsr.com/release.json independently returned that commit
+with builtAt 2026-11-14T21:48:57.032Z and all combined-release feature markers.
+
+Production browser verification on /granada confirmed:
+- Todos remains visible and selected within Res.
+- The first 24 products exactly match the verified local rotation.
+- Ver mas extends to 48 distinct products without changing the first 24.
+- Screenshot: tmp/res-catalog-order-published.jpg.
+
+The unrelated scripts/sicarQuoteSync.mjs working-tree edit was excluded.
