@@ -5,9 +5,20 @@
 - Nombre solicitado para 1.0.1: `Carnes San Martin Delivery GR`
 - Bundle ID: `com.sanmartinsr.app`
 - Version inicial: `1.0.0`
-- Ultimo build aprobado: `5` (codigo de app `8a5d9af4118f`), version 1.0.0. App Store Connect verificado el 2026-11-11: **Listo para distribucion**. La version aprobada conserva el nombre anterior y el icono blanco.
+- Ultima version publica: `1.0.1`, correspondiente al build `6` enviado desde `553b70d4e8f8`. El lookup publico de Apple para Nicaragua confirmo el nombre `Carnes San Martin Delivery GR` y fecha de publicacion `2026-11-12T14:48:22Z`, comprobado de nuevo el 2026-11-13.
 - Distribucion inicial: Nicaragua
 - Plataforma: iOS y iPadOS
+
+## Comprobacion de actualizacion (2026-11-13)
+
+Apple ya distribuye 1.0.1. El IPA firmado del build 6 contiene boxDisplayOrder,
+destinos de producto en anuncios y control oncePerDay. La comparacion de su
+fuente con e64ceff solo encuentra cambios posteriores en botones de descarga
+web, ocultos dentro de las apps nativas mediante showAppDownloadLinks.
+No se genero ni envio un build iOS redundante ni se modifico la ficha publica.
+La consulta fue al endpoint publico https://itunes.apple.com/lookup?id=6832058425&country=ni,
+no a una sesion privada de App Store Connect. No se retesto login en un iPhone
+fisico ni se realizaron compras. Las secciones posteriores son historicas.
 
 ## Identidad corregida (2026-11-11)
 

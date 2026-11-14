@@ -1,5 +1,14 @@
 # Mobile box order update: HOLD FOR APPLE APPROVAL
 
+## Current status (2026-11-13): original hold satisfied
+
+Apple 1.0.0 (5) was approved on 2026-11-11. The subsequent 1.0.1 (6)
+branding/box-order/popup update is now publicly available in Nicaragua,
+verified through Apple's public lookup on 2026-11-13. Do not treat the
+historical hold below as an active restriction or upload the old artifacts.
+Android 1.2.15 (18) was rebuilt from current source e64ceff in run 43532109488;
+see docs/android-release-1.2.15.md for hashes and pending Play Console upload.
+
 Owner instruction on 2026-11-09: prepare Android and iPhone updates, but do not
 upload either update until the currently submitted App Store version is approved.
 
