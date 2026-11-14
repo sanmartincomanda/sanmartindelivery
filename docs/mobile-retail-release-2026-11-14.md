@@ -1,6 +1,15 @@
 # Retail release: Android 1.2.16 (19), iOS 1.0.2 (8)
 
-## HOLD: profile photo removed after these builds
+## Update: photo-free iOS 1.0.2 (9) and web published
+
+Source f16a074 replaces the profile-photo feature with a person icon and updates
+the live privacy policy. Netlify deploy 6af8a0d62eac5b14ddd968fb and Firebase
+workflow 43623822066 are verified. iOS workflow 43623738484 succeeded; Apple
+processed 1.0.2 (9) as VALID, build ID 966de6cc-2646-4bb2-a264-2f56d7af9b76.
+This is an upload, NOT an App Review submission or approval. No new Android
+build was uploaded. See profile-photo-removal.md for evidence and next steps.
+
+## HOLD: earlier artifacts still contain profile photos
 
 The owner subsequently requested removing profile photos. The source now uses
 a non-interactive person icon on web, Android and iOS. See
@@ -9,16 +18,16 @@ profile-photo-removal.md for scope, checks and rollout requirements.
 The already uploaded iOS 1.0.2 (8) and Android 1.2.16 (19) still contain the
 photo editor. DO NOT resubmit those artifacts as the photo-free update.
 Check the current store state and use new unused build numbers after the
-source is reviewed and publication is authorized. No new store submission
-or production deployment was performed for the removal.
+source is reviewed and publication is authorized. The replacement iOS build
+and web publication are recorded above; the historical builds remain unchanged.
 
 The records below describe the previous release, not the removed feature's
 current implementation. The owner's reported rejection reason has not been
 independently verified against Apple's review message.
 
-## Current status: repaired profile published on 2026-11-14
+## Historical: profile with photo published on 2026-11-14
 
-This section supersedes the historical artifact/release records below.
+This section predates the photo removal and replacement recorded above.
 
 - Source: 240a08948c7e08f2fd805af08c7483a56c94eac5, pushed to main and
   release/ios-app-store. Unrelated scripts/sicarQuoteSync.mjs remains local.
