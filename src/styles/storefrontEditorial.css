@@ -16,7 +16,6 @@ html body .store-shell.storefront-brand-v3.storefront-retail .store-page main { 
 html body .store-shell.storefront-brand-v3.storefront-retail .store-filters-panel { margin-bottom: 6px !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-icon { background: #e1ebf4 !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-category-card.active .store-category-icon { background: #cddfff !important; }
-html body .store-shell.storefront-brand-v3.storefront-retail .store-category-card { min-height: 70px !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group-head { margin-bottom: 8px !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group-title { color: #063969 !important; }
 html body .store-shell.storefront-brand-v3.storefront-retail .store-product-group-link { color: var(--retail-blue) !important; }
@@ -69,9 +68,11 @@ html body .storefront-retail .retail-campaign-seal img {
 .storefront-retail .has-preciazo .retail-product-price small { color: var(--retail-muted); }
 html body .store-shell.storefront-brand-v3.storefront-retail .has-preciazo .retail-card-add { color: #bd0b19; background: #fff2ef; border-color: #f0c9c9; }
 html body .store-shell.storefront-brand-v3.storefront-retail .has-preciazo .retail-card-add:hover { background: #ffe4df; }
-html body .store-shell.storefront-brand-v3.storefront-retail .retail-promotion-group .store-product-group-title { color: #c20816 !important; }
-.storefront-retail .retail-promotion-signature { margin: 2px 0 0; font-size: 11px; line-height: 1.35; color: #063969; }
-.storefront-retail .retail-promotion-signature strong { color: #c20816; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-promotion-group .store-product-group-title { color: var(--retail-ink) !important; font-size: clamp(20px, 4.7vw, 28px) !important; line-height: 1.15; }
+html body .store-shell.storefront-brand-v3.storefront-retail .retail-promotion-group .store-product-group-kicker { display: block !important; color: #b51c28; font-size: 11px; font-weight: 600; letter-spacing: .08em; margin-bottom: 6px; }
+.storefront-retail .store-product-group-head > div:first-child { min-width: 0; }
+.storefront-retail .retail-promotion-group .store-product-group-actions { flex: 0 0 auto; }
+.storefront-retail .retail-promotion-group .store-product-group-actions .promotion-share-trigger { width: 44px; height: 44px; min-width: 44px; padding: 0; gap: 0; border: 0; border-radius: 50%; background: #eaeef0; color: var(--retail-ink); font-size: 0; }
 .storefront-retail .store-detail-image { position: relative; }
 .storefront-retail .store-detail-image .retail-promo-seal { width: 102px; top: 12px; right: 12px; padding-block: 7px 10px; }
 .storefront-retail .store-detail-image .retail-promo-seal-title { font-size: 16px; padding-block: 6px; }
@@ -111,7 +112,6 @@ html body .storefront-retail.store-shell .retail-food-story--grill { margin: 0; 
   .storefront-retail .retail-product .retail-promo-seal { width: 88px; top: 10px; right: 10px; padding-block: 6px 9px; }
   .storefront-retail .retail-product .retail-promo-seal-title { font-size: 14px; }
   .storefront-retail .retail-product .retail-promo-seal-brand { font-size: 10px; }
-  .storefront-retail .retail-promotion-signature { font-size: 12px; }
   html body .storefront-retail.store-shell .retail-food-story { grid-template-columns: 46% 54%; min-height: 212px; margin-bottom: 20px; }
   .storefront-retail .retail-food-story-copy { padding: 26px 32px; }
   .storefront-retail .retail-food-story-eyebrow { font-size: 11px; margin-bottom: 10px; }

@@ -21,13 +21,14 @@ console.log('Store category structure checks passed.');
 const retailStyles = readFileSync(new URL('../src/styles/storefrontRetail.css', import.meta.url), 'utf8');
 for (const tab of ['home', 'catalog', 'search']) {
   const dom = new JSDOM(`<!doctype html><html><head></head><body>
-    <div class="store-shell storefront-brand-v3 storefront-retail" data-retail-tab="${tab}">
+    <div class="store-shell storefront-public-v2 storefront-brand-v3 storefront-retail" data-retail-tab="${tab}">
       <div class="store-page"><main><section class="store-filters-panel">
         <nav class="store-tabs store-category-gallery" aria-label="Categorias del catalogo">
           <button class="store-chip store-category-card" data-category="todos">Todos</button>
           <button class="store-chip store-category-card" data-category="res">Res</button>
           <button class="store-chip store-category-card active" data-category="pollo" aria-pressed="true">Pollo</button>
           <button class="store-chip store-category-card" data-category="promociones">Promociones</button>
+          <button class="store-chip store-category-card" data-category="cajas"><span class="store-category-icon"></span><span class="store-category-copy"><span class="store-filter-label">Venta por cajas</span></span></button>
         </nav>
         <nav class="store-subtabs" aria-label="Subcategorias">
           <button class="store-chip active">Todos</button>
@@ -50,7 +51,10 @@ for (const tab of ['home', 'catalog', 'search']) {
       const buttonStyle = getComputedStyle(button);
       assert.notEqual(buttonStyle.display, 'none', `${tab}: every category remains available`);
       assert.ok(parseFloat(buttonStyle.minHeight) >= 44, `${tab}: category touch target`);
+      assert.equal(parseFloat(buttonStyle.minHeight), 108, `${tab}: enlarged icon and label have enough room`);
     }
+    assert.equal(getComputedStyle(gallery.querySelector('.store-category-icon')).width, '68px');
+    assert.equal(getComputedStyle(gallery.querySelector('.store-filter-label')).whiteSpace, 'normal', 'Long category names can wrap');
     const subtabs = document.querySelector('.store-subtabs');
     assert.equal(getComputedStyle(subtabs).display, 'flex', `${tab}: keep subcategories below the main rail`);
     assert.ok(parseFloat(getComputedStyle(subtabs.querySelector('button')).minHeight) >= 44);

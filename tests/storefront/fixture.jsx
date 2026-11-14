@@ -8,7 +8,7 @@ import { getRouteSanMartinSlots } from '../../src/services/routeSanMartin';
 import { ORDER_FULFILLMENT_DELIVERY, ORDER_FULFILLMENT_PICKUP } from '../../src/services/orders';
 
 const address = { id: 'qa-home', nombre: 'Casa', direccion: 'Dirección de prueba en Granada', referencia: 'Portón azul', ubicacion: { lat: 11.93, lng: -85.953, label: 'Granada' }, predeterminada: true };
-const user = { firebaseKey: 'qa-not-a-real-account', nombre: 'Cliente de prueba', telefono: '50500000000', ...address, nombre: 'Cliente de prueba', direccionesGuardadas: [address] };
+const user = { firebaseKey: 'qa-not-a-real-account', telefono: '50500000000', ...address, nombre: 'Cliente de prueba', direccionesGuardadas: [address] };
 const branch = { id: 'granada', routeSanMartinEnabled: !new URLSearchParams(window.location.search).has('routePaused'), shortName: 'Granada', name: 'Carnes San Martín Granada', address: 'Dirección de sucursal de prueba', storeLocation: address.ubicacion };
 const initialItems = [{ codigo: 'qa-res', nombre: 'RIB EYE PREMIUM PARA PARRILLA', cantidad: 4, unidad: 'lb', precioUnitario: 285, minQuantity: .5, quantityStep: .5, image: '/tienda/page/product-gold.jpg' }, { codigo: 'qa-pollo', nombre: 'FILETE DE POLLO', cantidad: 2, unidad: 'lb', precioUnitario: 98, minQuantity: .5, quantityStep: .5, image: '/tienda/page/product-birria.jpg' }];
 const rewards = [{ id: 'qa-reward', name: 'Premio de prueba', pointsRequired: 100, active: true, available: true, minPurchaseAmount: 0, image: '/tienda/page/product-gold.jpg', items: [{ id: 'qa-item', productCode: 'qa-res', productName: 'RIB EYE', quantity: 1, unit: 'lb' }] }, { id: 'qa-out', name: 'Premio agotado', pointsRequired: 50, available: false, image: '/tienda/page/product-birria.jpg' }];
@@ -49,12 +49,13 @@ function Fixture() {
   const slots = getRouteSanMartinSlots(new Date('2026-10-06T18:00:00-06:00'));
   return <div className="store-shell storefront-public-v2 storefront-brand-v3 storefront-retail">
     <main style={{ padding: 16 }}>
-      <p>QA aislado. Sin cuentas, pedidos ni cobros reales.</p>
+      {!params.has('presentation') && <><p>QA aislado. Sin cuentas, pedidos ni cobros reales.</p>
       <button onClick={() => setScreen('checkout')}>Abrir carrito de prueba</button>
       <button onClick={() => setScreen('profile')}>Perfil de prueba</button>
       <button onClick={() => setScreen('activity')}>Actividad de prueba</button>
-      <button onClick={() => setGold(true)}>Gold de prueba</button>
-      {screen === 'profile' && <StoreMobileProfilePage currentUser={user} rewardPoints={804} selectedBranch={branch} onEditProfile={setScreenFromMenu} onOpenRewards={() => setGold(true)} onOpenActivity={() => setScreen('activity')} onSignOut={() => setScreen('signedout')} />}
+      <button onClick={() => setGold(true)}>Gold de prueba</button></>}
+      {params.has('presentation') && <p style={{fontSize: 11, color: '#586875'}}>Vista previa · Datos ficticios</p>}
+      {screen === 'profile' && <StoreMobileProfilePage currentUser={params.has('longName') ? {...user, nombre: 'María Fernanda de los Ángeles San Martín Rodríguez'} : user} rewardsEnabled={!params.has('goldDisabled')} rewardPoints={804} selectedBranch={branch} onEditProfile={setScreenFromMenu} onOpenRewards={() => setGold(true)} onOpenActivity={() => setScreen('activity')} onSignOut={() => setScreen('signedout')} />}
       {screen === 'activity' && <StoreMobileActivityPage currentUser={user} orders={orders} selectedOrderId={selectedOrderId} onSelectOrder={setSelectedOrderId} onOrderBack={() => setSelectedOrderId('')} onCancelOrder={() => setSaved({ canceled: true })} />}
       {saved && <output data-testid="saved">{JSON.stringify(saved)}</output>}
       {submitted && <output data-testid="submitted">{JSON.stringify(submitted)}</output>}

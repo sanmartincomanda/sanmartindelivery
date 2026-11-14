@@ -9,6 +9,7 @@ import RetailFoodStory from './storefront/RetailFoodStory';
 import RetailPromoSeal from './storefront/RetailPromoSeal';
 import RetailSearchBox from './storefront/RetailSearchBox';
 import RetailQuickActions from './storefront/RetailQuickActions';
+import RetailProfile from './storefront/RetailProfile';
 import { BOX_CATEGORY_ID, describeBoxContents, orderBoxProductsForDisplay, resolveBoxAvailability } from '../services/storeBoxSales';
 import { BOX_ANNOUNCEMENT_ID, BOX_HOME_SECTION_ID, boxAnnouncementDay, getBoxAnnouncementProducts } from '../services/storeBoxAnnouncement.js';
 import RetailBoxSalesAnnouncement from './storefront/RetailBoxSalesAnnouncement';
@@ -17,7 +18,7 @@ import { getStorePopupTargetProduct, isStorePopupTargetAvailable } from '../serv
 import { STORE_POPUP_AD_VIEW_COUNT_KEY, readStorePopupAdViewCounts, canShowStorePopupAd, claimStorePopupAd, syncStorePopupAdExposure } from '../services/storePopupExposure.js';
 import useBoxSalesAnnouncement from './storefront/useBoxSalesAnnouncement';
 import PromotionShareButton from './storefront/PromotionShareButton';
-import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
+import { getRetailHomeSections, getRetailHomeSectionProducts, getRetailHomeSectionTitle, isRetailHomePromotion, isRetailHomeCarousel } from './storefront/retailHomePromotions';
 import RetailProductRail from './storefront/RetailProductRail';
 import { RetailHomeContext, RetailHomeButton, RetailBackActions } from './storefront/RetailHomeNavigation';
 import { GOOGLE_PLAY_STORE_URL, APP_STORE_URL, getHeaderAppDownload, RETAIL_EDITORIAL_TARGETS, isRetailBurgerProduct, isRetailBurgerSearch, isRetailGoldSection } from './storefront/retailEditorial';
@@ -2504,7 +2505,6 @@ export default function TiendaVirtualView({
   }, [activeCategory, activeProductPromotions, boxSalesEnabled, filteredProducts]);
 
   const visibleHomeSections = getRetailHomeSections(groupedAllProductsSections, isDashboard);
-  const homeFoodStoryIndex = visibleHomeSections.reduce((last, section, index) => isRetailHomeCarousel(section) ? index : last, 0);
   const homeHasGoldSection = visibleHomeSections.some(isRetailGoldSection);
 
   useEffect(() => {
@@ -9951,11 +9951,6 @@ export default function TiendaVirtualView({
           <RetailSearchBox value={query} onChange={handleStoreSearch} onFocusChange={setSearchFocused} enhanced={!isDashboard} />
         </header>
 
-        {!isDashboard && mobileNavSection === 'home' && <RetailQuickActions
-          hasOffers={visibleHomeSections.some(isRetailHomePromotion)} goldEnabled={rewardSettings.enabled !== false}
-          onOffers={() => { if (!retailHomeBusy) { goToRetailHome(); setQuickTarget('promotions'); } }}
-          onOrders={openCustomerOrders} onGold={() => openRewardsPanel()} />}
-
         {!online && <div className="retail-offline" role="status">Sin conexión. Podés revisar el catálogo guardado; conectate para confirmar tu pedido.</div>}
 
         {deliverySettingsReady && storeOperationStatus?.open === false && (
@@ -10014,6 +10009,7 @@ export default function TiendaVirtualView({
         ) : showMobileBottomNav && mobileNavSection === 'profile' ? (
           <StoreMobileProfilePage
             currentUser={currentUser}
+            rewardsEnabled={rewardSettings.enabled !== false}
             rewardPoints={Number(rewardAccount?.pointsBalance || 0)}
             selectedBranch={selectedBranch}
             onBack={() => {
@@ -10048,9 +10044,6 @@ export default function TiendaVirtualView({
 
         <main>
           {!isDashboard && ['catalog', 'search'].includes(mobileNavSection) && <div className="retail-catalog-heading"><StoreBackButton onClick={retailBack} label="Atrás" withHome={false} /><div><h1>{retailCatalogTitle}</h1><span>{filteredProducts.length} productos</span></div></div>}
-          {!isDashboard && mobileNavSection === 'home' && !deferredQuery && categoryOptions.some((category) => category.id === 'res') && (
-            <RetailFoodStory onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.cuts)} />
-          )}
           <section ref={filtersPanelRef} className="store-filters-panel">
             <div className="store-filter-strip">
               <div>
@@ -10116,6 +10109,11 @@ export default function TiendaVirtualView({
               </nav>
             )}
           </section>
+
+          {!isDashboard && mobileNavSection === 'home' && <RetailQuickActions
+            hasOffers={visibleHomeSections.some(isRetailHomePromotion)} goldEnabled={rewardSettings.enabled !== false}
+            onOffers={() => { if (!retailHomeBusy) { goToRetailHome(); setQuickTarget('promotions'); } }}
+            onOrders={openCustomerOrders} onGold={() => openRewardsPanel()} />}
 
           {showAppDownloadLinks && mobileNavSection === 'home' && activeCategory === 'todos' && !deferredQuery && (
             <section className="store-app-downloads" aria-label="Descargar la aplicación Carnes San Martín">
@@ -10214,12 +10212,11 @@ export default function TiendaVirtualView({
                   <section data-retail-promotions={showAllPromotionProducts ? 'true' : undefined} data-retail-box-sales={isBoxSection ? 'true' : undefined} className={`store-product-group${isPromotionSection ? ' retail-promotion-group' : ''}${isBoxSection ? ' retail-box-home-group' : ''}`}>
                     <div className="store-product-group-head">
                       <div>
-                        <span className="store-product-group-kicker">{section.kicker}</span>
+                        <span className="store-product-group-kicker">{isPromotionSection ? 'Promociones' : section.kicker}</span>
                         <h3 className={`store-product-group-title${isBoxSection ? ' retail-box-home-title' : ''}`} tabIndex={-1}>
                           {isBoxSection && <img src="/tienda/categorias/icons/cajas.svg" alt="" width="27" height="27" />}
-                          {section.title}
+                          {isDashboard ? section.title : getRetailHomeSectionTitle(section)}
                         </h3>
-                        {isPromotionSection && <p className="retail-promotion-signature">Preciazos en Carnes San Martín, <strong>sí</strong></p>}
                       </div>
                       <div className="store-product-group-actions">
                         {showAllPromotionProducts && (
@@ -10265,9 +10262,6 @@ export default function TiendaVirtualView({
                       </div>
                     )}
                   </section>
-                  {!isDashboard && sectionIndex === homeFoodStoryIndex && activeProducts.some(isRetailBurgerProduct) && (
-                    <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('Hamburguesas')} />
-                  )}
                   {!isDashboard && !homeHasGoldSection && sectionIndex === visibleHomeSections.length - 1 && (
                     <RetailFoodStory variant="grill" onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.grill)} />
                   )}
@@ -10281,6 +10275,8 @@ export default function TiendaVirtualView({
             </div>{!isDashboard && filteredProducts.length > catalogVisibleCount && <button type="button" className="store-button secondary retail-load-more" onClick={() => setCatalogLimits((limits) => ({ ...limits, [catalogFilterKey]: catalogVisibleCount + 24 }))}>Ver más productos ({filteredProducts.length - catalogVisibleCount})</button>}</>
           )}
           {!isDashboard && mobileNavSection === 'home' && <>
+            {!deferredQuery && categoryOptions.some(category => category.id === 'res') && <RetailFoodStory onBrowse={() => openStoreGroupCatalog(RETAIL_EDITORIAL_TARGETS.cuts)} />}
+            {!deferredQuery && activeProducts.some(isRetailBurgerProduct) && <RetailFoodStory variant="burgers" onBrowse={() => handleStoreSearch('Hamburguesas')} />}
             <button className="retail-catalog-all" type="button" onClick={() => handleMobileCategorySelect({ id: 'todos' })}>Ver todo el catálogo <span aria-hidden="true">→</span></button>
             {currentUser && rewardSettings.enabled !== false && <section className="retail-home-gold"><StoreCheckoutIcon name="reward" /><div><strong>Miembro Gold</strong><span>{Number(rewardAccount?.pointsBalance || 0)} puntos disponibles</span></div><button type="button" className="retail-text-button" onClick={openRewardsPanel}>Ver premios</button></section>}
           </>}
@@ -12665,22 +12661,8 @@ function StoreMobileActivityPage({ currentUser, orders, createdOrder, onCancelOr
   );
 }
 
-function StoreMobileProfilePage({ currentUser, rewardPoints, selectedBranch, onEditProfile, onOpenRewards, onOpenActivity, onSignOut }) {
-  const entries = [
-    { icon: 'account', title: 'Mi información', detail: currentUser?.telefono, action: () => onEditProfile('information') },
-    { icon: 'pin', title: 'Direcciones', detail: 'Tus lugares de entrega', action: () => onEditProfile('addresses') },
-    { icon: 'activity', title: 'Mis pedidos', detail: 'Historial y seguimiento', action: onOpenActivity },
-    { icon: 'orders', title: 'Ayuda y privacidad', detail: 'Información de tu cuenta', action: () => onEditProfile('help') },
-  ];
-  return (
-    <section className="store-mobile-app-page retail-profile">
-      <h1>Perfil</h1>
-      <div className="retail-profile-identity"><span aria-hidden="true">{String(currentUser?.nombre || 'C').charAt(0).toUpperCase()}</span><div><span className="retail-profile-eyebrow">Tu cuenta San Martín</span><h2>{currentUser?.nombre || 'Mi cuenta'}</h2><p>{selectedBranch?.name}</p></div><button type="button" className="retail-profile-edit" onClick={() => onEditProfile('information')} aria-label="Editar mi información"><StoreCheckoutIcon name="account" /></button></div>
-      <button type="button" className="retail-profile-gold" onClick={() => onOpenRewards()}><StoreCheckoutIcon name="reward" /><span><strong>Miembro Gold</strong><small>Ver premios y beneficios</small></span><b>{Number(rewardPoints || 0).toLocaleString('es-NI')} <small>pts</small></b><span aria-hidden="true">›</span></button>
-      <div className="retail-profile-menu">{entries.map((entry) => <button key={entry.title} type="button" onClick={entry.action}><StoreCheckoutIcon name={entry.icon} /><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><span aria-hidden="true">›</span></button>)}</div>
-      <button type="button" className="retail-signout" onClick={onSignOut}>Cerrar sesión</button>
-    </section>
-  );
+function StoreMobileProfilePage(props) {
+  return <RetailProfile {...props} Icon={StoreCheckoutIcon} />;
 }
 
 function ProductSheet({ product, cartQuantity, quantity, onClose, onConfirm, onQuantityChange }) {

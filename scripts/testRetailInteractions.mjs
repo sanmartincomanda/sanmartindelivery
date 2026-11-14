@@ -40,13 +40,14 @@ await build({ stdin: {
   contents: `export {default as StoreLaunch} from './src/components/storefront/StoreLaunch.jsx';
     export {default as RetailSearchBox} from './src/components/storefront/RetailSearchBox.jsx';
     export {default as RetailQuickActions} from './src/components/storefront/RetailQuickActions.jsx';
+    export {default as RetailProfile} from './src/components/storefront/RetailProfile.jsx';
     export {default as RetailProductCard} from './src/components/storefront/RetailProductCard.jsx';
     export {default as RetailPromoSeal} from './src/components/storefront/RetailPromoSeal.jsx';
     export {default as RetailProductRail} from './src/components/storefront/RetailProductRail.jsx';`,
   resolveDir: process.cwd(), loader: 'jsx',
 }, bundle:true, packages:'external', platform:'node', format:'cjs', loader:{'.css':'empty'}, outfile:'tmp/retail-interactions-tests.cjs' });
 const require = createRequire(import.meta.url);
-const {StoreLaunch, RetailSearchBox, RetailQuickActions, RetailProductCard, RetailPromoSeal, RetailProductRail} = require('../tmp/retail-interactions-tests.cjs');
+const {StoreLaunch, RetailSearchBox, RetailQuickActions, RetailProfile, RetailProductCard, RetailPromoSeal, RetailProductRail} = require('../tmp/retail-interactions-tests.cjs');
 const React = await import('react');
 const {createRoot} = await import('react-dom/client');
 const {act, createElement:h, useEffect, useState, StrictMode} = React;
@@ -125,9 +126,9 @@ actionStyles.textContent = await readFile(new URL('../src/styles/storefrontInter
 document.head.append(actionStyles);
 node.classList.add('storefront-retail');
 for (const [hasOffers, goldEnabled, labels] of [
-  [true, true, ['Promos', 'Pedidos', 'Miembro Gold']],
+  [true, true, ['Promos', 'Pedidos', 'Gold']],
   [true, false, ['Promos', 'Pedidos']],
-  [false, true, ['Pedidos', 'Miembro Gold']],
+  [false, true, ['Pedidos', 'Gold']],
   [false, false, ['Pedidos']],
 ]) {
   await render(h(RetailQuickActions, {hasOffers, goldEnabled, ...actionHandlers}));
@@ -146,6 +147,29 @@ for (const [hasOffers, goldEnabled, labels] of [
   }
 }
 assert.deepEqual(calls, ['offers','orders','gold', 'offers','orders', 'orders','gold', 'orders']);
+
+const profileCalls = [];
+const profileProps = {
+  currentUser: { nombre: 'Cliente con un nombre muy largo para comprobar el perfil', telefono: '50500000000' },
+  rewardPoints: 1580, selectedBranch: { name: 'Granada' },
+  Icon: ({name}) => h('svg', {'aria-hidden': true, 'data-icon': name}),
+  onEditProfile: view => profileCalls.push(view), onOpenRewards: () => profileCalls.push('gold'),
+  onOpenActivity: () => profileCalls.push('orders'), onSignOut: () => profileCalls.push('signout'),
+};
+await render(h(RetailProfile, profileProps));
+assert.equal(node.querySelector('.retail-profile-identity h2').textContent, profileProps.currentUser.nombre);
+assert.equal(node.querySelectorAll('.retail-profile-shortcuts button').length, 2);
+assert.equal(node.querySelectorAll('.retail-profile-menu button').length, 2);
+assert.match(node.querySelector('.retail-profile-gold b').textContent, /1[.,]580/);
+for (const selector of ['.retail-profile-edit', '.retail-profile-shortcuts button:first-child',
+  '.retail-profile-shortcuts button:last-child', '.retail-profile-gold',
+  '.retail-profile-menu button:first-child', '.retail-profile-menu button:last-child', '.retail-signout']) {
+  await click(selector);
+}
+assert.deepEqual(profileCalls, ['information', 'orders', 'addresses', 'gold', 'information', 'help', 'signout']);
+await render(h(RetailProfile, {...profileProps, rewardsEnabled: false, currentUser: null}));
+assert.equal(node.querySelector('.retail-profile-gold'), null, 'Disabled Gold is not promoted');
+assert.equal(node.querySelector('.retail-profile-identity h2').textContent, 'Mi cuenta');
 node.classList.remove('storefront-retail');
 actionStyles.remove();
 await reset();

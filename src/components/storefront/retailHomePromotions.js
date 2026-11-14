@@ -14,6 +14,12 @@ export function isBlackNovemberSection(section) {
 export const isRetailHomeCarousel = section =>
   isBlackNovemberSection(section) || section.id === BOX_HOME_SECTION_ID;
 
+export function getRetailHomeSectionTitle(section) {
+  const text = String(section.title || '').replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '').trim();
+  return /^black\s+(?:meat\s+)?november$/i.test(text) && isBlackNovemberSection(section)
+    ? 'Black Meat November' : section.title;
+}
+
 export function getRetailHomeSections(sections, isDashboard) {
   if (isDashboard) return sections;
   let regularIndex = 0;

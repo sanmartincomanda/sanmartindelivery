@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRetailHomeView, retailViewKey } from '../src/components/storefront/retailNavigationState.js';
-import { getRetailHomeSections, getRetailHomeSectionProducts, isRetailHomePromotion, isRetailHomeCarousel } from '../src/components/storefront/retailHomePromotions.js';
+import { getRetailHomeSections, getRetailHomeSectionProducts, getRetailHomeSectionTitle, isRetailHomePromotion, isRetailHomeCarousel } from '../src/components/storefront/retailHomePromotions.js';
 import { BOX_HOME_SECTION_ID } from '../src/services/storeBoxAnnouncement.js';
 import { readFileSync } from 'node:fs';
 
@@ -20,6 +20,11 @@ assert.deepEqual(getRetailHomeSectionProducts({ id: 'promo-single', products: pr
 assert.deepEqual(sections, originalSections, 'Presentation must not alter products, prices or order');
 const boxes={id:BOX_HOME_SECTION_ID,title:'Venta por caja',products};
 const black={id:'promo-black_meat_november_2026',title:'BLACK MEAT NOVEMBER',products};
+assert.equal(getRetailHomeSectionTitle(black), 'Black Meat November');
+assert.equal(getRetailHomeSectionTitle({...black,title:'Campaña nueva'}), 'Campaña nueva', 'Admin titles remain configurable');
+assert.equal(getRetailHomeSectionTitle({...black,title:'Black November especial'}), 'Black November especial', 'Do not erase meaningful campaign qualifiers');
+assert.equal(getRetailHomeSectionTitle({...black,title:'BLACK MEAT NOVEMBER 🟡🥩⚫️'}), 'Black Meat November');
+assert.equal(getRetailHomeSectionTitle(boxes), boxes.title);
 const withFeatured=[boxes,...sections.slice(0,3),black,...sections.slice(3)];
 const originalFeatured=structuredClone(withFeatured);
 assert.deepEqual(getRetailHomeSections(withFeatured,false).slice(0,2),[black,boxes]);
@@ -36,7 +41,13 @@ assert.equal(getRetailHomeSections([boxes,...sections],false)[0],boxes);
 assert.equal(getRetailHomeSections([...sections,black],false)[0],black);
 const homeSource=readFileSync(new URL('../src/components/TiendaVirtualView.jsx',import.meta.url),'utf8');
 assert.match(homeSource,/isHorizontalSection \? <RetailProductRail/);
-assert.match(homeSource,/sectionIndex === homeFoodStoryIndex/,'No food ad between Black November and boxes');
+const afterProductSections = homeSource.indexOf('className="retail-catalog-all"');
+const bottomEditorial = homeSource.lastIndexOf("mobileNavSection === 'home' && <>", afterProductSections);
+assert.ok(bottomEditorial > homeSource.indexOf('visibleHomeSections.map('), 'Food ads follow the product sections');
+const editorialSource = homeSource.slice(bottomEditorial, afterProductSections);
+assert.match(editorialSource, /RetailFoodStory onBrowse=/, 'Hoy se come bien stays below products');
+assert.match(editorialSource, /RetailFoodStory variant="burgers"/, 'Hamburgers stay below products');
+assert.equal(homeSource.match(/RetailFoodStory variant="burgers"/g)?.length, 1, 'Do not duplicate the hamburger ad');
 console.log('Home promotions: every campaign, combo and product is visible; regular rails and admin pagination are preserved.');
 
 const snapshot = {
