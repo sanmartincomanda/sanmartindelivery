@@ -20,10 +20,7 @@ html body .store-shell.storefront-public-v2.storefront-brand-v3.storefront-retai
 html body .storefront-retail.store-shell .csm-account-name h1 { margin: 0; font-size: clamp(28px, 6.7vw, 38px); line-height: 1.12; letter-spacing: -.035em; font-weight: 650; overflow-wrap: anywhere; }
 .storefront-retail .csm-account-name > span { display: block; margin-top: 8px; font-size: 13px; color: #526574; }
 .storefront-retail .csm-account-avatar { position: relative; display: flex; align-items: center; justify-content: center; flex: 0 0 72px; width: 72px; height: 72px; padding: 0; border: 1px solid #d8e2f0; border-radius: 50%; background: #edf2fa; color: #0044c5; box-shadow: none; }
-.storefront-retail .csm-account-avatar > img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .storefront-retail .csm-account-avatar > .csm-account-icon { width: 38px; height: 38px; flex-basis: 38px; }
-.storefront-retail .csm-account-camera { position: absolute; bottom: -2px; right: -2px; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 2px solid #fffdf8; border-radius: 50%; background: #0044c5; color: #fff; }
-.storefront-retail .csm-account-camera .csm-account-icon { width: 15px; height: 15px; flex-basis: 15px; }
 .storefront-retail .csm-account-shortcuts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; margin: 0 0 24px; padding: 0; }
 .storefront-retail .csm-account-shortcuts > button { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-width: 0; min-height: 74px; padding: 14px 12px; border: 0; border-radius: 10px; background: #eef1f5; box-shadow: none; text-align: left; color: #133a60; }
 .storefront-retail .csm-account-copy { display: flex; flex: 1 1 0; flex-direction: column; min-width: 0; gap: 4px; white-space: normal; word-break: normal; overflow-wrap: break-word; }
@@ -46,21 +43,5 @@ html body .storefront-retail.store-shell .csm-account button:disabled { opacity:
 .storefront-retail .csm-account-signout { display: flex; align-items: center; gap: 16px; min-height: 56px; margin: 12px 0 0; padding: 12px 0; border: 0; background: transparent; box-shadow: none; color: #ad2431; text-align: left; font-size: 14px; }
 .storefront-retail .csm-account :is(button,a) { transition: background-color 140ms ease-out; }
 .storefront-retail .csm-account :is(button:enabled,a):active { background-color: #e0e9f7; }
-.storefront-retail .csm-account-status { min-height: 18px; margin: 8px 0; font-size: 12px; color: #526574; }
-.storefront-retail .csm-account-photo-overlay { position: fixed; inset: 0; z-index: 160; display: flex; align-items: flex-end; justify-content: center; padding: env(safe-area-inset-top,0px) 0 0; background: #10293880; }
-.storefront-retail .csm-account-photo-sheet { width: 100%; max-width: 460px; max-height: calc(100dvh - env(safe-area-inset-top,0px)); overflow-y: auto; overscroll-behavior: contain; padding: 8px 20px max(20px,env(safe-area-inset-bottom,0px)); border-radius: 18px 18px 0 0; background: #fffdf8; animation: account-sheet-enter 220ms ease-out; }
-.storefront-retail .csm-account-sheet-handle { display: block; width: 32px; height: 4px; margin: 0 auto 8px; border-radius: 4px; background: #cbd4dc; }
-.storefront-retail .csm-account-photo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.storefront-retail .csm-account-photo-head h2 { margin: 0; font-size: 20px; }
-.storefront-retail .csm-account-photo-head button { display: flex; align-items: center; justify-content: center; width: 44px; min-height: 44px; border: 0; border-radius: 50%; background: transparent; color: #18394e; }
-.storefront-retail .csm-account-photo-preview { display: flex; align-items: center; justify-content: center; width: 128px; height: 128px; margin: 16px auto; border-radius: 50%; background: #edf2fa; color: #0044c5; }
-.storefront-retail .csm-account-photo-preview img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-.storefront-retail .csm-account-photo-preview .csm-account-icon { width: 52px; height: 52px; flex-basis: 52px; }
-.storefront-retail .csm-account-photo-sheet > p { font-size: 13px; line-height: 1.45; }
-.storefront-retail .csm-account-photo-sheet > button { display: block; width: 100%; min-height: 48px; margin: 10px 0 0; padding: 12px 16px; border: 0; border-radius: 8px; background: #edf2fa; color: #0044c5; font-weight: 600; }
-.storefront-retail .csm-account-photo-sheet > .csm-account-photo-save { background: #0044c5; color: #fff; }
-.storefront-retail .csm-account-photo-sheet > .csm-account-photo-remove { background: transparent; color: #ad2431; }
-.storefront-retail .csm-account-photo-error { color: #ad2431; }
-@keyframes account-sheet-enter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
 @media (max-width: 370px) { .storefront-retail .csm-account-shortcuts > button { padding-inline: 10px; gap: 8px; } .storefront-retail .csm-account-copy strong { font-size: 14px; } }
-@media (prefers-reduced-motion: reduce) { .storefront-retail .csm-account :is(button,a) { transition: none; } .storefront-retail .csm-account-photo-sheet { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .storefront-retail .csm-account :is(button,a) { transition: none; } }

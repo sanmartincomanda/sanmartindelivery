@@ -1,5 +1,13 @@
 # Account profile repair - 2026-11-14
 
+## Superseded photo feature
+
+The owner subsequently requested removing profile photos. The isolated
+layout and account actions remain, but the photo editor, processing and
+Firebase write helper have been removed. The current profile always shows
+a decorative person icon. See profile-photo-removal.md. Photo descriptions
+and test evidence below are historical, not the current feature set.
+
 ## Cause
 
 The previous profile reused StoreCheckoutIcon, whose wrapper inherits

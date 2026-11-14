@@ -147,7 +147,6 @@ import {
   requestStorePasswordReset,
   sanitizeStoreUser,
   updateStoreUserProfile,
-  saveStoreProfilePhoto,
 } from '../services/storeUsers';
 import {
   createStoreAddressDraft,
@@ -4022,14 +4021,6 @@ export default function TiendaVirtualView({
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleProfilePhotoSave = async (photo) => {
-    const userKey = currentUser?.key;
-    const patch = await saveStoreProfilePhoto(currentUser, photo);
-    if (getCurrentAuthUser()?.uid !== userKey) return;
-    // Patch only the current profile, never reset checkout/order state for a photo.
-    setCurrentUser(user => user?.key === userKey ? { ...user, ...patch } : user);
   };
 
   const handleAccountDeletionRequest = async (reason = '') => {
@@ -10028,7 +10019,6 @@ export default function TiendaVirtualView({
               scrollToStoreRef(pageTopRef);
             }}
             onEditProfile={openProfilePanel}
-            onSavePhoto={handleProfilePhotoSave}
             onOpenRewards={openRewardsPanel}
             onOpenActivity={() => {
               setMobileNavSection('activity');

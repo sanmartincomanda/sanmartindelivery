@@ -49,14 +49,14 @@ export async function enableTestFlightBuild({ buildNumber, request, wait, attemp
   return output;
 }
 
-async function main() {
-  const keyId = process.env.APP_STORE_CONNECT_KEY_ID;
-  const issuer = process.env.APP_STORE_CONNECT_ISSUER_ID;
-  const encodedKey = process.env.APP_STORE_CONNECT_PRIVATE_KEY_BASE64;
+export function createAppStoreRequest(env = process.env) {
+  const keyId = env.APP_STORE_CONNECT_KEY_ID;
+  const issuer = env.APP_STORE_CONNECT_ISSUER_ID;
+  const encodedKey = env.APP_STORE_CONNECT_PRIVATE_KEY_BASE64;
   if (!keyId || !issuer || !encodedKey) throw new Error('Missing existing App Store Connect credentials');
   const key = createPrivateKey(Buffer.from(encodedKey, 'base64'));
   const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const request = async (path, { method = 'GET', body } = {}) => {
+  return async (path, { method = 'GET', body } = {}) => {
     if (!path.startsWith('/v1/') || path.includes('://')) throw new Error('Invalid Apple API path');
     const now = Math.floor(Date.now() / 1000);
     const payload = `${encode({ alg: 'ES256', kid: keyId, typ: 'JWT' })}.${encode({ iss: issuer, iat: now, exp: now + 120, aud: 'appstoreconnect-v1' })}`;
@@ -72,6 +72,10 @@ async function main() {
     }
     return response.status === 204 ? null : response.json();
   };
+}
+
+async function main() {
+  const request = createAppStoreRequest();
   await enableTestFlightBuild({ buildNumber: process.env.BUILD_NUMBER, request,
     wait: milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)) });
 }

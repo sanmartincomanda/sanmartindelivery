@@ -14,7 +14,7 @@ on:
       build_number:
         description: Unique App Store build number
         required: true
-        default: '1'
+        default: '9'
       upload:
         description: Upload the signed build to App Store Connect (does not submit to review)
         type: boolean
@@ -41,6 +41,16 @@ jobs:
         env:
           BUILD_NUMBER: ${{ inputs.build_number }}
         run: '[[ "$BUILD_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]]'
+      - name: Test App Store build checks
+        run: node scripts/ios/testAppStoreBuildCheck.mjs && node scripts/ios/testTestFlightDistribution.mjs
+      - name: Check unused App Store build number
+        if: inputs.upload
+        run: node scripts/ios/checkAppStoreBuild.mjs available
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
       - run: npm ci
       - name: Prepare iOS
         run: npm run ios:sync && npm run test:ios-config && npm run test:store-access && npm run test:google-auth && npm run test:apple-auth
@@ -101,6 +111,8 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/ios-release"
           codesign --verify --deep --strict "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
       - name: Verify bundled authentication configuration
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
           python3 - <<'PY'
           import json, os, pathlib, plistlib
@@ -120,7 +132,15 @@ jobs:
           assert google['CLIENT_ID'].endswith('.apps.googleusercontent.com')
           schemes = [s for entry in info['CFBundleURLTypes'] for s in entry['CFBundleURLSchemes']]
           assert google['REVERSED_CLIENT_ID'] in schemes, 'Missing Google callback scheme'
+          assert info['CFBundleShortVersionString'] == '1.0.2'
+          assert info['CFBundleVersion'] == os.environ['BUILD_NUMBER']
+          assert not any(key in info for key in ['NSCameraUsageDescription', 'NSPhotoLibraryUsageDescription', 'NSPhotoLibraryAddUsageDescription'])
+          assets = '\n'.join(path.read_text() for path in (app / 'public/assets').iterdir() if path.suffix in ['.js', '.css'])
+          assert 'csm-account-avatar' in assets, 'Missing updated account profile'
+          for marker in ['csm-account-photo-overlay', 'csm-account-photo-save', 'profilePhotoUpdatedAt', 'Elegir foto de perfil']:
+              assert marker not in assets, 'Profile photo feature remains in signed archive: ' + marker
           print('Signed archive: native bridge, both providers, Firebase project and Google callback verified.')
+          print('Signed archive: correct version/build and person icon, no photo editor or gallery permissions.')
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -142,6 +162,14 @@ jobs:
           printf %s "$API_PRIVATE_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8"
           xcrun altool --validate-app --type ios -f "$RUNNER_TEMP/ios-release/App.ipa" --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER"
           xcrun altool --upload-app --type ios -f "$RUNNER_TEMP/ios-release/App.ipa" --apiKey "$API_KEY_ID" --apiIssuer "$API_ISSUER"
+      - name: Confirm Apple build processing
+        if: inputs.upload
+        run: node scripts/ios/checkAppStoreBuild.mjs processed
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
       - name: Remove temporary signing material
         if: always()
         run: |

@@ -35,7 +35,6 @@ function Fixture() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [selectedGift, setSelectedGift] = useState(null);
   const [profile, setProfile] = useState('');
-  const [profilePhoto, setProfilePhoto] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [closedModal, setClosedModal] = useState(false);
   const [saved, setSaved] = useState(null);
@@ -57,7 +56,7 @@ function Fixture() {
       <button onClick={() => setScreen('activity')}>Actividad de prueba</button>
       <button onClick={() => setGold(true)}>Gold de prueba</button></>}
       {params.has('presentation') && <p style={{fontSize: 11, color: '#586875'}}>Vista previa · Datos ficticios</p>}
-      {screen === 'profile' && <StoreMobileProfilePage currentUser={{...user, profilePhoto, ...(params.has('longName') ? {nombre: 'María Fernanda de los Ángeles San Martín Rodríguez'} : {})}} rewardsEnabled={!params.has('goldDisabled')} rewardPoints={804} selectedBranch={{...branch, whatsapp: '50500000000'}} onSavePhoto={async value => setProfilePhoto(value)} onEditProfile={setScreenFromMenu} onOpenRewards={() => setGold(true)} onOpenActivity={() => setScreen('activity')} onSignOut={() => setScreen('signedout')} />}
+      {screen === 'profile' && <StoreMobileProfilePage currentUser={{...user, ...(params.has('legacyPhoto') ? {profilePhoto: '/tienda/page/product-gold.jpg'} : {}), ...(params.has('longName') ? {nombre: 'María Fernanda de los Ángeles San Martín Rodríguez'} : {})}} rewardsEnabled={!params.has('goldDisabled')} rewardPoints={804} selectedBranch={{...branch, whatsapp: '50500000000'}} onEditProfile={setScreenFromMenu} onOpenRewards={() => setGold(true)} onOpenActivity={() => setScreen('activity')} onSignOut={() => setScreen('signedout')} />}
       {screen === 'activity' && <StoreMobileActivityPage currentUser={user} orders={orders} selectedOrderId={selectedOrderId} onSelectOrder={setSelectedOrderId} onOrderBack={() => setSelectedOrderId('')} onCancelOrder={() => setSaved({ canceled: true })} />}
       {saved && <output data-testid="saved">{JSON.stringify(saved)}</output>}
       {submitted && <output data-testid="submitted">{JSON.stringify(submitted)}</output>}
